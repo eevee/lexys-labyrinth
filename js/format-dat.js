@@ -1,7 +1,7 @@
 import * as util from './format-util.js';
-import { TILE_TYPES, CC2_TILE_TYPES } from './tiletypes.js';
+import TILE_TYPES from './tiletypes.js';
 
-const CC1_TILE_ENCODING = {
+const TILE_ENCODING = {
     0x00: 'floor',
     0x01: 'wall',
     0x02: 'chip',
@@ -151,15 +151,18 @@ function parse_level(buf) {
                 p += 2;
             }
 
-            let name = CC1_TILE_ENCODING[tile_byte];
+            let spec = TILE_ENCODING[tile_byte];
             // TODO could be more forgiving for goofy levels doing goofy things
-            if (! name)
+            if (! spec)
                 // TODO doesn't say what level or where in the file, come on
                 throw new Error(`Invalid tile byte: 0x${tile_byte.toString(16)}`);
 
-            let direction;
-            if (name instanceof Array) {
-                [name, direction] = name;
+            let name, direction;
+            if (spec instanceof Array) {
+                [name, direction] = spec;
+            }
+            else {
+                name = spec;
             }
             let tile_type = TILE_TYPES[name];
 

@@ -24,6 +24,12 @@ main {
         / min-content 12em
     ;
     gap: 1em;
+
+    image-rendering: optimizeSpeed;
+
+    --tile-width: 32px;
+    --tile-height: 32px;
+    --scale: 2;
 }
 
 .level {
@@ -33,9 +39,7 @@ main {
 }
 .level canvas {
     display: block;
-    width: calc(9 * 32px * 2);
-    width: calc(9 * 48px * 2);
-    image-rendering: optimizeSpeed;
+    width: calc(9 * var(--tile-width) * var(--scale));
 }
 .meta {
     grid-area: meta;
@@ -55,8 +59,12 @@ main {
 .chips {
     grid-area: chips;
 
+    padding: 0 0.5em;
     color: yellow;
     background: black;
+}
+.chips::before {
+    content: "chips left: ";
 }
 .time {
     grid-area: time;
@@ -66,6 +74,16 @@ main {
 }
 .inventory {
     grid-area: inventory;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+
+    background-size: calc(2 * var(--tile-width)) calc(2 * var(--tile-height));
+    width: calc(4 * var(--tile-width) * 2);
+    min-height: calc(2 * var(--tile-height) * 2);
+}
+.inventory img {
+    width: calc(2 * var(--tile-width));
 }
 .bummer {
     grid-area: level;

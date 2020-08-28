@@ -3,7 +3,7 @@
 import * as c2m from './format-c2m.js';
 import * as dat from './format-dat.js';
 import * as format_util from './format-util.js';
-import { TILE_TYPES, CC2_TILE_TYPES } from './tiletypes.js';
+import TILE_TYPES from './tiletypes.js';
 import { Tileset, CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 
 function mk(tag_selector, ...children) {
@@ -68,14 +68,11 @@ async function fetch(url) {
 const PAGE_TITLE = "Lexy's Labyrinth";
 
 class Tile {
-    constructor(type, x, y, direction = null) {
+    constructor(type, x, y, direction = 'south') {
         this.type = type;
         this.x = x;
         this.y = y;
         this.direction = direction;
-        if (type.has_direction && ! direction) {
-            this.direction = 'south';
-        }
 
         this.slide_mode = null;
 
@@ -85,6 +82,7 @@ class Tile {
     }
 
     static from_template(tile_template, x, y) {
+        if (! TILE_TYPES[tile_template.name]) console.error(tile_template.name);
         return new this(TILE_TYPES[tile_template.name], x, y, tile_template.direction);
     }
 
@@ -92,13 +90,15 @@ class Tile {
         if (this.type.ignores && this.type.ignores.has(name))
             return true;
 
-        for (let [item, count] of Object.entries(this.inventory)) {
-            if (count === 0)
-                continue;
+        if (this.inventory) {
+            for (let [item, count] of Object.entries(this.inventory)) {
+                if (count === 0)
+                    continue;
 
-            let item_type = TILE_TYPES[item];
-            if (item_type.item_ignores && item_type.item_ignores.has(name))
-                return true;
+                let item_type = TILE_TYPES[item];
+                if (item_type.item_ignores && item_type.item_ignores.has(name))
+                    return true;
+            }
         }
 
         return false;
@@ -179,21 +179,25 @@ const DIRECTIONS = {
         movement: [0, -1],
         left: 'west',
         right: 'east',
+        opposite: 'south',
     },
     south: {
         movement: [0, 1],
         left: 'east',
         right: 'west',
+        opposite: 'north',
     },
     west: {
         movement: [-1, 0],
         left: 'south',
         right: 'north',
+        opposite: 'east',
     },
     east: {
         movement: [1, 0],
         left: 'north',
         right: 'south',
+        opposite: 'west',
     },
 };
 
@@ -272,18 +276,20 @@ class Level {
         }
 
         for (let actor of this.actors) {
-            // TODO skip doomed?  strip them out?  hm
-            if (actor.slide_mode === 'ice') {
-                // Actors can't make voluntary moves on ice
+            // TODO strip these out maybe??
+            if (actor.doomed)
                 continue;
-            }
+
+            // Actors can't make voluntary moves on ice
+            if (actor.slide_mode === 'ice')
+                continue;
             if (actor === this.player) {
                 if (player_direction) {
                     actor.direction = player_direction;
                     this.attempt_step(actor, player_direction);
                 }
             }
-            else {
+            else if (actor.type.movement_mode === 'follow-left') {
                 // bug behavior: always try turning as left as possible, and
                 // fall back to less-left turns when that fails
                 let direction = DIRECTIONS[actor.direction].left;
@@ -293,6 +299,48 @@ class Level {
                         break;
                     }
                     direction = DIRECTIONS[direction].right;
+                }
+            }
+            else if (actor.type.movement_mode === 'follow-right') {
+                // paramecium behavior: always try turning as right as
+                // possible, and fall back to less-right turns when that fails
+                let direction = DIRECTIONS[actor.direction].right;
+                for (let i = 0; i < 4; i++) {
+                    if (this.attempt_step(actor, direction)) {
+                        actor.direction = direction;
+                        break;
+                    }
+                    direction = DIRECTIONS[direction].left;
+                }
+            }
+            else if (actor.type.movement_mode === 'turn-left') {
+                // glider behavior: preserve current direction; if that doesn't
+                // work, turn left, then right, then back the way we came
+                for (let direction of [
+                    actor.direction,
+                    DIRECTIONS[actor.direction].left,
+                    DIRECTIONS[actor.direction].right,
+                    DIRECTIONS[actor.direction].opposite,
+                ]) {
+                    if (this.attempt_step(actor, direction)) {
+                        actor.direction = direction;
+                        break;
+                    }
+                }
+            }
+            else if (actor.type.movement_mode === 'turn-right') {
+                // fireball behavior: preserve current direction; if that doesn't
+                // work, turn right, then left, then back the way we came
+                for (let direction of [
+                    actor.direction,
+                    DIRECTIONS[actor.direction].right,
+                    DIRECTIONS[actor.direction].left,
+                    DIRECTIONS[actor.direction].opposite,
+                ]) {
+                    if (this.attempt_step(actor, direction)) {
+                        actor.direction = direction;
+                        break;
+                    }
                 }
             }
 
@@ -311,31 +359,37 @@ class Level {
         let move = DIRECTIONS[direction].movement;
         let goal_x = actor.x + move[0];
         let goal_y = actor.y + move[1];
-        let goal_cell = this.cells[goal_y][goal_x];
 
-        let blocks;
-        goal_cell.each(tile => {
-            if (tile !== actor && tile.type.blocks) {
-                if (actor.type.pushes && actor.type.pushes[tile.type.name]) {
-                    if (this.attempt_step(tile, direction))
-                        // It moved out of the way!
-                        return;
+        let blocked;
+        if (goal_x >= 0 && goal_x < this.width && goal_y >= 0 && goal_y < this.height) {
+            let goal_cell = this.cells[goal_y][goal_x];
+            goal_cell.each(tile => {
+                if (tile !== actor && tile.type.blocks) {
+                    if (actor.type.pushes && actor.type.pushes[tile.type.name]) {
+                        if (this.attempt_step(tile, direction))
+                            // It moved out of the way!
+                            return;
+                    }
+                    if (tile.type.on_bump) {
+                        tile.type.on_bump(tile, this, actor);
+                        if (! tile.type.blocks)
+                            // It became something non-blocking!
+                            return;
+                    }
+                    blocked = true;
+                    // XXX should i break here, or bump everything?
                 }
-                if (tile.type.on_bump) {
-                    tile.type.on_bump(tile, this, actor);
-                    if (! tile.type.blocks)
-                        // It became something non-blocking!
-                        return;
-                }
-                blocks = true;
-                // XXX should i break here, or bump everything?
-            }
-        });
+            });
+        }
+        else {
+            // Hit the edge
+            blocked = true;
+        }
 
-        if (blocks) {
+        if (blocked) {
             if (actor.slide_mode === 'ice') {
                 // Actors on ice turn around when they hit something
-                actor.direction = DIRECTIONS[DIRECTIONS[direction].left].left;
+                actor.direction = DIRECTIONS[direction].opposite;
             }
             return false;
         }
@@ -419,11 +473,13 @@ class Game {
         this.tileset = tileset;
 
         // TODO obey level options; allow overriding
-        this.camera_size_x = 9;
-        this.camera_size_y = 9;
+        this.viewport_size_x = 19;
+        this.viewport_size_y = 19;
 
-        this.container = document.body;
-        this.container.innerHTML = GAME_UI_HTML;
+        document.body.innerHTML = GAME_UI_HTML;
+        this.container = document.body.querySelector('main');
+        this.container.style.setProperty('--tile-width', `${this.tileset.size_x}px`);
+        this.container.style.setProperty('--tile-height', `${this.tileset.size_y}px`);
         this.level_el = this.container.querySelector('.level');
         this.meta_el = this.container.querySelector('.meta');
         this.nav_el = this.container.querySelector('.nav');
@@ -433,6 +489,7 @@ class Game {
         this.inventory_el = this.container.querySelector('.inventory');
         this.bummer_el = this.container.querySelector('.bummer');
 
+        // Populate navigation
         this.nav_prev_button = this.nav_el.querySelector('.nav-prev');
         this.nav_next_button = this.nav_el.querySelector('.nav-next');
         this.nav_prev_button.addEventListener('click', ev => {
@@ -448,17 +505,29 @@ class Game {
             }
         });
 
-        this.load_level(0);
+        // Populate inventory
+        this._inventory_tiles = {};
+        let floor_tile = this.render_inventory_tile('floor');
+        this.inventory_el.style.backgroundImage = `url(${floor_tile})`;
 
-        this.level_canvas = mk('canvas', {width: tileset.size_x * this.camera_size_x, height: tileset.size_y * this.camera_size_y});
+        this.level_canvas = mk('canvas', {width: tileset.size_x * this.viewport_size_x, height: tileset.size_y * this.viewport_size_y});
         this.level_el.append(this.level_canvas);
         this.level_canvas.setAttribute('tabindex', '-1');
+        this.level_canvas.addEventListener('auxclick', ev => {
+            if (ev.button !== 1)
+                return;
+
+            let rect = this.level_canvas.getBoundingClientRect();
+            let x = Math.floor((ev.clientX - rect.x) / 2 / this.tileset.size_x + this.viewport_x);
+            let y = Math.floor((ev.clientY - rect.y) / 2 / this.tileset.size_y + this.viewport_y);
+            this.level.move_to(this.level.player, x, y);
+        });
 
         let last_key;
         this.pending_player_move = null;
         this.next_player_move = null;
         this.player_used_move = false;
-        let key_target = this.container;
+        let key_target = document.body;
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
             let direction;
@@ -495,6 +564,8 @@ class Game {
             }
         });
 
+        // Done with UI, now we can load a level
+        this.load_level(0);
         this.redraw();
 
         this.frame = 0;
@@ -537,6 +608,16 @@ class Game {
         requestAnimationFrame(this.do_frame.bind(this));
     }
 
+    render_inventory_tile(name) {
+        if (! this._inventory_tiles[name]) {
+            // TODO reuse the canvas
+            let canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
+            this.tileset.draw({type: TILE_TYPES[name]}, canvas.getContext('2d'), 0, 0);
+            this._inventory_tiles[name] = canvas.toDataURL();
+        }
+        return this._inventory_tiles[name];
+    }
+
     update_ui() {
         // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;
@@ -548,17 +629,30 @@ class Game {
         else {
             this.bummer_el.textContent = '';
         }
+
+        this.inventory_el.textContent = '';
+        for (let [name, count] of Object.entries(this.level.player.inventory)) {
+            if (count > 0) {
+                this.inventory_el.append(mk('img', {src: this.render_inventory_tile(name)}));
+            }
+        }
     }
         
     redraw() {
         let ctx = this.level_canvas.getContext('2d');
         ctx.clearRect(0, 0, this.level_canvas.width, this.level_canvas.height);
 
-        let camera_x = this.level.player.x - (this.camera_size_x - 1) / 2;
-        let camera_y = this.level.player.y - (this.camera_size_y - 1) / 2;
-        for (let dx = 0; dx < this.camera_size_x; dx++) {
-            for (let dy = 0; dy < this.camera_size_y; dy++) {
-                let cell = this.level.cells[dy + camera_y][dx + camera_x];
+        let xmargin = (this.viewport_size_x - 1) / 2;
+        let ymargin = (this.viewport_size_y - 1) / 2;
+        let x0 = this.level.player.x - xmargin;
+        let y0 = this.level.player.y - ymargin;
+        x0 = Math.max(0, Math.min(this.level.width - this.viewport_size_x, x0));
+        y0 = Math.max(0, Math.min(this.level.height - this.viewport_size_y, y0));
+        this.viewport_x = x0;
+        this.viewport_y = y0;
+        for (let dx = 0; dx < this.viewport_size_x; dx++) {
+            for (let dy = 0; dy < this.viewport_size_y; dy++) {
+                let cell = this.level.cells[dy + y0][dx + x0];
                 /*
                 if (! cell.is_dirty)
                     continue;
@@ -626,6 +720,10 @@ async function main() {
         stored_game = dat.parse_game(await fetch('levels/CCLP1.ccl'));
     }
     let game = new Game(stored_game, tileset);
+
+    if (query.get('debug')) {
+        game.debug = true;
+    }
 }
 
 main();

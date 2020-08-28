@@ -1,27 +1,42 @@
 export const CC2_TILESET_LAYOUT = {
     floor: [0, 2],
+    floor_letter: [2, 2],
     wall: [1, 2],
-    ice: [10, 1],
-    ice_sw: [12, 1],
-    ice_nw: [14, 1],
-    ice_ne: [13, 1],
-    ice_se: [11, 1],
-    water: [
-        [12, 24],
-        [13, 24],
-        [14, 24],
-        [15, 24],
-    ],
+
     fire: [
         [12, 29],
         [13, 29],
         [14, 29],
         [15, 29],
     ],
+    water: [
+        [12, 24],
+        [13, 24],
+        [14, 24],
+        [15, 24],
+    ],
+    ice: [10, 1],
+    ice_sw: [12, 1],
+    ice_nw: [14, 1],
+    ice_ne: [13, 1],
+    ice_se: [11, 1],
     force_floor_n: [[0, 19], [0, 20]],
     force_floor_e: [[2, 19], [2, 20]],
     force_floor_s: [[1, 19], [1, 20]],
     force_floor_w: [[3, 19], [3, 20]],
+    thief_keys: [15, 21],
+    thief_tools: [3, 2],
+
+    // TODO these guys don't have floor underneath.
+    swivel_sw: [9, 11],
+    swivel_nw: [10, 11],
+    swivel_ne: [12, 11],
+    swivel_se: [13, 11],
+    forbidden: [14, 5],
+    turtle: [13, 12],  // TODO also 14 + 15 for sinking
+    popwall: [8, 10],
+    bomb: [5, 4],
+
 
     exit: [
         [6, 2],
@@ -72,6 +87,11 @@ export const CC2_TILESET_LAYOUT = {
     flippers: [0, 6],
 
     hint: [5, 2],
+
+    score_10: [14, 1],
+    score_100: [13, 1],
+    score_1000: [12, 1],
+    score_2x: [15, 1],
 };
 
 export const TILE_WORLD_TILESET_LAYOUT = {
@@ -200,6 +220,7 @@ export class Tileset {
     draw(tile, ctx, x, y) {
         let drawspec = this.layout[tile.type.name];
         let coords = drawspec;
+        if (! coords) console.error(tile.type.name);
         if (!(coords instanceof Array)) {
             // Must be an object of directions
             coords = coords[tile.direction ?? 'south'];
