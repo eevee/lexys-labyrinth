@@ -2,6 +2,7 @@
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
 import * as c2m from './format-c2m.js';
 import * as dat from './format-dat.js';
+import * as format_util from './format-util.js';
 import { TILE_TYPES, CC2_TILE_TYPES } from './tiletypes.js';
 import { Tileset, CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 
@@ -53,6 +54,18 @@ function promise_event(element, success_event, failure_event) {
     return promise;
 }
 
+async function fetch(url) {
+    let xhr = new XMLHttpRequest;
+    let promise = promise_event(xhr, 'load', 'error');
+    xhr.open('GET', url);
+    xhr.responseType = 'arraybuffer';
+    xhr.send();
+    await promise;
+    return xhr.response;
+}
+
+
+const PAGE_TITLE = "Lexy's Labyrinth";
 
 class Tile {
     constructor(type, x, y, direction = null) {
@@ -495,6 +508,8 @@ class Game {
         // FIXME do better
         this.meta_el.textContent = this.level.stored_level.title;
 
+        document.title = `${PAGE_TITLE} - ${this.level.stored_level.title}`;
+
         this.nav_prev_button.disabled = level_index <= 0;
         this.nav_next_button.disabled = level_index >= this.stored_game.levels.length;
         this.update_ui();
@@ -560,50 +575,56 @@ class Game {
     }
 }
 
-async function load_level(url) {
-    let xhr = new XMLHttpRequest;
-    let promise = promise_event(xhr, 'load', 'error');
-    xhr.open('GET', url);
-    xhr.responseType = 'arraybuffer';
-    xhr.send();
-    await promise;
-    let data = xhr.response;
-    return c2m.parse(data);
-}
-
-async function load_game(url) {
-    let xhr = new XMLHttpRequest;
-    let promise = promise_event(xhr, 'load', 'error');
-    xhr.open('GET', url);
-    xhr.responseType = 'arraybuffer';
-    xhr.send();
-    await promise;
-    let data = xhr.response;
-    return dat.parse_game(data);
-}
-
-
-
 async function main() {
-    //let game = new Game;
-    let tiles = new Image();
-    //tiles.src = 'tileset-ms.png';
-    tiles.src = 'tileset-tworld.png';
-    //tiles.src = 'tileset-lexy.png';
-    //await promise_event(tiles, 'load', 'error');
-    await tiles.decode();
-    //let tileset = new Tileset(tiles, CC2_TILESET_LAYOUT, TILE_SIZE_X, TILE_SIZE_Y);
-    let tileset = new Tileset(tiles, TILE_WORLD_TILESET_LAYOUT, 48, 48);
-
-    let level_file = '001-020/map001.c2m';
-    if (location.search) {
-        level_file = '001-020/' + location.search.substring(1);
+    let query;
+    if (location.host.match(/localhost/)) {
+        query = new URLSearchParams(location.search);
     }
-    // TODO error handling, yadda
-    //let stored_level = await load_level(level_file);
-    // TODO also support tile world's DAC when reading from local??
-    // TODO ah, there's more metadata in CCX, crapola
-    let stored_game = await load_game('levels/CCLP1.ccl');
+    else {
+        query = new URLSearchParams;
+    }
+
+    // Pick a tileset
+    // These alternative ones only exist locally for me at the moment, since
+    // they're part of the commercial games!
+    let tilesheet = new Image();
+    let tilesize;
+    let tilelayout;
+    if (query.get('tileset') === 'ms') {
+        tilesheet.src = 'tileset-ms.png';
+        tilesize = 32;
+        tilelayout = CC2_TILESET_LAYOUT;
+    }
+    else if (query.get('tileset') === 'steam') {
+        tilesheet.src = 'tileset-steam.png';
+        tilesize = 32;
+        tilelayout = CC2_TILESET_LAYOUT;
+    }
+    else if (query.get('tileset') === 'lexy') {
+        tilesheet.src = 'tileset-lexy.png';
+        tilesize = 32;
+        tilelayout = CC2_TILESET_LAYOUT;
+    }
+    else {
+        tilesheet.src = 'tileset-tworld.png';
+        tilesize = 48;
+        tilelayout = TILE_WORLD_TILESET_LAYOUT;
+    }
+    await tilesheet.decode();
+    let tileset = new Tileset(tilesheet, tilelayout, tilesize, tilesize);
+
+    // Pick a level (set)
+    // TODO error handling  :(
+    let stored_game;
+    if (query.get('setpath')) {
+        stored_game = new format_util.StoredGame;
+        stored_game.levels.push(c2m.parse_level(await fetch(query.get('setpath'))));
+    }
+    else {
+        // TODO also support tile world's DAC when reading from local??
+        // TODO ah, there's more metadata in CCX, crapola
+        stored_game = dat.parse_game(await fetch('levels/CCLP1.ccl'));
+    }
     let game = new Game(stored_game, tileset);
 }
 
