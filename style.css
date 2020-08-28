@@ -1,0 +1,79 @@
+html {
+    height: 100%;
+}
+body {
+    font-size: 24px;
+    min-height: 100%;
+    margin: 0;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    background: #606060;
+}
+main {
+    display: grid;
+    grid:
+        "level meta"        min-content
+        "level chips"       min-content
+        "level time"        min-content
+        "level hint"        1fr
+        "level inventory"   min-content
+        / min-content 12em
+    ;
+    gap: 1em;
+}
+
+.level {
+    grid-area: level;
+
+    position: relative;
+}
+.level canvas {
+    display: block;
+    width: calc(9 * 32px * 2);
+    width: calc(9 * 48px * 2);
+    image-rendering: optimizeSpeed;
+}
+.meta {
+    grid-area: meta;
+
+    color: yellow;
+    background: black;
+    text-align: center;
+}
+.chips {
+    grid-area: chips;
+
+    color: yellow;
+    background: black;
+}
+.time {
+    grid-area: time;
+}
+.hint {
+    grid-area: hint;
+}
+.inventory {
+    grid-area: inventory;
+}
+.bummer {
+    grid-area: level;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    z-index: 99;
+    font-size: 48px;
+    padding: 25%;
+    background: #0009;
+    color: white;
+    text-align: center;
+    font-weight: bold;
+    text-shadow: 0 2px 1px black;
+}
+.bummer:empty {
+    display: none;
+}
