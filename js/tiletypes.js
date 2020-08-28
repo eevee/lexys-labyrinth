@@ -1,4 +1,10 @@
 export const TILE_TYPES = {
+    cloner: {
+        blocks: true,
+    },
+
+
+
     floor: {
         cc2_byte: 0x01,
     },
@@ -6,8 +12,42 @@ export const TILE_TYPES = {
         cc2_byte: 0x02,
         blocks: true,
     },
+    wall_invisible: {
+        blocks: true,
+    },
+    wall_appearing: {
+        blocks: true,
+    },
+    thinwall_n: {
+        thin_walls: new Set(['north']),
+    },
+    thinwall_s: {
+        thin_walls: new Set(['south']),
+    },
+    thinwall_e: {
+        thin_walls: new Set(['east']),
+    },
+    thinwall_w: {
+        thin_walls: new Set(['west']),
+    },
+    fake_wall: {
+        blocks: true,
+        on_bump(me, level, other) {
+            me.become('wall');
+        }
+    },
+    fake_floor: {
+        blocks: true,
+        on_bump(me, level, other) {
+            me.become('floor');
+        }
+    },
+
     ice: {
         cc2_byte: 0x03,
+        on_arrive(me, level, other) {
+            level.make_slide(other, 'ice');
+        }
     },
     ice_sw: {
         cc2_byte: 0x04,
@@ -15,6 +55,15 @@ export const TILE_TYPES = {
             south: true,
             west: true,
         },
+        on_arrive(me, level, other) {
+            if (other.direction === 'south') {
+                other.direction = 'east';
+            }
+            else {
+                other.direction = 'north';
+            }
+            level.make_slide(other, 'ice');
+        }
     },
     ice_nw: {
         cc2_byte: 0x05,
@@ -22,6 +71,15 @@ export const TILE_TYPES = {
             north: true,
             west: true,
         },
+        on_arrive(me, level, other) {
+            if (other.direction === 'north') {
+                other.direction = 'east';
+            }
+            else {
+                other.direction = 'south';
+            }
+            level.make_slide(other, 'ice');
+        }
     },
     ice_ne: {
         cc2_byte: 0x06,
@@ -29,6 +87,15 @@ export const TILE_TYPES = {
             north: true,
             east: true,
         },
+        on_arrive(me, level, other) {
+            if (other.direction === 'north') {
+                other.direction = 'west';
+            }
+            else {
+                other.direction = 'south';
+            }
+            level.make_slide(other, 'ice');
+        }
     },
     ice_se: {
         cc2_byte: 0x07,
@@ -36,6 +103,15 @@ export const TILE_TYPES = {
             south: true,
             east: true,
         },
+        on_arrive(me, level, other) {
+            if (other.direction === 'south') {
+                other.direction = 'west';
+            }
+            else {
+                other.direction = 'north';
+            }
+            level.make_slide(other, 'ice');
+        }
     },
     water: {
         cc2_byte: 0x08,
@@ -70,28 +146,28 @@ export const TILE_TYPES = {
         cc2_byte: 0x0a,
         on_arrive(me, level, other) {
             other.direction = 'north';
-            other.is_sliding = true;
+            level.make_slide(other, 'push');
         }
     },
     force_floor_e: {
         cc2_byte: 0x0b,
         on_arrive(me, level, other) {
             other.direction = 'east';
-            other.is_sliding = true;
+            level.make_slide(other, 'push');
         }
     },
     force_floor_s: {
         cc2_byte: 0x0c,
         on_arrive(me, level, other) {
             other.direction = 'south';
-            other.is_sliding = true;
+            level.make_slide(other, 'push');
         }
     },
     force_floor_w: {
         cc2_byte: 0x0d,
         on_arrive(me, level, other) {
             other.direction = 'west';
-            other.is_sliding = true;
+            level.make_slide(other, 'push');
         }
     },
 
@@ -222,6 +298,36 @@ export const TILE_TYPES = {
         has_direction: true,
         is_top_layer: true,
     },
+    paramecium: {
+        cc2_byte: 0x34,
+        is_actor: true,
+        has_direction: true,
+        is_top_layer: true,
+    },
+    ball: {
+        cc2_byte: 0x35,
+        is_actor: true,
+        has_direction: true,
+        is_top_layer: true,
+    },
+    blob: {
+        cc2_byte: 0x36,
+        is_actor: true,
+        has_direction: true,
+        is_top_layer: true,
+    },
+    teeth: {
+        cc2_byte: 0x37,
+        is_actor: true,
+        has_direction: true,
+        is_top_layer: true,
+    },
+    fireball: {
+        cc2_byte: 0x38,
+        is_actor: true,
+        has_direction: true,
+        is_top_layer: true,
+    },
 
     cleats: {
         cc2_byte: 0x3b,
@@ -253,7 +359,7 @@ export const TILE_TYPES = {
         item_ignores: new Set(['water']),
     },
 
-    clue: {
+    hint: {
         cc2_byte: 0x45,
     },
 };
@@ -264,7 +370,7 @@ CC2_TILE_TYPES.fill(null);
 for (let [name, tiledef] of Object.entries(TILE_TYPES)) {
     tiledef.name = name;
 
-    if (tiledef.cc2_byte === null)
+    if (tiledef.cc2_byte === null || tiledef.cc2_byte === undefined)
         continue;
 
     let existing = CC2_TILE_TYPES[tiledef.cc2_byte];

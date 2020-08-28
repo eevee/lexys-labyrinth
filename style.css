@@ -16,6 +16,7 @@ main {
     display: grid;
     grid:
         "level meta"        min-content
+        "level nav"         min-content
         "level chips"       min-content
         "level time"        min-content
         "level hint"        1fr
@@ -42,6 +43,14 @@ main {
     color: yellow;
     background: black;
     text-align: center;
+}
+.nav {
+    grid-area: nav;
+    display: flex;
+    gap: 1em;
+}
+.nav .nav-browse {
+    flex: 1;
 }
 .chips {
     grid-area: chips;

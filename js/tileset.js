@@ -62,18 +62,27 @@ export const CC2_TILESET_LAYOUT = {
         west: [[12, 7], [13, 7], [14, 7], [15, 7]],
     },
 
+    ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
+
+    fireball: [[12, 9], [13, 9], [14, 9], [15, 9]],
+
     cleats: [2, 6],
     suction_boots: [3, 6],
     fire_boots: [1, 6],
     flippers: [0, 6],
 
-    clue: [5, 2],
+    hint: [5, 2],
 };
 
 export const TILE_WORLD_TILESET_LAYOUT = {
     floor: [0, 0],
     wall: [0, 1],
+    thinwall_n: [0, 6],
+    thinwall_w: [0, 7],
+    thinwall_s: [0, 8],
+    thinwall_e: [0, 9],
     ice: [0, 12],
+
     ice_sw: [1, 13],
     ice_nw: [1, 10],
     ice_ne: [1, 11],
@@ -84,6 +93,9 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     force_floor_e: [1, 3],
     force_floor_s: [0, 13],
     force_floor_w: [1, 4],
+    // TODO there are two of these, which seems self-defeating??
+    fake_wall: [1, 14],
+    fake_floor: [1, 15],
 
     exit: [[3, 10], [3, 11]],
 
@@ -93,6 +105,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
         west: [6, 13],
         east: [6, 15],
     },
+    cloner: [3, 1],
     player_drowned: [3, 3],
     player_burned: [3, 4],
     // TODO the tileset has several of these...?  why?
@@ -118,13 +131,62 @@ export const TILE_WORLD_TILESET_LAYOUT = {
         south: [4, 2],
         west: [4, 1],
     },
+    fireball: {
+        north: [4, 4],
+        east: [4, 7],
+        south: [4, 6],
+        west: [4, 5],
+    },
+    ball: {
+        north: [4, 8],
+        east: [4, 11],
+        south: [4, 10],
+        west: [4, 9],
+    },
+    tank_blue: {
+        north: [4, 12],
+        east: [4, 15],
+        south: [4, 14],
+        west: [4, 5],
+    },
+    glider: {
+        north: [5, 0],
+        east: [5, 3],
+        south: [5, 2],
+        west: [5, 1],
+    },
+    teeth: {
+        north: [5, 4],
+        east: [5, 7],
+        south: [5, 6],
+        west: [5, 5],
+    },
+    walker: {
+        north: [5, 8],
+        east: [5, 11],
+        south: [5, 10],
+        west: [5, 9],
+    },
+    blob: {
+        north: [5, 12],
+        east: [5, 15],
+        south: [5, 14],
+        west: [5, 5],
+    },
+
+    paramecium: {
+        north: [6, 0],
+        east: [6, 3],
+        south: [6, 2],
+        west: [6, 1],
+    },
 
     cleats: [6, 10],
     suction_boots: [6, 11],
     fire_boots: [6, 9],
     flippers: [6, 8],
 
-    clue: [2, 15],
+    hint: [2, 15],
 };
 
 export class Tileset {

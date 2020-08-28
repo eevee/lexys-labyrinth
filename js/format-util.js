@@ -9,6 +9,7 @@ export class StoredLevel {
     constructor() {
         this.title = '';
         this.password = null;
+        this.hint = '';
         this.chips_required = 0;
         this.time_limit = 0;
         this.viewport_size = 9;

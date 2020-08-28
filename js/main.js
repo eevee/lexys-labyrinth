@@ -64,7 +64,7 @@ class Tile {
             this.direction = 'south';
         }
 
-        this.is_sliding = false;
+        this.slide_mode = null;
 
         if (type.has_inventory) {
             this.inventory = {};
@@ -204,6 +204,8 @@ class Level {
         this.actors = [];
         this.chips_remaining = this.stored_level.chips_required;
 
+        this.hint_shown = null;
+
         let n = 0;
         for (let y = 0; y < this.height; y++) {
             let row = [];
@@ -240,7 +242,7 @@ class Level {
         }
 
         for (let actor of this.actors) {
-            if (actor.is_sliding) {
+            if (actor.slide_mode !== null) {
                 // TODO do we stop sliding if we hit something, too?
                 this.attempt_step(actor, actor.direction);
             }
@@ -258,6 +260,10 @@ class Level {
 
         for (let actor of this.actors) {
             // TODO skip doomed?  strip them out?  hm
+            if (actor.slide_mode === 'ice') {
+                // Actors can't make voluntary moves on ice
+                continue;
+            }
             if (actor === this.player) {
                 if (player_direction) {
                     actor.direction = player_direction;
@@ -310,12 +316,16 @@ class Level {
                 }
                 blocks = true;
                 // XXX should i break here, or bump everything?
-                return false;
             }
         });
 
-        if (blocks)
+        if (blocks) {
+            if (actor.slide_mode === 'ice') {
+                // Actors on ice turn around when they hit something
+                actor.direction = DIRECTIONS[DIRECTIONS[direction].left].left;
+            }
             return false;
+        }
 
         // We're clear!
         this.move_to(actor, goal_x, goal_y);
@@ -329,7 +339,7 @@ class Level {
         let goal_cell = this.cells[y][x];
         let original_cell = this.cells[actor.y][actor.x];
         original_cell._remove(actor);
-        actor.is_sliding = false;
+        actor.slide_mode = null;
         goal_cell._add(actor);
         actor.x = x;
         actor.y = y;
@@ -338,11 +348,19 @@ class Level {
         goal_cell.is_dirty = true;
 
         // Step on all the tiles in the new cell
+        if (actor === this.player) {
+            this.hint_shown = null;
+        }
         goal_cell.each(tile => {
             if (tile === actor)
                 return;
             if (actor.ignores(tile.type.name))
                 return;
+
+            if (actor === this.player && tile.type.name === 'hint') {
+                this.hint_shown = this.stored_level.hint;
+            }
+
             if (tile.type.is_item && actor.type.has_inventory) {
                 actor.give_item(tile.type.name);
                 tile.destroy();
@@ -361,12 +379,20 @@ class Level {
 
     // TODO make a set of primitives for actually altering the level that also
     // record how to undo themselves
+    make_slide(actor, mode) {
+        actor.slide_mode = mode;
+    }
 }
 
 const GAME_UI_HTML = `
 <main>
     <div class="level"><!-- level canvas and any overlays go here --></div>
     <div class="meta"></div>
+    <div class="nav">
+        <button class="nav-prev" type="button">«</button>
+        <button class="nav-browse" type="button">Choose level...</button>
+        <button class="nav-next" type="button">»</button>
+    </div>
     <div class="hint"></div>
     <div class="chips"></div>
     <div class="time"></div>
@@ -375,7 +401,8 @@ const GAME_UI_HTML = `
 </main>
 `;
 class Game {
-    constructor(tileset, level) {
+    constructor(stored_game, tileset) {
+        this.stored_game = stored_game;
         this.tileset = tileset;
 
         // TODO obey level options; allow overriding
@@ -386,13 +413,29 @@ class Game {
         this.container.innerHTML = GAME_UI_HTML;
         this.level_el = this.container.querySelector('.level');
         this.meta_el = this.container.querySelector('.meta');
+        this.nav_el = this.container.querySelector('.nav');
         this.hint_el = this.container.querySelector('.hint');
         this.chips_el = this.container.querySelector('.chips');
         this.time_el = this.container.querySelector('.time');
         this.inventory_el = this.container.querySelector('.inventory');
         this.bummer_el = this.container.querySelector('.bummer');
 
-        this.load_level(level);
+        this.nav_prev_button = this.nav_el.querySelector('.nav-prev');
+        this.nav_next_button = this.nav_el.querySelector('.nav-next');
+        this.nav_prev_button.addEventListener('click', ev => {
+            // TODO confirm
+            if (this.level_index > 0) {
+                this.load_level(this.level_index - 1);
+            }
+        });
+        this.nav_next_button.addEventListener('click', ev => {
+            // TODO confirm
+            if (this.level_index < this.stored_game.levels.length - 1) {
+                this.load_level(this.level_index + 1);
+            }
+        });
+
+        this.load_level(0);
 
         this.level_canvas = mk('canvas', {width: tileset.size_x * this.camera_size_x, height: tileset.size_y * this.camera_size_y});
         this.level_el.append(this.level_canvas);
@@ -446,10 +489,14 @@ class Game {
         requestAnimationFrame(this.do_frame.bind(this));
     }
 
-    load_level(level) {
-        this.level = level;
+    load_level(level_index) {
+        this.level_index = level_index;
+        this.level = new Level(this.stored_game.levels[level_index]);
         // FIXME do better
         this.meta_el.textContent = this.level.stored_level.title;
+
+        this.nav_prev_button.disabled = level_index <= 0;
+        this.nav_next_button.disabled = level_index >= this.stored_game.levels.length;
         this.update_ui();
     }
 
@@ -476,7 +523,9 @@ class Game {
     }
 
     update_ui() {
+        // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;
+        this.hint_el.textContent = this.level.hint_shown ?? '';
 
         if (this.level.state === 'failure') {
             this.bummer_el.textContent = this.level.fail_message;
@@ -555,8 +604,7 @@ async function main() {
     // TODO also support tile world's DAC when reading from local??
     // TODO ah, there's more metadata in CCX, crapola
     let stored_game = await load_game('levels/CCLP1.ccl');
-    let level = new Level(stored_game.levels[0]);
-    let game = new Game(tileset, level);
+    let game = new Game(stored_game, tileset);
 }
 
 main();
