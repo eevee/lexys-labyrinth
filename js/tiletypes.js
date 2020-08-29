@@ -100,12 +100,15 @@ const TILE_TYPES = {
 
     // Terrain
     dirt: {
-        // TODO block monsters, and melinda only without the hiking boots
+        blocks_monsters: true,
+        blocks_blocks: true,
+        // TODO block melinda only without the hiking boots; can't use ignore because then she wouldn't step on it  :S  also ignore doesn't apply to blocks anyway.
         on_arrive(me, level, other) {
             me.become('floor');
         }
     },
     gravel: {
+        blocks_monsters: true,
     },
 
     // Hazards
@@ -249,39 +252,48 @@ const TILE_TYPES = {
     dirt_block: {
         blocks: true,
         is_object: true,
+        is_block: true,
     },
 
     // Critters
     bug: {
         is_actor: true,
         is_object: true,
+        is_monster: true,
         movement_mode: 'follow-left',
     },
     paramecium: {
         is_actor: true,
         is_object: true,
+        is_monster: true,
+        movement_mode: 'follow-right',
     },
     ball: {
         is_actor: true,
         is_object: true,
+        is_monster: true,
     },
     blob: {
         is_actor: true,
         is_object: true,
+        is_monster: true,
     },
     teeth: {
         is_actor: true,
         is_object: true,
+        is_monster: true,
     },
     fireball: {
         is_actor: true,
         is_object: true,
+        is_monster: true,
         movement_mode: 'turn-right',
         ignores: new Set(['fire']),
     },
     glider: {
         is_actor: true,
         is_object: true,
+        is_monster: true,
         movement_mode: 'turn-left',
         ignores: new Set(['water']),
     },
@@ -359,6 +371,8 @@ const TILE_TYPES = {
         is_object: true,
         is_chip: true,
         is_required_chip: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.collect_chip();

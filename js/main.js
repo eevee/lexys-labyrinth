@@ -67,6 +67,33 @@ async function fetch(url) {
 
 const PAGE_TITLE = "Lexy's Labyrinth";
 
+const DIRECTIONS = {
+    north: {
+        movement: [0, -1],
+        left: 'west',
+        right: 'east',
+        opposite: 'south',
+    },
+    south: {
+        movement: [0, 1],
+        left: 'east',
+        right: 'west',
+        opposite: 'north',
+    },
+    west: {
+        movement: [-1, 0],
+        left: 'south',
+        right: 'north',
+        opposite: 'east',
+    },
+    east: {
+        movement: [1, 0],
+        left: 'north',
+        right: 'south',
+        opposite: 'west',
+    },
+};
+
 class Tile {
     constructor(type, x, y, direction = 'south') {
         this.type = type;
@@ -89,6 +116,24 @@ class Tile {
             type.load(tile, tile_template);
         }
         return tile;
+    }
+
+    blocks(other, direction) {
+        if (this.type.blocks)
+            return true;
+
+        if (this.type.thin_walls &&
+            this.type.thin_walls.has(DIRECTIONS[direction].opposite))
+            return true;
+
+        if (other.type.is_player && this.type.blocks_players)
+            return true;
+        if (other.type.is_monster && this.type.blocks_monsters)
+            return true;
+        if (other.type.is_block && this.type.blocks_blocks)
+            return true;
+
+        return false;
     }
 
     ignores(name) {
@@ -178,33 +223,6 @@ class Cell extends Array {
         this.length = p;
     }
 }
-
-const DIRECTIONS = {
-    north: {
-        movement: [0, -1],
-        left: 'west',
-        right: 'east',
-        opposite: 'south',
-    },
-    south: {
-        movement: [0, 1],
-        left: 'east',
-        right: 'west',
-        opposite: 'north',
-    },
-    west: {
-        movement: [-1, 0],
-        left: 'south',
-        right: 'north',
-        opposite: 'east',
-    },
-    east: {
-        movement: [1, 0],
-        left: 'north',
-        right: 'south',
-        opposite: 'west',
-    },
-};
 
 class Level {
     constructor(stored_level) {
@@ -387,10 +405,7 @@ class Level {
             if (! blocked) {
                 let goal_cell = this.cells[goal_y][goal_x];
                 goal_cell.each(tile => {
-                    if (! (
-                        tile.type.blocks ||
-                        (tile.type.thin_walls && tile.type.thin_walls.has(DIRECTIONS[direction].opposite))
-                    ))
+                    if (! tile.blocks(actor, direction))
                         return;
 
                     if (actor.type.pushes && actor.type.pushes[tile.type.name]) {
@@ -400,7 +415,7 @@ class Level {
                     }
                     if (tile.type.on_bump) {
                         tile.type.on_bump(tile, this, actor);
-                        if (! tile.type.blocks)
+                        if (! tile.blocks(actor, direction))
                             // It became something non-blocking!
                             return;
                     }
