@@ -367,9 +367,28 @@ class Level {
 
         let blocked;
         if (goal_x >= 0 && goal_x < this.width && goal_y >= 0 && goal_y < this.height) {
-            let goal_cell = this.cells[goal_y][goal_x];
-            goal_cell.each(tile => {
-                if (tile !== actor && tile.type.blocks) {
+            // Check for a thin wall in our current cell first
+            let original_cell = this.cells[actor.y][actor.x];
+            original_cell.each(tile => {
+                if (tile !== actor && tile.type.thin_walls &&
+                    tile.type.thin_walls.has(direction))
+                {
+                    blocked = true;
+                    return;
+                }
+            });
+            
+            // Only bother touching the goal cell if we're not already trapped in this one
+            // FIXME actually, this prevents flicking!
+            if (! blocked) {
+                let goal_cell = this.cells[goal_y][goal_x];
+                goal_cell.each(tile => {
+                    if (! (
+                        tile.type.blocks ||
+                        (tile.type.thin_walls && tile.type.thin_walls.has(DIRECTIONS[direction].opposite))
+                    ))
+                        return;
+
                     if (actor.type.pushes && actor.type.pushes[tile.type.name]) {
                         if (this.attempt_step(tile, direction))
                             // It moved out of the way!
@@ -383,8 +402,8 @@ class Level {
                     }
                     blocked = true;
                     // XXX should i break here, or bump everything?
-                }
-            });
+                });
+            }
         }
         else {
             // Hit the edge

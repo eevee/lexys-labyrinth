@@ -30,8 +30,9 @@ export const CC2_TILESET_LAYOUT = {
     // TODO these guys don't have floor underneath.
     swivel_sw: [9, 11],
     swivel_nw: [10, 11],
-    swivel_ne: [12, 11],
-    swivel_se: [13, 11],
+    swivel_ne: [11, 11],
+    swivel_se: [12, 11],
+    swivel_floor: [13, 11],
     forbidden: [14, 5],
     turtle: [13, 12],  // TODO also 14 + 15 for sinking
     popwall: [8, 10],

@@ -47,17 +47,18 @@ const TILE_TYPES = {
     },
 
     // Swivel doors
+    swivel_floor: {},
     swivel_ne: {
-        thin_walls: new Set(['north'], ['east']),
+        thin_walls: new Set(['north', 'east']),
     },
     swivel_se: {
-        thin_walls: new Set(['south'], ['east']),
+        thin_walls: new Set(['south', 'east']),
     },
     swivel_sw: {
-        thin_walls: new Set(['south'], ['west']),
+        thin_walls: new Set(['south', 'west']),
     },
     swivel_nw: {
-        thin_walls: new Set(['north'], ['west']),
+        thin_walls: new Set(['north', 'west']),
     },
 
     // Locked doors
@@ -140,10 +141,7 @@ const TILE_TYPES = {
         }
     },
     ice_sw: {
-        thin_walls: {
-            south: true,
-            west: true,
-        },
+        thin_walls: new Set(['south', 'west']),
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
                 other.direction = 'east';
@@ -155,10 +153,7 @@ const TILE_TYPES = {
         }
     },
     ice_nw: {
-        thin_walls: {
-            north: true,
-            west: true,
-        },
+        thin_walls: new Set(['north', 'west']),
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
                 other.direction = 'east';
@@ -170,10 +165,7 @@ const TILE_TYPES = {
         }
     },
     ice_ne: {
-        thin_walls: {
-            north: true,
-            east: true,
-        },
+        thin_walls: new Set(['north', 'east']),
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
                 other.direction = 'west';
@@ -185,10 +177,7 @@ const TILE_TYPES = {
         }
     },
     ice_se: {
-        thin_walls: {
-            south: true,
-            east: true,
-        },
+        thin_walls: new Set(['south', 'east']),
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
                 other.direction = 'west';
