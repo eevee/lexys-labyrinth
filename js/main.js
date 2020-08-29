@@ -414,6 +414,18 @@ class Level {
         original_cell.is_dirty = true;
         goal_cell.is_dirty = true;
 
+        // Announce we're leaving, for the handful of tiles that care about it
+        original_cell.each(tile => {
+            if (tile === actor)
+                return;
+            if (actor.ignores(tile.type.name))
+                return;
+
+            if (tile.type.on_depart) {
+                tile.type.on_depart(tile, this, actor);
+            }
+        });
+
         // Step on all the tiles in the new cell
         if (actor === this.player) {
             this.hint_shown = null;

@@ -12,8 +12,14 @@ const TILE_TYPES = {
     },
     wall_appearing: {
         blocks: true,
+        on_bump(me, level, other) {
+            me.become('wall');
+        }
     },
     popwall: {
+        on_depart(me, level, other) {
+            me.become('wall');
+        }
     },
     thinwall_n: {
         thin_walls: new Set(['north']),
