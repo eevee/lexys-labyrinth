@@ -115,13 +115,12 @@ const TILE_ENCODING = {
     // 0x6e: (Unused) : 
     // 0x6f: Railroad sign : '#next'
     // 0x70: Custom wall (green) : Modifier allows other styles, see below
-    // TODO needs a preceding modifier but that's not done yet (and should enforce that a modifier is followed by a modifiable tile?)
-    0x71: 'floor_letter',
+    0x71: ['#mod8', 'floor_letter'],
     // 0x72: Purple toggle wall : 
     // 0x73: Purple toggle floor : 
     // 0x74: (Unused) : 
     // 0x75: (Unused) : 
-    // 0x76: 8-bit Modifier (see Modifier section below) : 1 modifier byte, Tile Specification for affected tile
+    0x76: ['#mod8', '#next'],
     // 0x77: 16-bit Modifier (see Modifier section below) : 2 modifier bytes, Tile Specification for affected tile
     // 0x78: 32-bit Modifier (see Modifier section below) : 4 modifier bytes, Tile Specification for affected tile
     // 0x79: (Unused) : '#direction', '#next'
@@ -313,29 +312,49 @@ export function parse_level(buf) {
             level.size_x = width;
             level.size_y = height;
             let p = 2;
+
+            function read_spec() {
+                let tile_byte = bytes[p];
+                p++;
+                if (tile_byte >= 0x77 && tile_byte <= 0x78) {
+                    // XXX handle these modifier "tiles"
+                    p += tile_byte - 0x75;
+                    return [];
+                }
+                let spec = TILE_ENCODING[tile_byte];
+                if (! spec)
+                    throw new Error(`Unrecognized tile type 0x${tile_byte.toString(16)}`);
+
+                let name;
+                let args = [];
+                if (spec instanceof Array) {
+                    return spec;
+                }
+                else {
+                    return [spec];
+                }
+            }
+
             for (let n = 0; n < width * height; n++) {
                 let cell = new util.StoredCell;
                 while (true) {
-                    let tile_byte = bytes[p];
-                    p++;
-                    if (tile_byte >= 0x76 && tile_byte <= 0x78) {
-                        // XXX handle these modifier "tiles"
-                        p += tile_byte - 0x75;
-                        continue;
-                    }
-                    let spec = TILE_ENCODING[tile_byte];
-                    if (! spec)
-                        throw new Error(`Unrecognized tile type 0x${tile_byte.toString(16)}`);
+                    let [name, ...args] = read_spec();
+                    if (name === undefined) continue;  // XXX modifier skip hack
 
-                    let name;
-                    let args = [];
-                    if (spec instanceof Array) {
-                        [name, ...args] = spec;
+                    let modifier;
+                    if (name === '#mod8') {
+                        if (args[0] !== '#next')
+                            throw new Error(`Tile requires a preceding modifier`);
+
+                        modifier = bytes[p];
+                        p++;
+                        let mod_marker;
+                        [mod_marker, name, ...args] = read_spec();
+                        if (mod_marker !== '#mod8')
+                            throw new Error(`Expected a tile requiring a modifier`);
                     }
-                    else {
-                        name = spec;
-                    }
-                    let tile = {name};
+
+                    let tile = {name, modifier};
                     cell.push(tile);
                     let type = TILE_TYPES[name];
                     if (!type) console.error(name);

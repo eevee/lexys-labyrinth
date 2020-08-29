@@ -84,7 +84,11 @@ class Tile {
     static from_template(tile_template, x, y) {
         let type = TILE_TYPES[tile_template.name];
         if (! type) console.error(tile_template.name);
-        return new this(type, x, y, tile_template.direction);
+        let tile = new this(type, x, y, tile_template.direction);
+        if (type.load) {
+            type.load(tile, tile_template);
+        }
+        return tile;
     }
 
     ignores(name) {

@@ -3,6 +3,9 @@ const TILE_TYPES = {
     floor: {
     },
     floor_letter: {
+        load(me, template) {
+            me.ascii_code = template.modifier;
+        }
     },
     wall: {
         blocks: true,

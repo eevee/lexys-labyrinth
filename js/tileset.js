@@ -1,6 +1,19 @@
 export const CC2_TILESET_LAYOUT = {
     floor: [0, 2],
     floor_letter: [2, 2],
+    'floor_letter#ascii': {
+        x0: 0,
+        y0: 0,
+        width: 16,
+        height: 1,
+    },
+    'floor_letter#arrows': {
+        north: [14, 31],
+        east: [14.5, 31],
+        south: [15, 31],
+        west: [15.5, 31],
+    },
+
     wall: [1, 2],
 
     fire: [
@@ -89,10 +102,10 @@ export const CC2_TILESET_LAYOUT = {
 
     hint: [5, 2],
 
-    score_10: [14, 1],
-    score_100: [13, 1],
-    score_1000: [12, 1],
-    score_2x: [15, 1],
+    score_10: [14, 2],
+    score_100: [13, 2],
+    score_1000: [12, 2],
+    score_2x: [15, 2],
 };
 
 // XXX need to specify that you can't use this for cc2 levels, somehow
@@ -247,10 +260,21 @@ export class Tileset {
         this.size_y = size_y;
     }
 
+    // Helper to draw to a canvas using tile coordinates
+    blit(ctx, sx, sy, dx, dy, scale = 1) {
+        let w = this.size_x * scale;
+        let h = this.size_y * scale;
+        ctx.drawImage(
+            this.image,
+            sx * this.size_x, sy * this.size_y, w, h,
+            dx * this.size_x, dy * this.size_y, w, h);
+    }
+
     draw(tile, ctx, x, y) {
-        let drawspec = this.layout[tile.type.name];
+        let name = tile.type.name;
+        let drawspec = this.layout[name];
         let coords = drawspec;
-        if (! coords) console.error(tile.type.name);
+        if (! coords) console.error(name);
         if (!(coords instanceof Array)) {
             // Must be an object of directions
             coords = coords[tile.direction ?? 'south'];
@@ -259,9 +283,38 @@ export class Tileset {
             coords = coords[0];
         }
 
-        ctx.drawImage(
-            this.image,
-            coords[0] * this.size_x, coords[1] * this.size_y, this.size_x, this.size_y,
-            x * this.size_x, y * this.size_y, this.size_x, this.size_y);
+        this.blit(ctx, coords[0], coords[1], x, y);
+
+        // Special behavior for special objects
+        // TODO? hardcode this less?
+        if (name === 'floor_letter') {
+            let n = tile.ascii_code - 32;
+            let scale = 0.5;
+            let sx, sy;
+            if (n < 0) {
+                // Arrows
+                if (n < -4) {
+                    // Default to south
+                    n = -2;
+                }
+
+                let direction = ['north', 'east', 'south', 'west'][n + 4];
+                [sx, sy] = this.layout['floor_letter#arrows'][direction];
+            }
+            else {
+                // ASCII text (only up through uppercase)
+                let letter_spec = this.layout['floor_letter#ascii'];
+                if (n > letter_spec.width / scale * letter_spec.height / scale) {
+                    n = 0;
+                }
+                let w = letter_spec.width / scale;
+                sx = (letter_spec.x0 + n % w) * scale;
+                sy = (letter_spec.y0 + Math.floor(n / w)) * scale;
+            }
+            let offset = (1 - scale) / 2;
+            this.blit(
+                ctx, sx, sy,
+                x + offset, y + offset, scale);
+        }
     }
 }
