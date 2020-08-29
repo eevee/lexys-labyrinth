@@ -194,6 +194,8 @@ export function parse_level(buf) {
     let level = new util.StoredLevel;
     let full_view = new DataView(buf);
     let next_section_start = 0;
+    let extra_hints;
+    let hint_tiles = [];
     while (next_section_start < buf.byteLength) {
         // Read section header and length
         let section_start = next_section_start;
@@ -203,23 +205,43 @@ export function parse_level(buf) {
         if (next_section_start > buf.byteLength)
             throw new Error(`Section at byte ${section_start} of type '${section_type}' extends ${buf.length - next_section_start} bytes past the end of the file`);
 
-        if (section_type === 'CC2M' || section_type === 'LOCK' || section_type === 'TITL' || section_type === 'AUTH' || section_type === 'VERS' || section_type === 'CLUE' || section_type === 'NOTE') {
+        if (section_type === 'CC2M' || section_type === 'LOCK' || section_type === 'VERS' ||
+            section_type === 'TITL' || section_type === 'AUTH' ||
+            section_type === 'CLUE' || section_type === 'NOTE')
+        {
             // These are all singular strings (with a terminating NUL, for some reason)
             // XXX character encoding??
-            // FIXME assign to appropriate fields
-            let field = section_type;
-            if (section_type === 'TITL') {
-                field = 'title';
+            let str = util.string_from_buffer_ascii(buf.slice(section_start + 8, next_section_start - 1)).replace(/\r\n/g, "\n");
+
+            // TODO store more of this, at least for idempotence, maybe
+            if (section_type === 'CC2M') {
+                // File version, doesn't seem interesting
+            }
+            else if (section_type === 'LOCK') {
+                // Unclear, seems to be a comment about the editor...?
+            }
+            else if (section_type === 'VERS') {
+                // Editor version which created this level
+            }
+            else if (section_type === 'TITL') {
+                // Level title
+                level.title = str;
             }
             else if (section_type === 'AUTH') {
-                field = 'author';
+                // Author's name
+                level.author = str;
             }
-            /*
             else if (section_type === 'CLUE') {
-                field = 'hint';
+                // Level hint
+                level.hint = str;
             }
-            */
-            level[field] = util.string_from_buffer_ascii(buf.slice(section_start + 8, next_section_start - 1)).replace(/\r\n/g, "\n");
+            else if (section_type === 'NOTE') {
+                // Author's comments...  but might also include multiple hints
+                // for levels with multiple hint tiles, delineated by [CLUE].
+                // For my purposes, extra hints are associated with the
+                // individual tiles, so we'll map those later
+                [level.comment, ...extra_hints] = str.split(/(?<=^|\n)\[CLUE\]\n/g);
+            }
             continue;
         }
 
@@ -311,15 +333,22 @@ export function parse_level(buf) {
                     }
                     let tile = {name};
                     cell.push(tile);
-                    let tiledef = TILE_TYPES[name];
-                    if (!tiledef) console.error(name);
-                    if (tiledef.is_required_chip) {
+                    let type = TILE_TYPES[name];
+                    if (!type) console.error(name);
+                    if (type.is_required_chip) {
                         level.chips_required++;
                     }
-                    if (tiledef.is_player) {
+                    if (type.is_player) {
                         // TODO handle multiple starts
                         level.player_start_x = n % width;
                         level.player_start_y = Math.floor(n / width);
+                    }
+                    if (type.is_hint) {
+                        // Remember all the hint tiles (in reading order) so we
+                        // can map extra hints to them later.  Don't do it now,
+                        // since the format doesn't technically guarantee that
+                        // the metadata sections appear before the map data!
+                        hint_tiles.push(tile);
                     }
 
                     // Handle extra arguments
@@ -361,6 +390,16 @@ export function parse_level(buf) {
             // TODO save it, persist when editing level
         }
     }
-    console.log(level);
+
+    // Connect extra hints
+    let h = 0;
+    for (let tile of hint_tiles) {
+        if (h > extra_hints.length)
+            break;
+
+        tile.specific_hint = extra_hints[h];
+        h++;
+    }
+
     return level;
 }

@@ -392,6 +392,7 @@ const TILE_TYPES = {
     },
 
     hint: {
+        is_hint: true,
     },
     socket: {
         blocks: true,

@@ -82,8 +82,9 @@ class Tile {
     }
 
     static from_template(tile_template, x, y) {
-        if (! TILE_TYPES[tile_template.name]) console.error(tile_template.name);
-        return new this(TILE_TYPES[tile_template.name], x, y, tile_template.direction);
+        let type = TILE_TYPES[tile_template.name];
+        if (! type) console.error(tile_template.name);
+        return new this(type, x, y, tile_template.direction);
     }
 
     ignores(name) {
@@ -231,15 +232,19 @@ class Level {
                 let cell = new Cell;
                 row.push(cell);
 
-                let template_cell = this.stored_level.linear_cells[n];
+                let stored_cell = this.stored_level.linear_cells[n];
                 n++;
                 
-                for (let template_tile of template_cell) {
+                for (let template_tile of stored_cell) {
                     let tile = Tile.from_template(template_tile, x, y);
                     if (tile.type.is_player) {
                         // TODO handle multiple players, also chip and melinda both
                         // TODO complain if no chip
                         this.player = tile;
+                    }
+                    if (tile.type.is_hint) {
+                        // Copy over the tile-specific hint, if any
+                        tile.specific_hint = template_tile.specific_hint ?? null;
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);
@@ -436,8 +441,8 @@ class Level {
             if (actor.ignores(tile.type.name))
                 return;
 
-            if (actor === this.player && tile.type.name === 'hint') {
-                this.hint_shown = this.stored_level.hint;
+            if (actor === this.player && tile.type.is_hint) {
+                this.hint_shown = tile.specific_hint ?? this.stored_level.hint;
             }
 
             if (tile.type.is_item && actor.type.has_inventory) {
@@ -485,8 +490,8 @@ class Game {
         this.tileset = tileset;
 
         // TODO obey level options; allow overriding
-        this.viewport_size_x = 19;
-        this.viewport_size_y = 19;
+        this.viewport_size_x = 9;
+        this.viewport_size_y = 9;
 
         document.body.innerHTML = GAME_UI_HTML;
         this.container = document.body.querySelector('main');
