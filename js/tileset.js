@@ -94,119 +94,148 @@ export const CC2_TILESET_LAYOUT = {
     score_2x: [15, 1],
 };
 
+// XXX need to specify that you can't use this for cc2 levels, somehow
 export const TILE_WORLD_TILESET_LAYOUT = {
     floor: [0, 0],
     wall: [0, 1],
+    chip: [0, 2],
+    water: [0, 3],
+    fire: [0, 4],
+    wall_invisible: [0, 5],
     thinwall_n: [0, 6],
     thinwall_w: [0, 7],
     thinwall_s: [0, 8],
     thinwall_e: [0, 9],
+    dirt_block: [0, 10],
+    dirt: [0, 11],
     ice: [0, 12],
+    force_floor_s: [0, 13],
+    // These are "moving blocks", the ones used by cloners
+    // TODO uhh which should i use here.
+    /*
+    dirt_block: {
+        north: [0, 14],
+        west: [0, 15],
+        south: [1, 0],
+        east: [1, 1],
+    },
+    */
 
-    ice_sw: [1, 13],
+    force_floor_n: [1, 2],
+    force_floor_e: [1, 3],
+    force_floor_w: [1, 4],
+    exit: [1, 5],
+    door_blue: [1, 6],
+    door_red: [1, 7],
+    door_green: [1, 8],
+    door_yellow: [1, 9],
     ice_nw: [1, 10],
     ice_ne: [1, 11],
     ice_se: [1, 12],
-    water: [0, 3],
-    fire: [0, 4],
-    force_floor_n: [1, 2],
-    force_floor_e: [1, 3],
-    force_floor_s: [0, 13],
-    force_floor_w: [1, 4],
-    // TODO there are two of these, which seems self-defeating??
+    ice_sw: [1, 13],
     fake_wall: [1, 14],
     fake_floor: [1, 15],
 
-    exit: [[3, 10], [3, 11]],
+    // TODO overlay buffer?? [2, 0]
+    thief_tools: [2, 1],
+    socket: [2, 2],
+    button_green: [2, 3],
+    button_red: [2, 4],
+    green_wall: [2, 5],
+    green_floor: [2, 6],
+    button_brown: [2, 7],
+    button_blue: [2, 8],
+    teleport_blue: [2, 9],
+    bomb: [2, 10],
+    trap: [2, 11],
+    wall_appearing: [2, 12],
+    gravel: [2, 13],
+    popwall: [2, 14],
+    hint: [2, 15],
 
+    thinwall_se: [3, 0],
+    cloner: [3, 1],
+    force_floor_all: [3, 2],
+    player_drowned: [3, 3],
+    player_burned: [3, 4],
+    player_bombed: [3, 5],
+    explosion_bomb: [3, 6],
+    explosion_other: [3, 7],
+    // 3, 8 unused
+    player_exiting: [3, 9],
+    // 3, 10 and 11 are "exit_extra_{1,2}" 
+    // TODO player swimming is 3, 12-15
+
+    bug: {
+        north: [4, 0],
+        west: [4, 1],
+        south: [4, 2],
+        east: [4, 3],
+    },
+    fireball: {
+        north: [4, 4],
+        west: [4, 5],
+        south: [4, 6],
+        east: [4, 7],
+    },
+    ball: {
+        north: [4, 8],
+        west: [4, 9],
+        south: [4, 10],
+        east: [4, 11],
+    },
+    tank_blue: {
+        north: [4, 12],
+        west: [4, 13],
+        south: [4, 14],
+        east: [4, 15],
+    },
+
+    glider: {
+        north: [5, 0],
+        west: [5, 1],
+        south: [5, 2],
+        east: [5, 3],
+    },
+    teeth: {
+        north: [5, 4],
+        west: [5, 5],
+        south: [5, 6],
+        east: [5, 7],
+    },
+    walker: {
+        north: [5, 8],
+        west: [5, 9],
+        south: [5, 10],
+        east: [5, 11],
+    },
+    blob: {
+        north: [5, 12],
+        west: [5, 13],
+        south: [5, 14],
+        east: [5, 15],
+    },
+
+    paramecium: {
+        north: [6, 0],
+        west: [6, 1],
+        south: [6, 2],
+        east: [6, 3],
+    },
+    key_blue: [6, 4],
+    key_red: [6, 5],
+    key_green: [6, 6],
+    key_yellow: [6, 7],
+    flippers: [6, 8],
+    fire_boots: [6, 9],
+    cleats: [6, 10],
+    suction_boots: [6, 11],
     player: {
         north: [6, 12],
         south: [6, 14],
         west: [6, 13],
         east: [6, 15],
     },
-    cloner: [3, 1],
-    player_drowned: [3, 3],
-    player_burned: [3, 4],
-    // TODO the tileset has several of these...?  why?
-    dirt_block: [0, 10],
-
-    door_red: [1, 7],
-    door_blue: [1, 6],
-    door_yellow: [1, 9],
-    door_green: [1, 8],
-    key_red: [6, 5],
-    key_blue: [6, 4],
-    key_yellow: [6, 7],
-    key_green: [6, 6],
-    chip: [0, 2],
-    // XXX can't use for cc2 levels, need to specify that somehow
-    //chip_extra: [10, 3],
-    socket: [2, 2],
-
-    dirt: [0, 11],
-    bug: {
-        north: [4, 0],
-        east: [4, 3],
-        south: [4, 2],
-        west: [4, 1],
-    },
-    fireball: {
-        north: [4, 4],
-        east: [4, 7],
-        south: [4, 6],
-        west: [4, 5],
-    },
-    ball: {
-        north: [4, 8],
-        east: [4, 11],
-        south: [4, 10],
-        west: [4, 9],
-    },
-    tank_blue: {
-        north: [4, 12],
-        east: [4, 15],
-        south: [4, 14],
-        west: [4, 5],
-    },
-    glider: {
-        north: [5, 0],
-        east: [5, 3],
-        south: [5, 2],
-        west: [5, 1],
-    },
-    teeth: {
-        north: [5, 4],
-        east: [5, 7],
-        south: [5, 6],
-        west: [5, 5],
-    },
-    walker: {
-        north: [5, 8],
-        east: [5, 11],
-        south: [5, 10],
-        west: [5, 9],
-    },
-    blob: {
-        north: [5, 12],
-        east: [5, 15],
-        south: [5, 14],
-        west: [5, 5],
-    },
-
-    paramecium: {
-        north: [6, 0],
-        east: [6, 3],
-        south: [6, 2],
-        west: [6, 1],
-    },
-
-    cleats: [6, 10],
-    suction_boots: [6, 11],
-    fire_boots: [6, 9],
-    flippers: [6, 8],
-
-    hint: [2, 15],
 };
 
 export class Tileset {
