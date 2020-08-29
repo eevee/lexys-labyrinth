@@ -174,8 +174,9 @@ function parse_level(buf) {
                 let cell = level.linear_cells[c];
                 c++;
 
-                // FIXME not entirely sure how to handle floor, to be honest; should it just be blank, and blank cells get drawn as floor?  eugh but then it would be drawn under floor tiles too...
-                if (name === 'floor' && cell.length > 0) {
+                // The upper layer uses 0x00 (floor) to indicate an empty
+                // space, which is probably not what we want
+                if (name === 'floor' && l === 0) {
                     continue;
                 }
 
