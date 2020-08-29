@@ -21,9 +21,9 @@ export const CC2_TILESET_LAYOUT = {
     ice_ne: [13, 1],
     ice_se: [11, 1],
     force_floor_n: [[0, 19], [0, 20]],
-    force_floor_e: [[2, 19], [2, 20]],
+    force_floor_e: [[2, 19], [3, 19]],
     force_floor_s: [[1, 19], [1, 20]],
-    force_floor_w: [[3, 19], [3, 20]],
+    force_floor_w: [[2, 20], [3, 20]],
     thief_keys: [15, 21],
     thief_tools: [3, 2],
 

@@ -205,6 +205,10 @@ export function parse_level(buf) {
         if (next_section_start > buf.byteLength)
             throw new Error(`Section at byte ${section_start} of type '${section_type}' extends ${buf.length - next_section_start} bytes past the end of the file`);
 
+        // This chunk marks the end of the file regardless
+        if (section_type === 'END ')
+            break;
+
         if (section_type === 'CC2M' || section_type === 'LOCK' || section_type === 'VERS' ||
             section_type === 'TITL' || section_type === 'AUTH' ||
             section_type === 'CLUE' || section_type === 'NOTE')
