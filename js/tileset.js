@@ -1,5 +1,23 @@
 export const CC2_TILESET_LAYOUT = {
+    door_red: [0, 1],
+    door_blue: [1, 1],
+    door_yellow: [2, 1],
+    door_green: [3, 1],
+    key_red: [4, 1],
+    key_blue: [5, 1],
+    key_yellow: [6, 1],
+    key_green: [7, 1],
+    dirt_block: [8, 1],
+    // xray
+    ice: [10, 1],
+    ice_se: [11, 1],
+    ice_sw: [12, 1],
+    ice_ne: [13, 1],
+    ice_nw: [14, 1],
+    cloner: [15, 1],
+
     floor: [0, 2],
+    wall: [1, 2],
     floor_letter: [2, 2],
     'floor_letter#ascii': {
         x0: 0,
@@ -13,51 +31,160 @@ export const CC2_TILESET_LAYOUT = {
         south: [15, 31],
         west: [15.5, 31],
     },
-
-    wall: [1, 2],
-
-    fire: [
-        [12, 29],
-        [13, 29],
-        [14, 29],
-        [15, 29],
-    ],
-    water: [
-        [12, 24],
-        [13, 24],
-        [14, 24],
-        [15, 24],
-    ],
-    ice: [10, 1],
-    ice_sw: [12, 1],
-    ice_nw: [14, 1],
-    ice_ne: [13, 1],
-    ice_se: [11, 1],
-    force_floor_n: [[0, 19], [0, 20]],
-    force_floor_e: [[2, 19], [3, 19]],
-    force_floor_s: [[1, 19], [1, 20]],
-    force_floor_w: [[2, 20], [3, 20]],
-    thief_keys: [15, 21],
     thief_tools: [3, 2],
-
-    // TODO these guys don't have floor underneath.
-    swivel_sw: [9, 11],
-    swivel_nw: [10, 11],
-    swivel_ne: [11, 11],
-    swivel_se: [12, 11],
-    swivel_floor: [13, 11],
-    forbidden: [14, 5],
-    turtle: [13, 12],  // TODO also 14 + 15 for sinking
-    popwall: [8, 10],
-    bomb: [5, 4],
-
-
+    socket: [4, 2],
+    hint: [5, 2],
     exit: [
         [6, 2],
         [7, 2],
         [8, 2],
         [9, 2],
     ],
+    // ice block, xray
+    score_10: [14, 2],
+    score_100: [13, 2],
+    score_1000: [12, 2],
+    score_2x: [15, 2],
+
+    // LCD digit font
+    green_chip: [10, 3],
+    chip_extra: [10, 3],
+    chip: [11, 3],
+    // bribe
+    // mercury boot
+    // canopy, xray
+
+    // tnt
+    bomb: [5, 4],
+    green_bomb: [6, 4],
+    // ??? tiny fireworks
+    // custom floors
+    // custom walls
+
+    // explosion
+    // splash
+    // flame jet
+    // green walls...?
+    forbidden: [14, 5],
+    // directional block frame, i think?
+
+    flippers: [0, 6],
+    fire_boots: [1, 6],
+    cleats: [2, 6],
+    suction_boots: [3, 6],
+    hiking_boots: [4, 6],
+    // speed boots...?  not boots though
+    // weird translucent spiral
+    // weird translucent red
+    button_blue: [8, 6],
+    button_green: [9, 6],
+    button_red: [10, 6],
+    button_brown: [11, 6],
+    button_pink: [12, 6],
+    button_black: [13, 6],
+    button_orange: [14, 6],
+    button_yellow: [15, 6],
+
+    // TODO moving
+    bug: {
+        north: [[0, 7], [1, 7], [2, 7], [3, 7]],
+        east: [[4, 7], [5, 7], [6, 7], [7, 7]],
+        south: [[8, 7], [9, 7], [10, 7], [11, 7]],
+        west: [[12, 7], [13, 7], [14, 7], [15, 7]],
+    },
+
+    tank_blue: {
+        north: [[0, 8], [1, 8]],
+        east: [[2, 8], [3, 8]],
+        south: [[4, 8], [5, 8]],
+        west: [[6, 8], [7, 8]],
+    },
+    glider: {
+        north: [[8, 8], [9, 8]],
+        east: [[10, 8], [11, 8]],
+        south: [[12, 8], [13, 8]],
+        west: [[14, 8], [15, 8]],
+    },
+
+    green_floor: [[0, 9], [1, 9], [2, 9], [3, 9]],
+    purple_floor: [[4, 9], [5, 9], [6, 9], [7, 9]],
+    // TODO [8, 9] is used as an overlay for green wall
+    // TODO state (10 is closed)
+    trap: [9, 9],
+    button_gray: [11, 9],
+    fireball: [[12, 9], [13, 9], [14, 9], [15, 9]],
+
+    fake_wall: [0, 10],
+    fake_floor: [0, 10],
+    // TODO thin walls are built piecemeal, sigh
+    // TODO directional block arrows
+    teleport_blue: [[4, 10], [5, 10], [6, 10], [7, 10]],
+    popwall: [8, 10],
+    gravel: [9, 10],
+    ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
+    steel: [15, 10],
+
+    // TODO teeth, seem to be missing north???
+    swivel_sw: [9, 11],
+    swivel_nw: [10, 11],
+    swivel_ne: [11, 11],
+    swivel_se: [12, 11],
+    swivel_floor: [13, 11],
+    // TODO some kinda four-edges thing again
+    // TODO stopwatch with a - sign??
+    paramecium: {
+        north: [[0, 12], [1, 12], [2, 12]],
+        east: [[3, 12], [4, 12], [5, 12]],
+        south: [[6, 12], [7, 12], [8, 12]],
+        west: [[9, 12], [10, 12], [11, 12]],
+    },
+    foil: [12, 12],
+    turtle: [13, 12],  // TODO also 14 + 15 for sinking
+
+    walker: [0, 13],
+    // TODO walker animations span multiple tiles, rgh
+    helmet: [0, 14],
+    // 14: stopwatch
+    // 15: stopwatch with +
+
+    blob: [0, 15],
+    // TODO blob animations also span multiple tiles
+    // TODO [0, 16] some kinda red/blue outline
+    mimic: [14, 16],
+    // TODO [15, 16] some kinda yellow/black outline
+
+    // timid teeth
+    // bowling ball
+    tank_yellow: {
+        north: [[8, 17], [9, 17]],
+        east: [[10, 17], [11, 17]],
+        south: [[12, 17], [13, 17]],
+        west: [[14, 17], [15, 17]],
+    },
+
+    // TODO saucer, has layers and moves and stuff
+    eyeball: [11, 18],
+    ghost: {
+        north: [12, 18],
+        east: [13, 18],
+        south: [14, 18],
+        west: [15, 18],
+    },
+
+    force_floor_n: [[0, 19], [0, 20]],
+    force_floor_e: [[2, 19], [3, 19]],
+    force_floor_s: [[1, 19], [1, 20]],
+    force_floor_w: [[2, 20], [3, 20]],
+    teleport_green: [[4, 19], [5, 19], [6, 19], [7, 19]],
+    teleport_yellow: [[8, 19], [9, 19], [10, 19], [11, 19]],
+    // TODO round, thing, not sure what
+    teleport_red: [[4, 20], [5, 20], [6, 20], [7, 20]],
+    slime: [[8, 20], [9, 20], [10, 20], [11, 20], [12, 20], [13, 20], [14, 20], [15, 20]],
+
+    force_floor_all: [[0, 21], [1, 21], [2, 21], [3, 21], [4, 21], [5, 21], [6, 21], [7, 21]],
+    // latches
+    // switch
+    thief_keys: [15, 21],
 
     // TODO moving + swimming + pushing animations
     player: {
@@ -66,46 +193,28 @@ export const CC2_TILESET_LAYOUT = {
         west: [8, 23],
         east: [8, 22],
     },
-    // TODO these shouldn't loop
+    water: [
+        [12, 24],
+        [13, 24],
+        [14, 24],
+        [15, 24],
+    ],
+
+    // TODO melinda, same layout as chip
+    fire: [
+        [12, 29],
+        [13, 29],
+        [14, 29],
+        [15, 29],
+    ],
+
+    // TODO these shouldn't loop and also seem to be more general
     player_drowned: [[4, 5], [5, 5], [6, 5], [7, 5]],
     player_burned: [[0, 5], [1, 5], [2, 5], [3, 5]],
-    dirt_block: [8, 1],
 
-    door_red: [0, 1],
-    door_blue: [1, 1],
-    door_yellow: [2, 1],
-    door_green: [3, 1],
-    key_red: [4, 1],
-    key_blue: [5, 1],
-    key_yellow: [6, 1],
-    key_green: [7, 1],
-    chip: [11, 3],
-    chip_extra: [10, 3],
-    socket: [4, 2],
-
+    // train tracks, which are layered...
     dirt: [4, 31],
-    bug: {
-        north: [[0, 7], [1, 7], [2, 7], [3, 7]],
-        east: [[4, 7], [5, 7], [6, 7], [7, 7]],
-        south: [[8, 7], [9, 7], [10, 7], [11, 7]],
-        west: [[12, 7], [13, 7], [14, 7], [15, 7]],
-    },
-
-    ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
-
-    fireball: [[12, 9], [13, 9], [14, 9], [15, 9]],
-
-    cleats: [2, 6],
-    suction_boots: [3, 6],
-    fire_boots: [1, 6],
-    flippers: [0, 6],
-
-    hint: [5, 2],
-
-    score_10: [14, 2],
-    score_100: [13, 2],
-    score_1000: [12, 2],
-    score_2x: [15, 2],
+    // misc other stuff
 };
 
 // XXX need to specify that you can't use this for cc2 levels, somehow
