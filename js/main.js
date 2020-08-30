@@ -102,6 +102,7 @@ class Tile {
         this.direction = direction;
 
         this.slide_mode = null;
+        this.movement_cooldown = 0;
 
         if (type.has_inventory) {
             this.inventory = {};
@@ -279,97 +280,107 @@ class Level {
         }
     }
 
-    halftic() {
+    advance_tic(player_direction) {
         if (this.state !== 'playing') {
-            console.warn(`Level.halftic() called when state is ${this.state}`);
+            console.warn(`Level.advance_tic() called when state is ${this.state}`);
             return;
         }
 
-        for (let actor of this.actors) {
-            if (actor.slide_mode !== null) {
-                // TODO do we stop sliding if we hit something, too?
-                this.attempt_step(actor, actor.direction);
-            }
-
-            if (this.state === 'success' || this.state === 'failure')
-                break;
-        }
-    }
-
-    advance(player_direction) {
-        if (this.state !== 'playing') {
-            console.warn(`Level.advance() called when state is ${this.state}`);
-            return;
-        }
-
+        // XXX this entire turn order is rather different in ms rules
         for (let actor of this.actors) {
             // TODO strip these out maybe??
             if (actor.doomed)
                 continue;
 
-            // Actors can't make voluntary moves on ice
-            if (actor.slide_mode === 'ice')
-                continue;
-            if (actor === this.player) {
+            if (actor.movement_cooldown > 0) {
+                actor.movement_cooldown -= 1;
+                if (actor.movement_cooldown > 0)
+                    continue;
+            }
+
+            let direction_preference;
+            // Actors can't make voluntary moves on ice, so they're stuck with
+            // whatever they've got
+            if (actor.slide_mode === 'ice') {
+                direction_preference = [actor.direction];
+            }
+            else if (actor.slide_mode === 'force') {
+                // Only the player can make voluntary moves on a force floor,
+                // and only if their previous move was an /involuntary/ move on
+                // a force floor.  If they do, it overrides the forced move
+                // XXX this in particular has some subtleties in lynx (e.g. you
+                // can override forwards??) and DEFINITELY all kinds of stuff
+                // in ms
+                if (actor === this.player &&
+                    player_direction &&
+                    actor.last_move_was_force)
+                {
+                    direction_preference = [player_direction];
+                    actor.last_move_was_force = false;
+                }
+                else {
+                    direction_preference = [actor.direction];
+                    if (actor === this.player) {
+                        actor.last_move_was_force = true;
+                    }
+                }
+            }
+            else if (actor === this.player) {
                 if (player_direction) {
-                    actor.direction = player_direction;
-                    this.attempt_step(actor, player_direction);
+                    direction_preference = [player_direction];
+                    actor.last_move_was_force = false;
                 }
             }
             else if (actor.type.movement_mode === 'follow-left') {
                 // bug behavior: always try turning as left as possible, and
                 // fall back to less-left turns when that fails
-                let direction = DIRECTIONS[actor.direction].left;
-                for (let i = 0; i < 4; i++) {
-                    if (this.attempt_step(actor, direction)) {
-                        actor.direction = direction;
-                        break;
-                    }
-                    direction = DIRECTIONS[direction].right;
-                }
+                let d = DIRECTIONS[actor.direction];
+                direction_preference = [d.left, actor.direction, d.right, d.opposite];
             }
             else if (actor.type.movement_mode === 'follow-right') {
                 // paramecium behavior: always try turning as right as
                 // possible, and fall back to less-right turns when that fails
-                let direction = DIRECTIONS[actor.direction].right;
-                for (let i = 0; i < 4; i++) {
-                    if (this.attempt_step(actor, direction)) {
-                        actor.direction = direction;
-                        break;
-                    }
-                    direction = DIRECTIONS[direction].left;
-                }
+                let d = DIRECTIONS[actor.direction];
+                direction_preference = [d.right, actor.direction, d.left, d.opposite];
             }
             else if (actor.type.movement_mode === 'turn-left') {
                 // glider behavior: preserve current direction; if that doesn't
                 // work, turn left, then right, then back the way we came
-                for (let direction of [
-                    actor.direction,
-                    DIRECTIONS[actor.direction].left,
-                    DIRECTIONS[actor.direction].right,
-                    DIRECTIONS[actor.direction].opposite,
-                ]) {
-                    if (this.attempt_step(actor, direction)) {
-                        actor.direction = direction;
-                        break;
-                    }
-                }
+                let d = DIRECTIONS[actor.direction];
+                direction_preference = [actor.direction, d.left, d.right, d.opposite];
             }
             else if (actor.type.movement_mode === 'turn-right') {
                 // fireball behavior: preserve current direction; if that doesn't
                 // work, turn right, then left, then back the way we came
-                for (let direction of [
-                    actor.direction,
-                    DIRECTIONS[actor.direction].right,
-                    DIRECTIONS[actor.direction].left,
-                    DIRECTIONS[actor.direction].opposite,
-                ]) {
-                    if (this.attempt_step(actor, direction)) {
-                        actor.direction = direction;
-                        break;
-                    }
+                let d = DIRECTIONS[actor.direction];
+                direction_preference = [actor.direction, d.right, d.left, d.opposite];
+            }
+            else if (actor.type.movement_mode === 'bounce') {
+                // bouncy ball behavior: preserve current direction; if that
+                // doesn't work, bounce back the way we came
+                let d = DIRECTIONS[actor.direction];
+                direction_preference = [actor.direction, d.opposite];
+            }
+
+            if (! direction_preference)
+                continue;
+
+            let moved = false;
+            for (let direction of direction_preference) {
+                actor.direction = direction;
+                if (this.attempt_step(actor, direction)) {
+                    moved = true;
+                    break;
                 }
             }
+
+            // Always set the cooldown if we even attempt to move.  Speed
+            // multiplier is based on the tile we landed /on/, if any.
+            let speed_multiplier = 1;
+            if (actor.slide_mode !== null) {
+                speed_multiplier = 2;
+            }
+            actor.movement_cooldown = actor.type.movement_speed / speed_multiplier;
 
             // TODO do i need to do this more aggressively?
             if (this.state === 'success' || this.state === 'failure')
@@ -382,6 +393,8 @@ class Level {
         this.fail_message = message;
     }
 
+    // Try to move the given actor one tile in the given direction and update
+    // their cooldown.  Return true if successful.
     attempt_step(actor, direction) {
         let move = DIRECTIONS[direction].movement;
         let goal_x = actor.x + move[0];
@@ -442,6 +455,9 @@ class Level {
         return true;
     }
 
+    // Move the given actor to the given position and perform any appropriate
+    // tile interactions.  Does NOT check for whether the move is actually
+    // legal; use attempt_step for that!
     move_to(actor, x, y) {
         if (x === actor.x && y === actor.y)
             return;
@@ -644,15 +660,10 @@ class Game {
     do_frame() {
         if (this.level.state === 'playing') {
             this.frame++;
-            if (this.frame % 6 === 0) {
-                this.level.halftic();
-            }
-            if (this.frame % 12 === 0) {
-                this.level.advance(this.next_player_move);
+            if (this.frame % 3 === 0) {
+                this.level.advance_tic(this.next_player_move);
                 this.next_player_move = this.pending_player_move;
                 this.player_used_move = true;
-            }
-            if (this.frame % 6 === 0) {
                 this.redraw();
             }
             this.frame %= 60;

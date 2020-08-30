@@ -197,25 +197,25 @@ const TILE_TYPES = {
     force_floor_n: {
         on_arrive(me, level, other) {
             other.direction = 'north';
-            level.make_slide(other, 'push');
+            level.make_slide(other, 'force');
         }
     },
     force_floor_e: {
         on_arrive(me, level, other) {
             other.direction = 'east';
-            level.make_slide(other, 'push');
+            level.make_slide(other, 'force');
         }
     },
     force_floor_s: {
         on_arrive(me, level, other) {
             other.direction = 'south';
-            level.make_slide(other, 'push');
+            level.make_slide(other, 'force');
         }
     },
     force_floor_w: {
         on_arrive(me, level, other) {
             other.direction = 'west';
-            level.make_slide(other, 'push');
+            level.make_slide(other, 'force');
         }
     },
     bomb: {
@@ -261,33 +261,40 @@ const TILE_TYPES = {
         is_object: true,
         is_monster: true,
         movement_mode: 'follow-left',
+        movement_speed: 4,
     },
     paramecium: {
         is_actor: true,
         is_object: true,
         is_monster: true,
         movement_mode: 'follow-right',
+        movement_speed: 4,
     },
     ball: {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        movement_mode: 'bounce',
+        movement_speed: 4,
     },
     blob: {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        movement_speed: 8,
     },
     teeth: {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        movement_speed: 4,
     },
     fireball: {
         is_actor: true,
         is_object: true,
         is_monster: true,
         movement_mode: 'turn-right',
+        movement_speed: 4,
         ignores: new Set(['fire']),
     },
     glider: {
@@ -295,6 +302,7 @@ const TILE_TYPES = {
         is_object: true,
         is_monster: true,
         movement_mode: 'turn-left',
+        movement_speed: 4,
         ignores: new Set(['water']),
     },
 
@@ -356,9 +364,11 @@ const TILE_TYPES = {
         is_player: true,
         has_inventory: true,
         is_object: true,
+        movement_speed: 4,
         pushes: {
             dirt_block: true,
         },
+        // FIXME this prevents thief from taking green key
         infinite_items: {
             key_green: true,
         },
