@@ -133,7 +133,14 @@ export const CC2_TILESET_LAYOUT = {
     ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
     steel: [15, 10],
 
-    // TODO teeth, seem to be missing north???
+    teeth: {
+        // NOTE: CC2 inexplicably dropped north teeth and just uses the south
+        // sprites instead
+        north: [[0, 11], [1, 11], [2, 11]],
+        east: [[3, 11], [4, 11], [5, 11]],
+        south: [[0, 11], [1, 11], [2, 11]],
+        west: [[6, 11], [7, 11], [8, 11]],
+    },
     swivel_sw: [9, 11],
     swivel_nw: [10, 11],
     swivel_ne: [11, 11],

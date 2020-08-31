@@ -132,7 +132,7 @@ const TILE_TYPES = {
     water: {
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
-            if (other.type.name == 'dirt_block') {
+            if (other.type.name == 'dirt_block' || other.type.name == 'clone_block') {
                 other.destroy();
                 me.become('dirt');
             }
@@ -261,6 +261,13 @@ const TILE_TYPES = {
 
     // Mechanisms
     dirt_block: {
+        blocks: true,
+        is_object: true,
+        is_block: true,
+        ignores: new Set(['fire']),
+    },
+    clone_block: {
+        // TODO is this in any way distinct from dirt block
         blocks: true,
         is_object: true,
         is_block: true,
@@ -457,6 +464,7 @@ const TILE_TYPES = {
         movement_speed: 4,
         pushes: {
             dirt_block: true,
+            clone_block: true,
         },
         // FIXME this prevents thief from taking green key
         infinite_items: {
