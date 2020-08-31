@@ -8,6 +8,7 @@ export const CC2_TILESET_LAYOUT = {
     key_yellow: [6, 1],
     key_green: [7, 1],
     dirt_block: [8, 1],
+    clone_block: [8, 1],
     // xray
     ice: [10, 1],
     ice_se: [11, 1],

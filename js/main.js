@@ -536,30 +536,10 @@ class Level {
     }
 }
 
-class LevelBrowserOverlay {
-    constructor(game) {
+class Overlay {
+    constructor(game, root) {
         this.game = game;
-        this.root = mk('table.level-browser');
-        for (let [i, stored_level] of this.game.stored_game.levels.entries()) {
-            this.root.append(mk('tr',
-                {'data-index': i},
-                mk('td', i + 1),
-                mk('td', stored_level.title),
-                // TODO score?
-                // TODO other stats??
-                mk('td', '▶'),
-            ));
-        }
-
-        this.root.addEventListener('click', ev => {
-            let tr = ev.target.closest('table.level-browser tr');
-            if (! tr)
-                return;
-
-            let index = parseInt(tr.getAttribute('data-index'), 10);
-            this.game.load_level(index);
-            this.close();
-        });
+        this.root = root;
 
         // Don't propagate clicks on the root element, so they won't trigger a
         // parent overlay's automatic dismissal
@@ -573,19 +553,60 @@ class LevelBrowserOverlay {
             this.game.set_state('paused');
         }
 
-        let overlay = mk('div.overlay', mk('div.dialog', this.root));
+        let overlay = mk('div.overlay', this.root);
         document.body.append(overlay);
 
         // Remove the overlay when clicking outside the element
         overlay.addEventListener('click', ev => {
             this.close();
         });
-
-        return promise;
     }
 
     close() {
         this.root.closest('.overlay').remove();
+    }
+}
+class LevelBrowserOverlay extends Overlay {
+    constructor(game) {
+        let root = mk('table.level-browser');
+        for (let [i, stored_level] of game.stored_game.levels.entries()) {
+            this.root.append(mk('tr',
+                {'data-index': i},
+                mk('td', i + 1),
+                mk('td', stored_level.title),
+                // TODO score?
+                // TODO other stats??
+                mk('td', '▶'),
+            ));
+        }
+
+        root.addEventListener('click', ev => {
+            let tr = ev.target.closest('table.level-browser tr');
+            if (! tr)
+                return;
+
+            let index = parseInt(tr.getAttribute('data-index'), 10);
+            this.game.load_level(index);
+            this.close();
+        });
+
+        super(game, mk('div.dialog', root));
+    }
+}
+class ConfirmOverlay extends Overlay {
+    constructor(game, message, what) {
+        let root = mk('div.dialog', mk('p', {}, message));
+        let yes = mk('button', {type: 'button'}, "Yep");
+        let no = mk('button', {type: 'button'}, "Nope");
+        yes.addEventListener('click', ev => {
+            this.close();
+            what();
+        });
+        no.addEventListener('click', ev => {
+            this.close();
+        });
+        root.append(yes, no);
+        super(game, root);
     }
 }
 
@@ -640,7 +661,7 @@ const GAME_UI_HTML = `
     <div class="inventory"></div>
     <div class="controls">
         <button class="control-pause" type="button">Pause</button>
-        <button class="control-restart" type="button" disabled>Restart</button>
+        <button class="control-restart" type="button">Restart</button>
         <button class="control-undo" type="button" disabled>Undo</button>
         <button class="control-rewind" type="button" disabled>Rewind</button>
     </div>
@@ -718,12 +739,14 @@ class Game {
             if (this.level_index > 0) {
                 this.load_level(this.level_index - 1);
             }
+            ev.target.blur();
         });
         this.nav_next_button.addEventListener('click', ev => {
             // TODO confirm
             if (this.level_index < this.stored_game.levels.length - 1) {
                 this.load_level(this.level_index + 1);
             }
+            ev.target.blur();
         });
         nav_el.querySelector('.nav-browse').addEventListener('click', ev => {
             new LevelBrowserOverlay(this).open();
@@ -733,6 +756,13 @@ class Game {
         this.pause_button = this.container.querySelector('.controls .control-pause');
         this.pause_button.addEventListener('click', ev => {
             this.toggle_pause();
+            ev.target.blur();
+        });
+        this.restart_button = this.container.querySelector('.controls .control-restart');
+        this.restart_button.addEventListener('click', ev => {
+            new ConfirmOverlay(this, "Abandon this attempt and try again?", () => {
+                this.restart_level();
+            }).open();
             ev.target.blur();
         });
         // Demo playback
@@ -785,7 +815,6 @@ class Game {
                     this.set_state('playing');
                 }
                 else if (this.state === 'stopped') {
-                    console.log(this.level.state);
                     if (this.level.state === 'success') {
                         // Advance to the next level
                         // TODO game ending?
@@ -793,10 +822,7 @@ class Game {
                     }
                     else {
                         // Restart
-                        this.level.restart();
-                        this.set_state('waiting');
-                        this.update_ui();
-                        this.redraw();
+                        this.restart_level();
                     }
                     return;
                 }
@@ -902,6 +928,13 @@ class Game {
         this.redraw();
     }
 
+    restart_level() {
+        this.level.restart();
+        this.set_state('waiting');
+        this.update_ui();
+        this.redraw();
+    }
+
     get_input() {
         if (this.demo) {
             let step = this.demo.next();
@@ -999,6 +1032,7 @@ class Game {
 
     update_ui() {
         this.pause_button.disabled = !(this.state === 'playing' || this.state === 'paused');
+        this.restart_button.disabled = (this.state === 'waiting');
 
         // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;
