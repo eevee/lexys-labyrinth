@@ -570,7 +570,7 @@ class LevelBrowserOverlay extends Overlay {
     constructor(game) {
         let root = mk('table.level-browser');
         for (let [i, stored_level] of game.stored_game.levels.entries()) {
-            this.root.append(mk('tr',
+            root.append(mk('tr',
                 {'data-index': i},
                 mk('td', i + 1),
                 mk('td', stored_level.title),
