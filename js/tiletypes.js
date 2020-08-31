@@ -1,3 +1,5 @@
+import { DIRECTIONS } from './defs.js';
+
 const TILE_TYPES = {
     // Floors and walls
     floor: {
@@ -11,6 +13,7 @@ const TILE_TYPES = {
         blocks: true,
     },
     wall_invisible: {
+        // TODO cc2 seems to make these flicker briefly
         blocks: true,
     },
     wall_appearing: {
@@ -35,6 +38,9 @@ const TILE_TYPES = {
     },
     thinwall_w: {
         thin_walls: new Set(['west']),
+    },
+    thinwall_se: {
+        thin_walls: new Set(['south', 'east']),
     },
     fake_wall: {
         blocks: true,
@@ -219,6 +225,11 @@ const TILE_TYPES = {
         }
     },
     bomb: {
+        // TODO explode
+        on_arrive(me, level, other) {
+            me.destroy();
+            other.destroy();
+        }
     },
     thief_tools: {
         on_arrive(me, level, other) {
@@ -246,13 +257,65 @@ const TILE_TYPES = {
     },
 
     // Mechanisms
-    cloner: {
-        blocks: true,
-    },
     dirt_block: {
         blocks: true,
         is_object: true,
         is_block: true,
+    },
+    green_floor: {},
+    green_wall: {
+        blocks: true,
+    },
+    cloner: {
+        // TODO ???
+        blocks: true,
+    },
+    trap: {
+        // TODO ???
+    },
+    teleport_blue: {
+        // TODO
+    },
+    // Buttons
+    button_blue: {
+        on_arrive(me, level, other) {
+            // Flip direction of all tanks
+            for (let actor of level.actors) {
+                // TODO generify somehow??
+                if (actor.type.name === 'tank_blue') {
+                    actor.direction = DIRECTIONS[actor.direction].opposite;
+                }
+            }
+        }
+    },
+    button_green: {
+        on_arrive(me, level, other) {
+            // Swap green floors and walls
+            for (let row of level.cells) {
+                for (let cell of row) {
+                    for (let tile of cell) {
+                        if (tile.type.name === 'green_floor') {
+                            tile.become('green_wall');
+                        }
+                        else if (tile.type.name === 'green_wall') {
+                            tile.become('green_floor');
+                        }
+                        else if (tile.type.name === 'green_chip') {
+                            tile.become('green_bomb');
+                        }
+                        else if (tile.type.name === 'green_bomb') {
+                            tile.become('green_chip');
+                        }
+                    }
+                }
+            }
+        }
+    },
+    button_brown: {
+        // TODO how do i implement this.
+    },
+    button_red: {
+        // TODO
     },
 
     // Critters
@@ -260,6 +323,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        blocks_monsters: true,
         movement_mode: 'follow-left',
         movement_speed: 4,
     },
@@ -267,6 +331,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        blocks_monsters: true,
         movement_mode: 'follow-right',
         movement_speed: 4,
     },
@@ -274,25 +339,45 @@ const TILE_TYPES = {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        blocks_monsters: true,
         movement_mode: 'bounce',
+        movement_speed: 4,
+    },
+    walker: {
+        is_actor: true,
+        is_object: true,
+        is_monster: true,
+        blocks_monsters: true,
+        // TODO movement_move: 'bounce-random',
+        movement_speed: 4,
+    },
+    tank_blue: {
+        is_actor: true,
+        is_object: true,
+        is_monster: true,
+        blocks_monsters: true,
+        movement_mode: 'forward',
         movement_speed: 4,
     },
     blob: {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        blocks_monsters: true,
         movement_speed: 8,
     },
     teeth: {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        blocks_monsters: true,
         movement_speed: 4,
     },
     fireball: {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        blocks_monsters: true,
         movement_mode: 'turn-right',
         movement_speed: 4,
         ignores: new Set(['fire']),
@@ -301,6 +386,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_object: true,
         is_monster: true,
+        blocks_monsters: true,
         movement_mode: 'turn-left',
         movement_speed: 4,
         ignores: new Set(['water']),

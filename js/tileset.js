@@ -17,6 +17,8 @@ export const CC2_TILESET_LAYOUT = {
     cloner: [15, 1],
 
     floor: [0, 2],
+    wall_invisible: [0, 2],
+    wall_appearing: [0, 2],
     wall: [1, 2],
     floor_letter: [2, 2],
     'floor_letter#ascii': {
@@ -108,7 +110,14 @@ export const CC2_TILESET_LAYOUT = {
 
     green_floor: [[0, 9], [1, 9], [2, 9], [3, 9]],
     purple_floor: [[4, 9], [5, 9], [6, 9], [7, 9]],
-    // TODO [8, 9] is used as an overlay for green wall
+    green_wall: {
+        base: 'green_floor',
+        overlay: [8, 9],
+    },
+    purple_wall: {
+        base: 'purple_floor',
+        overlay: [8, 9],
+    },
     // TODO state (10 is closed)
     trap: [9, 9],
     button_gray: [11, 9],
@@ -384,6 +393,14 @@ export class Tileset {
         let drawspec = this.layout[name];
         let coords = drawspec;
         if (! coords) console.error(name);
+
+        let overlay;
+        if (coords.overlay) {
+            // Goofy overlay thing used for green/purple toggle tiles
+            overlay = coords.overlay;
+            coords = this.layout[coords.base];
+        }
+
         if (!(coords instanceof Array)) {
             // Must be an object of directions
             coords = coords[tile.direction ?? 'south'];
@@ -393,6 +410,9 @@ export class Tileset {
         }
 
         this.blit(ctx, coords[0], coords[1], x, y);
+        if (overlay) {
+            this.blit(ctx, overlay[0], overlay[1], x, y);
+        }
 
         // Special behavior for special objects
         // TODO? hardcode this less?

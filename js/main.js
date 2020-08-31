@@ -5,6 +5,7 @@ import * as dat from './format-dat.js';
 import * as format_util from './format-util.js';
 import TILE_TYPES from './tiletypes.js';
 import { Tileset, CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
+import { DIRECTIONS } from './defs.js';
 
 function mk(tag_selector, ...children) {
     let [tag, ...classes] = tag_selector.split('.');
@@ -66,33 +67,6 @@ async function fetch(url) {
 
 
 const PAGE_TITLE = "Lexy's Labyrinth";
-
-const DIRECTIONS = {
-    north: {
-        movement: [0, -1],
-        left: 'west',
-        right: 'east',
-        opposite: 'south',
-    },
-    south: {
-        movement: [0, 1],
-        left: 'east',
-        right: 'west',
-        opposite: 'north',
-    },
-    west: {
-        movement: [-1, 0],
-        left: 'south',
-        right: 'north',
-        opposite: 'east',
-    },
-    east: {
-        movement: [1, 0],
-        left: 'north',
-        right: 'south',
-        opposite: 'west',
-    },
-};
 
 class Tile {
     constructor(type, x, y, direction = 'south') {
@@ -231,16 +205,16 @@ class Level {
         this.width = stored_level.size_x;
         this.height = stored_level.size_y;
         this.restart();
+    }
 
+    restart() {
         // playing: normal play
         // success: has been won
         // failure: died
         // note that pausing is NOT handled here, but by whatever's driving our
         // event loop!
         this.state = 'playing';
-    }
 
-    restart() {
         this.cells = [];
         this.player = null;
         this.actors = [];
@@ -370,6 +344,10 @@ class Level {
                 // doesn't work, bounce back the way we came
                 let d = DIRECTIONS[actor.direction];
                 direction_preference = [actor.direction, d.opposite];
+            }
+            else if (actor.type.movement_mode === 'forward') {
+                // blue tank behavior: keep moving forward
+                direction_preference = [actor.direction];
             }
 
             if (! direction_preference)
@@ -530,6 +508,13 @@ class Level {
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
+            }
+
+            if ((actor.type.is_player && tile.type.is_monster) ||
+                (actor.type.is_monster && tile.type.is_player))
+            {
+                // TODO ooh, obituaries
+                this.fail("Oops!  Watch out for creatures!");
             }
         });
     }
@@ -734,6 +719,29 @@ class Game {
                 return;
             }
 
+            if (ev.key === ' ') {
+                if (this.state === 'waiting') {
+                    // Start without moving
+                    this.set_state('playing');
+                }
+                else if (this.state === 'stopped') {
+                    console.log(this.level.state);
+                    if (this.level.state === 'success') {
+                        // Advance to the next level
+                        // TODO game ending?
+                        this.load_level(this.level_index + 1);
+                    }
+                    else {
+                        // Restart
+                        this.level.restart();
+                        this.set_state('waiting');
+                        this.update_ui();
+                        this.redraw();
+                    }
+                    return;
+                }
+            }
+
             if (this.key_mapping[ev.key]) {
                 this.current_keys.add(ev.key);
                 ev.stopPropagation();
@@ -813,6 +821,7 @@ class Game {
     }
 
     load_level(level_index) {
+        // TODO clear out input?  (when restarting, too?)
         this.level_index = level_index;
         this.level = new Level(this.stored_game.levels[level_index]);
         // waiting: haven't yet pressed a key so the timer isn't going
@@ -1085,8 +1094,15 @@ async function main() {
     // TODO error handling  :(
     let stored_game;
     if (query.get('setpath')) {
-        stored_game = new format_util.StoredGame;
-        stored_game.levels.push(c2m.parse_level(await fetch(query.get('setpath'))));
+        let path = query.get('setpath');
+        let data = await fetch(path);
+        if (path.match(/\.(?:dat|ccl)$/i)) {
+            stored_game = dat.parse_game(data);
+        }
+        else {
+            stored_game = new format_util.StoredGame;
+            stored_game.levels.push(c2m.parse_level(data));
+        }
     }
     else {
         // TODO also support tile world's DAC when reading from local??

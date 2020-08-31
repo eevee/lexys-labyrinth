@@ -125,6 +125,7 @@ main > header > nav {
 dl.score-chart {
     display: grid;
     grid-auto-columns: 1fr 1fr;
+    font-size: 1.25rem;
     font-weight: normal;
 }
 dl.score-chart dt {
