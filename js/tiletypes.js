@@ -224,6 +224,9 @@ const TILE_TYPES = {
             level.make_slide(other, 'force');
         }
     },
+    force_floor_all: {
+        // TODO cc2 cycles these...
+    },
     bomb: {
         // TODO explode
         on_arrive(me, level, other) {
@@ -261,6 +264,7 @@ const TILE_TYPES = {
         blocks: true,
         is_object: true,
         is_block: true,
+        ignores: new Set(['fire']),
     },
     green_floor: {},
     green_wall: {

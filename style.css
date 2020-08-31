@@ -43,9 +43,33 @@ body > header > nav {
     gap: 0.5em;
 }
 
+.overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #0004;
+}
+.dialog {
+    max-width: 80%;
+    max-height: 80%;
+    overflow: auto;
+    padding: 1em;
+    border: 1px solid black;
+    color: black;
+    background: #e8e8e8;
+    box-shadow: 0 1px 3px #000c;
+}
+
 main {
     flex: 0;
     margin: auto;  /* center in both directions baby */
+    isolation: isolate;
     display: grid;
     align-items: center;
     grid:
@@ -107,7 +131,7 @@ main > header > nav {
     justify-content: center;
     align-items: center;
 
-    z-index: 99;
+    z-index: 1;
     font-size: 48px;
     padding: 10%;
     background: #0009;

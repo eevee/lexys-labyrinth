@@ -310,7 +310,7 @@ class Level {
             }
             else if (actor === this.player) {
                 if (player_direction) {
-                    console.log('--- player moving', player_direction);
+                    //console.log('--- player moving', player_direction);
                     direction_preference = [player_direction];
                     actor.last_move_was_force = false;
                 }
@@ -532,6 +532,59 @@ class Level {
     }
 }
 
+class LevelBrowserOverlay {
+    constructor(game) {
+        this.game = game;
+        this.root = mk('table.level-browser');
+        for (let [i, stored_level] of this.game.stored_game.levels.entries()) {
+            this.root.append(mk('tr',
+                {'data-index': i},
+                mk('td', i + 1),
+                mk('td', stored_level.title),
+                // TODO score?
+                // TODO other stats??
+                mk('td', '▶'),
+            ));
+        }
+
+        this.root.addEventListener('click', ev => {
+            let tr = ev.target.closest('table.level-browser tr');
+            if (! tr)
+                return;
+
+            let index = parseInt(tr.getAttribute('data-index'), 10);
+            this.game.load_level(index);
+            this.close();
+        });
+
+        // Don't propagate clicks on the root element, so they won't trigger a
+        // parent overlay's automatic dismissal
+        this.root.addEventListener('click', ev => {
+            ev.stopPropagation();
+        });
+    }
+
+    open() {
+        if (this.game.state === 'playing') {
+            this.game.set_state('paused');
+        }
+
+        let overlay = mk('div.overlay', mk('div.dialog', this.root));
+        document.body.append(overlay);
+
+        // Remove the overlay when clicking outside the element
+        overlay.addEventListener('click', ev => {
+            this.close();
+        });
+
+        return promise;
+    }
+
+    close() {
+        this.root.closest('.overlay').remove();
+    }
+}
+
 // TODO:
 // - some kinda visual theme i guess lol
 // - level password, if any
@@ -561,7 +614,7 @@ const GAME_UI_HTML = `
         <h2 class="level-name">Level 1 — Key Pyramid</h2>
         <nav class="nav">
             <button class="nav-prev" type="button">⬅️\ufe0e</button>
-            <button class="nav-browse" type="button" disabled>Level select</button>
+            <button class="nav-browse" type="button">Level select</button>
             <button class="nav-next" type="button">➡️\ufe0e</button>
         </nav>
     </header>
@@ -667,6 +720,9 @@ class Game {
             if (this.level_index < this.stored_game.levels.length - 1) {
                 this.load_level(this.level_index + 1);
             }
+        });
+        nav_el.querySelector('.nav-browse').addEventListener('click', ev => {
+            new LevelBrowserOverlay(this).open();
         });
 
         // Bind buttons
