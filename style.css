@@ -1,31 +1,67 @@
 html {
+    font-size: 24px;
     height: 100%;
 }
 body {
-    font-size: 24px;
     min-height: 100%;
     margin: 0;
 
     display: flex;
-    justify-content: center;
-    align-items: center;
+    flex-direction: column;
 
-    background: #404040;
+    background: #101214;
+    color: white;
 }
+
+/* Generic element styling */
+button {
+    font-size: inherit;
+    padding: 0.125em 0.5em;
+    border: 1px solid black;
+    background: #909090;
+    border-image: url(button.png) 33.333% fill / auto repeat;
+    text-transform: lowercase;
+}
+h1, h2, h3, h4, h5, h6 {
+    font-weight: normal;
+    margin: 0;
+}
+
+/* Main page structure */
+body > header {
+    display: flex;
+    align-items: center;
+    padding: 0.5em;
+    background: #00080c;
+}
+body > header > h1 {
+    flex: 1;
+    font-size: 1.25rem;
+}
+body > header > nav {
+    display: flex;
+    gap: 0.5em;
+}
+
 main {
+    flex: 0;
+    margin: auto;  /* center in both directions baby */
     display: grid;
+    align-items: center;
     grid:
-        "level meta"        min-content
-        "level nav"         min-content
-        "level chips"       min-content
-        "level time"        min-content
-        "level hint"        1fr
-        "level inventory"   min-content
-        "controls controls"
+        "header     header"
+        "level      chips"
+        "level      time"
+        "level      bonus"
+        "level      message"   1fr
+        "level inventory"
+        "level controls"
         "demo demo"
-        / min-content 12em
+        /* Need explicit min-content to force the hint to wrap */
+        / min-content min-content
     ;
-    gap: 1em;
+    column-gap: 1em;
+    row-gap: 0.5em;
 
     image-rendering: optimizeSpeed;
 
@@ -34,8 +70,23 @@ main {
     --scale: 2;
 }
 
-button {
-    font-size: inherit;
+main > header {
+    grid-area: header;
+    display: grid;
+    grid-auto-columns: 1fr auto;
+    align-items: center;
+    gap: 0.25em;
+}
+main > header > h1,
+main > header > h2 {
+    grid-column: 1;
+    line-height: 1;
+}
+main > header > nav {
+    grid-column: 2;
+    justify-self: end;
+    display: flex;
+    gap: 0.25em;
 }
 
 .level {
@@ -49,14 +100,16 @@ button {
 }
 .bummer {
     grid-area: level;
+    place-self: stretch;
 
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
 
     z-index: 99;
     font-size: 48px;
-    padding: 25%;
+    padding: 10%;
     background: #0009;
     color: white;
     text-align: center;
@@ -66,6 +119,29 @@ button {
 .bummer:empty {
     display: none;
 }
+.bummer p {
+    margin: 0;
+}
+dl.score-chart {
+    display: grid;
+    grid-auto-columns: 1fr 1fr;
+    font-weight: normal;
+}
+dl.score-chart dt {
+    grid-column: 1;
+    text-align: left;
+}
+dl.score-chart dd {
+    grid-column: 2;
+    margin: 0;
+    text-align: right;
+}
+dl.score-chart .-sum {
+    margin-bottom: 0.5em;
+    border-top: 1px solid white;
+    color: hsl(40, 75%, 80%);
+}
+
 .meta {
     grid-area: meta;
 
@@ -73,30 +149,59 @@ button {
     background: black;
     text-align: center;
 }
-.nav {
-    grid-area: nav;
-    display: flex;
-    gap: 1em;
-}
-.nav .nav-browse {
-    flex: 1;
-}
 .chips {
     grid-area: chips;
-
-    padding: 0 0.5em;
-    color: yellow;
-    background: black;
-}
-.chips::before {
-    content: "chips left: ";
 }
 .time {
     grid-area: time;
 }
-.hint {
-    grid-area: hint;
+.bonus {
+    grid-area: bonus;
 }
+.chips,
+.time,
+.bonus {
+    display: flex;
+    align-items: center;
+}
+.chips h3,
+.time h3,
+.bonus h3 {
+    flex: 1;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+.chips output,
+.time output,
+.bonus output {
+    flex: 0;
+    font-size: 2em;
+    padding: 0.125em;
+    min-width: 2em;
+    min-height: 1em;
+    line-height: 1;
+    text-align: right;
+    font-family: monospace;
+    color: hsl(45, 100%, 60%);
+    background: #080808;
+    border: 1px inset #202020;
+}
+
+.message {
+    grid-area: message;
+    align-self: stretch;
+
+    padding: 0.5em;
+    font-family: serif;
+    font-style: italic;
+    color: hsl(45, 100%, 60%);
+    background: #080808;
+    border: 1px inset #202020;
+}
+.message:empty {
+    display: none;
+}
+
 .inventory {
     grid-area: inventory;
     display: flex;
@@ -112,6 +217,11 @@ button {
 }
 .controls {
     grid-area: controls;
+    display: flex;
+    gap: 0.25em;
+}
+.controls > button {
+    flex: 1;
 }
 .demo {
     grid-area: demo;

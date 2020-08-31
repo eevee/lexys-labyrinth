@@ -11,7 +11,7 @@ function mk(tag_selector, ...children) {
     let el = document.createElement(tag);
     el.classList = classes.join(' ');
     if (children.length > 0) {
-        if (!(children[0] instanceof Node) && typeof(children[0]) !== "string" && typeof(children[0]) !== "number") {
+        if (!(children[0] instanceof Node) && children[0] !== undefined && typeof(children[0]) !== "string" && typeof(children[0]) !== "number") {
             let [attrs] = children.splice(0, 1);
             for (let [key, value] of Object.entries(attrs)) {
                 el.setAttribute(key, value);
@@ -235,7 +235,8 @@ class Level {
         // playing: normal play
         // success: has been won
         // failure: died
-        // paused: paused
+        // note that pausing is NOT handled here, but by whatever's driving our
+        // event loop!
         this.state = 'playing';
     }
 
@@ -244,6 +245,14 @@ class Level {
         this.player = null;
         this.actors = [];
         this.chips_remaining = this.stored_level.chips_required;
+        if (this.stored_level.time_limit === 0) {
+            this.time_remaining = null;
+        }
+        else {
+            this.time_remaining = this.stored_level.time_limit;
+        }
+        this.bonus_points = 0;
+        this.tic_counter = 0;
 
         this.hint_shown = null;
 
@@ -282,9 +291,8 @@ class Level {
 
     advance_tic(player_direction) {
         if (this.state !== 'playing') {
-            // FIXME this breaks the step buttons; maybe pausing should be in game only
-            //console.warn(`Level.advance_tic() called when state is ${this.state}`);
-            //return;
+            console.warn(`Level.advance_tic() called when state is ${this.state}`);
+            return;
         }
 
         // XXX this entire turn order is rather different in ms rules
@@ -388,11 +396,26 @@ class Level {
             if (this.state === 'success' || this.state === 'failure')
                 break;
         }
+
+        if (this.time_remaining !== null) {
+            this.tic_counter++;
+            while (this.tic_counter > 20) {
+                this.tic_counter -= 20;
+                this.time_remaining -= 1;
+                if (this.time_remaining <= 0) {
+                    this.fail("Time's up!");
+                }
+            }
+        }
     }
 
     fail(message) {
         this.state = 'failure';
         this.fail_message = message;
+    }
+
+    win() {
+        this.state = 'success';
     }
 
     // Try to move the given actor one tile in the given direction and update
@@ -526,34 +549,58 @@ class Level {
 
 // TODO:
 // - some kinda visual theme i guess lol
-// - level /number/
 // - level password, if any
-// - set name
-// - timer!
-// - intro splash with list of available levels
+// - timer!!!!!
+// - bonus points (cc2 only, or maybe only if got any so far this level)
+// - intro splash with list of available level packs
 // - button: quit to splash
 // - button: options
 // - implement winning and show score for this level
 // - show current score so far
+// - about, help
 const GAME_UI_HTML = `
+<header>
+    <h1>Lexy's Labyrinth</h1>
+    <nav>
+        <button class="nav-about" type="button" disabled>about</button>
+        <button class="nav-help" type="button" disabled>help</button>
+        <button class="nav-options" type="button" disabled>options</button>
+    </nav>
+</header>
 <main>
+    <header>
+        <h1 class="level-set">Chip's Challenge Level Pack 1</h1>
+        <nav>
+            <button class="set-nav-return" type="button" disabled>Change pack</button>
+        </nav>
+        <h2 class="level-name">Level 1 — Key Pyramid</h2>
+        <nav class="nav">
+            <button class="nav-prev" type="button">⬅️\ufe0e</button>
+            <button class="nav-browse" type="button" disabled>Level select</button>
+            <button class="nav-next" type="button">➡️\ufe0e</button>
+        </nav>
+    </header>
     <div class="level"><!-- level canvas and any overlays go here --></div>
     <div class="bummer"></div>
-    <div class="meta"></div>
-    <div class="nav">
-        <button class="nav-prev" type="button">«</button>
-        <button class="nav-browse" type="button">Level select</button>
-        <button class="nav-next" type="button">»</button>
+    <div class="message"></div>
+    <div class="chips">
+        <h3>Chips</h3>
+        <output></output>
     </div>
-    <div class="hint"></div>
-    <div class="chips"></div>
-    <div class="time"></div>
+    <div class="time">
+        <h3>Time</h3>
+        <output></output>
+    </div>
+    <div class="bonus">
+        <h3>Bonus</h3>
+        <output></output>
+    </div>
     <div class="inventory"></div>
     <div class="controls">
         <button class="control-pause" type="button">Pause</button>
-        <button class="control-restart" type="button">Restart</button>
-        <button class="control-undo" type="button">Undo</button>
-        <button class="control-rewind" type="button">Rewind</button>
+        <button class="control-restart" type="button" disabled>Restart</button>
+        <button class="control-undo" type="button" disabled>Undo</button>
+        <button class="control-rewind" type="button" disabled>Rewind</button>
     </div>
     <div class="demo">
         <h2>Solution demo available</h2>
@@ -610,19 +657,20 @@ class Game {
         this.container.style.setProperty('--tile-width', `${this.tileset.size_x}px`);
         this.container.style.setProperty('--tile-height', `${this.tileset.size_y}px`);
         this.level_el = this.container.querySelector('.level');
-        this.meta_el = this.container.querySelector('.meta');
-        this.nav_el = this.container.querySelector('.nav');
-        this.hint_el = this.container.querySelector('.hint');
-        this.chips_el = this.container.querySelector('.chips');
-        this.time_el = this.container.querySelector('.time');
+        this.level_name_el = this.container.querySelector('.level-name');
+        this.message_el = this.container.querySelector('.message');
+        this.chips_el = this.container.querySelector('.chips output');
+        this.time_el = this.container.querySelector('.time output');
+        this.bonus_el = this.container.querySelector('.bonus output');
         this.inventory_el = this.container.querySelector('.inventory');
         this.bummer_el = this.container.querySelector('.bummer');
         this.input_el = this.container.querySelector('.input');
         this.demo_el = this.container.querySelector('.demo');
 
         // Populate navigation
-        this.nav_prev_button = this.nav_el.querySelector('.nav-prev');
-        this.nav_next_button = this.nav_el.querySelector('.nav-next');
+        let nav_el = this.container.querySelector('.nav');
+        this.nav_prev_button = nav_el.querySelector('.nav-prev');
+        this.nav_next_button = nav_el.querySelector('.nav-next');
         this.nav_prev_button.addEventListener('click', ev => {
             // TODO confirm
             if (this.level_index > 0) {
@@ -637,13 +685,9 @@ class Game {
         });
 
         // Bind buttons
-        this.container.querySelector('.controls .control-pause').addEventListener('click', ev => {
-            if (this.level.state === 'playing') {
-                this.level.state = 'paused';
-            }
-            else if (this.level.state === 'paused') {
-                this.level.state = 'playing';
-            }
+        this.pause_button = this.container.querySelector('.controls .control-pause');
+        this.pause_button.addEventListener('click', ev => {
+            this.toggle_pause();
             ev.target.blur();
         });
         // Demo playback
@@ -685,10 +729,19 @@ class Game {
         this.current_keys = new Set;  // keys that are currently held
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
+            if (ev.key === 'p' || ev.key === 'Pause') {
+                this.toggle_pause();
+                return;
+            }
+
             if (this.key_mapping[ev.key]) {
                 this.current_keys.add(ev.key);
                 ev.stopPropagation();
                 ev.preventDefault();
+
+                if (this.state === 'waiting') {
+                    this.set_state('playing');
+                }
             }
         });
         key_target.addEventListener('keyup', ev => {
@@ -721,7 +774,6 @@ class Game {
 
         // Done with UI, now we can load a level
         this.load_level(0);
-        this.redraw();
 
         // Fill in the scrubber
         if (false && this.level.stored_level.demo) {
@@ -763,14 +815,22 @@ class Game {
     load_level(level_index) {
         this.level_index = level_index;
         this.level = new Level(this.stored_game.levels[level_index]);
+        // waiting: haven't yet pressed a key so the timer isn't going
+        // playing: playing normally
+        // paused: um, paused
+        // rewinding: playing backwards
+        // stopped: level has ended one way or another
+        this.set_state('waiting');
+
         // FIXME do better
-        this.meta_el.textContent = this.level.stored_level.title;
+        this.level_name_el.textContent = `Level ${level_index + 1} — ${this.level.stored_level.title}`;
 
         document.title = `${PAGE_TITLE} - ${this.level.stored_level.title}`;
 
         this.nav_prev_button.disabled = level_index <= 0;
         this.nav_next_button.disabled = level_index >= this.stored_game.levels.length;
         this.update_ui();
+        this.redraw();
     }
 
     get_input() {
@@ -835,13 +895,19 @@ class Game {
 
             this.level.advance_tic(player_move);
             this.tic++;
+
+            if (this.level.state !== 'playing') {
+                // We either won or lost!
+                this.set_state('stopped');
+                break;
+            }
         }
         this.redraw();
         this.update_ui();
     }
 
     do_frame() {
-        if (this.level.state === 'playing') {
+        if (this.state === 'playing') {
             this.frame++;
             if (this.frame % 3 === 0) {
                 this.advance_by(1);
@@ -863,16 +929,18 @@ class Game {
     }
 
     update_ui() {
+        this.pause_button.disabled = !(this.state === 'playing' || this.state === 'paused');
+
         // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;
-        this.hint_el.textContent = this.level.hint_shown ?? '';
-
-        if (this.level.state === 'failure') {
-            this.bummer_el.textContent = this.level.fail_message;
+        if (this.level.time_remaining === null) {
+            this.time_el.textContent = '---';
         }
         else {
-            this.bummer_el.textContent = '';
+            this.time_el.textContent = this.level.time_remaining;
         }
+        this.bonus_el.textContent = this.level.bonus_points;
+        this.message_el.textContent = this.level.hint_shown ?? "";
 
         this.inventory_el.textContent = '';
         for (let [name, count] of Object.entries(this.level.player.inventory)) {
@@ -888,6 +956,59 @@ class Game {
 
         for (let action of Object.keys(ACTION_LABELS)) {
             this.input_action_elements[action].classList.toggle('--pressed', this.previous_input.has(action));
+        }
+    }
+
+    toggle_pause() {
+        if (this.state === 'paused') {
+            this.set_state('playing');
+        }
+        else if (this.state === 'playing') {
+            this.set_state('paused');
+        }
+    }
+
+    set_state(new_state) {
+        if (new_state === this.state)
+            return;
+
+        this.state = new_state;
+
+        if (this.state === 'waiting') {
+            this.bummer_el.textContent = "Ready!";
+        }
+        else if (this.state === 'playing' || this.state === 'rewinding') {
+            this.bummer_el.textContent = "";
+        }
+        else if (this.state === 'paused') {
+            this.bummer_el.textContent = "/// paused ///";
+        }
+        else if (this.state === 'stopped') {
+            if (this.level.state === 'failure') {
+                this.bummer_el.textContent = this.level.fail_message;
+            }
+            else {
+                this.bummer_el.textContent = "";
+                let base = (this.level_index + 1) * 500;
+                let time = (this.level.time_remaining || 0) * 10;
+                this.bummer_el.append(
+                    mk('p', "go bit buster!"),
+                    mk('dl.score-chart',
+                        mk('dt', "base score"),
+                        mk('dd', base),
+                        mk('dt', "time bonus"),
+                        mk('dd', `+ ${time}`),
+                        mk('dt', "score bonus"),
+                        mk('dd', `+ ${this.level.bonus_points}`),
+                        mk('dt.-sum', "level score"),
+                        mk('dd.-sum', base + time + this.level.bonus_points),
+                        mk('dt', "improvement"),
+                        mk('dd', "(TODO)"),
+                        mk('dt', "total score"),
+                        mk('dd', "(TODO)"),
+                    ),
+                );
+            }
         }
     }
 

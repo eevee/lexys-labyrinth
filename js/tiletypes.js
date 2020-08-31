@@ -332,7 +332,7 @@ const TILE_TYPES = {
         is_object: true,
         is_item: true,
         is_tool: true,
-        item_ignores: new Set(['ice']),
+        item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
     },
     suction_boots: {
         is_object: true,
@@ -419,6 +419,11 @@ const TILE_TYPES = {
         }
     },
     exit: {
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.win();
+            }
+        }
     },
 };
 
