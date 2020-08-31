@@ -826,6 +826,8 @@ class Game {
                     }
                     return;
                 }
+                // Don't scroll pls
+                ev.preventDefault();
             }
 
             if (this.key_mapping[ev.key]) {
