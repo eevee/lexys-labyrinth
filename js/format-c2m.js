@@ -1,6 +1,91 @@
 import * as util from './format-util.js';
 import TILE_TYPES from './tiletypes.js';
 
+const CC2_DEMO_INPUT_MASK = {
+    drop:   0x01,
+    down:   0x02,
+    left:   0x04,
+    right:  0x08,
+    up:     0x10,
+    swap:   0x20,
+    cycle:  0x40,
+};
+
+class CC2Demo {
+    constructor(buf) {
+        this.buf = buf;
+        this.bytes = new Uint8Array(buf);
+
+        // byte 0 is unknown, always 0?
+        this.force_floor_seed = this.bytes[1];
+        this.blob_seed = this.bytes[2];
+
+
+        let l = this.bytes.length;
+        if (l % 2 === 0) {
+            l--;
+        }
+        for (let p = 3; p < l; p += 2) {
+            let delay = this.bytes[p];
+
+            let input_mask = this.bytes[p + 1];
+            let input = new Set;
+            if ((input_mask & 0x80) !== 0) {
+                input.add('p2');
+            }
+            for (let [action, bit] of Object.entries(CC2_DEMO_INPUT_MASK)) {
+                if ((input_mask & bit) !== 0) {
+                    input.add(action);
+                }
+            }
+            console.log('demo step', delay, input);
+        }
+    }
+
+    *[Symbol.iterator]() {
+        let l = this.bytes.length;
+        if (l % 2 === 0) {
+            l--;
+            // TODO assert last byte is terminating 0xff
+        }
+        let input = new Set;
+        let t = 0;
+        // 47 left 33 down means
+        // LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+        // |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *
+        //   |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *
+        for (let p = 3; p < l; p += 2) {
+            // The first byte measures how long the /previous/ input remains
+            // valid, so yield that first.  Note that this is measured in 60Hz
+            // frames, so we need to convert to 20Hz tics by subtracting 3
+            // frames at a time.
+            t += this.bytes[p];
+            // t >= 4: almost right, desyncs just before yellow door
+            // t >= 3: skips a move, then desyncs trying to leave red door room
+            // t >= 2: skips a move, also desyncs before yellow door
+            // t >= 1: same as 2
+            // t >= 0: same as 3
+            while (t > 0) {
+                t -= 3;
+                console.log(t, input);
+                yield input;
+            }
+
+            let input_mask = this.bytes[p + 1];
+            let is_player_2 = ((input_mask & 0x80) !== 0);
+            // TODO handle player 2
+            for (let [action, bit] of Object.entries(CC2_DEMO_INPUT_MASK)) {
+                if ((input_mask & bit) === 0) {
+                    input.delete(action);
+                }
+                else {
+                    input.add(action);
+                }
+            }
+        }
+    }
+}
+
 // TODO assert that direction + next match the tile types
 const TILE_ENCODING = {
     0x01: 'floor',
@@ -405,9 +490,13 @@ export function parse_level(buf) {
         }
         else if (section_type === 'KEY ') {
         }
-        else if (section_type === 'REPL') {
-        }
-        else if (section_type === 'PRPL') {
+        else if (section_type === 'REPL' || section_type === 'PRPL') {
+            // "Replay", i.e. demo solution
+            let data = section_buf;
+            if (section_type === 'PRPL') {
+                data = decompress(data);
+            }
+            level.demo = new CC2Demo(data);
         }
         else if (section_type === 'RDNY') {
         }

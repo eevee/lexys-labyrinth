@@ -10,7 +10,7 @@ body {
     justify-content: center;
     align-items: center;
 
-    background: #606060;
+    background: #404040;
 }
 main {
     display: grid;
@@ -21,6 +21,8 @@ main {
         "level time"        min-content
         "level hint"        1fr
         "level inventory"   min-content
+        "controls controls"
+        "demo demo"
         / min-content 12em
     ;
     gap: 1em;
@@ -32,6 +34,10 @@ main {
     --scale: 2;
 }
 
+button {
+    font-size: inherit;
+}
+
 .level {
     grid-area: level;
 
@@ -40,6 +46,25 @@ main {
 .level canvas {
     display: block;
     width: calc(9 * var(--tile-width) * var(--scale));
+}
+.bummer {
+    grid-area: level;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    z-index: 99;
+    font-size: 48px;
+    padding: 25%;
+    background: #0009;
+    color: white;
+    text-align: center;
+    font-weight: bold;
+    text-shadow: 0 2px 1px black;
+}
+.bummer:empty {
+    display: none;
 }
 .meta {
     grid-area: meta;
@@ -85,22 +110,69 @@ main {
 .inventory img {
     width: calc(2 * var(--tile-width));
 }
-.bummer {
-    grid-area: level;
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
-
-    z-index: 99;
-    font-size: 48px;
-    padding: 25%;
-    background: #0009;
-    color: white;
-    text-align: center;
-    font-weight: bold;
-    text-shadow: 0 2px 1px black;
+.controls {
+    grid-area: controls;
 }
-.bummer:empty {
-    display: none;
+.demo {
+    grid-area: demo;
+}
+
+.demo-scrubber {
+    position: relative;
+    overflow-x: auto;
+    padding: 0;
+    margin: 1em 0;
+    list-style: none;
+}
+.demo-scrubber li {
+    position: relative;
+    height: 1em;
+    margin: 2px 0;
+    background: #303030;
+}
+.demo-scrubber li .demo-scrubber-bar {
+    position: absolute;
+    height: 1em;
+    left: calc(var(--start-time) * 3px);
+    width: calc((var(--end-time) - var(--start-time)) * 3px);
+    background: #606060;
+}
+.demo-scrubber .demo-scrubber-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--time) * 3px);
+    width: 2px;
+    margin-left: -1px;
+    background: darkred;
+    --time: 0;
+}
+
+/* Debug stuff */
+.input {
+    display: grid;
+    grid:
+        "drop   up      cycle" 1.5em
+        "left   swap    right" 1.5em
+        ".      down    .    " 1.5em
+        / 1.5em 1.5em 1.5em
+    ;
+    gap: 0.5em;
+}
+.input-action {
+    padding: 0.25em;
+    line-height: 1;
+    color: #fff4;
+    background: #202020;
+}
+.input-action[data-action=up] { grid-area: up; }
+.input-action[data-action=down] { grid-area: down; }
+.input-action[data-action=left] { grid-area: left; }
+.input-action[data-action=right] { grid-area: right; }
+.input-action[data-action=swap] { grid-area: swap; }
+.input-action[data-action=cycle] { grid-area: cycle; }
+.input-action[data-action=drop] { grid-area: drop; }
+.input-action.--pressed {
+    color: white;
+    background: hsl(215, 75%, 25%);
 }

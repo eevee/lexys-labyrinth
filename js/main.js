@@ -257,7 +257,7 @@ class Level {
 
                 let stored_cell = this.stored_level.linear_cells[n];
                 n++;
-                
+
                 for (let template_tile of stored_cell) {
                     let tile = Tile.from_template(template_tile, x, y);
                     if (tile.type.is_player) {
@@ -282,8 +282,9 @@ class Level {
 
     advance_tic(player_direction) {
         if (this.state !== 'playing') {
-            console.warn(`Level.advance_tic() called when state is ${this.state}`);
-            return;
+            // FIXME this breaks the step buttons; maybe pausing should be in game only
+            //console.warn(`Level.advance_tic() called when state is ${this.state}`);
+            //return;
         }
 
         // XXX this entire turn order is rather different in ms rules
@@ -327,6 +328,7 @@ class Level {
             }
             else if (actor === this.player) {
                 if (player_direction) {
+                    console.log('--- player moving', player_direction);
                     direction_preference = [player_direction];
                     actor.last_move_was_force = false;
                 }
@@ -412,7 +414,7 @@ class Level {
                     return;
                 }
             });
-            
+
             // Only bother touching the goal cell if we're not already trapped in this one
             // FIXME actually, this prevents flicking!
             if (! blocked) {
@@ -522,26 +524,82 @@ class Level {
     }
 }
 
+// TODO:
+// - some kinda visual theme i guess lol
+// - level /number/
+// - level password, if any
+// - set name
+// - timer!
+// - intro splash with list of available levels
+// - button: quit to splash
+// - button: options
+// - implement winning and show score for this level
+// - show current score so far
 const GAME_UI_HTML = `
 <main>
     <div class="level"><!-- level canvas and any overlays go here --></div>
+    <div class="bummer"></div>
     <div class="meta"></div>
     <div class="nav">
         <button class="nav-prev" type="button">«</button>
-        <button class="nav-browse" type="button">Choose level...</button>
+        <button class="nav-browse" type="button">Level select</button>
         <button class="nav-next" type="button">»</button>
     </div>
     <div class="hint"></div>
     <div class="chips"></div>
     <div class="time"></div>
     <div class="inventory"></div>
-    <div class="bummer"></div>
+    <div class="controls">
+        <button class="control-pause" type="button">Pause</button>
+        <button class="control-restart" type="button">Restart</button>
+        <button class="control-undo" type="button">Undo</button>
+        <button class="control-rewind" type="button">Rewind</button>
+    </div>
+    <div class="demo">
+        <h2>Solution demo available</h2>
+        <div class="demo-controls">
+            <button class="demo-play" type="button">Restart and play</button>
+            <button class="demo-step-1" type="button">Step 1 tic</button>
+            <button class="demo-step-4" type="button">Step 1 move</button>
+            <button class="demo-step-20" type="button">Step 1 second</button>
+        </div>
+        <div class="demo-scrubber"></div>
+        <div class="input"></div>
+    </div>
 </main>
 `;
+const ACTION_LABELS = {
+    up: '⬆️\ufe0f',
+    down: '⬇️\ufe0f',
+    left: '⬅️\ufe0f',
+    right: '➡️\ufe0f',
+    drop: '🚮',
+    cycle: '🔄',
+    swap: '👫',
+};
+const ACTION_DIRECTIONS = {
+    up: 'north',
+    down: 'south',
+    left: 'west',
+    right: 'east',
+};
 class Game {
     constructor(stored_game, tileset) {
         this.stored_game = stored_game;
         this.tileset = tileset;
+        this.key_mapping = {
+            ArrowLeft: 'left',
+            ArrowRight: 'right',
+            ArrowUp: 'up',
+            ArrowDown: 'down',
+            w: 'up',
+            a: 'left',
+            s: 'down',
+            d: 'right',
+            q: 'drop',
+            e: 'cycle',
+            c: 'swap',
+        };
 
         // TODO obey level options; allow overriding
         this.viewport_size_x = 9;
@@ -559,6 +617,8 @@ class Game {
         this.time_el = this.container.querySelector('.time');
         this.inventory_el = this.container.querySelector('.inventory');
         this.bummer_el = this.container.querySelector('.bummer');
+        this.input_el = this.container.querySelector('.input');
+        this.demo_el = this.container.querySelector('.demo');
 
         // Populate navigation
         this.nav_prev_button = this.nav_el.querySelector('.nav-prev');
@@ -574,6 +634,27 @@ class Game {
             if (this.level_index < this.stored_game.levels.length - 1) {
                 this.load_level(this.level_index + 1);
             }
+        });
+
+        // Bind buttons
+        this.container.querySelector('.controls .control-pause').addEventListener('click', ev => {
+            if (this.level.state === 'playing') {
+                this.level.state = 'paused';
+            }
+            else if (this.level.state === 'paused') {
+                this.level.state = 'playing';
+            }
+            ev.target.blur();
+        });
+        // Demo playback
+        this.container.querySelector('.demo .demo-step-1').addEventListener('click', ev => {
+            this.advance_by(1);
+        });
+        this.container.querySelector('.demo .demo-step-4').addEventListener('click', ev => {
+            this.advance_by(4);
+        });
+        this.container.querySelector('.demo .demo-step-20').addEventListener('click', ev => {
+            this.advance_by(20);
         });
 
         // Populate inventory
@@ -599,48 +680,83 @@ class Game {
         this.next_player_move = null;
         this.player_used_move = false;
         let key_target = document.body;
+        this.previous_input = new Set;  // actions that were held last tic
+        this.previous_action = null;  // last direction we were moving, if any
+        this.current_keys = new Set;  // keys that are currently held
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
-            let direction;
-            if (ev.key === 'ArrowDown') {
-                direction = 'south';
+            if (this.key_mapping[ev.key]) {
+                this.current_keys.add(ev.key);
+                ev.stopPropagation();
+                ev.preventDefault();
             }
-            else if (ev.key === 'ArrowUp') {
-                direction = 'north';
-            }
-            else if (ev.key === 'ArrowLeft') {
-                direction = 'west';
-            }
-            else if (ev.key === 'ArrowRight') {
-                direction = 'east';
-            }
-            
-            if (! direction)
-                return;
-            ev.stopPropagation();
-            ev.preventDefault();
-
-            last_key = ev.key;
-            this.pending_player_move = direction;
-            this.next_player_move = direction;
-            this.player_used_move = false;
         });
         key_target.addEventListener('keyup', ev => {
-            if (ev.key === last_key) {
-                last_key = null;
-                this.pending_player_move = null;
-                if (this.player_used_move) {
-                    this.next_player_move = null;
-                }
+            if (this.key_mapping[ev.key]) {
+                this.current_keys.delete(ev.key);
+                ev.stopPropagation();
+                ev.preventDefault();
             }
         });
+
+        // Populate demo scrubber
+        let scrubber_el = this.container.querySelector('.demo-scrubber');
+        let scrubber_elements = {};
+        for (let [action, label] of Object.entries(ACTION_LABELS)) {
+            let el = mk('li');
+            scrubber_el.append(el);
+            scrubber_elements[action] = el;
+        }
+        this.demo_scrubber_marker = mk('div.demo-scrubber-marker');
+        scrubber_el.append(this.demo_scrubber_marker);
+
+        // Populate input debugger
+        this.input_el = this.container.querySelector('.input');
+        this.input_action_elements = {};
+        for (let [action, label] of Object.entries(ACTION_LABELS)) {
+            let el = mk('span.input-action', {'data-action': action}, label);
+            this.input_el.append(el);
+            this.input_action_elements[action] = el;
+        }
 
         // Done with UI, now we can load a level
         this.load_level(0);
         this.redraw();
 
+        // Fill in the scrubber
+        if (false && this.level.stored_level.demo) {
+            let input_starts = {};
+            for (let action of Object.keys(ACTION_LABELS)) {
+                input_starts[action] = null;
+            }
+            let t = 0;
+            for (let input of this.level.stored_level.demo) {
+                for (let [action, t0] of Object.entries(input_starts)) {
+                    if (input.has(action)) {
+                        if (t0 === null) {
+                            input_starts[action] = t;
+                        }
+                    }
+                    else if (t0 !== null) {
+                        let bar = mk('span.demo-scrubber-bar');
+                        bar.style.setProperty('--start-time', t0);
+                        bar.style.setProperty('--end-time', t);
+                        scrubber_elements[action].append(bar);
+                        input_starts[action] = null;
+                    }
+                }
+                t += 1;
+            }
+            this.demo = this.level.stored_level.demo[Symbol.iterator]();
+        }
+        else {
+            // TODO update these, as appropriate, when loading a level
+            this.input_el.style.display = 'none';
+            this.demo_el.style.display = 'none';
+        }
+
         this.frame = 0;
-        this.tick++;
+        this.tic = 0;
         requestAnimationFrame(this.do_frame.bind(this));
     }
 
@@ -657,18 +773,80 @@ class Game {
         this.update_ui();
     }
 
+    get_input() {
+        if (this.demo) {
+            let step = this.demo.next();
+            if (step.done) {
+                return new Set;
+            }
+            else {
+                return step.value;
+            }
+        }
+        else {
+            // Convert input keys to actions.  This is only done now
+            // because there might be multiple keys bound to one
+            // action, and it still counts as pressed as long as at
+            // least one key is held
+            let input = new Set;
+            for (let key of this.current_keys) {
+                input.add(this.key_mapping[key]);
+            }
+            return input;
+        }
+    }
+
+    advance_by(tics) {
+        for (let i = 0; i < tics; i++) {
+            let input = this.get_input();
+            let current_input = input;
+            if (! input.has('up') && ! input.has('down') && ! input.has('left') && ! input.has('right')) {
+                //input = this.previous_input;
+            }
+
+            // Choose the movement direction based on the held keys.  A
+            // newly pressed action takes priority; in the case of a tie,
+            // um, XXX ????
+            let chosen_action = null;
+            let any_action = null;
+            for (let action of ['up', 'down', 'left', 'right']) {
+                if (input.has(action)) {
+                    if (this.previous_input.has(action)) {
+                        chosen_action = action;
+                    }
+                    any_action = action;
+                }
+            }
+            if (! chosen_action) {
+                // No keys are new, so check whether we were previously
+                // holding a key and are still doing it
+                if (this.previous_action && input.has(this.previous_action)) {
+                    chosen_action = this.previous_action;
+                }
+                else {
+                    // No dice, so use an arbitrary action
+                    chosen_action = any_action;
+                }
+            }
+
+            let player_move = chosen_action ? ACTION_DIRECTIONS[chosen_action] : null;
+            this.previous_action = chosen_action;
+            this.previous_input = current_input;
+
+            this.level.advance_tic(player_move);
+            this.tic++;
+        }
+        this.redraw();
+        this.update_ui();
+    }
+
     do_frame() {
         if (this.level.state === 'playing') {
             this.frame++;
             if (this.frame % 3 === 0) {
-                this.level.advance_tic(this.next_player_move);
-                this.next_player_move = this.pending_player_move;
-                this.player_used_move = true;
-                this.redraw();
+                this.advance_by(1);
             }
             this.frame %= 60;
-
-            this.update_ui();
         }
 
         requestAnimationFrame(this.do_frame.bind(this));
@@ -702,8 +880,17 @@ class Game {
                 this.inventory_el.append(mk('img', {src: this.render_inventory_tile(name)}));
             }
         }
+
+        if (this.demo) {
+            this.demo_scrubber_marker.style.setProperty('--time', this.tic);
+            this.demo_scrubber_marker.scrollIntoView({inline: 'center'});
+        }
+
+        for (let action of Object.keys(ACTION_LABELS)) {
+            this.input_action_elements[action].classList.toggle('--pressed', this.previous_input.has(action));
+        }
     }
-        
+
     redraw() {
         let ctx = this.level_canvas.getContext('2d');
         ctx.clearRect(0, 0, this.level_canvas.width, this.level_canvas.height);
