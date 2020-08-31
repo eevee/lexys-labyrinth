@@ -1053,13 +1053,7 @@ class Game {
 }
 
 async function main() {
-    let query;
-    if (location.host.match(/localhost/)) {
-        query = new URLSearchParams(location.search);
-    }
-    else {
-        query = new URLSearchParams;
-    }
+    let query = new URLSearchParams(location.search);
 
     // Pick a tileset
     // These alternative ones only exist locally for me at the moment, since
@@ -1093,8 +1087,8 @@ async function main() {
     // Pick a level (set)
     // TODO error handling  :(
     let stored_game;
-    if (query.get('setpath')) {
-        let path = query.get('setpath');
+    let path = query.get('setpath');
+    if (path && path.match(/^levels[/]/)) {
         let data = await fetch(path);
         if (path.match(/\.(?:dat|ccl)$/i)) {
             stored_game = dat.parse_game(data);
