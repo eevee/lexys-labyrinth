@@ -243,16 +243,20 @@ class Level {
 
                 for (let template_tile of stored_cell) {
                     let tile = Tile.from_template(template_tile, x, y);
-                    if (tile.type.is_player) {
-                        // TODO handle multiple players, also chip and melinda both
-                        // TODO complain if no chip
-                        this.player = tile;
-                    }
                     if (tile.type.is_hint) {
                         // Copy over the tile-specific hint, if any
                         tile.specific_hint = template_tile.specific_hint ?? null;
                     }
-                    if (tile.type.is_actor) {
+                    if (tile.type.is_player) {
+                        // TODO handle multiple players, also chip and melinda both
+                        // TODO complain if no chip
+                        this.player = tile;
+                        // Always put the player at the start of the actor list
+                        // (accomplished traditionally with a swap)
+                        this.actors.push(this.actors[0]);
+                        this.actors[0] = tile;
+                    }
+                    else if (tile.type.is_actor) {
                         this.actors.push(tile);
                     }
                     cell.push(tile);
