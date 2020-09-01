@@ -7,7 +7,7 @@ const TILE_TYPES = {
     floor_letter: {
         load(me, template) {
             me.ascii_code = template.modifier;
-        }
+        },
     },
     wall: {
         blocks: true,
@@ -20,12 +20,12 @@ const TILE_TYPES = {
         blocks: true,
         on_bump(me, level, other) {
             me.become('wall');
-        }
+        },
     },
     popwall: {
         on_depart(me, level, other) {
             me.become('wall');
-        }
+        },
     },
     thinwall_n: {
         thin_walls: new Set(['north']),
@@ -46,13 +46,13 @@ const TILE_TYPES = {
         blocks: true,
         on_bump(me, level, other) {
             me.become('wall');
-        }
+        },
     },
     fake_floor: {
         blocks: true,
         on_bump(me, level, other) {
             me.become('floor');
-        }
+        },
     },
 
     // Swivel doors
@@ -77,7 +77,7 @@ const TILE_TYPES = {
             if (other.type.has_inventory && other.take_item('key_red')) {
                 me.type = TILE_TYPES.floor;
             }
-        }
+        },
     },
     door_blue: {
         blocks: true,
@@ -85,7 +85,7 @@ const TILE_TYPES = {
             if (other.type.has_inventory && other.take_item('key_blue')) {
                 me.type = TILE_TYPES.floor;
             }
-        }
+        },
     },
     door_yellow: {
         blocks: true,
@@ -93,7 +93,7 @@ const TILE_TYPES = {
             if (other.type.has_inventory && other.take_item('key_yellow')) {
                 me.type = TILE_TYPES.floor;
             }
-        }
+        },
     },
     door_green: {
         blocks: true,
@@ -101,7 +101,7 @@ const TILE_TYPES = {
             if (other.type.has_inventory && other.take_item('key_green')) {
                 me.type = TILE_TYPES.floor;
             }
-        }
+        },
     },
 
     // Terrain
@@ -111,7 +111,7 @@ const TILE_TYPES = {
         // TODO block melinda only without the hiking boots; can't use ignore because then she wouldn't step on it  :S  also ignore doesn't apply to blocks anyway.
         on_arrive(me, level, other) {
             me.become('floor');
-        }
+        },
     },
     gravel: {
         blocks_monsters: true,
@@ -127,7 +127,7 @@ const TILE_TYPES = {
             else {
                 other.destroy();
             }
-        }
+        },
     },
     water: {
         on_arrive(me, level, other) {
@@ -143,14 +143,14 @@ const TILE_TYPES = {
             else {
                 other.destroy();
             }
-        }
+        },
     },
     turtle: {
     },
     ice: {
         on_arrive(me, level, other) {
             level.make_slide(other, 'ice');
-        }
+        },
     },
     ice_sw: {
         thin_walls: new Set(['south', 'west']),
@@ -162,7 +162,7 @@ const TILE_TYPES = {
                 other.direction = 'north';
             }
             level.make_slide(other, 'ice');
-        }
+        },
     },
     ice_nw: {
         thin_walls: new Set(['north', 'west']),
@@ -174,7 +174,7 @@ const TILE_TYPES = {
                 other.direction = 'south';
             }
             level.make_slide(other, 'ice');
-        }
+        },
     },
     ice_ne: {
         thin_walls: new Set(['north', 'east']),
@@ -186,7 +186,7 @@ const TILE_TYPES = {
                 other.direction = 'south';
             }
             level.make_slide(other, 'ice');
-        }
+        },
     },
     ice_se: {
         thin_walls: new Set(['south', 'east']),
@@ -198,31 +198,31 @@ const TILE_TYPES = {
                 other.direction = 'north';
             }
             level.make_slide(other, 'ice');
-        }
+        },
     },
     force_floor_n: {
         on_arrive(me, level, other) {
             other.direction = 'north';
             level.make_slide(other, 'force');
-        }
+        },
     },
     force_floor_e: {
         on_arrive(me, level, other) {
             other.direction = 'east';
             level.make_slide(other, 'force');
-        }
+        },
     },
     force_floor_s: {
         on_arrive(me, level, other) {
             other.direction = 'south';
             level.make_slide(other, 'force');
-        }
+        },
     },
     force_floor_w: {
         on_arrive(me, level, other) {
             other.direction = 'west';
             level.make_slide(other, 'force');
-        }
+        },
     },
     force_floor_all: {
         // TODO cc2 cycles these...
@@ -232,7 +232,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             me.destroy();
             other.destroy();
-        }
+        },
     },
     thief_tools: {
         on_arrive(me, level, other) {
@@ -243,7 +243,7 @@ const TILE_TYPES = {
                     }
                 }
             }
-        }
+        },
     },
     thief_keys: {
         on_arrive(me, level, other) {
@@ -254,7 +254,7 @@ const TILE_TYPES = {
                     }
                 }
             }
-        }
+        },
     },
     forbidden: {
     },
@@ -294,10 +294,14 @@ const TILE_TYPES = {
                     cell._add(new tile.constructor(tile.type, tile.x, tile.y, tile.direction));
                 }
             }
-        }
+        },
     },
     trap: {
-        // TODO ???
+        on_arrive(me, level, other) {
+            if (! me.open) {
+                other.stuck = true;
+            }
+        },
     },
     teleport_blue: {
         // TODO
@@ -312,7 +316,7 @@ const TILE_TYPES = {
                     actor.direction = DIRECTIONS[actor.direction].opposite;
                 }
             }
-        }
+        },
     },
     button_green: {
         on_arrive(me, level, other) {
@@ -335,10 +339,35 @@ const TILE_TYPES = {
                     }
                 }
             }
-        }
+        },
     },
     button_brown: {
-        // TODO how do i implement this.
+        connects_to: 'trap',
+        connect_order: 'forward',
+        on_arrive(me, level, other) {
+            if (me.connection && ! me.connection.doomed) {
+                // TODO do gray buttons affect traps?  if so this should use activate()
+                let trap = me.connection;
+                trap.open = true;
+                for (let tile of level.cells[trap.y][trap.x]) {
+                    if (tile.stuck) {
+                        tile.stuck = false;
+                    }
+                }
+            }
+        },
+        on_depart(me, level, other) {
+            if (me.connection && ! me.connection.doomed) {
+                // TODO do gray buttons affect traps?  if so this should use activate()
+                let trap = me.connection;
+                trap.open = false;
+                for (let tile of level.cells[trap.y][trap.x]) {
+                    if (tile.is_actor) {
+                        tile.stuck = false;
+                    }
+                }
+            }
+        },
     },
     button_red: {
         connects_to: 'cloner',
@@ -347,7 +376,7 @@ const TILE_TYPES = {
             if (me.connection && ! me.connection.doomed) {
                 me.connection.type.activate(me.connection, level);
             }
-        }
+        },
     },
 
     // Critters
@@ -507,7 +536,7 @@ const TILE_TYPES = {
                 level.collect_chip();
                 me.destroy();
             }
-        }
+        },
     },
     chip_extra: {
         is_chip: true,
@@ -535,14 +564,14 @@ const TILE_TYPES = {
             if (other.type.is_player && level.chips_remaining === 0) {
                 me.type = TILE_TYPES.floor;
             }
-        }
+        },
     },
     exit: {
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.win();
             }
-        }
+        },
     },
 };
 
