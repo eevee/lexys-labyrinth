@@ -291,14 +291,22 @@ class Level {
             let x = connectable.x;
             let y = connectable.y;
             let goal = connectable.type.connects_to;
+            let direction = 1;
+            if (connectable.type.connect_order == 'backward') {
+                direction = -1;
+            }
             let found = false;
             for (let i = 0; i < num_cells - 1; i++) {
-                x++;
-                while (x >= this.width) {
+                x += direction;
+                if (x >= this.width) {
                     x -= this.width;
-                    y++;
-                    y %= this.width;
+                    y = (y + 1) % this.height;
                 }
+                else if (x < 0) {
+                    x += this.width;
+                    y = (y - 1 + this.height) % this.height;
+                }
+
                 for (let tile of this.cells[y][x]) {
                     if (tile.type.name === goal) {
                         // TODO should be weak, but you can't destroy cloners so in practice not a concern
@@ -313,6 +321,7 @@ class Level {
         }
     }
 
+    // Move the game state forwards by one tic
     advance_tic(player_direction) {
         if (this.state !== 'playing') {
             console.warn(`Level.advance_tic() called when state is ${this.state}`);
@@ -331,6 +340,7 @@ class Level {
                     continue;
             }
             // XXX does the cooldown drop while in a trap?  is this even right?
+            // TODO should still attempt to move (so chip turns), just will be stuck (but wait, do monsters turn?  i don't think so)
             if (actor.stuck)
                 continue;
 
@@ -546,6 +556,7 @@ class Level {
         if (actor === this.player) {
             this.hint_shown = null;
         }
+        let teleporter;
         goal_cell.each(tile => {
             if (tile === actor)
                 return;
@@ -560,6 +571,9 @@ class Level {
                 actor.give_item(tile.type.name);
                 tile.destroy();
             }
+            else if (tile.type.is_teleporter) {
+                teleporter = tile;
+            }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
             }
@@ -571,6 +585,34 @@ class Level {
                 this.fail("Oops!  Watch out for creatures!");
             }
         });
+
+        // Handle teleporting, now that the dust has cleared
+        let current_cell = goal_cell;
+        if (teleporter) {
+            let goal = teleporter.connection;
+            // TODO in pathological cases this might infinite loop
+            while (true) {
+                // Physically move the actor to the new teleporter
+                // XXX is this right, compare with tile world?  i overhear it's actually implemented as a slide?
+                // XXX will probably play badly with undo lol
+                let tele_cell = this.cells[goal.y][goal.x];
+                current_cell._remove(actor);
+                tele_cell._add(actor);
+                current_cell = tele_cell;
+                actor.x = goal.x;
+                actor.y = goal.y;
+                if (this.attempt_step(actor, actor.direction))
+                    // Success, teleportation complete
+                    break;
+                if (goal === teleporter)
+                    // We've tried every teleporter, including the one they
+                    // stepped on, so leave them on it
+                    break;
+
+                // Otherwise, try the next one
+                goal = goal.connection;
+            }
+        }
     }
 
     collect_chip() {

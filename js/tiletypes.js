@@ -304,7 +304,11 @@ const TILE_TYPES = {
         },
     },
     teleport_blue: {
-        // TODO
+        connects_to: 'teleport_blue',
+        connect_order: 'backward',
+        is_teleporter: true,
+        // TODO implement 'backward'
+        // TODO to make this work, i need to be able to check if a spot is blocked /ahead of time/
     },
     // Buttons
     button_blue: {
