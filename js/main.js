@@ -143,10 +143,15 @@ class Tile {
         this.inventory[name] = (this.inventory[name] ?? 0) + 1;
     }
 
-    take_item(name) {
+    take_item(name, amount = null) {
         if (this.inventory[name] && this.inventory[name] >= 1) {
-            if (!(this.type.infinite_items && this.type.infinite_items[name])) {
-                this.inventory[name]--;
+            if (amount == null && this.type.infinite_items && this.type.infinite_items[name]) {
+                // Some items can't be taken away normally, by which I mean,
+                // green keys
+                ;
+            }
+            else {
+                this.inventory[name] = Math.max(0, this.inventory[name] - (amount || 1));
             }
             return true;
         }
@@ -358,7 +363,6 @@ class Level {
             }
             else if (actor === this.player) {
                 if (player_direction) {
-                    //console.log('--- player moving', player_direction);
                     direction_preference = [player_direction];
                     actor.last_move_was_force = false;
                 }
@@ -410,13 +414,15 @@ class Level {
                 }
             }
 
-            // Always set the cooldown if we even attempt to move.  Speed
-            // multiplier is based on the tile we landed /on/, if any.
-            let speed_multiplier = 1;
-            if (actor.slide_mode !== null) {
-                speed_multiplier = 2;
+            // Only set movement cooldown if we actually moved!
+            if (moved) {
+                // Speed multiplier is based on the tile we landed /on/.
+                let speed_multiplier = 1;
+                if (actor.slide_mode !== null) {
+                    speed_multiplier = 2;
+                }
+                actor.movement_cooldown = actor.type.movement_speed / speed_multiplier;
             }
-            actor.movement_cooldown = actor.type.movement_speed / speed_multiplier;
 
             // TODO do i need to do this more aggressively?
             if (this.state === 'success' || this.state === 'failure')
@@ -940,6 +946,8 @@ class Game {
                 t += 1;
             }
             this.demo = this.level.stored_level.demo[Symbol.iterator]();
+            // FIXME should probably start playback on first input
+            this.set_state('playing');
         }
         else {
             // TODO update these, as appropriate, when loading a level

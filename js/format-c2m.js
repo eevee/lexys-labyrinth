@@ -19,27 +19,6 @@ class CC2Demo {
         // byte 0 is unknown, always 0?
         this.force_floor_seed = this.bytes[1];
         this.blob_seed = this.bytes[2];
-
-
-        let l = this.bytes.length;
-        if (l % 2 === 0) {
-            l--;
-        }
-        for (let p = 3; p < l; p += 2) {
-            let delay = this.bytes[p];
-
-            let input_mask = this.bytes[p + 1];
-            let input = new Set;
-            if ((input_mask & 0x80) !== 0) {
-                input.add('p2');
-            }
-            for (let [action, bit] of Object.entries(CC2_DEMO_INPUT_MASK)) {
-                if ((input_mask & bit) !== 0) {
-                    input.add(action);
-                }
-            }
-            console.log('demo step', delay, input);
-        }
     }
 
     *[Symbol.iterator]() {
@@ -65,9 +44,8 @@ class CC2Demo {
             // t >= 2: skips a move, also desyncs before yellow door
             // t >= 1: same as 2
             // t >= 0: same as 3
-            while (t > 0) {
+            while (t >= 3) {
                 t -= 3;
-                console.log(t, input);
                 yield input;
             }
 
@@ -150,7 +128,7 @@ const TILE_ENCODING = {
     0x3c: ['suction_boots', '#next'],
     0x3d: ['fire_boots', '#next'],
     0x3e: ['flippers', '#next'],
-    0x3f: 'thief_keys',
+    0x3f: 'thief_tools',
     0x40: ['bomb', '#next'],
     //0x41: Open trap (unused in main levels) : 
     0x42: 'trap',
@@ -225,7 +203,7 @@ const TILE_ENCODING = {
     // 0x87: Black button : 
     // 0x88: ON/OFF switch (OFF) : 
     // 0x89: ON/OFF switch (ON) : 
-    0x8a: 'thief_tools',
+    0x8a: 'thief_keys',
     // 0x8b: Ghost : '#direction', '#next'
     // 0x8c: Steel foil : '#next'
     0x8d: ['turtle', 'water'],
