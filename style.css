@@ -9,6 +9,7 @@ body {
     display: flex;
     flex-direction: column;
 
+    line-height: 1.25;
     background: #101214;
     color: white;
 }
@@ -25,6 +26,15 @@ button {
 h1, h2, h3, h4, h5, h6 {
     font-weight: normal;
     margin: 0;
+}
+p {
+    margin: 0.5em 0;
+}
+p:first-child {
+    margin-top: 0;
+}
+p:last-child {
+    margin-bottom: 0;
 }
 
 /* Main page structure */
@@ -43,6 +53,7 @@ body > header > nav {
     gap: 0.5em;
 }
 
+/* Overlay styling */
 .overlay {
     display: flex;
     align-items: center;
@@ -53,19 +64,63 @@ body > header > nav {
     bottom: 0;
     left: 0;
     right: 0;
-    background: #0004;
+    background: #fff4;
 }
 .dialog {
+    display: flex;
+    flex-direction: column;
+
+    min-width: 33%;
     max-width: 80%;
     max-height: 80%;
-    overflow: auto;
-    padding: 1em;
     border: 1px solid black;
     color: black;
-    background: #e8e8e8;
+    background: #f4f4f4;
     box-shadow: 0 1px 3px #000c;
 }
+.dialog > header {
+    padding: 0.5em;
+    line-height: 1;
+    background: hsl(225, 20%, 40%);
+    color: white;
+}
+.dialog > header h1 {
+    font-size: 1em;
+}
+.dialog > footer {
+    display: flex;
+    justify-content: end;
+    gap: 0.5em;
 
+    padding: 0.5em;
+    background: #d0d0d0;
+}
+.dialog > header:empty,
+.dialog > footer:empty {
+    display: none;
+}
+.dialog > section {
+    overflow: auto;
+    padding: 1em;
+}
+
+/* Individual overlays */
+table.level-browser {
+    width: 100%;
+    /* for some reason the table ignores the bottom padding when it overflows */
+    margin-bottom: 1em;
+    line-height: 1.25;
+    border-spacing: 0;
+    cursor: pointer;
+}
+table.level-browser td {
+    padding: 0 0.25em;
+}
+table.level-browser tr:hover {
+    background: hsl(225, 60%, 90%);
+}
+
+/* Game area */
 main {
     flex: 0;
     margin: auto;  /* center in both directions baby */
@@ -278,5 +333,5 @@ dl.score-chart .-sum {
 .input-action[data-action=drop] { grid-area: drop; }
 .input-action.--pressed {
     color: white;
-    background: hsl(215, 75%, 25%);
+    background: hsl(225, 75%, 25%);
 }

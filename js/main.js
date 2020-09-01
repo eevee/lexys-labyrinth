@@ -643,6 +643,8 @@ class Level {
     }
 }
 
+
+// Stackable modal overlay of some kind, usually a dialog
 class Overlay {
     constructor(game, root) {
         this.game = game;
@@ -673,11 +675,104 @@ class Overlay {
         this.root.closest('.overlay').remove();
     }
 }
-class LevelBrowserOverlay extends Overlay {
+
+// Overlay styled like a dialog box
+class DialogOverlay extends Overlay {
     constructor(game) {
-        let root = mk('table.level-browser');
+        super(game, mk('div.dialog'));
+
+        this.root.append(
+            this.header = mk('header'),
+            this.main = mk('section'),
+            this.footer = mk('footer'),
+        );
+    }
+
+    set_title(title) {
+        this.header.textContent = '';
+        this.header.append(mk('h1', {}, title));
+    }
+
+    add_button(label, onclick) {
+        let button = mk('button', {type: 'button'}, label);
+        button.addEventListener('click', onclick);
+        this.footer.append(button);
+    }
+}
+
+// Yes/no popup dialog
+class ConfirmOverlay extends DialogOverlay {
+    constructor(game, message, what) {
+        super(game);
+        this.set_title("just checking");
+        this.main.append(mk('p', {}, message));
+        let yes = mk('button', {type: 'button'}, "yep");
+        let no = mk('button', {type: 'button'}, "nope");
+        yes.addEventListener('click', ev => {
+            this.close();
+            what();
+        });
+        no.addEventListener('click', ev => {
+            this.close();
+        });
+        this.footer.append(yes, no);
+    }
+}
+
+// About dialog
+const ABOUT_HTML = `
+<p>Welcome to Lexy's Labyrinth, an exciting old-school tile-based puzzle adventure that is compatible with — but legally distinct from — <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge</a> and its exciting sequel <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a>.</p>
+<p>This is a reimplementation from scratch of the game and uses none of its original code or assets.  It aims to match the behavior of the Steam releases (sans obvious bugs), since those are now the canonical versions of the game, but compatibility settings aren't off the table.</p>
+<p>The default level pack is the community-made <a href="https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1">Chip's Challenge Level Pack 1</a>, which I had no hand in whatsoever; please follow the link for full attribution.  With any luck, future releases will include other community level packs, the ability to play your own, and even a way to play the original levels once you've purchased them on Steam!</p>
+<p>Source code is on <a href="https://github.com/eevee/lexys-labyrinth">GitHub</a>.</p>
+<p>Special thanks to the incredibly detailed <a href="https://bitbusters.club/">Bit Busters Club</a> and its associated wiki and Discord, the latter of which is full of welcoming people who've been more than happy to answer all my burning arcane questions about Chip's Challenge mechanics.  Thank you also to <a href="https://tw2.bitbusters.club/">Tile World</a>, an open source Chip's Challenge 1 emulator whose source code was indispensable, and the origin of the default tileset.</p>
+`;
+class AboutOverlay extends DialogOverlay {
+    constructor(game) {
+        super(game);
+        this.set_title("about");
+        this.main.innerHTML = ABOUT_HTML;
+        this.add_button("cool", ev => {
+            this.close();
+        });
+    }
+}
+
+// Options dialog
+// functionality?:
+// - store local levels and tilesets in localstorage?  (will duplicate space but i'll be able to remember them)
+// aesthetics:
+// - tileset
+// - animations on or off
+// compat:
+// - flicking
+// - that cc2 hook wrapping thing
+// - that cc2 thing where a brown button sends a 1-frame pulse to a wired trap
+// - cc2 something about blue teleporters at 0, 0 forgetting they're looking for unwired only
+// - monsters go in fire
+// - rff blocks monsters
+// - rff truly random
+// - all manner of fucking bugs
+class OptionsOverlay extends DialogOverlay {
+    constructor(game) {
+        super(game);
+        this.set_title("options");
+        this.main.append(mk('p', "Sorry!  None implemented yet."));
+        this.add_button("well alright then", ev => {
+            this.close();
+        });
+    }
+}
+
+// List of levels
+class LevelBrowserOverlay extends DialogOverlay {
+    constructor(game) {
+        super(game);
+        this.set_title("choose a level");
+        let table = mk('table.level-browser');
+        this.main.append(table);
         for (let [i, stored_level] of game.stored_game.levels.entries()) {
-            root.append(mk('tr',
+            table.append(mk('tr',
                 {'data-index': i},
                 mk('td', i + 1),
                 mk('td', stored_level.title),
@@ -687,7 +782,7 @@ class LevelBrowserOverlay extends Overlay {
             ));
         }
 
-        root.addEventListener('click', ev => {
+        table.addEventListener('click', ev => {
             let tr = ev.target.closest('table.level-browser tr');
             if (! tr)
                 return;
@@ -697,23 +792,9 @@ class LevelBrowserOverlay extends Overlay {
             this.close();
         });
 
-        super(game, mk('div.dialog', root));
-    }
-}
-class ConfirmOverlay extends Overlay {
-    constructor(game, message, what) {
-        let root = mk('div.dialog', mk('p', {}, message));
-        let yes = mk('button', {type: 'button'}, "Yep");
-        let no = mk('button', {type: 'button'}, "Nope");
-        yes.addEventListener('click', ev => {
-            this.close();
-            what();
-        });
-        no.addEventListener('click', ev => {
+        this.add_button("nevermind", ev => {
             this.close();
         });
-        root.append(yes, no);
-        super(game, root);
     }
 }
 
@@ -724,7 +805,6 @@ class ConfirmOverlay extends Overlay {
 // - bonus points (cc2 only, or maybe only if got any so far this level)
 // - intro splash with list of available level packs
 // - button: quit to splash
-// - button: options
 // - implement winning and show score for this level
 // - show current score so far
 // - about, help
@@ -732,9 +812,9 @@ const GAME_UI_HTML = `
 <header>
     <h1>Lexy's Labyrinth</h1>
     <nav>
-        <button class="nav-about" type="button" disabled>about</button>
+        <button class="nav-about" type="button">about</button>
         <button class="nav-help" type="button" disabled>help</button>
-        <button class="nav-options" type="button" disabled>options</button>
+        <button class="nav-options" type="button">options</button>
     </nav>
 </header>
 <main>
@@ -835,6 +915,15 @@ class Game {
         this.bummer_el = this.container.querySelector('.bummer');
         this.input_el = this.container.querySelector('.input');
         this.demo_el = this.container.querySelector('.demo');
+
+        // Populate stuff
+        let header = document.body.querySelector('body > header');
+        header.querySelector('.nav-about').addEventListener('click', ev => {
+            new AboutOverlay(this).open();
+        });
+        header.querySelector('.nav-options').addEventListener('click', ev => {
+            new OptionsOverlay(this).open();
+        });
 
         // Populate navigation
         let nav_el = this.container.querySelector('.nav');
