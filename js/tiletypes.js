@@ -364,7 +364,6 @@ const TILE_TYPES = {
         connect_order: 'forward',
         on_arrive(me, level, other) {
             if (me.connection && ! me.connection.doomed) {
-                // TODO do gray buttons affect traps?  if so this should use activate()
                 let trap = me.connection;
                 trap.open = true;
                 for (let tile of level.cells[trap.y][trap.x]) {
@@ -376,7 +375,6 @@ const TILE_TYPES = {
         },
         on_depart(me, level, other) {
             if (me.connection && ! me.connection.doomed) {
-                // TODO do gray buttons affect traps?  if so this should use activate()
                 let trap = me.connection;
                 trap.open = false;
                 for (let tile of level.cells[trap.y][trap.x]) {

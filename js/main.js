@@ -289,15 +289,44 @@ class Level {
 
         // Connect buttons and teleporters
         let num_cells = this.width * this.height;
+        console.log(this.stored_level.custom_trap_wiring);
+        console.log(this.stored_level.custom_cloner_wiring);
         for (let connectable of connectables) {
             let x = connectable.x;
             let y = connectable.y;
             let goal = connectable.type.connects_to;
+            let found = false;
+
+            // Check for custom wiring, for MSCC .DAT levels
+            let n = x + y * this.width;
+            console.log(x, y, n);
+            let target_cell_n = null;
+            if (goal === 'trap') {
+                target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
+            }
+            else if (goal === 'cloner') {
+                target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
+            }
+            if (target_cell_n) {
+                // TODO this N could be outside the map bounds
+                let target_cell_x = target_cell_n % this.width;
+                let target_cell_y = Math.floor(target_cell_n / this.width);
+                for (let tile of this.cells[target_cell_y][target_cell_x]) {
+                    if (tile.type.name === goal) {
+                        connectable.connection = tile;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found)
+                    continue;
+            }
+
+            // Otherwise, look in reading order
             let direction = 1;
-            if (connectable.type.connect_order == 'backward') {
+            if (connectable.type.connect_order === 'backward') {
                 direction = -1;
             }
-            let found = false;
             for (let i = 0; i < num_cells - 1; i++) {
                 x += direction;
                 if (x >= this.width) {
@@ -314,6 +343,7 @@ class Level {
                         // TODO should be weak, but you can't destroy cloners so in practice not a concern
                         connectable.connection = tile;
                         found = true;
+                        break;
                     }
                 }
                 if (found)

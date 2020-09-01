@@ -209,14 +209,31 @@ function parse_level(buf) {
             level.title = util.string_from_buffer_ascii(buf.slice(p, p + field_length - 1));
         }
         else if (field_type === 0x04) {
-            // Trap linkages
-            // TODO read this
-            // TODO under lynx rules these aren't even used, and they cause bugs in mscc1!
+            // Trap linkages (MSCC only, not in Lynx or CC2)
+            let field_view = new DataView(buf.slice(p, p + field_length));
+            let q = 0;
+            while (q < field_length) {
+                let button_x = field_view.getUint16(q + 0, true);
+                let button_y = field_view.getUint16(q + 2, true);
+                let trap_x = field_view.getUint16(q + 4, true);
+                let trap_y = field_view.getUint16(q + 6, true);
+                // Fifth u16 is always zero, possibly live game state
+                q += 10;
+                level.custom_trap_wiring[button_x + button_y * level.size_x] = trap_x + trap_y * level.size_x;
+            }
         }
         else if (field_type === 0x05) {
-            // Trap linkages
-            // TODO read this
-            // TODO under lynx rules these aren't even used, and they cause bugs in mscc1!
+            // Cloner linkages (MSCC only, not in Lynx or CC2)
+            let field_view = new DataView(buf.slice(p, p + field_length));
+            let q = 0;
+            while (q < field_length) {
+                let button_x = field_view.getUint16(q + 0, true);
+                let button_y = field_view.getUint16(q + 2, true);
+                let cloner_x = field_view.getUint16(q + 4, true);
+                let cloner_y = field_view.getUint16(q + 6, true);
+                q += 8;
+                level.custom_cloner_wiring[button_x + button_y * level.size_x] = cloner_x + cloner_y * level.size_x;
+            }
         }
         else if (field_type === 0x06) {
             // Password, with trailing NUL, and otherwise XORed with 0x99 (?!)
