@@ -289,13 +289,23 @@ const TILE_TYPES = {
             let current_tiles = Array.from(cell);
             for (let tile of current_tiles) {
                 if (tile !== me && tile.type.is_actor) {
+                    // Copy this stuff in case the movement changes it
+                    let type = tile.type;
+                    let direction = tile.direction;
+
+                    // Unstick and try to move the actor; if it's blocked,
+                    // abort the clone
                     tile.stuck = false;
-                    // TODO precise behavior?  is this added immediately and can move later that same turn or what?
-                    level.actors.push(tile);
-                    // FIXME rearrange to make this possible lol
-                    // FIXME go through level for this, and everything else of course
-                    // FIXME add this underneath, just above the cloner
-                    cell._add(new tile.constructor(tile.type, tile.x, tile.y, tile.direction));
+                    if (level.attempt_step(tile, direction)) {
+                        level.actors.push(tile);
+                        // FIXME rearrange to make this possible lol
+                        // FIXME go through level for this, and everything else of course
+                        // FIXME add this underneath, just above the cloner
+                        cell._add(new tile.constructor(type, me.x, me.y, direction));
+                    }
+                    else {
+                        tile.stuck = true;
+                    }
                 }
             }
         },
