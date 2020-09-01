@@ -1,3 +1,13 @@
+// TODO really need to specify this format more concretely, whoof
+// XXX special kinds of drawing i know this has for a fact:
+// - letter tiles draw from a block of half-tiles onto the center of the base
+// - slime and walkers have double-size tiles when moving
+// - wired tiles are a whole thing
+// - thin walls are packed into just two tiles
+// - saucer has a half-tile overlay for its direction?
+// - railroad tracks overlay a Lot
+// - directional blocks have arrows in an awkward layout, not 4x4 grid but actually positioned on the edges
+// - green and purple toggle walls use an overlay
 export const CC2_TILESET_LAYOUT = {
     door_red: [0, 1],
     door_blue: [1, 1],
@@ -126,7 +136,28 @@ export const CC2_TILESET_LAYOUT = {
 
     fake_wall: [0, 10],
     fake_floor: [0, 10],
-    // TODO thin walls are built piecemeal, sigh
+    // Thin walls are built piecemeal from these two tiles; the first is N/S,
+    // the second is E/W
+    thinwall_n: {
+        tile: [1, 10],
+        mask: [0, 0, 1, 0.5],
+    },
+    thinwall_s: {
+        tile: [1, 10],
+        mask: [0, 0.5, 1, 0.5],
+    },
+    thinwall_w: {
+        tile: [2, 10],
+        mask: [0, 0, 0.5, 1],
+    },
+    thinwall_e: {
+        tile: [2, 10],
+        mask: [0.5, 0, 0.5, 1],
+    },
+    thinwall_se: {
+        base: 'thinwall_s',
+        overlay: 'thinwall_e',
+    },
     // TODO directional block arrows
     teleport_blue: [[4, 10], [5, 10], [6, 10], [7, 10]],
     popwall: [8, 10],
@@ -387,9 +418,9 @@ export class Tileset {
     }
 
     // Helper to draw to a canvas using tile coordinates
-    blit(ctx, sx, sy, dx, dy, scale = 1) {
-        let w = this.size_x * scale;
-        let h = this.size_y * scale;
+    blit(ctx, sx, sy, dx, dy, scale_x = 1, scale_y = scale_x) {
+        let w = this.size_x * scale_x;
+        let h = this.size_y * scale_y;
         ctx.drawImage(
             this.image,
             sx * this.size_x, sy * this.size_y, w, h,
@@ -397,29 +428,63 @@ export class Tileset {
     }
 
     draw(tile, ctx, x, y) {
-        let name = tile.type.name;
-        let drawspec = this.layout[name];
-        let coords = drawspec;
-        if (! coords) console.error(name);
+        this.draw_type(tile.type.name, tile, ctx, x, y);
+    }
 
-        let overlay;
-        if (coords.overlay) {
-            // Goofy overlay thing used for green/purple toggle tiles
-            overlay = coords.overlay;
-            coords = this.layout[coords.base];
+    // Draws a tile type, given by name.  Passing in a tile is optional, but
+    // without it you'll get defaults.
+    draw_type(name, tile, ctx, x, y) {
+        let drawspec = this.layout[name];
+        if (! drawspec) {
+            console.error(`Don't know how to draw tile type ${type.name}!`);
+            return;
         }
 
+        if (drawspec.overlay) {
+            // Goofy overlay thing used for green/purple toggle tiles and
+            // southeast thin walls.  Draw the base (a type name), then draw
+            // the overlay (either a type name or a regular draw spec).
+            // TODO chance of infinite recursion here
+            this.draw_type(drawspec.base, tile, ctx, x, y);
+            if (typeof drawspec.overlay === 'string') {
+                this.draw_type(drawspec.overlay, tile, ctx, x, y);
+                return;
+            }
+            else {
+                drawspec = drawspec.overlay;
+            }
+        }
+
+        let coords = drawspec;
+        if (drawspec.mask) {
+            // Some tiles (OK, just the thin walls) don't actually draw a full
+            // tile, so some adjustments are needed; see below
+            coords = drawspec.tile;
+        }
+
+        // Unwrap animations etc.
         if (!(coords instanceof Array)) {
             // Must be an object of directions
-            coords = coords[tile.direction ?? 'south'];
+            coords = coords[(tile && tile.direction) ?? 'south'];
         }
         if (coords[0] instanceof Array) {
             coords = coords[0];
         }
 
-        this.blit(ctx, coords[0], coords[1], x, y);
-        if (overlay) {
-            this.blit(ctx, overlay[0], overlay[1], x, y);
+        if (drawspec.mask) {
+            // Continue on with masking
+            coords = drawspec.tile;
+            let [x0, y0, w, h] = drawspec.mask;
+            this.blit(
+                ctx,
+                coords[0] + x0,
+                coords[1] + y0,
+                x + x0,
+                y + y0,
+                w, h);
+        }
+        else {
+            this.blit(ctx, coords[0], coords[1], x, y);
         }
 
         // Special behavior for special objects
