@@ -723,7 +723,6 @@ const GAME_UI_HTML = `
             <button class="demo-step-4" type="button">Step 1 move</button>
             <button class="demo-step-20" type="button">Step 1 second</button>
         </div>
-        <div class="demo-scrubber"></div>
         <div class="input"></div>
     </div>
 </main>
@@ -898,17 +897,6 @@ class Game {
             }
         });
 
-        // Populate demo scrubber
-        let scrubber_el = this.container.querySelector('.demo-scrubber');
-        let scrubber_elements = {};
-        for (let [action, label] of Object.entries(ACTION_LABELS)) {
-            let el = mk('li');
-            scrubber_el.append(el);
-            scrubber_elements[action] = el;
-        }
-        this.demo_scrubber_marker = mk('div.demo-scrubber-marker');
-        scrubber_el.append(this.demo_scrubber_marker);
-
         // Populate input debugger
         this.input_el = this.container.querySelector('.input');
         this.input_action_elements = {};
@@ -921,30 +909,7 @@ class Game {
         // Done with UI, now we can load a level
         this.load_level(0);
 
-        // Fill in the scrubber
         if (false && this.level.stored_level.demo) {
-            let input_starts = {};
-            for (let action of Object.keys(ACTION_LABELS)) {
-                input_starts[action] = null;
-            }
-            let t = 0;
-            for (let input of this.level.stored_level.demo) {
-                for (let [action, t0] of Object.entries(input_starts)) {
-                    if (input.has(action)) {
-                        if (t0 === null) {
-                            input_starts[action] = t;
-                        }
-                    }
-                    else if (t0 !== null) {
-                        let bar = mk('span.demo-scrubber-bar');
-                        bar.style.setProperty('--start-time', t0);
-                        bar.style.setProperty('--end-time', t);
-                        scrubber_elements[action].append(bar);
-                        input_starts[action] = null;
-                    }
-                }
-                t += 1;
-            }
             this.demo = this.level.stored_level.demo[Symbol.iterator]();
             // FIXME should probably start playback on first input
             this.set_state('playing');
@@ -1104,11 +1069,6 @@ class Game {
             if (count > 0) {
                 this.inventory_el.append(mk('img', {src: this.render_inventory_tile(name)}));
             }
-        }
-
-        if (this.demo) {
-            this.demo_scrubber_marker.style.setProperty('--time', this.tic);
-            this.demo_scrubber_marker.scrollIntoView({inline: 'center'});
         }
 
         for (let action of Object.keys(ACTION_LABELS)) {

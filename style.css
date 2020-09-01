@@ -252,37 +252,6 @@ dl.score-chart .-sum {
     grid-area: demo;
 }
 
-.demo-scrubber {
-    position: relative;
-    overflow-x: auto;
-    padding: 0;
-    margin: 1em 0;
-    list-style: none;
-}
-.demo-scrubber li {
-    position: relative;
-    height: 1em;
-    margin: 2px 0;
-    background: #303030;
-}
-.demo-scrubber li .demo-scrubber-bar {
-    position: absolute;
-    height: 1em;
-    left: calc(var(--start-time) * 3px);
-    width: calc((var(--end-time) - var(--start-time)) * 3px);
-    background: #606060;
-}
-.demo-scrubber .demo-scrubber-marker {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: calc(var(--time) * 3px);
-    width: 2px;
-    margin-left: -1px;
-    background: darkred;
-    --time: 0;
-}
-
 /* Debug stuff */
 .input {
     display: grid;
