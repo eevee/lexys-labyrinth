@@ -977,6 +977,12 @@ class Game {
             this.demo_el.style.display = 'none';
         }
 
+        // Auto-size the level canvas, both now and on resize
+        this.adjust_scale();
+        window.addEventListener('resize', ev => {
+            this.adjust_scale();
+        });
+
         this.frame = 0;
         this.tic = 0;
         requestAnimationFrame(this.do_frame.bind(this));
@@ -1214,6 +1220,32 @@ class Game {
                 }
             }
         }
+    }
+
+    // Auto-size the game canvas to fit the screen, if possible
+    adjust_scale() {
+        // TODO make this optional
+        // The base size is the size of the canvas, i.e. the viewport size
+        // times the tile size
+        let base_x = this.tileset.size_x * this.viewport_size_x;
+        let base_y = this.tileset.size_y * this.viewport_size_y;
+        // The main UI is centered in a flex item with auto margins, so the
+        // extra space available is the size of those margins
+        let style = window.getComputedStyle(this.container);
+        let extra_x = parseFloat(style['margin-left']) + parseFloat(style['margin-right']);
+        let extra_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);
+        // The total available space, then, is the current size of the
+        // canvas plus the size of the margins
+        let total_x = extra_x + this.level_canvas.offsetWidth;
+        let total_y = extra_y + this.level_canvas.offsetHeight;
+        // Divide to find the biggest scale that still fits.  But don't
+        // exceed 90% of the available space, or it'll feel cramped.
+        let scale = Math.floor(0.9 * Math.min(total_x / base_x, total_y / base_y));
+        if (scale <= 0) {
+            scale = 1;
+        }
+        // FIXME this doesn't take into account the inventory, which is also affected by scale
+        this.container.style.setProperty('--scale', scale);
     }
 }
 

@@ -91,7 +91,7 @@ main {
 
     --tile-width: 32px;
     --tile-height: 32px;
-    --scale: 2;
+    --scale: 1;
 }
 
 main > header {
@@ -233,12 +233,12 @@ dl.score-chart .-sum {
     flex-wrap: wrap;
     align-items: start;
 
-    background-size: calc(2 * var(--tile-width)) calc(2 * var(--tile-height));
-    width: calc(4 * var(--tile-width) * 2);
-    min-height: calc(2 * var(--tile-height) * 2);
+    background-size: calc(var(--tile-width) * var(--scale)) calc(var(--tile-height) * var(--scale));
+    width: calc(4 * var(--tile-width) * var(--scale));
+    min-height: calc(2 * var(--tile-height) * var(--scale));
 }
 .inventory img {
-    width: calc(2 * var(--tile-width));
+    width: calc(var(--tile-width) * var(--scale));
 }
 .controls {
     grid-area: controls;
