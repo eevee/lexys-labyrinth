@@ -234,6 +234,8 @@ class Level {
         this.tic_counter = 0;
 
         this.hint_shown = null;
+        // TODO in lynx/steam, this carries over between levels; in tile world, you can set it manually
+        this.force_floor_direction = 'north';
 
         let n = 0;
         let connectables = [];
@@ -615,10 +617,23 @@ class Level {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Level alteration methods.  EVERYTHING that changes the state of a level,
+    // including the state of a single tile, should do it through one of these
+    // for undo/rewind purposes
+
     collect_chip() {
         if (this.chips_remaining > 0) {
             this.chips_remaining--;
         }
+    }
+
+    // Get the next direction a random force floor will use.  They share global
+    // state and cycle clockwise.
+    get_force_floor_direction() {
+        let d = this.force_floor_direction;
+        this.force_floor_direction = DIRECTIONS[d].right;
+        return d;
     }
 
     // TODO make a set of primitives for actually altering the level that also

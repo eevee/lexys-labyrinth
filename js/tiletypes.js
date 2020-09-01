@@ -225,7 +225,11 @@ const TILE_TYPES = {
         },
     },
     force_floor_all: {
-        // TODO cc2 cycles these...
+        // TODO ms: this is random, and an acting wall to monsters (!)
+        on_arrive(me, level, other) {
+            other.direction = level.get_force_floor_direction();
+            level.make_slide(other, 'force');
+        },
     },
     bomb: {
         // TODO explode
