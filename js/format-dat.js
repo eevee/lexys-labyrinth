@@ -180,7 +180,7 @@ function parse_level(buf) {
                     continue;
                 }
 
-                cell.push({name, direction});
+                cell.unshift({name, direction});
             }
         }
         if (c !== 1024)

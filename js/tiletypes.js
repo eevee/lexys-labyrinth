@@ -278,8 +278,23 @@ const TILE_TYPES = {
         blocks: true,
     },
     cloner: {
-        // TODO ???
         blocks: true,
+        activate(me, level) {
+            let cell = level.cells[me.y][me.x];
+            // Clone so we don't end up repeatedly cloning the same object
+            let current_tiles = Array.from(cell);
+            for (let tile of current_tiles) {
+                if (tile !== me && tile.type.is_actor) {
+                    tile.stuck = false;
+                    // TODO precise behavior?  is this added immediately and can move later that same turn or what?
+                    level.actors.push(tile);
+                    // FIXME rearrange to make this possible lol
+                    // FIXME go through level for this, and everything else of course
+                    // FIXME add this underneath, just above the cloner
+                    cell._add(new tile.constructor(tile.type, tile.x, tile.y, tile.direction));
+                }
+            }
+        }
     },
     trap: {
         // TODO ???
@@ -326,7 +341,13 @@ const TILE_TYPES = {
         // TODO how do i implement this.
     },
     button_red: {
-        // TODO
+        connects_to: 'cloner',
+        connect_order: 'forward',
+        on_arrive(me, level, other) {
+            if (me.connection && ! me.connection.doomed) {
+                me.connection.type.activate(me.connection, level);
+            }
+        }
     },
 
     // Critters

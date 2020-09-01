@@ -231,6 +231,7 @@ class Level {
         this.hint_shown = null;
 
         let n = 0;
+        let connectables = [];
         for (let y = 0; y < this.height; y++) {
             let row = [];
             this.cells.push(row);
@@ -240,6 +241,7 @@ class Level {
 
                 let stored_cell = this.stored_level.linear_cells[n];
                 n++;
+                let has_cloner, has_forbidden;
 
                 for (let template_tile of stored_cell) {
                     let tile = Tile.from_template(template_tile, x, y);
@@ -247,6 +249,11 @@ class Level {
                         // Copy over the tile-specific hint, if any
                         tile.specific_hint = template_tile.specific_hint ?? null;
                     }
+
+                    if (tile.type.name === 'cloner') {
+                        has_cloner = true;
+                    }
+
                     if (tile.type.is_player) {
                         // TODO handle multiple players, also chip and melinda both
                         // TODO complain if no chip
@@ -257,13 +264,47 @@ class Level {
                         this.actors[0] = tile;
                     }
                     else if (tile.type.is_actor) {
-                        this.actors.push(tile);
+                        if (has_cloner) {
+                            tile.stuck = true;
+                        }
+                        else {
+                            this.actors.push(tile);
+                        }
                     }
                     cell.push(tile);
+
+                    if (tile.type.connects_to) {
+                        connectables.push(tile);
+                    }
                 }
-                // Make the bottom tile be /first/
-                cell.reverse();
             }
+        }
+
+        // Connect buttons and teleporters
+        let num_cells = this.width * this.height;
+        for (let connectable of connectables) {
+            let x = connectable.x;
+            let y = connectable.y;
+            let goal = connectable.type.connects_to;
+            let found = false;
+            for (let i = 0; i < num_cells - 1; i++) {
+                x++;
+                while (x >= this.width) {
+                    x -= this.width;
+                    y++;
+                    y %= this.width;
+                }
+                for (let tile of this.cells[y][x]) {
+                    if (tile.type.name === goal) {
+                        // TODO should be weak, but you can't destroy cloners so in practice not a concern
+                        connectable.connection = tile;
+                        found = true;
+                    }
+                }
+                if (found)
+                    break;
+            }
+            // TODO soft warn for e.g. a button with no cloner?  (or a cloner with no button?)
         }
     }
 
@@ -284,6 +325,9 @@ class Level {
                 if (actor.movement_cooldown > 0)
                     continue;
             }
+            // XXX does the cooldown drop while in a trap?  is this even right?
+            if (actor.stuck)
+                continue;
 
             let direction_preference;
             // Actors can't make voluntary moves on ice, so they're stuck with

@@ -485,6 +485,7 @@ export function parse_level(buf) {
                     if (! has_next)
                         break;
                 }
+                cell.reverse();
                 level.linear_cells.push(cell);
             }
         }
