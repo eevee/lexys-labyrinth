@@ -379,6 +379,10 @@ class Level {
                     actor.last_move_was_force = false;
                 }
             }
+            else if (actor.type.movement_mode === 'forward') {
+                // blue tank behavior: keep moving forward
+                direction_preference = [actor.direction];
+            }
             else if (actor.type.movement_mode === 'follow-left') {
                 // bug behavior: always try turning as left as possible, and
                 // fall back to less-left turns when that fails
@@ -409,9 +413,41 @@ class Level {
                 let d = DIRECTIONS[actor.direction];
                 direction_preference = [actor.direction, d.opposite];
             }
-            else if (actor.type.movement_mode === 'forward') {
-                // blue tank behavior: keep moving forward
-                direction_preference = [actor.direction];
+            else if (actor.type.movement_mode === 'bounce-random') {
+                // walker behavior: preserve current direction; if that
+                // doesn't work, pick a random direction, even the one we
+                // failed to move in
+                // TODO unclear if this is right in cc2 as well.  definitely not in ms, which chooses a legal move
+                direction_preference = [actor.direction, ['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
+            }
+            else if (actor.type.movement_mode === 'pursue') {
+                // teeth behavior: always move towards the player
+                let dx = actor.x - this.player.x;
+                let dy = actor.y - this.player.y;
+                // Chooses the furthest direction, vertical wins ties
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Horizontal
+                    if (dx > 0) {
+                        direction_preference = ['west'];
+                    }
+                    else {
+                        direction_preference = ['east'];
+                    }
+                }
+                else {
+                    // Vertical
+                    if (dy > 0) {
+                        direction_preference = ['north'];
+                    }
+                    else {
+                        direction_preference = ['south'];
+                    }
+                }
+            }
+            else if (actor.type.movement_mode === 'random') {
+                // blob behavior: move completely at random
+                // TODO cc2 has twiddles for how this works per-level, as well as the initial seed for demo playback
+                direction_preference = [['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
             }
 
             if (! direction_preference)

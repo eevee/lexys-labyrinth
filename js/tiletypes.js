@@ -417,7 +417,7 @@ const TILE_TYPES = {
         is_object: true,
         is_monster: true,
         blocks_monsters: true,
-        // TODO movement_move: 'bounce-random',
+        movement_mode: 'bounce-random',
         movement_speed: 4,
     },
     tank_blue: {
@@ -433,6 +433,7 @@ const TILE_TYPES = {
         is_object: true,
         is_monster: true,
         blocks_monsters: true,
+        movement_mode: 'random',
         movement_speed: 8,
     },
     teeth: {
@@ -440,7 +441,9 @@ const TILE_TYPES = {
         is_object: true,
         is_monster: true,
         blocks_monsters: true,
-        movement_speed: 4,
+        movement_mode: 'pursue',
+        // TODO actually 4 with deliberate pauses but i have no way to model that atm
+        movement_speed: 8,
     },
     fireball: {
         is_actor: true,
