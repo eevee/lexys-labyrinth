@@ -176,29 +176,8 @@ class Cell extends Array {
             throw new Error("Asked to remove tile that doesn't seem to exist");
 
         this.splice(layer, 1);
+        tile.cell = null;
         return layer;
-    }
-
-    each(f) {
-        let copy = Array.from(this);
-        for (let i = 0, l = copy.length; i < l; i++) {
-            if (f(copy[i]) === false)
-                break;
-        }
-    }
-
-    _gc() {
-        let p = 0;
-        for (let i = 0, l = this.length; i < l; i++) {
-            let cell = this[i];
-            if (! cell.doomed) {
-                if (p !== i) {
-                    this[p] = cell;
-                }
-                p++;
-            }
-        }
-        this.length = p;
     }
 }
 
@@ -361,10 +340,6 @@ class Level {
 
         // XXX this entire turn order is rather different in ms rules
         for (let actor of this.actors) {
-            // TODO strip these out maybe??
-            if (actor.doomed)
-                continue;
-
             if (actor.movement_cooldown > 0) {
                 this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
                 if (actor.movement_cooldown > 0)
@@ -539,37 +514,42 @@ class Level {
         let blocked;
         if (goal_x >= 0 && goal_x < this.width && goal_y >= 0 && goal_y < this.height) {
             // Check for a thin wall in our current cell first
-            original_cell.each(tile => {
+            for (let tile of original_cell) {
                 if (tile !== actor && tile.type.thin_walls &&
                     tile.type.thin_walls.has(direction))
                 {
                     blocked = true;
-                    return;
+                    break;
                 }
-            });
+            }
 
-            // Only bother touching the goal cell if we're not already trapped in this one
+            // Only bother touching the goal cell if we're not already trapped
+            // in this one
+            // (Note that here, and anywhere else that has any chance of
+            // altering the cell's contents, we iterate over a copy of the cell
+            // to insulate ourselves from tiles appearing or disappearing
+            // mid-iteration.)
             // FIXME actually, this prevents flicking!
             if (! blocked) {
                 let goal_cell = this.cells[goal_y][goal_x];
-                goal_cell.each(tile => {
+                for (let tile of Array.from(goal_cell)) {
                     if (! tile.blocks(actor, direction))
-                        return;
+                        continue;
 
                     if (actor.type.pushes && actor.type.pushes[tile.type.name]) {
                         if (this.attempt_step(tile, direction))
                             // It moved out of the way!
-                            return;
+                            continue;
                     }
                     if (tile.type.on_bump) {
                         tile.type.on_bump(tile, this, actor);
                         if (! tile.blocks(actor, direction))
                             // It became something non-blocking!
-                            return;
+                            continue;
                     }
                     blocked = true;
                     // XXX should i break here, or bump everything?
-                });
+                }
             }
         }
         else {
@@ -604,27 +584,27 @@ class Level {
         this.add_tile(actor, goal_cell);
 
         // Announce we're leaving, for the handful of tiles that care about it
-        original_cell.each(tile => {
+        for (let tile of Array.from(original_cell)) {
             if (tile === actor)
-                return;
+                continue;
             if (actor.ignores(tile.type.name))
-                return;
+                continue;
 
             if (tile.type.on_depart) {
                 tile.type.on_depart(tile, this, actor);
             }
-        });
+        }
 
         // Step on all the tiles in the new cell
         if (actor === this.player) {
             this._set_prop(this, 'hint_shown', null);
         }
         let teleporter;
-        goal_cell.each(tile => {
+        for (let tile of Array.from(goal_cell)) {
             if (tile === actor)
-                return;
+                continue;
             if (actor.ignores(tile.type.name))
-                return;
+                continue;
 
             if (actor === this.player && tile.type.is_hint) {
                 this._set_prop(this, 'hint_shown', tile.specific_hint ?? this.stored_level.hint);
@@ -646,7 +626,7 @@ class Level {
                 // TODO ooh, obituaries
                 this.fail("Oops!  Watch out for creatures!");
             }
-        });
+        }
 
         // Handle teleporting, now that the dust has cleared
         let current_cell = goal_cell;
@@ -1466,9 +1446,7 @@ class Game {
                     let tile = cell[i];
                     if (tile) {
                         any_drawn = true;
-                        if (! tile.doomed) {
-                            this.tileset.draw(tile, this.level, ctx, dx, dy);
-                        }
+                        this.tileset.draw(tile, this.level, ctx, dx, dy);
                     }
                 }
             }

@@ -368,7 +368,7 @@ const TILE_TYPES = {
         connects_to: 'trap',
         connect_order: 'forward',
         on_arrive(me, level, other) {
-            if (me.connection && ! me.connection.doomed) {
+            if (me.connection && me.connection.cell) {
                 let trap = me.connection;
                 trap.open = true;
                 for (let tile of trap.cell) {
@@ -379,7 +379,7 @@ const TILE_TYPES = {
             }
         },
         on_depart(me, level, other) {
-            if (me.connection && ! me.connection.doomed) {
+            if (me.connection && me.connection.cell) {
                 let trap = me.connection;
                 trap.open = false;
                 for (let tile of trap.cell) {
@@ -394,7 +394,7 @@ const TILE_TYPES = {
         connects_to: 'cloner',
         connect_order: 'forward',
         on_arrive(me, level, other) {
-            if (me.connection && ! me.connection.doomed) {
+            if (me.connection && me.connection.cell) {
                 me.connection.type.activate(me.connection, level);
             }
         },
