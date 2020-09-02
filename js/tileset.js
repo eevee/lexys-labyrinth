@@ -1,3 +1,5 @@
+import { DIRECTIONS } from './defs.js';
+
 // TODO really need to specify this format more concretely, whoof
 // XXX special kinds of drawing i know this has for a fact:
 // - letter tiles draw from a block of half-tiles onto the center of the base
@@ -129,8 +131,10 @@ export const CC2_TILESET_LAYOUT = {
         base: 'purple_floor',
         overlay: [8, 9],
     },
-    // TODO state (10 is closed)
-    trap: [9, 9],
+    trap: {
+        closed: [9, 9],
+        open: [10, 9],
+    },
     button_gray: [11, 9],
     fireball: [[12, 9], [13, 9], [14, 9], [15, 9]],
 
@@ -427,27 +431,35 @@ export class Tileset {
             dx * this.size_x, dy * this.size_y, w, h);
     }
 
-    draw(tile, ctx, x, y) {
-        this.draw_type(tile.type.name, tile, ctx, x, y);
+    draw(tile, level, ctx, x, y) {
+        this.draw_type(tile.type.name, tile, level, ctx, x, y);
     }
 
     // Draws a tile type, given by name.  Passing in a tile is optional, but
     // without it you'll get defaults.
-    draw_type(name, tile, ctx, x, y) {
+    draw_type(name, tile, level, ctx, x, y) {
         let drawspec = this.layout[name];
         if (! drawspec) {
             console.error(`Don't know how to draw tile type ${type.name}!`);
             return;
         }
 
+        /*
+        if (tile && tile.movement_cooldown) {
+            let offset = DIRECTIONS[tile.direction].movement;
+            x -= tile.movement_cooldown / tile.type.movement_speed * offset[0];
+            y -= tile.movement_cooldown / tile.type.movement_speed * offset[1];
+        }
+        */
+
         if (drawspec.overlay) {
             // Goofy overlay thing used for green/purple toggle tiles and
             // southeast thin walls.  Draw the base (a type name), then draw
             // the overlay (either a type name or a regular draw spec).
             // TODO chance of infinite recursion here
-            this.draw_type(drawspec.base, tile, ctx, x, y);
+            this.draw_type(drawspec.base, tile, level, ctx, x, y);
             if (typeof drawspec.overlay === 'string') {
-                this.draw_type(drawspec.overlay, tile, ctx, x, y);
+                this.draw_type(drawspec.overlay, tile, level, ctx, x, y);
                 return;
             }
             else {
@@ -464,11 +476,26 @@ export class Tileset {
 
         // Unwrap animations etc.
         if (!(coords instanceof Array)) {
-            // Must be an object of directions
-            coords = coords[(tile && tile.direction) ?? 'south'];
+            // Must be an object of either tile-specific state, or directions
+            if (name === 'trap') {
+                if (tile && tile.open) {
+                    coords = coords.open;
+                }
+                else {
+                    coords = coords.closed;
+                }
+            }
+            else {
+                coords = coords[(tile && tile.direction) ?? 'south'];
+            }
         }
         if (coords[0] instanceof Array) {
-            coords = coords[0];
+            if (level) {
+                coords = coords[Math.floor(level.tic_counter % 5 / 5 * coords.length)];
+            }
+            else {
+                coords = coords[0];
+            }
         }
 
         if (drawspec.mask) {

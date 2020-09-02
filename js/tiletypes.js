@@ -19,12 +19,14 @@ const TILE_TYPES = {
     wall_appearing: {
         blocks: true,
         on_bump(me, level, other) {
-            me.become('wall');
+            level.transmute_tile(me, 'wall');
         },
     },
     popwall: {
+        blocks_monsters: true,
+        blocks_blocks: true,
         on_depart(me, level, other) {
-            me.become('wall');
+            level.transmute_tile(me, 'wall');
         },
     },
     thinwall_n: {
@@ -45,13 +47,13 @@ const TILE_TYPES = {
     fake_wall: {
         blocks: true,
         on_bump(me, level, other) {
-            me.become('wall');
+            level.transmute_tile(me, 'wall');
         },
     },
     fake_floor: {
         blocks: true,
         on_bump(me, level, other) {
-            me.become('floor');
+            level.transmute_tile(me, 'floor');
         },
     },
 
@@ -110,7 +112,7 @@ const TILE_TYPES = {
         blocks_blocks: true,
         // TODO block melinda only without the hiking boots; can't use ignore because then she wouldn't step on it  :S  also ignore doesn't apply to blocks anyway.
         on_arrive(me, level, other) {
-            me.become('floor');
+            level.transmute_tile(me, 'floor');
         },
     },
     gravel: {
@@ -122,10 +124,10 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.fail("Oops!  You can't walk on fire without fire boots!");
-                other.become('player_burned');
+                level.transmute_tile(other, 'player_burned');
             }
             else {
-                other.destroy();
+                level.remove_tile(other);
             }
         },
     },
@@ -133,15 +135,15 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
             if (other.type.name == 'dirt_block' || other.type.name == 'clone_block') {
-                other.destroy();
-                me.become('dirt');
+                level.remove_tile(other);
+                level.transmute_tile(me, 'dirt');
             }
             else if (other.type.is_player) {
-                level.fail("Oops!  You can't swim without flippers!");
-                other.become('player_drowned');
+                level.fail("swimming with the fishes");
+                level.transmute_tile(other, 'player_drowned');
             }
             else {
-                other.destroy();
+                level.remove_tile(other);
             }
         },
     },
@@ -234,8 +236,11 @@ const TILE_TYPES = {
     bomb: {
         // TODO explode
         on_arrive(me, level, other) {
-            me.destroy();
-            other.destroy();
+            level.remove_tile(me);
+            level.remove_tile(other);
+            if (other.type.is_player) {
+                level.fail("watch where you step");
+            }
         },
     },
     thief_tools: {
@@ -267,6 +272,7 @@ const TILE_TYPES = {
     dirt_block: {
         blocks: true,
         is_object: true,
+        is_actor: true,
         is_block: true,
         ignores: new Set(['fire']),
     },
@@ -274,6 +280,7 @@ const TILE_TYPES = {
         // TODO is this in any way distinct from dirt block
         blocks: true,
         is_object: true,
+        is_actor: true,
         is_block: true,
         ignores: new Set(['fire']),
     },
@@ -284,10 +291,9 @@ const TILE_TYPES = {
     cloner: {
         blocks: true,
         activate(me, level) {
-            let cell = level.cells[me.y][me.x];
-            // Clone so we don't end up repeatedly cloning the same object
-            let current_tiles = Array.from(cell);
-            for (let tile of current_tiles) {
+            let cell = me.cell;
+            // Copy, so we don't end up repeatedly cloning the same object
+            for (let tile of Array.from(cell)) {
                 if (tile !== me && tile.type.is_actor) {
                     // Copy this stuff in case the movement changes it
                     let type = tile.type;
@@ -295,16 +301,14 @@ const TILE_TYPES = {
 
                     // Unstick and try to move the actor; if it's blocked,
                     // abort the clone
-                    tile.stuck = false;
+                    level.set_actor_stuck(tile, false);
                     if (level.attempt_step(tile, direction)) {
                         level.actors.push(tile);
-                        // FIXME rearrange to make this possible lol
-                        // FIXME go through level for this, and everything else of course
                         // FIXME add this underneath, just above the cloner
-                        cell._add(new tile.constructor(type, me.x, me.y, direction));
+                        level.add_tile(new tile.constructor(type, direction), cell);
                     }
                     else {
-                        tile.stuck = true;
+                        level.set_actor_stuck(tile, true);
                     }
                 }
             }
@@ -313,7 +317,7 @@ const TILE_TYPES = {
     trap: {
         on_arrive(me, level, other) {
             if (! me.open) {
-                other.stuck = true;
+                level.set_actor_stuck(other, true);
             }
         },
     },
@@ -331,7 +335,7 @@ const TILE_TYPES = {
             for (let actor of level.actors) {
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_blue') {
-                    actor.direction = DIRECTIONS[actor.direction].opposite;
+                    level.set_actor_direction(actor, DIRECTIONS[actor.direction].opposite);
                 }
             }
         },
@@ -339,20 +343,21 @@ const TILE_TYPES = {
     button_green: {
         on_arrive(me, level, other) {
             // Swap green floors and walls
+            // TODO could probably make this more compact for undo purposes
             for (let row of level.cells) {
                 for (let cell of row) {
                     for (let tile of cell) {
                         if (tile.type.name === 'green_floor') {
-                            tile.become('green_wall');
+                            level.transmute_tile(tile, 'green_wall');
                         }
                         else if (tile.type.name === 'green_wall') {
-                            tile.become('green_floor');
+                            level.transmute_tile(tile, 'green_floor');
                         }
                         else if (tile.type.name === 'green_chip') {
-                            tile.become('green_bomb');
+                            level.transmute_tile(tile, 'green_bomb');
                         }
                         else if (tile.type.name === 'green_bomb') {
-                            tile.become('green_chip');
+                            level.transmute_tile(tile, 'green_chip');
                         }
                     }
                 }
@@ -366,9 +371,9 @@ const TILE_TYPES = {
             if (me.connection && ! me.connection.doomed) {
                 let trap = me.connection;
                 trap.open = true;
-                for (let tile of level.cells[trap.y][trap.x]) {
+                for (let tile of trap.cell) {
                     if (tile.stuck) {
-                        tile.stuck = false;
+                        level.set_actor_stuck(tile, false);
                     }
                 }
             }
@@ -377,9 +382,9 @@ const TILE_TYPES = {
             if (me.connection && ! me.connection.doomed) {
                 let trap = me.connection;
                 trap.open = false;
-                for (let tile of level.cells[trap.y][trap.x]) {
+                for (let tile of trap.cell) {
                     if (tile.is_actor) {
-                        tile.stuck = false;
+                        level.set_actor_stuck(tile, true);
                     }
                 }
             }
@@ -553,7 +558,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.collect_chip();
-                me.destroy();
+                level.remove_tile(me);
             }
         },
     },

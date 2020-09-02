@@ -69,11 +69,10 @@ async function fetch(url) {
 const PAGE_TITLE = "Lexy's Labyrinth";
 
 class Tile {
-    constructor(type, x, y, direction = 'south') {
+    constructor(type, direction = 'south') {
         this.type = type;
-        this.x = x;
-        this.y = y;
         this.direction = direction;
+        this.cell = null;
 
         this.slide_mode = null;
         this.movement_cooldown = 0;
@@ -83,10 +82,10 @@ class Tile {
         }
     }
 
-    static from_template(tile_template, x, y) {
+    static from_template(tile_template) {
         let type = TILE_TYPES[tile_template.name];
         if (! type) console.error(tile_template.name);
-        let tile = new this(type, x, y, tile_template.direction);
+        let tile = new this(type, tile_template.direction);
         if (type.load) {
             type.load(tile, tile_template);
         }
@@ -129,15 +128,6 @@ class Tile {
         return false;
     }
 
-    become(name) {
-        this.type = TILE_TYPES[name];
-        // TODO adjust anything else?
-    }
-
-    destroy() {
-        this.doomed = true;
-    }
-
     // Inventory stuff
     give_item(name) {
         this.inventory[name] = (this.inventory[name] ?? 0) + 1;
@@ -162,13 +152,20 @@ class Tile {
 }
 
 class Cell extends Array {
-    constructor() {
+    constructor(x, y) {
         super();
-        this.is_dirty = false;
+        this.x = x;
+        this.y = y;
     }
 
-    _add(tile) {
-        this.push(tile);
+    _add(tile, index = null) {
+        if (index === null) {
+            this.push(tile);
+        }
+        else {
+            this.splice(index, 0, tile);
+        }
+        tile.cell = this;
     }
 
     // DO NOT use me to remove a tile permanently, only to move it!
@@ -179,14 +176,15 @@ class Cell extends Array {
             throw new Error("Asked to remove tile that doesn't seem to exist");
 
         this.splice(layer, 1);
+        return layer;
     }
 
     each(f) {
-        for (let i = this.length - 1; i >= 0; i--) {
-            if (f(this[i]) === false)
+        let copy = Array.from(this);
+        for (let i = 0, l = copy.length; i < l; i++) {
+            if (f(copy[i]) === false)
                 break;
         }
-        this._gc();
     }
 
     _gc() {
@@ -237,13 +235,16 @@ class Level {
         // TODO in lynx/steam, this carries over between levels; in tile world, you can set it manually
         this.force_floor_direction = 'north';
 
+        this.undo_stack = [];
+        this.pending_undo = [];
+
         let n = 0;
         let connectables = [];
         for (let y = 0; y < this.height; y++) {
             let row = [];
             this.cells.push(row);
             for (let x = 0; x < this.width; x++) {
-                let cell = new Cell;
+                let cell = new Cell(x, y);
                 row.push(cell);
 
                 let stored_cell = this.stored_level.linear_cells[n];
@@ -251,7 +252,7 @@ class Level {
                 let has_cloner, has_forbidden;
 
                 for (let template_tile of stored_cell) {
-                    let tile = Tile.from_template(template_tile, x, y);
+                    let tile = Tile.from_template(template_tile);
                     if (tile.type.is_hint) {
                         // Copy over the tile-specific hint, if any
                         tile.specific_hint = template_tile.specific_hint ?? null;
@@ -278,7 +279,7 @@ class Level {
                             this.actors.push(tile);
                         }
                     }
-                    cell.push(tile);
+                    cell._add(tile);
 
                     if (tile.type.connects_to) {
                         connectables.push(tile);
@@ -289,17 +290,15 @@ class Level {
 
         // Connect buttons and teleporters
         let num_cells = this.width * this.height;
-        console.log(this.stored_level.custom_trap_wiring);
-        console.log(this.stored_level.custom_cloner_wiring);
         for (let connectable of connectables) {
-            let x = connectable.x;
-            let y = connectable.y;
+            let cell = connectable.cell;
+            let x = cell.x;
+            let y = cell.y;
             let goal = connectable.type.connects_to;
             let found = false;
 
             // Check for custom wiring, for MSCC .DAT levels
             let n = x + y * this.width;
-            console.log(x, y, n);
             let target_cell_n = null;
             if (goal === 'trap') {
                 target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
@@ -367,7 +366,7 @@ class Level {
                 continue;
 
             if (actor.movement_cooldown > 0) {
-                actor.movement_cooldown -= 1;
+                this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
                 if (actor.movement_cooldown > 0)
                     continue;
             }
@@ -394,19 +393,19 @@ class Level {
                     actor.last_move_was_force)
                 {
                     direction_preference = [player_direction];
-                    actor.last_move_was_force = false;
+                    this._set_prop(actor, 'last_move_was_force', false);
                 }
                 else {
                     direction_preference = [actor.direction];
                     if (actor === this.player) {
-                        actor.last_move_was_force = true;
+                        this._set_prop(actor, 'last_move_was_force', true);
                     }
                 }
             }
             else if (actor === this.player) {
                 if (player_direction) {
                     direction_preference = [player_direction];
-                    actor.last_move_was_force = false;
+                    this._set_prop(actor, 'last_move_was_force', false);
                 }
             }
             else if (actor.type.movement_mode === 'forward') {
@@ -452,8 +451,8 @@ class Level {
             }
             else if (actor.type.movement_mode === 'pursue') {
                 // teeth behavior: always move towards the player
-                let dx = actor.x - this.player.x;
-                let dy = actor.y - this.player.y;
+                let dx = actor.cell.x - this.player.cell.x;
+                let dy = actor.cell.y - this.player.cell.y;
                 // Chooses the furthest direction, vertical wins ties
                 if (Math.abs(dx) > Math.abs(dy)) {
                     // Horizontal
@@ -485,7 +484,7 @@ class Level {
 
             let moved = false;
             for (let direction of direction_preference) {
-                actor.direction = direction;
+                this.set_actor_direction(actor, direction);
                 if (this.attempt_step(actor, direction)) {
                     moved = true;
                     break;
@@ -499,7 +498,7 @@ class Level {
                 if (actor.slide_mode !== null) {
                     speed_multiplier = 2;
                 }
-                actor.movement_cooldown = actor.type.movement_speed / speed_multiplier;
+                this._set_prop(actor, 'movement_cooldown', actor.type.movement_speed / speed_multiplier);
             }
 
             // TODO do i need to do this more aggressively?
@@ -508,6 +507,13 @@ class Level {
         }
 
         if (this.time_remaining !== null) {
+            let tic_counter = this.tic_counter;
+            let time_remaining = this.time_remaining;
+            this.pending_undo.push(() => {
+                this.tic_counter = tic_counter;
+                this.time_remaining = time_remaining;
+            });
+
             this.tic_counter++;
             while (this.tic_counter > 20) {
                 this.tic_counter -= 20;
@@ -517,28 +523,22 @@ class Level {
                 }
             }
         }
-    }
 
-    fail(message) {
-        this.state = 'failure';
-        this.fail_message = message;
-    }
-
-    win() {
-        this.state = 'success';
+        // Commit the undo state at the end of each tic
+        this.commit();
     }
 
     // Try to move the given actor one tile in the given direction and update
     // their cooldown.  Return true if successful.
     attempt_step(actor, direction) {
         let move = DIRECTIONS[direction].movement;
-        let goal_x = actor.x + move[0];
-        let goal_y = actor.y + move[1];
+        let original_cell = actor.cell;
+        let goal_x = original_cell.x + move[0];
+        let goal_y = original_cell.y + move[1];
 
         let blocked;
         if (goal_x >= 0 && goal_x < this.width && goal_y >= 0 && goal_y < this.height) {
             // Check for a thin wall in our current cell first
-            let original_cell = this.cells[actor.y][actor.x];
             original_cell.each(tile => {
                 if (tile !== actor && tile.type.thin_walls &&
                     tile.type.thin_walls.has(direction))
@@ -594,19 +594,14 @@ class Level {
     // tile interactions.  Does NOT check for whether the move is actually
     // legal; use attempt_step for that!
     move_to(actor, x, y) {
-        if (x === actor.x && y === actor.y)
+        let original_cell = actor.cell;
+        if (x === original_cell.x && y === original_cell.y)
             return;
 
         let goal_cell = this.cells[y][x];
-        let original_cell = this.cells[actor.y][actor.x];
-        original_cell._remove(actor);
+        this.remove_tile(actor);
         actor.slide_mode = null;
-        goal_cell._add(actor);
-        actor.x = x;
-        actor.y = y;
-
-        original_cell.is_dirty = true;
-        goal_cell.is_dirty = true;
+        this.add_tile(actor, goal_cell);
 
         // Announce we're leaving, for the handful of tiles that care about it
         original_cell.each(tile => {
@@ -622,7 +617,7 @@ class Level {
 
         // Step on all the tiles in the new cell
         if (actor === this.player) {
-            this.hint_shown = null;
+            this._set_prop(this, 'hint_shown', null);
         }
         let teleporter;
         goal_cell.each(tile => {
@@ -632,12 +627,11 @@ class Level {
                 return;
 
             if (actor === this.player && tile.type.is_hint) {
-                this.hint_shown = tile.specific_hint ?? this.stored_level.hint;
+                this._set_prop(this, 'hint_shown', tile.specific_hint ?? this.stored_level.hint);
             }
 
-            if (tile.type.is_item && actor.type.has_inventory) {
-                actor.give_item(tile.type.name);
-                tile.destroy();
+            if (tile.type.is_item && this.give_actor(actor, tile.type.name)) {
+                this.remove_tile(tile);
             }
             else if (tile.type.is_teleporter) {
                 teleporter = tile;
@@ -663,12 +657,10 @@ class Level {
                 // Physically move the actor to the new teleporter
                 // XXX is this right, compare with tile world?  i overhear it's actually implemented as a slide?
                 // XXX will probably play badly with undo lol
-                let tele_cell = this.cells[goal.y][goal.x];
+                let tele_cell = goal.cell;
                 current_cell._remove(actor);
                 tele_cell._add(actor);
                 current_cell = tele_cell;
-                actor.x = goal.x;
-                actor.y = goal.y;
                 if (this.attempt_step(actor, actor.direction))
                     // Success, teleportation complete
                     break;
@@ -684,14 +676,53 @@ class Level {
     }
 
     // -------------------------------------------------------------------------
+    // Undo handling
+
+    commit() {
+        this.undo_stack.push(this.pending_undo);
+        this.pending_undo = [];
+    }
+
+    undo() {
+        let entry = this.undo_stack.pop();
+        // Undo in reverse order!  There's no redo, so it's okay to destroy this
+        entry.reverse();
+        for (let undo of entry) {
+            undo();
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Level alteration methods.  EVERYTHING that changes the state of a level,
     // including the state of a single tile, should do it through one of these
     // for undo/rewind purposes
 
+    _set_prop(obj, key, val) {
+        let old_val = obj[key];
+        this.pending_undo.push(() => obj[key] = old_val);
+        obj[key] = val;
+    }
+
     collect_chip() {
-        if (this.chips_remaining > 0) {
+        let current = this.chips_remaining;
+        if (current > 0) {
+            this.pending_undo.push(() => this.chips_remaining = current);
             this.chips_remaining--;
         }
+    }
+
+    fail(message) {
+        this.pending_undo.push(() => {
+            this.state = 'playing';
+            this.fail_message = null;
+        });
+        this.state = 'failure';
+        this.fail_message = message;
+    }
+
+    win() {
+        this.pending_undo.push(() => this.state = 'playing');
+        this.state = 'success';
     }
 
     // Get the next direction a random force floor will use.  They share global
@@ -702,10 +733,54 @@ class Level {
         return d;
     }
 
-    // TODO make a set of primitives for actually altering the level that also
-    // record how to undo themselves
+    // Tile stuff in particular
+
+    remove_tile(tile) {
+        let cell = tile.cell;
+        let layer = cell._remove(tile);
+        this.pending_undo.push(() => cell._add(tile, layer));
+    }
+
+    add_tile(tile, cell, layer = null) {
+        cell._add(tile, layer);
+        this.pending_undo.push(() => cell._remove(tile));
+    }
+
+    transmute_tile(tile, name) {
+        let current = tile.type.name;
+        this.pending_undo.push(() => tile.type = TILE_TYPES[current]);
+        tile.type = TILE_TYPES[name];
+        // TODO adjust anything else?
+    }
+
+    give_actor(actor, name) {
+        if (! actor.type.has_inventory)
+            return false;
+
+        let current = actor.inventory[name];
+        this.pending_undo.push(() => actor.inventory[name] = current);
+        actor.inventory[name] = (current ?? 0) + 1;
+        return true;
+    }
+
+    // Mark an actor as sliding
     make_slide(actor, mode) {
         actor.slide_mode = mode;
+    }
+
+    // Change an actor's direction
+    set_actor_direction(actor, direction) {
+        let current = actor.direction;
+        this.pending_undo.push(() => actor.direction = current);
+        actor.direction = direction;
+    }
+
+    set_actor_stuck(actor, is_stuck) {
+        let current = actor.stuck;
+        if (current === is_stuck)
+            return;
+        this.pending_undo.push(() => actor.stuck = current);
+        actor.stuck = is_stuck;
     }
 }
 
@@ -915,8 +990,8 @@ const GAME_UI_HTML = `
     <div class="controls">
         <button class="control-pause" type="button">Pause</button>
         <button class="control-restart" type="button">Restart</button>
-        <button class="control-undo" type="button" disabled>Undo</button>
-        <button class="control-rewind" type="button" disabled>Rewind</button>
+        <button class="control-undo" type="button">Undo</button>
+        <button class="control-rewind" type="button">Rewind</button>
     </div>
     <div class="demo">
         <h2>Solution demo available</h2>
@@ -966,6 +1041,7 @@ class Game {
         // TODO obey level options; allow overriding
         this.viewport_size_x = 9;
         this.viewport_size_y = 9;
+        this.scale = 1;
 
         document.body.innerHTML = GAME_UI_HTML;
         this.container = document.body.querySelector('main');
@@ -1026,6 +1102,23 @@ class Game {
             }).open();
             ev.target.blur();
         });
+        this.undo_button = this.container.querySelector('.controls .control-undo');
+        this.undo_button.addEventListener('click', ev => {
+            let player_cell = this.level.player.cell;
+            while (player_cell === this.level.player.cell && this.level.undo_stack.length > 0) {
+                this.level.undo();
+            }
+            if (this.level.undo_stack.length === 0) {
+                this.set_state('waiting');
+            }
+            else {
+                // Be sure to undo any success or failure
+                this.set_state('playing');
+            }
+            this.update_ui();
+            this.redraw();
+            ev.target.blur();
+        });
         // Demo playback
         this.container.querySelector('.demo .demo-step-1').addEventListener('click', ev => {
             this.advance_by(1);
@@ -1050,8 +1143,8 @@ class Game {
                 return;
 
             let rect = this.level_canvas.getBoundingClientRect();
-            let x = Math.floor((ev.clientX - rect.x) / 2 / this.tileset.size_x + this.viewport_x);
-            let y = Math.floor((ev.clientY - rect.y) / 2 / this.tileset.size_y + this.viewport_y);
+            let x = Math.floor((ev.clientX - rect.x) / this.scale / this.tileset.size_x + this.viewport_x);
+            let y = Math.floor((ev.clientY - rect.y) / this.scale / this.tileset.size_y + this.viewport_y);
             this.level.move_to(this.level.player, x, y);
         });
 
@@ -1261,7 +1354,7 @@ class Game {
         if (! this._inventory_tiles[name]) {
             // TODO reuse the canvas
             let canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
-            this.tileset.draw({type: TILE_TYPES[name]}, canvas.getContext('2d'), 0, 0);
+            this.tileset.draw({type: TILE_TYPES[name]}, null, canvas.getContext('2d'), 0, 0);
             this._inventory_tiles[name] = canvas.toDataURL();
         }
         return this._inventory_tiles[name];
@@ -1348,29 +1441,34 @@ class Game {
     }
 
     redraw() {
+        // TODO split this out to a renderer, call it every frame, have the level flag itself as dirty
         let ctx = this.level_canvas.getContext('2d');
         ctx.clearRect(0, 0, this.level_canvas.width, this.level_canvas.height);
 
         let xmargin = (this.viewport_size_x - 1) / 2;
         let ymargin = (this.viewport_size_y - 1) / 2;
-        let x0 = this.level.player.x - xmargin;
-        let y0 = this.level.player.y - ymargin;
+        let player_cell = this.level.player.cell;
+        let x0 = player_cell.x - xmargin;
+        let y0 = player_cell.y - ymargin;
         x0 = Math.max(0, Math.min(this.level.width - this.viewport_size_x, x0));
         y0 = Math.max(0, Math.min(this.level.height - this.viewport_size_y, y0));
         this.viewport_x = x0;
         this.viewport_y = y0;
-        for (let dx = 0; dx < this.viewport_size_x; dx++) {
-            for (let dy = 0; dy < this.viewport_size_y; dy++) {
-                let cell = this.level.cells[dy + y0][dx + x0];
-                /*
-                if (! cell.is_dirty)
-                    continue;
-                */
-                cell.is_dirty = false;
-
-                for (let tile of cell) {
-                    if (! tile.doomed) {
-                        this.tileset.draw(tile, ctx, dx, dy);
+        // Draw in layers, so animated objects aren't overdrawn by neighboring terrain
+        let any_drawn = true;
+        let i = -1;
+        while (any_drawn) {
+            i++;
+            any_drawn = false;
+            for (let dx = 0; dx < this.viewport_size_x; dx++) {
+                for (let dy = 0; dy < this.viewport_size_y; dy++) {
+                    let cell = this.level.cells[dy + y0][dx + x0];
+                    let tile = cell[i];
+                    if (tile) {
+                        any_drawn = true;
+                        if (! tile.doomed) {
+                            this.tileset.draw(tile, this.level, ctx, dx, dy);
+                        }
                     }
                 }
             }
@@ -1399,7 +1497,9 @@ class Game {
         if (scale <= 0) {
             scale = 1;
         }
-        // FIXME this doesn't take into account the inventory, which is also affected by scale
+
+        // FIXME the above logic doesn't take into account the inventory, which is also affected by scale
+        this.scale = scale;
         this.container.style.setProperty('--scale', scale);
     }
 }
