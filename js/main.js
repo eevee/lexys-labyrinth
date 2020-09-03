@@ -170,6 +170,12 @@ class Level {
         }
         this.bonus_points = 0;
         this.tic_counter = 0;
+        // 0 to 7, indicating the first tic that teeth can move on.
+        // 0 is equivalent to even step; 4 is equivalent to odd step.
+        // 5 is the default in CC2.  Lynx can use any of the 8.  MSCC uses
+        // either 0 or 4, and defaults to 0, but which you get depends on the
+        // global clock which doesn't get reset between levels (!).
+        this.step_parity = 5;
 
         this.hint_shown = null;
         // TODO in lynx/steam, this carries over between levels; in tile world, you can set it manually
@@ -335,6 +341,11 @@ class Level {
             if (actor.stuck)
                 continue;
 
+            // Teeth can only move the first 4 of every 8 tics, though "first"
+            // can be adjusted
+            if (actor.type.uses_teeth_hesitation && (this.tic_counter + this.step_parity) % 8 >= 4)
+                continue;
+
             let direction_preference;
             // Actors can't make voluntary moves on ice, so they're stuck with
             // whatever they've got
@@ -413,24 +424,27 @@ class Level {
                 // teeth behavior: always move towards the player
                 let dx = actor.cell.x - this.player.cell.x;
                 let dy = actor.cell.y - this.player.cell.y;
+                let preferred_horizontal, preferred_vertical;
+                if (dx > 0) {
+                    preferred_horizontal = 'west';
+                }
+                else if (dx < 0) {
+                    preferred_horizontal = 'east';
+                }
+                if (dy > 0) {
+                    preferred_vertical = 'north';
+                }
+                else if (dy < 0) {
+                    preferred_vertical = 'south';
+                }
                 // Chooses the furthest direction, vertical wins ties
                 if (Math.abs(dx) > Math.abs(dy)) {
-                    // Horizontal
-                    if (dx > 0) {
-                        direction_preference = ['west'];
-                    }
-                    else {
-                        direction_preference = ['east'];
-                    }
+                    // Horizontal first
+                    direction_preference = [preferred_horizontal, preferred_vertical].filter(x => x);
                 }
                 else {
-                    // Vertical
-                    if (dy > 0) {
-                        direction_preference = ['north'];
-                    }
-                    else {
-                        direction_preference = ['south'];
-                    }
+                    // Vertical first
+                    direction_preference = [preferred_vertical, preferred_horizontal].filter(x => x);
                 }
             }
             else if (actor.type.movement_mode === 'random') {
@@ -465,8 +479,7 @@ class Level {
             });
 
             this.tic_counter++;
-            while (this.tic_counter > 20) {
-                this.tic_counter -= 20;
+            if (this.tic_counter % 20 === 0) {
                 this.time_remaining -= 1;
                 if (this.time_remaining <= 0) {
                     this.fail("Time's up!");

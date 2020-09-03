@@ -452,8 +452,8 @@ const TILE_TYPES = {
         is_monster: true,
         blocks_monsters: true,
         movement_mode: 'pursue',
-        // TODO actually 4 with deliberate pauses but i have no way to model that atm
-        movement_speed: 8,
+        movement_speed: 4,
+        uses_teeth_hesitation: true,
     },
     fireball: {
         is_actor: true,
