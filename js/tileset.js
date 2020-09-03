@@ -487,7 +487,7 @@ export class Tileset {
                 // TODO this is getting really ad-hoc and clumsy lol, maybe
                 // have tiles expose a single 'state' prop or something
                 if (coords.moving) {
-                    if (tile.movement_cooldown) {
+                    if (tile.animation_speed) {
                         coords = coords.moving;
                     }
                     else {

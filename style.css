@@ -152,9 +152,8 @@ main {
         "level      time"
         "level      bonus"
         "level      message"   1fr
-        "level inventory"
-        "level controls"
-        "demo demo"
+        "level      inventory"
+        "controls   controls"
         /* Need explicit min-content to force the hint to wrap */
         / min-content min-content
     ;
@@ -319,18 +318,28 @@ dl.score-chart .-sum {
 .controls {
     grid-area: controls;
     display: flex;
+}
+.play-controls,
+.demo-controls {
+    display: flex;
     gap: 0.25em;
 }
-.controls > button {
-    flex: 1;
+.play-controls {
+    align-self: start;
 }
-.demo {
-    grid-area: demo;
+.demo-controls {
+    display: none;
+    flex: 1;
+    justify-content: end;
+}
+main.--has-demo .demo-controls {
+    display: flex;
 }
 
 /* Debug stuff */
 .input {
     display: grid;
+    display: none;
     grid:
         "drop   up      cycle" 1.5em
         "left   swap    right" 1.5em

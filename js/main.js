@@ -39,13 +39,15 @@ class Tile {
     visual_position(tic_offset = 0) {
         let x = this.cell.x;
         let y = this.cell.y;
-        if (! this.movement_cooldown) {
+        if (! this.animation_speed) {
             return [x, y];
         }
         else {
-            let p = (- this.movement_cooldown + tic_offset) / this.movement_speed;
-            let motion = DIRECTIONS[this.direction].movement;
-            return [x + p * motion[0], y + p * motion[1]];
+            let p = (this.animation_progress + tic_offset) / this.animation_speed;
+            return [
+                (1 - p) * this.previous_cell.x + p * x,
+                (1 - p) * this.previous_cell.y + p * y,
+            ];
         }
     }
 
@@ -299,18 +301,35 @@ class Level {
 
         // XXX this entire turn order is rather different in ms rules
         for (let actor of this.actors) {
+            // Actors with no cell were destroyed
+            if (! actor.cell)
+                continue;
+
+            // Decrement the cooldown here, but only check it later because
+            // stepping on cells in the next block might reset it
             if (actor.movement_cooldown > 0) {
                 this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
-                if (actor.movement_cooldown > 0) {
-                    continue;
-                }
-                else if (! this.compat.tiles_react_instantly) {
-                    // For delayed arrival (usually paired with smooth
-                    // scrolling), tiles only react once actors finish moving
-                    // onto them
-                    this.step_on_cell(actor);
+            }
+
+            if (actor.animation_speed) {
+                // Deal with movement animation
+                actor.animation_progress += 1;
+                if (actor.animation_progress >= actor.animation_speed) {
+                    actor.previous_cell = null;
+                    actor.animation_progress = null;
+                    actor.animation_speed = null;
+                    if (! this.compat.tiles_react_instantly) {
+                        this.step_on_cell(actor);
+                        // May have been destroyed here, too!
+                        if (! actor.cell)
+                            continue;
+                    }
                 }
             }
+
+            if (actor.movement_cooldown > 0)
+                continue;
+
             // XXX does the cooldown drop while in a trap?  is this even right?
             // TODO should still attempt to move (so chip turns), just will be stuck (but wait, do monsters turn?  i don't think so)
             if (actor.stuck)
@@ -432,17 +451,6 @@ class Level {
                 }
             }
 
-            // Only set movement cooldown if we actually moved!
-            if (moved) {
-                // Speed multiplier is based on the tile we landed /on/.
-                let speed = actor.type.movement_speed;
-                if (actor.slide_mode !== null) {
-                    speed /= 2;
-                }
-                this._set_prop(actor, 'movement_cooldown', speed);
-                this._set_prop(actor, 'movement_speed', speed);
-            }
-
             // TODO do i need to do this more aggressively?
             if (this.state === 'success' || this.state === 'failure')
                 break;
@@ -466,15 +474,38 @@ class Level {
             }
         }
 
+        // Strip out any destroyed actors from the acting order
+        let p = 0;
+        for (let i = 0, l = this.actors.length; i < l; i++) {
+            let actor = this.actors[i];
+            if (actor.cell) {
+                if (p !== i) {
+                    this.actors[p] = actor;
+                }
+                p++;
+            }
+        }
+        this.actors.length = p;
+
         // Commit the undo state at the end of each tic
         this.commit();
     }
 
     // Try to move the given actor one tile in the given direction and update
     // their cooldown.  Return true if successful.
-    attempt_step(actor, direction) {
+    attempt_step(actor, direction, speed = null) {
+        // If speed is given, we're being pushed by something so we're using
+        // its speed.  Otherwise, use our movement speed.  If we're moving onto
+        // a sliding tile, we'll halve it later
+        let check_for_slide = false;
+        if (speed === null) {
+            speed = actor.type.movement_speed;
+            check_for_slide = true;
+        }
+
         let move = DIRECTIONS[direction].movement;
         let original_cell = actor.cell;
+        if (!original_cell) console.error(actor);
         let goal_x = original_cell.x + move[0];
         let goal_y = original_cell.y + move[1];
 
@@ -500,11 +531,16 @@ class Level {
             if (! blocked) {
                 let goal_cell = this.cells[goal_y][goal_x];
                 for (let tile of Array.from(goal_cell)) {
+                    if (check_for_slide && tile.type.slide_mode) {
+                        check_for_slide = false;
+                        speed /= 2;
+                    }
+
                     if (! tile.blocks(actor, direction))
                         continue;
 
                     if (actor.type.pushes && actor.type.pushes[tile.type.name]) {
-                        if (this.attempt_step(tile, direction))
+                        if (this.attempt_step(tile, direction, speed))
                             // It moved out of the way!
                             continue;
                     }
@@ -533,21 +569,28 @@ class Level {
         }
 
         // We're clear!
-        this.move_to(actor, goal_x, goal_y);
+        this.move_to(actor, goal_x, goal_y, speed);
+
+        // Set movement cooldown since we just moved
+        this._set_prop(actor, 'movement_cooldown', speed);
         return true;
     }
 
     // Move the given actor to the given position and perform any appropriate
     // tile interactions.  Does NOT check for whether the move is actually
     // legal; use attempt_step for that!
-    move_to(actor, x, y) {
+    move_to(actor, x, y, speed) {
         let original_cell = actor.cell;
         if (x === original_cell.x && y === original_cell.y)
             return;
 
+        actor.previous_cell = actor.cell;
+        actor.animation_speed = speed;
+        actor.animation_progress = 0;
+
         let goal_cell = this.cells[y][x];
         this.remove_tile(actor);
-        actor.slide_mode = null;
+        this.make_slide(actor, null);
         this.add_tile(actor, goal_cell);
 
         // Announce we're leaving, for the handful of tiles that care about it
@@ -562,11 +605,13 @@ class Level {
             }
         }
 
-        // Check for hitting a monster, which is always instant and ends the
-        // game right here
+        // Check for a couple effects that always apply immediately
         // TODO i guess this covers blocks too
         // TODO do blocks smash monsters?
         for (let tile of goal_cell) {
+            if (tile.type.slide_mode) {
+                this.make_slide(actor, tile.type.slide_mode);
+            }
             if ((actor.type.is_player && tile.type.is_monster) ||
                 (actor.type.is_monster && tile.type.is_player))
             {
@@ -609,6 +654,7 @@ class Level {
         }
 
         // Handle teleporting, now that the dust has cleared
+        // FIXME something funny happening here, your input isn't ignore while walking out of it?
         let current_cell = actor.cell;
         if (teleporter) {
             let goal = teleporter.connection;
@@ -759,6 +805,9 @@ class Overlay {
     }
 
     open() {
+        // FIXME ah, but keystrokes can still go to the game, including
+        // spacebar to begin it if it was waiting.  how do i completely disable
+        // an entire chunk of the page?
         if (this.game.state === 'playing') {
             this.game.set_state('paused');
         }
@@ -990,20 +1039,18 @@ const GAME_UI_HTML = `
     </div>
     <div class="inventory"></div>
     <div class="controls">
-        <button class="control-pause" type="button">Pause</button>
-        <button class="control-restart" type="button">Restart</button>
-        <button class="control-undo" type="button">Undo</button>
-        <button class="control-rewind" type="button">Rewind</button>
-    </div>
-    <div class="demo">
-        <h2>Solution demo available</h2>
+        <div class="play-controls">
+            <button class="control-pause" type="button">Pause</button>
+            <button class="control-restart" type="button">Restart</button>
+            <button class="control-undo" type="button">Undo</button>
+            <button class="control-rewind" type="button">Rewind</button>
+        </div>
         <div class="demo-controls">
-            <button class="demo-play" type="button">Restart and play</button>
+            <button class="demo-play" type="button">View replay</button>
             <button class="demo-step-1" type="button">Step 1 tic</button>
             <button class="demo-step-4" type="button">Step 1 move</button>
-            <button class="demo-step-20" type="button">Step 1 second</button>
+            <div class="input"></div>
         </div>
-        <div class="input"></div>
     </div>
 </main>
 `;
@@ -1125,14 +1172,23 @@ class Game {
             ev.target.blur();
         });
         // Demo playback
-        this.container.querySelector('.demo .demo-step-1').addEventListener('click', ev => {
+        this.container.querySelector('.demo-controls .demo-play').addEventListener('click', ev => {
+            if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
+                new ConfirmOverlay(this, "Abandon your progress and watch the replay?", () => {
+                    this.play_demo();
+                });
+            }
+            else {
+                this.play_demo();
+            }
+        });
+        this.container.querySelector('.demo-controls .demo-step-1').addEventListener('click', ev => {
             this.advance_by(1);
+            this._redraw();
         });
-        this.container.querySelector('.demo .demo-step-4').addEventListener('click', ev => {
+        this.container.querySelector('.demo-controls .demo-step-4').addEventListener('click', ev => {
             this.advance_by(4);
-        });
-        this.container.querySelector('.demo .demo-step-20').addEventListener('click', ev => {
-            this.advance_by(20);
+            this._redraw();
         });
 
         // Populate inventory
@@ -1224,17 +1280,6 @@ class Game {
         // Done with UI, now we can load a level
         this.load_level(0);
 
-        if (false && this.level.stored_level.demo) {
-            this.demo = this.level.stored_level.demo[Symbol.iterator]();
-            // FIXME should probably start playback on first input
-            this.set_state('playing');
-        }
-        else {
-            // TODO update these, as appropriate, when loading a level
-            this.input_el.style.display = 'none';
-            this.demo_el.style.display = 'none';
-        }
-
         // Auto-size the level canvas, both now and on resize
         this.adjust_scale();
         window.addEventListener('resize', ev => {
@@ -1265,6 +1310,9 @@ class Game {
         this.nav_prev_button.disabled = level_index <= 0;
         this.nav_next_button.disabled = level_index >= this.stored_game.levels.length;
 
+        this.demo_faucet = null;
+        this.container.classList.toggle('--has-demo', !!this.level.stored_level.demo);
+
         this.update_ui();
         // Force a redraw, which won't happen on its own since the game isn't running
         this._redraw();
@@ -1274,11 +1322,19 @@ class Game {
         this.level.restart(this.compat);
         this.set_state('waiting');
         this.update_ui();
+        this._redraw();
+    }
+
+    play_demo() {
+        this.demo_faucet = this.level.stored_level.demo[Symbol.iterator]();
+        this.restart_level();
+        // FIXME should probably start playback on first real input
+        this.set_state('playing');
     }
 
     get_input() {
-        if (this.demo) {
-            let step = this.demo.next();
+        if (this.demo_faucet) {
+            let step = this.demo_faucet.next();
             if (step.done) {
                 return new Set;
             }

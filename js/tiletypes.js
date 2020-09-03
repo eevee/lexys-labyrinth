@@ -150,12 +150,11 @@ const TILE_TYPES = {
     turtle: {
     },
     ice: {
-        on_arrive(me, level, other) {
-            level.make_slide(other, 'ice');
-        },
+        slide_mode: 'ice',
     },
     ice_sw: {
         thin_walls: new Set(['south', 'west']),
+        slide_mode: 'ice',
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
                 other.direction = 'east';
@@ -163,11 +162,11 @@ const TILE_TYPES = {
             else {
                 other.direction = 'north';
             }
-            level.make_slide(other, 'ice');
         },
     },
     ice_nw: {
         thin_walls: new Set(['north', 'west']),
+        slide_mode: 'ice',
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
                 other.direction = 'east';
@@ -175,11 +174,11 @@ const TILE_TYPES = {
             else {
                 other.direction = 'south';
             }
-            level.make_slide(other, 'ice');
         },
     },
     ice_ne: {
         thin_walls: new Set(['north', 'east']),
+        slide_mode: 'ice',
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
                 other.direction = 'west';
@@ -187,11 +186,11 @@ const TILE_TYPES = {
             else {
                 other.direction = 'south';
             }
-            level.make_slide(other, 'ice');
         },
     },
     ice_se: {
         thin_walls: new Set(['south', 'east']),
+        slide_mode: 'ice',
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
                 other.direction = 'west';
@@ -199,38 +198,37 @@ const TILE_TYPES = {
             else {
                 other.direction = 'north';
             }
-            level.make_slide(other, 'ice');
         },
     },
     force_floor_n: {
+        slide_mode: 'force',
         on_arrive(me, level, other) {
             other.direction = 'north';
-            level.make_slide(other, 'force');
         },
     },
     force_floor_e: {
+        slide_mode: 'force',
         on_arrive(me, level, other) {
             other.direction = 'east';
-            level.make_slide(other, 'force');
         },
     },
     force_floor_s: {
+        slide_mode: 'force',
         on_arrive(me, level, other) {
             other.direction = 'south';
-            level.make_slide(other, 'force');
         },
     },
     force_floor_w: {
+        slide_mode: 'force',
         on_arrive(me, level, other) {
             other.direction = 'west';
-            level.make_slide(other, 'force');
         },
     },
     force_floor_all: {
+        slide_mode: 'force',
         // TODO ms: this is random, and an acting wall to monsters (!)
         on_arrive(me, level, other) {
             other.direction = level.get_force_floor_direction();
-            level.make_slide(other, 'force');
         },
     },
     bomb: {
@@ -325,7 +323,6 @@ const TILE_TYPES = {
         connects_to: 'teleport_blue',
         connect_order: 'backward',
         is_teleporter: true,
-        // TODO implement 'backward'
         // TODO to make this work, i need to be able to check if a spot is blocked /ahead of time/
     },
     // Buttons
@@ -565,6 +562,14 @@ const TILE_TYPES = {
     chip_extra: {
         is_chip: true,
         is_object: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.collect_chip();
+                level.remove_tile(me);
+            }
+        },
     },
     score_10: {
         is_object: true,
