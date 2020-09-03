@@ -25,25 +25,19 @@ class CC2Demo {
         let l = this.bytes.length;
         if (l % 2 === 0) {
             l--;
-            // TODO assert last byte is terminating 0xff
         }
         let input = new Set;
         let t = 0;
-        // 47 left 33 down means
-        // LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
-        // |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *
-        //   |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *  *  |  *  *
         for (let p = 3; p < l; p += 2) {
             // The first byte measures how long the /previous/ input remains
             // valid, so yield that first.  Note that this is measured in 60Hz
             // frames, so we need to convert to 20Hz tics by subtracting 3
             // frames at a time.
-            t += this.bytes[p];
-            // t >= 4: almost right, desyncs just before yellow door
-            // t >= 3: skips a move, then desyncs trying to leave red door room
-            // t >= 2: skips a move, also desyncs before yellow door
-            // t >= 1: same as 2
-            // t >= 0: same as 3
+            let delay = this.bytes[p];
+            if (delay === 0xff)
+                break;
+
+            t += delay;
             while (t >= 3) {
                 t -= 3;
                 yield input;
@@ -52,6 +46,9 @@ class CC2Demo {
             let input_mask = this.bytes[p + 1];
             let is_player_2 = ((input_mask & 0x80) !== 0);
             // TODO handle player 2
+            if (is_player_2)
+                continue;
+
             for (let [action, bit] of Object.entries(CC2_DEMO_INPUT_MASK)) {
                 if ((input_mask & bit) === 0) {
                     input.delete(action);
