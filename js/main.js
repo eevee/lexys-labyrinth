@@ -544,7 +544,7 @@ class Level {
             if (! blocked) {
                 let goal_cell = this.cells[goal_y][goal_x];
                 for (let tile of Array.from(goal_cell)) {
-                    if (check_for_slide && tile.type.slide_mode) {
+                    if (check_for_slide && tile.type.slide_mode && ! actor.ignores(tile.type.name)) {
                         check_for_slide = false;
                         speed /= 2;
                     }
@@ -622,7 +622,7 @@ class Level {
         // TODO i guess this covers blocks too
         // TODO do blocks smash monsters?
         for (let tile of goal_cell) {
-            if (tile.type.slide_mode) {
+            if (tile.type.slide_mode && ! actor.ignores(tile.type.name)) {
                 this.make_slide(actor, tile.type.slide_mode);
             }
             if ((actor.type.is_player && tile.type.is_monster) ||
