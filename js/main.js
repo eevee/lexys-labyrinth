@@ -1441,7 +1441,7 @@ class Game {
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
-        this.tic_offset = Math.min(1, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
+        this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
 
         this._redraw();
         this._redraw_handle = requestAnimationFrame(this._redraw_bound);

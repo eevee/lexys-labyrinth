@@ -500,7 +500,7 @@ export class Tileset {
         if (coords[0] instanceof Array) {
             if (level) {
                 if (tile.animation_speed) {
-                    coords = coords[Math.floor((tile.animation_progress + level.tic_offset) / tile.animation_speed * coords.length * 0.999)];
+                    coords = coords[Math.floor((tile.animation_progress + level.tic_offset) / tile.animation_speed * coords.length)];
                 }
                 else {
                     coords = coords[Math.floor((level.tic_counter % 5 + level.tic_offset) / 5 * coords.length)];
