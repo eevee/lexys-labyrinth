@@ -1284,6 +1284,13 @@ class Game {
             this.input_action_elements[action] = el;
         }
 
+        // Auto pause when we lose focus
+        window.addEventListener('blur', ev => {
+            if (this.state === 'playing' || this.state === 'rewinding') {
+                this.set_state('paused');
+            }
+        });
+
         this._advance_bound = this.advance.bind(this);
         this._redraw_bound = this.redraw.bind(this);
         // Used to determine where within a tic we are, for animation purposes
