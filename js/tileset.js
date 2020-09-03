@@ -1,5 +1,3 @@
-import { DIRECTIONS } from './defs.js';
-
 // TODO really need to specify this format more concretely, whoof
 // XXX special kinds of drawing i know this has for a fact:
 // - letter tiles draw from a block of half-tiles onto the center of the base
@@ -240,10 +238,18 @@ export const CC2_TILESET_LAYOUT = {
 
     // TODO moving + swimming + pushing animations
     player: {
-        north: [0, 22],
-        south: [0, 23],
-        west: [8, 23],
-        east: [8, 22],
+        moving: {
+            north: [[0, 22], [1, 22], [2, 22], [3, 22], [4, 22], [5, 22], [6, 22], [7, 22]],
+            south: [[0, 23], [1, 23], [2, 23], [3, 23], [4, 23], [5, 23], [6, 23], [7, 23]],
+            west: [[8, 23], [9, 23], [10, 23], [11, 23], [12, 23], [13, 23], [14, 23], [15, 23]],
+            east: [[8, 22], [9, 22], [10, 22], [11, 22], [12, 22], [13, 22], [14, 22], [15, 22]],
+        },
+        standing: {
+            north: [0, 22],
+            south: [0, 23],
+            west: [8, 23],
+            east: [8, 22],
+        },
     },
     water: [
         [12, 24],
@@ -444,14 +450,6 @@ export class Tileset {
             return;
         }
 
-        /*
-        if (tile && tile.movement_cooldown) {
-            let offset = DIRECTIONS[tile.direction].movement;
-            x -= tile.movement_cooldown / tile.type.movement_speed * offset[0];
-            y -= tile.movement_cooldown / tile.type.movement_speed * offset[1];
-        }
-        */
-
         if (drawspec.overlay) {
             // Goofy overlay thing used for green/purple toggle tiles and
             // southeast thin walls.  Draw the base (a type name), then draw
@@ -486,12 +484,22 @@ export class Tileset {
                 }
             }
             else {
+                // TODO this is getting really ad-hoc and clumsy lol, maybe
+                // have tiles expose a single 'state' prop or something
+                if (coords.moving) {
+                    if (tile.movement_cooldown) {
+                        coords = coords.moving;
+                    }
+                    else {
+                        coords = coords.standing;
+                    }
+                }
                 coords = coords[(tile && tile.direction) ?? 'south'];
             }
         }
         if (coords[0] instanceof Array) {
             if (level) {
-                coords = coords[Math.floor(level.tic_counter % 5 / 5 * coords.length)];
+                coords = coords[Math.floor((level.tic_counter % 5 + level.tic_offset) / 5 * coords.length)];
             }
             else {
                 coords = coords[0];

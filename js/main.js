@@ -1,70 +1,13 @@
 // TODO bugs and quirks i'm aware of:
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
+import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
 import * as c2m from './format-c2m.js';
 import * as dat from './format-dat.js';
 import * as format_util from './format-util.js';
-import TILE_TYPES from './tiletypes.js';
+import CanvasRenderer from './renderer-canvas.js';
 import { Tileset, CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
-import { DIRECTIONS } from './defs.js';
-
-function mk(tag_selector, ...children) {
-    let [tag, ...classes] = tag_selector.split('.');
-    let el = document.createElement(tag);
-    el.classList = classes.join(' ');
-    if (children.length > 0) {
-        if (!(children[0] instanceof Node) && children[0] !== undefined && typeof(children[0]) !== "string" && typeof(children[0]) !== "number") {
-            let [attrs] = children.splice(0, 1);
-            for (let [key, value] of Object.entries(attrs)) {
-                el.setAttribute(key, value);
-            }
-        }
-        el.append(...children);
-    }
-    return el;
-}
-
-function promise_event(element, success_event, failure_event) {
-    let resolve, reject;
-    let promise = new Promise((res, rej) => {
-        resolve = res;
-        reject = rej;
-    });
-
-    let success_handler = e => {
-        element.removeEventListener(success_event, success_handler);
-        if (failure_event) {
-            element.removeEventListener(failure_event, failure_handler);
-        }
-
-        resolve(e);
-    };
-    let failure_handler = e => {
-        element.removeEventListener(success_event, success_handler);
-        if (failure_event) {
-            element.removeEventListener(failure_event, failure_handler);
-        }
-
-        reject(e);
-    };
-
-    element.addEventListener(success_event, success_handler);
-    if (failure_event) {
-        element.addEventListener(failure_event, failure_handler);
-    }
-
-    return promise;
-}
-
-async function fetch(url) {
-    let xhr = new XMLHttpRequest;
-    let promise = promise_event(xhr, 'load', 'error');
-    xhr.open('GET', url);
-    xhr.responseType = 'arraybuffer';
-    xhr.send();
-    await promise;
-    return xhr.response;
-}
-
+import TILE_TYPES from './tiletypes.js';
+import { mk, promise_event, fetch } from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
 
@@ -90,6 +33,20 @@ class Tile {
             type.load(tile, tile_template);
         }
         return tile;
+    }
+
+    // Gives the effective position of an actor in motion, given smooth scrolling
+    visual_position(tic_offset = 0) {
+        let x = this.cell.x;
+        let y = this.cell.y;
+        if (! this.movement_cooldown) {
+            return [x, y];
+        }
+        else {
+            let p = (- this.movement_cooldown + tic_offset) / this.movement_speed;
+            let motion = DIRECTIONS[this.direction].movement;
+            return [x + p * motion[0], y + p * motion[1]];
+        }
     }
 
     blocks(other, direction) {
@@ -182,14 +139,16 @@ class Cell extends Array {
 }
 
 class Level {
-    constructor(stored_level) {
+    constructor(stored_level, compat = {}) {
         this.stored_level = stored_level;
         this.width = stored_level.size_x;
         this.height = stored_level.size_y;
-        this.restart();
+        this.restart(compat);
     }
 
-    restart() {
+    restart(compat) {
+        this.compat = {};
+
         // playing: normal play
         // success: has been won
         // failure: died
@@ -342,8 +301,15 @@ class Level {
         for (let actor of this.actors) {
             if (actor.movement_cooldown > 0) {
                 this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
-                if (actor.movement_cooldown > 0)
+                if (actor.movement_cooldown > 0) {
                     continue;
+                }
+                else if (! this.compat.tiles_react_instantly) {
+                    // For delayed arrival (usually paired with smooth
+                    // scrolling), tiles only react once actors finish moving
+                    // onto them
+                    this.step_on_cell(actor);
+                }
             }
             // XXX does the cooldown drop while in a trap?  is this even right?
             // TODO should still attempt to move (so chip turns), just will be stuck (but wait, do monsters turn?  i don't think so)
@@ -469,11 +435,12 @@ class Level {
             // Only set movement cooldown if we actually moved!
             if (moved) {
                 // Speed multiplier is based on the tile we landed /on/.
-                let speed_multiplier = 1;
+                let speed = actor.type.movement_speed;
                 if (actor.slide_mode !== null) {
-                    speed_multiplier = 2;
+                    speed /= 2;
                 }
-                this._set_prop(actor, 'movement_cooldown', actor.type.movement_speed / speed_multiplier);
+                this._set_prop(actor, 'movement_cooldown', speed);
+                this._set_prop(actor, 'movement_speed', speed);
             }
 
             // TODO do i need to do this more aggressively?
@@ -595,12 +562,32 @@ class Level {
             }
         }
 
-        // Step on all the tiles in the new cell
+        // Check for hitting a monster, which is always instant and ends the
+        // game right here
+        // TODO i guess this covers blocks too
+        // TODO do blocks smash monsters?
+        for (let tile of goal_cell) {
+            if ((actor.type.is_player && tile.type.is_monster) ||
+                (actor.type.is_monster && tile.type.is_player))
+            {
+                // TODO ooh, obituaries
+                this.fail("Oops!  Watch out for creatures!");
+                return;
+            }
+        }
+
+        if (this.compat.tiles_react_instantly) {
+            this.step_on_cell(actor);
+        }
+    }
+
+    // Step on every tile in a cell we just arrived in
+    step_on_cell(actor) {
         if (actor === this.player) {
             this._set_prop(this, 'hint_shown', null);
         }
         let teleporter;
-        for (let tile of Array.from(goal_cell)) {
+        for (let tile of Array.from(actor.cell)) {
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))
@@ -619,17 +606,10 @@ class Level {
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
             }
-
-            if ((actor.type.is_player && tile.type.is_monster) ||
-                (actor.type.is_monster && tile.type.is_player))
-            {
-                // TODO ooh, obituaries
-                this.fail("Oops!  Watch out for creatures!");
-            }
         }
 
         // Handle teleporting, now that the dust has cleared
-        let current_cell = goal_cell;
+        let current_cell = actor.cell;
         if (teleporter) {
             let goal = teleporter.connection;
             // TODO in pathological cases this might infinite loop
@@ -874,14 +854,56 @@ class AboutOverlay extends DialogOverlay {
 // - rff blocks monsters
 // - rff truly random
 // - all manner of fucking bugs
+// TODO distinguish between deliberately gameplay changes and bugs, though that's kind of an arbitrary line
+const COMPAT_OPTIONS = [{
+    key: 'tiles_react_instantly',
+    label: "Tiles react instantly",
+    impls: ['lynx', 'ms'],
+    note: "In classic CC, actors moved instantly from one tile to another, so tiles would react (e.g., buttons would become pressed) instantly as well.  CC2 made actors slide smoothly between tiles, and it made more sense visually for the reactions to only happen once the sliding animation had finished.  That's technically a gameplay change, since it delays a lot of tile behavior for 4 tics (the time it takes most actors to move), so here's a compat option.  Works best in conjunction with disabling smooth scrolling; otherwise you'll see strange behavior like completing a level before actually stepping onto the exit.",
+}];
+const OPTIONS_TABS = [{
+    name: 'compat',
+    label: "Compat",
+}];
 class OptionsOverlay extends DialogOverlay {
     constructor(game) {
         super(game);
         this.set_title("options");
-        this.main.append(mk('p', "Sorry!  None implemented yet."));
         this.add_button("well alright then", ev => {
             this.close();
         });
+
+        let tab_strip = mk('nav.tabstrip');
+        this.main.append(tab_strip);
+        this.tab_links = {};
+        this.tab_blocks = {};
+        for (let tabdef of OPTIONS_TABS) {
+            let link = mk('a', {href: 'javascript:', 'data-tab': tabdef.name}, tabdef.label);
+            tab_strip.append(link);
+            this.tab_links[tabdef.name] = link;
+            let block = mk('section');
+            this.main.append(block);
+            this.tab_blocks[tabdef.name] = block;
+        }
+
+        // Compat tab
+        this.tab_blocks['compat'].append(mk('p', "Changes to compatibility settings won't take effect until you restart the level."));
+        let ul = mk('ul');
+        this.tab_blocks['compat'].append(ul);
+        for (let optdef of COMPAT_OPTIONS) {
+            let li = mk('li');
+            let label = mk('label');
+            li.append(label);
+            label.append(mk('input', {type: 'checkbox', name: optdef.key}));
+            for (let impl of optdef.impls) {
+                label.append(mk(`span.compat-${impl}`, impl));
+            }
+            label.append(optdef.label);
+            li.append(mk('p', optdef.note));
+            ul.append(li);
+        }
+
+        this.main.append(mk('p', "Sorry!  This stuff doesn't actually work yet."));
     }
 }
 
@@ -1023,6 +1045,10 @@ class Game {
         this.viewport_size_y = 9;
         this.scale = 1;
 
+        this.compat = {
+            tiles_react_instantly: false,
+        };
+
         document.body.innerHTML = GAME_UI_HTML;
         this.container = document.body.querySelector('main');
         this.container.style.setProperty('--tile-width', `${this.tileset.size_x}px`);
@@ -1096,7 +1122,6 @@ class Game {
                 this.set_state('playing');
             }
             this.update_ui();
-            this.redraw();
             ev.target.blur();
         });
         // Demo playback
@@ -1115,16 +1140,15 @@ class Game {
         let floor_tile = this.render_inventory_tile('floor');
         this.inventory_el.style.backgroundImage = `url(${floor_tile})`;
 
-        this.level_canvas = mk('canvas', {width: tileset.size_x * this.viewport_size_x, height: tileset.size_y * this.viewport_size_y});
-        this.level_el.append(this.level_canvas);
-        this.level_canvas.setAttribute('tabindex', '-1');
-        this.level_canvas.addEventListener('auxclick', ev => {
+        this.renderer = new CanvasRenderer(tileset);
+        this.level_el.append(this.renderer.canvas);
+        this.renderer.canvas.addEventListener('auxclick', ev => {
             if (ev.button !== 1)
                 return;
 
-            let rect = this.level_canvas.getBoundingClientRect();
-            let x = Math.floor((ev.clientX - rect.x) / this.scale / this.tileset.size_x + this.viewport_x);
-            let y = Math.floor((ev.clientY - rect.y) / this.scale / this.tileset.size_y + this.viewport_y);
+            let rect = this.renderer.canvas.getBoundingClientRect();
+            let x = Math.floor((ev.clientX - rect.x) / this.scale / this.tileset.size_x + this.renderer.viewport_x);
+            let y = Math.floor((ev.clientY - rect.y) / this.scale / this.tileset.size_y + this.renderer.viewport_y);
             this.level.move_to(this.level.player, x, y);
         });
 
@@ -1191,6 +1215,12 @@ class Game {
             this.input_action_elements[action] = el;
         }
 
+        this._advance_bound = this.advance.bind(this);
+        this._redraw_bound = this.redraw.bind(this);
+        // Used to determine where within a tic we are, for animation purposes
+        this.tic_offset = 0;
+        this.last_advance = 0;  // performance.now timestamp
+
         // Done with UI, now we can load a level
         this.load_level(0);
 
@@ -1210,22 +1240,22 @@ class Game {
         window.addEventListener('resize', ev => {
             this.adjust_scale();
         });
-
-        this.frame = 0;
-        this.tic = 0;
-        requestAnimationFrame(this.do_frame.bind(this));
     }
 
     load_level(level_index) {
         // TODO clear out input?  (when restarting, too?)
         this.level_index = level_index;
-        this.level = new Level(this.stored_game.levels[level_index]);
+        this.level = new Level(this.stored_game.levels[level_index], this.compat);
+        this.renderer.set_level(this.level);
         // waiting: haven't yet pressed a key so the timer isn't going
         // playing: playing normally
         // paused: um, paused
         // rewinding: playing backwards
         // stopped: level has ended one way or another
         this.set_state('waiting');
+
+        this.tic_offset = 0;
+        this.last_advance = 0;
 
         // FIXME do better
         this.level_name_el.textContent = `Level ${level_index + 1} — ${this.level.stored_level.title}`;
@@ -1234,15 +1264,16 @@ class Game {
 
         this.nav_prev_button.disabled = level_index <= 0;
         this.nav_next_button.disabled = level_index >= this.stored_game.levels.length;
+
         this.update_ui();
-        this.redraw();
+        // Force a redraw, which won't happen on its own since the game isn't running
+        this._redraw();
     }
 
     restart_level() {
-        this.level.restart();
+        this.level.restart(this.compat);
         this.set_state('waiting');
         this.update_ui();
-        this.redraw();
     }
 
     get_input() {
@@ -1306,7 +1337,6 @@ class Game {
             this.previous_input = current_input;
 
             this.level.advance_tic(player_move);
-            this.tic++;
 
             if (this.level.state !== 'playing') {
                 // We either won or lost!
@@ -1314,20 +1344,43 @@ class Game {
                 break;
             }
         }
-        this.redraw();
         this.update_ui();
     }
 
-    do_frame() {
-        if (this.state === 'playing') {
-            this.frame++;
-            if (this.frame % 3 === 0) {
-                this.advance_by(1);
-            }
-            this.frame %= 60;
+    // Main driver of the level; advances by one tic, then schedules itself to
+    // be called again next tic
+    advance() {
+        if (this.state !== 'playing' && this.state !== 'rewinding') {
+            this._advance_handle = null;
+            return;
         }
 
-        requestAnimationFrame(this.do_frame.bind(this));
+        this.last_advance = performance.now();
+        this.advance_by(1);
+        this._advance_handle = window.setTimeout(this._advance_bound, 1000 / TICS_PER_SECOND);
+    }
+
+    // Redraws every frame, unless the game isn't running
+    redraw() {
+        if (this.state !== 'playing' && this.state !== 'rewinding') {
+            this._redraw_handle = null;
+            return;
+        }
+
+        // Calculate this here, not in _redraw, because that's called at weird
+        // times when the game might not have actually advanced at all yet
+        // TODO this is not gonna be right while pausing lol
+        // TODO i'm not sure it'll be right when rewinding either
+        // TODO or if the game's speed changes.  wow!
+        this.tic_offset = (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND) % 1;
+
+        this._redraw();
+        this._redraw_handle = requestAnimationFrame(this._redraw_bound);
+    }
+
+    // Actually redraw.  Used to force drawing outside of normal play
+    _redraw() {
+        this.renderer.draw(this.tic_offset);
     }
 
     render_inventory_tile(name) {
@@ -1418,37 +1471,15 @@ class Game {
                 );
             }
         }
-    }
 
-    redraw() {
-        // TODO split this out to a renderer, call it every frame, have the level flag itself as dirty
-        let ctx = this.level_canvas.getContext('2d');
-        ctx.clearRect(0, 0, this.level_canvas.width, this.level_canvas.height);
-
-        let xmargin = (this.viewport_size_x - 1) / 2;
-        let ymargin = (this.viewport_size_y - 1) / 2;
-        let player_cell = this.level.player.cell;
-        let x0 = player_cell.x - xmargin;
-        let y0 = player_cell.y - ymargin;
-        x0 = Math.max(0, Math.min(this.level.width - this.viewport_size_x, x0));
-        y0 = Math.max(0, Math.min(this.level.height - this.viewport_size_y, y0));
-        this.viewport_x = x0;
-        this.viewport_y = y0;
-        // Draw in layers, so animated objects aren't overdrawn by neighboring terrain
-        let any_drawn = true;
-        let i = -1;
-        while (any_drawn) {
-            i++;
-            any_drawn = false;
-            for (let dx = 0; dx < this.viewport_size_x; dx++) {
-                for (let dy = 0; dy < this.viewport_size_y; dy++) {
-                    let cell = this.level.cells[dy + y0][dx + x0];
-                    let tile = cell[i];
-                    if (tile) {
-                        any_drawn = true;
-                        this.tileset.draw(tile, this.level, ctx, dx, dy);
-                    }
-                }
+        // The advance and redraw methods run in a loop, but they cancel
+        // themselves if the game isn't running, so restart them here
+        if (this.state === 'playing' || this.state === 'rewinding') {
+            if (! this._advance_handle) {
+                this.advance();
+            }
+            if (! this._redraw_handle) {
+                this.redraw();
             }
         }
     }
@@ -1467,8 +1498,8 @@ class Game {
         let extra_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);
         // The total available space, then, is the current size of the
         // canvas plus the size of the margins
-        let total_x = extra_x + this.level_canvas.offsetWidth;
-        let total_y = extra_y + this.level_canvas.offsetHeight;
+        let total_x = extra_x + this.renderer.canvas.offsetWidth;
+        let total_y = extra_y + this.renderer.canvas.offsetHeight;
         // Divide to find the biggest scale that still fits.  But don't
         // exceed 90% of the available space, or it'll feel cramped.
         let scale = Math.floor(0.9 * Math.min(total_x / base_x, total_y / base_y));

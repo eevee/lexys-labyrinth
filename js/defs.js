@@ -1,3 +1,5 @@
+export const TICS_PER_SECOND = 20;
+
 export const DIRECTIONS = {
     north: {
         movement: [0, -1],

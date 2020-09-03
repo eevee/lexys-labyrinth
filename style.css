@@ -15,6 +15,11 @@ body {
 }
 
 /* Generic element styling */
+input[type=radio],
+input[type=checkbox] {
+    margin: 0.125em;
+    vertical-align: middle;
+}
 button {
     font-size: inherit;
     padding: 0.125em 0.5em;
@@ -120,6 +125,20 @@ table.level-browser tr:hover {
     background: hsl(225, 60%, 90%);
 }
 
+/* Bits and pieces */
+.compat-lynx,
+.compat-ms {
+    font-size: 0.75em;
+    display: inline-block;
+    margin: 0 0.25em;
+    padding: 0.25em;
+    line-height: 1;
+    vertical-align: middle;
+    color: white;
+    background: gray;
+    border-radius: 0.25em;
+}
+
 /* Game area */
 main {
     flex: 0;
@@ -175,7 +194,9 @@ main > header > nav {
 }
 .level canvas {
     display: block;
-    width: calc(9 * var(--tile-width) * var(--scale));
+    width: calc(var(--viewport-width) * var(--tile-width) * var(--scale));
+    --viewport-width: 9;
+    --viewport-height: 9;
 }
 .bummer {
     grid-area: level;
