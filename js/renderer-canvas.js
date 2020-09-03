@@ -42,13 +42,14 @@ export class CanvasRenderer {
         let [px, py] = this.level.player.visual_position(tic_offset);
         let x0 = Math.max(0, Math.min(this.level.width - this.viewport_size_x, px - xmargin));
         let y0 = Math.max(0, Math.min(this.level.height - this.viewport_size_y, py - xmargin));
+        // Round to the pixel grid
+        x0 = Math.floor(x0 * this.tileset.size_x + 0.5) / this.tileset.size_x;
+        y0 = Math.floor(y0 * this.tileset.size_y + 0.5) / this.tileset.size_y;
         this.viewport_x = x0;
         this.viewport_y = y0;
         // The viewport might not be aligned to the grid, so split off any fraction
         let xf0 = Math.floor(x0);
         let yf0 = Math.floor(y0);
-        let xoff = xf0 - x0;
-        let yoff = yf0 - y0;
         let x1 = Math.ceil(x0 + this.viewport_size_x - 1);
         let y1 = Math.ceil(y0 + this.viewport_size_y - 1);
         // Draw in layers, so animated objects aren't overdrawn by neighboring terrain
@@ -67,6 +68,9 @@ export class CanvasRenderer {
                         if (tile.type.is_actor) {
                             // Handle smooth scrolling
                             let [vx, vy] = tile.visual_position(tic_offset);
+                            // Round this to the pixel grid too!
+                            vx = Math.floor(vx * this.tileset.size_x + 0.5) / this.tileset.size_x;
+                            vy = Math.floor(vy * this.tileset.size_y + 0.5) / this.tileset.size_y;
                             this.tileset.draw(tile, this.level, ctx, vx - x0, vy - y0);
                         }
                         else {
