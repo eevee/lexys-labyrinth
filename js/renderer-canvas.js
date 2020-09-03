@@ -9,8 +9,8 @@ export class CanvasRenderer {
         // and it doesn't do that until creating a renderer!  It could be fixed
         // to do so, but then we wouldn't make a canvas so it couldn't be
         // hooked, yadda yadda
-        this.viewport_size_x = 10;
-        this.viewport_size_y = 10;
+        this.viewport_size_x = 9;
+        this.viewport_size_y = 9;
         this.canvas = mk('canvas', {width: tileset.size_x * this.viewport_size_x, height: tileset.size_y * this.viewport_size_y});
         this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
         this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
