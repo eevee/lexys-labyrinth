@@ -700,6 +700,11 @@ class Level {
     commit() {
         this.undo_stack.push(this.pending_undo);
         this.pending_undo = [];
+
+        // Limit the stack to, idk, 200 tics (10 seconds)
+        if (this.undo_stack.length > 200) {
+            this.undo_stack.splice(0, this.undo_stack.length - 200);
+        }
     }
 
     undo() {
