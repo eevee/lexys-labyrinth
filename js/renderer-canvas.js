@@ -52,19 +52,16 @@ export class CanvasRenderer {
         let yf0 = Math.floor(y0);
         let x1 = Math.ceil(x0 + this.viewport_size_x - 1);
         let y1 = Math.ceil(y0 + this.viewport_size_y - 1);
-        // Draw in layers, so animated objects aren't overdrawn by neighboring terrain
-        let any_drawn = true;
-        let i = -1;
-        while (any_drawn) {
-            i++;
-            any_drawn = false;
+        // Draw one layer at a time, so animated objects aren't overdrawn by
+        // neighboring terrain
+        // XXX layer count hardcoded here
+        for (let layer = 0; layer < 4; layer++) {
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
-                    let cell = this.level.cells[y][x];
-                    if (! cell) console.error(x, y);
-                    let tile = cell[i];
-                    if (tile) {
-                        any_drawn = true;
+                    for (let tile of this.level.cells[y][x]) {
+                        if (tile.type.draw_layer !== layer)
+                            continue;
+
                         if (tile.type.is_actor) {
                             // Handle smooth scrolling
                             let [vx, vy] = tile.visual_position(tic_offset);

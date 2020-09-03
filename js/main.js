@@ -130,13 +130,13 @@ class Cell extends Array {
     // DO NOT use me to remove a tile permanently, only to move it!
     // Should only be called from Level, which handles some bookkeeping!
     _remove(tile) {
-        let layer = this.indexOf(tile);
-        if (layer < 0)
+        let index = this.indexOf(tile);
+        if (index < 0)
             throw new Error("Asked to remove tile that doesn't seem to exist");
 
-        this.splice(layer, 1);
+        this.splice(index, 1);
         tile.cell = null;
-        return layer;
+        return index;
     }
 }
 
@@ -756,12 +756,12 @@ class Level {
 
     remove_tile(tile) {
         let cell = tile.cell;
-        let layer = cell._remove(tile);
-        this.pending_undo.push(() => cell._add(tile, layer));
+        let index = cell._remove(tile);
+        this.pending_undo.push(() => cell._add(tile, index));
     }
 
-    add_tile(tile, cell, layer = null) {
-        cell._add(tile, layer);
+    add_tile(tile, cell, index = null) {
+        cell._add(tile, index);
         this.pending_undo.push(() => cell._remove(tile));
     }
 

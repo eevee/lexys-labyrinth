@@ -1,28 +1,40 @@
 import { DIRECTIONS } from './defs.js';
 
+// Draw layers
+const LAYER_TERRAIN = 0;
+const LAYER_ITEM = 1;
+const LAYER_ACTOR = 2;
+const LAYER_OVERLAY = 3;
+
 const TILE_TYPES = {
     // Floors and walls
     floor: {
+        draw_layer: LAYER_TERRAIN,
     },
     floor_letter: {
+        draw_layer: LAYER_TERRAIN,
         load(me, template) {
             me.ascii_code = template.modifier;
         },
     },
     wall: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
     },
     wall_invisible: {
+        draw_layer: LAYER_TERRAIN,
         // TODO cc2 seems to make these flicker briefly
         blocks: true,
     },
     wall_appearing: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         on_bump(me, level, other) {
             level.transmute_tile(me, 'wall');
         },
     },
     popwall: {
+        draw_layer: LAYER_TERRAIN,
         blocks_monsters: true,
         blocks_blocks: true,
         on_depart(me, level, other) {
@@ -30,27 +42,34 @@ const TILE_TYPES = {
         },
     },
     thinwall_n: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north']),
     },
     thinwall_s: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south']),
     },
     thinwall_e: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['east']),
     },
     thinwall_w: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['west']),
     },
     thinwall_se: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'east']),
     },
     fake_wall: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         on_bump(me, level, other) {
             level.transmute_tile(me, 'wall');
         },
     },
     fake_floor: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         on_bump(me, level, other) {
             level.transmute_tile(me, 'floor');
@@ -58,22 +77,29 @@ const TILE_TYPES = {
     },
 
     // Swivel doors
-    swivel_floor: {},
+    swivel_floor: {
+        draw_layer: LAYER_TERRAIN,
+    },
     swivel_ne: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north', 'east']),
     },
     swivel_se: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'east']),
     },
     swivel_sw: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'west']),
     },
     swivel_nw: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north', 'west']),
     },
 
     // Locked doors
     door_red: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_red')) {
@@ -82,6 +108,7 @@ const TILE_TYPES = {
         },
     },
     door_blue: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_blue')) {
@@ -90,6 +117,7 @@ const TILE_TYPES = {
         },
     },
     door_yellow: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_yellow')) {
@@ -98,6 +126,7 @@ const TILE_TYPES = {
         },
     },
     door_green: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_green')) {
@@ -108,6 +137,7 @@ const TILE_TYPES = {
 
     // Terrain
     dirt: {
+        draw_layer: LAYER_TERRAIN,
         blocks_monsters: true,
         blocks_blocks: true,
         // TODO block melinda only without the hiking boots; can't use ignore because then she wouldn't step on it  :S  also ignore doesn't apply to blocks anyway.
@@ -116,11 +146,13 @@ const TILE_TYPES = {
         },
     },
     gravel: {
+        draw_layer: LAYER_TERRAIN,
         blocks_monsters: true,
     },
 
     // Hazards
     fire: {
+        draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.fail("Oops!  You can't walk on fire without fire boots!");
@@ -132,6 +164,7 @@ const TILE_TYPES = {
         },
     },
     water: {
+        draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
             if (other.type.name == 'dirt_block' || other.type.name == 'clone_block') {
@@ -148,11 +181,15 @@ const TILE_TYPES = {
         },
     },
     turtle: {
+        // XXX well not really because it goes on top of water??
+        draw_layer: LAYER_TERRAIN,
     },
     ice: {
+        draw_layer: LAYER_TERRAIN,
         slide_mode: 'ice',
     },
     ice_sw: {
+        draw_layer: LAYER_TERRAIN,
         thin_walls: new Set(['south', 'west']),
         slide_mode: 'ice',
         on_arrive(me, level, other) {
@@ -165,6 +202,7 @@ const TILE_TYPES = {
         },
     },
     ice_nw: {
+        draw_layer: LAYER_TERRAIN,
         thin_walls: new Set(['north', 'west']),
         slide_mode: 'ice',
         on_arrive(me, level, other) {
@@ -177,6 +215,7 @@ const TILE_TYPES = {
         },
     },
     ice_ne: {
+        draw_layer: LAYER_TERRAIN,
         thin_walls: new Set(['north', 'east']),
         slide_mode: 'ice',
         on_arrive(me, level, other) {
@@ -189,6 +228,7 @@ const TILE_TYPES = {
         },
     },
     ice_se: {
+        draw_layer: LAYER_TERRAIN,
         thin_walls: new Set(['south', 'east']),
         slide_mode: 'ice',
         on_arrive(me, level, other) {
@@ -201,30 +241,35 @@ const TILE_TYPES = {
         },
     },
     force_floor_n: {
+        draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         on_arrive(me, level, other) {
             other.direction = 'north';
         },
     },
     force_floor_e: {
+        draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         on_arrive(me, level, other) {
             other.direction = 'east';
         },
     },
     force_floor_s: {
+        draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         on_arrive(me, level, other) {
             other.direction = 'south';
         },
     },
     force_floor_w: {
+        draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         on_arrive(me, level, other) {
             other.direction = 'west';
         },
     },
     force_floor_all: {
+        draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         // TODO ms: this is random, and an acting wall to monsters (!)
         on_arrive(me, level, other) {
@@ -232,6 +277,7 @@ const TILE_TYPES = {
         },
     },
     bomb: {
+        draw_layer: LAYER_ITEM,
         // TODO explode
         on_arrive(me, level, other) {
             level.remove_tile(me);
@@ -242,6 +288,7 @@ const TILE_TYPES = {
         },
     },
     thief_tools: {
+        draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             if (other.inventory) {
                 for (let [name, count] of Object.entries(other.inventory)) {
@@ -253,6 +300,7 @@ const TILE_TYPES = {
         },
     },
     thief_keys: {
+        draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             if (other.inventory) {
                 for (let [name, count] of Object.entries(other.inventory)) {
@@ -264,10 +312,12 @@ const TILE_TYPES = {
         },
     },
     forbidden: {
+        draw_layer: LAYER_TERRAIN,
     },
 
     // Mechanisms
     dirt_block: {
+        draw_layer: LAYER_ACTOR,
         blocks: true,
         is_object: true,
         is_actor: true,
@@ -275,6 +325,7 @@ const TILE_TYPES = {
         ignores: new Set(['fire']),
     },
     clone_block: {
+        draw_layer: LAYER_ACTOR,
         // TODO is this in any way distinct from dirt block
         blocks: true,
         is_object: true,
@@ -282,11 +333,15 @@ const TILE_TYPES = {
         is_block: true,
         ignores: new Set(['fire']),
     },
-    green_floor: {},
+    green_floor: {
+        draw_layer: LAYER_TERRAIN,
+    },
     green_wall: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
     },
     cloner: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         activate(me, level) {
             let cell = me.cell;
@@ -313,6 +368,7 @@ const TILE_TYPES = {
         },
     },
     trap: {
+        draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             if (! me.open) {
                 level.set_actor_stuck(other, true);
@@ -320,6 +376,7 @@ const TILE_TYPES = {
         },
     },
     teleport_blue: {
+        draw_layer: LAYER_TERRAIN,
         connects_to: 'teleport_blue',
         connect_order: 'backward',
         is_teleporter: true,
@@ -327,6 +384,7 @@ const TILE_TYPES = {
     },
     // Buttons
     button_blue: {
+        draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             // Flip direction of all tanks
             for (let actor of level.actors) {
@@ -338,6 +396,7 @@ const TILE_TYPES = {
         },
     },
     button_green: {
+        draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             // Swap green floors and walls
             // TODO could probably make this more compact for undo purposes
@@ -362,6 +421,7 @@ const TILE_TYPES = {
         },
     },
     button_brown: {
+        draw_layer: LAYER_TERRAIN,
         connects_to: 'trap',
         connect_order: 'forward',
         on_arrive(me, level, other) {
@@ -388,6 +448,7 @@ const TILE_TYPES = {
         },
     },
     button_red: {
+        draw_layer: LAYER_TERRAIN,
         connects_to: 'cloner',
         connect_order: 'forward',
         on_arrive(me, level, other) {
@@ -399,6 +460,7 @@ const TILE_TYPES = {
 
     // Critters
     bug: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -407,6 +469,7 @@ const TILE_TYPES = {
         movement_speed: 4,
     },
     paramecium: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -415,6 +478,7 @@ const TILE_TYPES = {
         movement_speed: 4,
     },
     ball: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -423,6 +487,7 @@ const TILE_TYPES = {
         movement_speed: 4,
     },
     walker: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -431,6 +496,7 @@ const TILE_TYPES = {
         movement_speed: 4,
     },
     tank_blue: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -439,6 +505,7 @@ const TILE_TYPES = {
         movement_speed: 4,
     },
     blob: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -447,6 +514,7 @@ const TILE_TYPES = {
         movement_speed: 8,
     },
     teeth: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -456,6 +524,7 @@ const TILE_TYPES = {
         uses_teeth_hesitation: true,
     },
     fireball: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -465,6 +534,7 @@ const TILE_TYPES = {
         ignores: new Set(['fire']),
     },
     glider: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_object: true,
         is_monster: true,
@@ -476,33 +546,39 @@ const TILE_TYPES = {
 
     // Keys
     key_red: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_item: true,
         is_key: true,
     },
     key_blue: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_item: true,
         is_key: true,
     },
     key_yellow: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_item: true,
         is_key: true,
     },
     key_green: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_item: true,
         is_key: true,
     },
     // Tools
     cleats: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_item: true,
         is_tool: true,
         item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
     },
     suction_boots: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_item: true,
         is_tool: true,
@@ -514,12 +590,14 @@ const TILE_TYPES = {
         ]),
     },
     fire_boots: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_item: true,
         is_tool: true,
         item_ignores: new Set(['fire']),
     },
     flippers: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_item: true,
         is_tool: true,
@@ -528,6 +606,7 @@ const TILE_TYPES = {
 
     // Progression
     player: {
+        draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_player: true,
         has_inventory: true,
@@ -543,10 +622,13 @@ const TILE_TYPES = {
         },
     },
     player_drowned: {
+        draw_layer: LAYER_ACTOR,
     },
     player_burned: {
+        draw_layer: LAYER_ACTOR,
     },
     chip: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
         is_chip: true,
         is_required_chip: true,
@@ -560,6 +642,7 @@ const TILE_TYPES = {
         },
     },
     chip_extra: {
+        draw_layer: LAYER_ITEM,
         is_chip: true,
         is_object: true,
         blocks_monsters: true,
@@ -572,22 +655,28 @@ const TILE_TYPES = {
         },
     },
     score_10: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
     },
     score_100: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
     },
     score_1000: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
     },
     score_2x: {
+        draw_layer: LAYER_ITEM,
         is_object: true,
     },
 
     hint: {
+        draw_layer: LAYER_TERRAIN,
         is_hint: true,
     },
     socket: {
+        draw_layer: LAYER_TERRAIN,
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.is_player && level.chips_remaining === 0) {
@@ -596,6 +685,7 @@ const TILE_TYPES = {
         },
     },
     exit: {
+        draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.win();
@@ -607,6 +697,13 @@ const TILE_TYPES = {
 // Tell them all their own names
 for (let [name, type] of Object.entries(TILE_TYPES)) {
     type.name = name;
+
+    if (type.draw_layer === undefined ||
+        type.draw_layer !== Math.floor(type.draw_layer) ||
+        type.draw_layer >= 4)
+    {
+        console.error(`Tile type ${name} has a bad draw layer`);
+    }
 }
 
 export default TILE_TYPES;
