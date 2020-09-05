@@ -579,6 +579,13 @@ class Level {
             if (actor.slide_mode === 'ice') {
                 // Actors on ice turn around when they hit something
                 actor.direction = DIRECTIONS[direction].opposite;
+                // Somewhat clumsy hack: step on the ice tile again, so if it's
+                // a corner, it'll turn us in the correct direction
+                for (let tile of original_cell) {
+                    if (tile.type.slide_mode === 'ice' && tile.type.on_arrive) {
+                        tile.type.on_arrive(tile, this, actor);
+                    }
+                }
             }
             return false;
         }
