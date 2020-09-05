@@ -1601,7 +1601,7 @@ class Splash extends PrimaryView {
         // TODO indicate we're downloading something
         // TODO handle errors
         // TODO cancel a download if we start another one?
-        let data = await fetch(path);
+        let buf = await fetch(path);
         let stored_game;
         this.load_file(buf);
         // TODO get title out of C2G when it's supported
