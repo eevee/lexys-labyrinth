@@ -555,6 +555,7 @@ class Level {
                         continue;
 
                     if (actor.type.pushes && actor.type.pushes[tile.type.name]) {
+                        this.set_actor_direction(tile, direction);
                         if (this.attempt_step(tile, direction, speed))
                             // It moved out of the way!
                             continue;
@@ -578,7 +579,7 @@ class Level {
         if (blocked) {
             if (actor.slide_mode === 'ice') {
                 // Actors on ice turn around when they hit something
-                actor.direction = DIRECTIONS[direction].opposite;
+                this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
                 // Somewhat clumsy hack: step on the ice tile again, so if it's
                 // a corner, it'll turn us in the correct direction
                 for (let tile of original_cell) {
@@ -639,6 +640,11 @@ class Level {
             {
                 // TODO ooh, obituaries
                 this.fail("Oops!  Watch out for creatures!");
+                return;
+            }
+            if (actor.type.is_block && tile.type.is_player) {
+                // TODO ooh, obituaries
+                this.fail("squish");
                 return;
             }
         }
