@@ -3,7 +3,7 @@ html {
     height: 100%;
 }
 body {
-    min-height: 100%;
+    height: 100%;
     margin: 0;
 
     display: flex;
@@ -180,9 +180,17 @@ body[data-mode=splash] #header-level {
 /* Splash (intro part) */
 
 #splash {
-    flex: 0;
     margin: auto;
     overflow: auto;
+}
+
+#splash h2 {
+    border-bottom: 1px solid #404040;
+    color: #909090;
+    text-shadow: 0 1px #0004;
+}
+#splash * + h2 {
+    margin-top: 2rem;
 }
 
 #level-pack-list {
@@ -428,14 +436,15 @@ main.--has-demo .demo-controls {
 /* Editor */
 
 #editor {
+    flex: 1 1 auto;
     display: grid;
     grid:
         "level  palette"
     ;
 
-    max-width: 95%;
-    max-height: 95%;
+    min-height: 0;
     margin: auto;
+    padding: 1em;
 }
 
 #editor .level {

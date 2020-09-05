@@ -1462,7 +1462,19 @@ class Editor extends PrimaryView {
         // Tile palette
         let palette_el = this.root.querySelector('.palette');
         this.palette = {};  // name => element
-        for (let name of ['floor', 'wall']) {
+        for (let name of [
+            // Terrain
+            'floor', 'wall', 'hint', 'socket', 'exit',
+            'popwall',
+            'fake_floor', 'fake_wall',
+            'water', 'fire', 'ice', 'force_floor_all',
+            // TODO ice curves
+            // Items
+            'chip', // 'chip_extra', -- XXX doesn't exist in TW tileset!
+            'key_blue', 'key_red', 'key_yellow', 'key_green',
+            // Creatures
+        ])
+        {
             let entry = mk('canvas.palette-entry', {
                 width: this.conductor.tileset.size_x,
                 height: this.conductor.tileset.size_y,
@@ -1553,6 +1565,19 @@ class Splash extends PrimaryView {
             pack_list.append(li);
         }
 
+        // Bind to file upload control
+        let upload_el = this.root.querySelector('#splash-upload');
+        // Clear it out in case of refresh
+        upload_el.value = '';
+        upload_el.addEventListener('change', async ev => {
+            let file = ev.target.files[0];
+            let buf = await file.arrayBuffer();
+            this.load_file(buf);
+            // TODO get title out of C2G when it's supported
+            this.conductor.level_pack_name_el.textContent = file.name;
+        });
+
+        // Bind to "create level" button
         this.root.querySelector('#splash-create-level').addEventListener('click', ev => {
             let stored_level = new format_util.StoredLevel;
             stored_level.size_x = 32;
@@ -1578,18 +1603,27 @@ class Splash extends PrimaryView {
         // TODO cancel a download if we start another one?
         let data = await fetch(path);
         let stored_game;
-        // TODO check magic numbers, not extensions
-        // TODO also support tile world's DAC when reading from local??
-        // TODO ah, there's more metadata in CCX, crapola
-        if (path.match(/\.(?:dat|ccl)$/i)) {
-            stored_game = dat.parse_game(data);
-        }
-        else {
-            stored_game = new format_util.StoredGame;
-            stored_game.levels.push(c2m.parse_level(data));
-        }
+        this.load_file(buf);
         // TODO get title out of C2G when it's supported
         this.conductor.level_pack_name_el.textContent = title || path;
+    }
+
+    load_file(buf) {
+        // TODO also support tile world's DAC when reading from local??
+        // TODO ah, there's more metadata in CCX, crapola
+        let magic = String.fromCharCode.apply(null, new Uint8Array(buf.slice(0, 4)));
+        let stored_game;
+        console.log(magic);
+        if (magic === 'CC2M' || magic === 'CCS ') {
+            stored_game = new format_util.StoredGame;
+            stored_game.levels.push(c2m.parse_level(buf));
+        }
+        else if (magic === '\xac\x2a\x02\x00' || magic == '\xac\x2a\x02\x01') {
+            stored_game = dat.parse_game(buf);
+        }
+        else {
+            throw new Error("Unrecognized file format");
+        }
         this.conductor.load_game(stored_game);
         this.conductor.switch_to_player();
     }
