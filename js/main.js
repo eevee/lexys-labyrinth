@@ -980,7 +980,7 @@ class Player extends PrimaryView {
         });
         this.restart_button = this.root.querySelector('.controls .control-restart');
         this.restart_button.addEventListener('click', ev => {
-            new ConfirmOverlay(this, "Abandon this attempt and try again?", () => {
+            new ConfirmOverlay(this.conductor, "Abandon this attempt and try again?", () => {
                 this.restart_level();
             }).open();
             ev.target.blur();
@@ -1004,7 +1004,7 @@ class Player extends PrimaryView {
         // Demo playback
         this.root.querySelector('.demo-controls .demo-play').addEventListener('click', ev => {
             if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
-                new ConfirmOverlay(this, "Abandon your progress and watch the replay?", () => {
+                new ConfirmOverlay(this.conductor, "Abandon your progress and watch the replay?", () => {
                     this.play_demo();
                 });
             }
