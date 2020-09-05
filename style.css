@@ -320,7 +320,7 @@ dl.score-chart .-sum {
 .chips,
 .time,
 .bonus {
-    font-size: calc(0.5em * var(--scale));
+    font-size: calc(var(--tile-height) * var(--scale) / 3);
     display: flex;
     align-items: center;
 }
@@ -351,7 +351,7 @@ dl.score-chart .-sum {
     grid-area: message;
     align-self: stretch;
 
-    font-size: calc(0.75em * var(--scale));
+    font-size: calc(var(--tile-height) * var(--scale) / 3);
     padding: 0.25em 0.5em;
     font-family: serif;
     font-style: italic;
