@@ -7,7 +7,7 @@ import * as format_util from './format-util.js';
 import CanvasRenderer from './renderer-canvas.js';
 import { Tileset, CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
-import { mk, promise_event, fetch } from './util.js';
+import { mk, promise_event, fetch, walk_grid } from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
 
@@ -145,6 +145,8 @@ class Level {
         this.stored_level = stored_level;
         this.width = stored_level.size_x;
         this.height = stored_level.size_y;
+        this.size_x = stored_level.size_x;
+        this.size_y = stored_level.size_y;
         this.restart(compat);
     }
 
@@ -811,8 +813,8 @@ class Level {
 
 // Stackable modal overlay of some kind, usually a dialog
 class Overlay {
-    constructor(game, root) {
-        this.game = game;
+    constructor(conductor, root) {
+        this.conductor = conductor;
         this.root = root;
 
         // Don't propagate clicks on the root element, so they won't trigger a
@@ -826,8 +828,8 @@ class Overlay {
         // FIXME ah, but keystrokes can still go to the game, including
         // spacebar to begin it if it was waiting.  how do i completely disable
         // an entire chunk of the page?
-        if (this.game.state === 'playing') {
-            this.game.set_state('paused');
+        if (this.conductor.player.state === 'playing') {
+            this.conductor.player.set_state('paused');
         }
 
         let overlay = mk('div.overlay', this.root);
@@ -846,8 +848,8 @@ class Overlay {
 
 // Overlay styled like a dialog box
 class DialogOverlay extends Overlay {
-    constructor(game) {
-        super(game, mk('div.dialog'));
+    constructor(conductor) {
+        super(conductor, mk('div.dialog'));
 
         this.root.append(
             this.header = mk('header'),
@@ -870,8 +872,8 @@ class DialogOverlay extends Overlay {
 
 // Yes/no popup dialog
 class ConfirmOverlay extends DialogOverlay {
-    constructor(game, message, what) {
-        super(game);
+    constructor(conductor, message, what) {
+        super(conductor);
         this.set_title("just checking");
         this.main.append(mk('p', {}, message));
         let yes = mk('button', {type: 'button'}, "yep");
@@ -887,191 +889,35 @@ class ConfirmOverlay extends DialogOverlay {
     }
 }
 
-// About dialog
-const ABOUT_HTML = `
-<p>Welcome to Lexy's Labyrinth, an exciting old-school tile-based puzzle adventure that is compatible with — but legally distinct from — <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge</a> and its exciting sequel <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a>.</p>
-<p>This is a reimplementation from scratch of the game and uses none of its original code or assets.  It aims to match the behavior of the Steam releases (sans obvious bugs), since those are now the canonical versions of the game, but compatibility settings aren't off the table.</p>
-<p>The default level pack is the community-made <a href="https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1">Chip's Challenge Level Pack 1</a>, which I had no hand in whatsoever; please follow the link for full attribution.  With any luck, future releases will include other community level packs, the ability to play your own, and even a way to play the original levels once you've purchased them on Steam!</p>
-<p>Source code is on <a href="https://github.com/eevee/lexys-labyrinth">GitHub</a>.</p>
-<p>Special thanks to the incredibly detailed <a href="https://bitbusters.club/">Bit Busters Club</a> and its associated wiki and Discord, the latter of which is full of welcoming people who've been more than happy to answer all my burning arcane questions about Chip's Challenge mechanics.  Thank you also to <a href="https://tw2.bitbusters.club/">Tile World</a>, an open source Chip's Challenge 1 emulator whose source code was indispensable, and the origin of the default tileset.</p>
-`;
-class AboutOverlay extends DialogOverlay {
-    constructor(game) {
-        super(game);
-        this.set_title("about");
-        this.main.innerHTML = ABOUT_HTML;
-        this.add_button("cool", ev => {
-            this.close();
-        });
+
+// -------------------------------------------------------------------------------------------------
+// Main display...  modes
+
+class PrimaryView {
+    constructor(conductor, root) {
+        this.conductor = conductor;
+        this.root = root;
+    }
+
+    activate() {
+        this.root.removeAttribute('hidden');
+    }
+
+    deactivate() {
+        this.root.setAttribute('hidden', '');
     }
 }
 
-// Options dialog
-// functionality?:
-// - store local levels and tilesets in localstorage?  (will duplicate space but i'll be able to remember them)
-// aesthetics:
-// - tileset
-// - animations on or off
-// compat:
-// - flicking
-// - that cc2 hook wrapping thing
-// - that cc2 thing where a brown button sends a 1-frame pulse to a wired trap
-// - cc2 something about blue teleporters at 0, 0 forgetting they're looking for unwired only
-// - monsters go in fire
-// - rff blocks monsters
-// - rff truly random
-// - all manner of fucking bugs
-// TODO distinguish between deliberately gameplay changes and bugs, though that's kind of an arbitrary line
-const COMPAT_OPTIONS = [{
-    key: 'tiles_react_instantly',
-    label: "Tiles react instantly",
-    impls: ['lynx', 'ms'],
-    note: "In classic CC, actors moved instantly from one tile to another, so tiles would react (e.g., buttons would become pressed) instantly as well.  CC2 made actors slide smoothly between tiles, and it made more sense visually for the reactions to only happen once the sliding animation had finished.  That's technically a gameplay change, since it delays a lot of tile behavior for 4 tics (the time it takes most actors to move), so here's a compat option.  Works best in conjunction with disabling smooth scrolling; otherwise you'll see strange behavior like completing a level before actually stepping onto the exit.",
-}];
-const OPTIONS_TABS = [{
-    name: 'compat',
-    label: "Compat",
-}];
-class OptionsOverlay extends DialogOverlay {
-    constructor(game) {
-        super(game);
-        this.set_title("options");
-        this.add_button("well alright then", ev => {
-            this.close();
-        });
-
-        let tab_strip = mk('nav.tabstrip');
-        this.main.append(tab_strip);
-        this.tab_links = {};
-        this.tab_blocks = {};
-        for (let tabdef of OPTIONS_TABS) {
-            let link = mk('a', {href: 'javascript:', 'data-tab': tabdef.name}, tabdef.label);
-            tab_strip.append(link);
-            this.tab_links[tabdef.name] = link;
-            let block = mk('section');
-            this.main.append(block);
-            this.tab_blocks[tabdef.name] = block;
-        }
-
-        // Compat tab
-        this.tab_blocks['compat'].append(mk('p', "Changes to compatibility settings won't take effect until you restart the level."));
-        let ul = mk('ul');
-        this.tab_blocks['compat'].append(ul);
-        for (let optdef of COMPAT_OPTIONS) {
-            let li = mk('li');
-            let label = mk('label');
-            li.append(label);
-            label.append(mk('input', {type: 'checkbox', name: optdef.key}));
-            for (let impl of optdef.impls) {
-                label.append(mk(`span.compat-${impl}`, impl));
-            }
-            label.append(optdef.label);
-            li.append(mk('p', optdef.note));
-            ul.append(li);
-        }
-
-        this.main.append(mk('p', "Sorry!  This stuff doesn't actually work yet."));
-    }
-}
-
-// List of levels
-class LevelBrowserOverlay extends DialogOverlay {
-    constructor(game) {
-        super(game);
-        this.set_title("choose a level");
-        let table = mk('table.level-browser');
-        this.main.append(table);
-        for (let [i, stored_level] of game.stored_game.levels.entries()) {
-            table.append(mk('tr',
-                {'data-index': i},
-                mk('td', i + 1),
-                mk('td', stored_level.title),
-                // TODO score?
-                // TODO other stats??
-                mk('td', '▶'),
-            ));
-        }
-
-        table.addEventListener('click', ev => {
-            let tr = ev.target.closest('table.level-browser tr');
-            if (! tr)
-                return;
-
-            let index = parseInt(tr.getAttribute('data-index'), 10);
-            this.game.load_level(index);
-            this.close();
-        });
-
-        this.add_button("nevermind", ev => {
-            this.close();
-        });
-    }
-}
 
 // TODO:
 // - some kinda visual theme i guess lol
 // - level password, if any
-// - timer!!!!!
 // - bonus points (cc2 only, or maybe only if got any so far this level)
 // - intro splash with list of available level packs
 // - button: quit to splash
 // - implement winning and show score for this level
 // - show current score so far
 // - about, help
-const GAME_UI_HTML = `
-<header>
-    <h1>Lexy's Labyrinth</h1>
-    <nav>
-        <button class="nav-about" type="button">about</button>
-        <button class="nav-help" type="button" disabled>help</button>
-        <button class="nav-options" type="button">options</button>
-    </nav>
-</header>
-<main>
-    <header>
-        <h1 class="level-set">Chip's Challenge Level Pack 1</h1>
-        <nav>
-            <button class="set-nav-return" type="button" disabled>Change pack</button>
-        </nav>
-        <h2 class="level-name">Level 1 — Key Pyramid</h2>
-        <nav class="nav">
-            <button class="nav-prev" type="button">⬅️\ufe0e</button>
-            <button class="nav-browse" type="button">Level select</button>
-            <button class="nav-next" type="button">➡️\ufe0e</button>
-        </nav>
-    </header>
-    <div class="level"><!-- level canvas and any overlays go here --></div>
-    <div class="bummer"></div>
-    <div class="message"></div>
-    <div class="chips">
-        <h3>Chips</h3>
-        <output></output>
-    </div>
-    <div class="time">
-        <h3>Time</h3>
-        <output></output>
-    </div>
-    <div class="bonus">
-        <h3>Bonus</h3>
-        <output></output>
-    </div>
-    <div class="inventory"></div>
-    <div class="controls">
-        <div class="play-controls">
-            <button class="control-pause" type="button">Pause</button>
-            <button class="control-restart" type="button">Restart</button>
-            <button class="control-undo" type="button">Undo</button>
-            <button class="control-rewind" type="button">Rewind</button>
-        </div>
-        <div class="demo-controls">
-            <button class="demo-play" type="button">View replay</button>
-            <button class="demo-step-1" type="button">Step 1 tic</button>
-            <button class="demo-step-4" type="button">Step 1 move</button>
-            <div class="input"></div>
-        </div>
-    </div>
-</main>
-`;
 const ACTION_LABELS = {
     up: '⬆️\ufe0f',
     down: '⬇️\ufe0f',
@@ -1087,10 +933,10 @@ const ACTION_DIRECTIONS = {
     left: 'west',
     right: 'east',
 };
-class Game {
-    constructor(stored_game, tileset) {
-        this.stored_game = stored_game;
-        this.tileset = tileset;
+class Player extends PrimaryView {
+    constructor(conductor) {
+        super(conductor, document.body.querySelector('main#player'));
+
         this.key_mapping = {
             ArrowLeft: 'left',
             ArrowRight: 'right',
@@ -1105,92 +951,55 @@ class Game {
             c: 'swap',
         };
 
-        // TODO obey level options; allow overriding
-        this.viewport_size_x = 9;
-        this.viewport_size_y = 9;
         this.scale = 1;
 
         this.compat = {
             tiles_react_instantly: false,
         };
 
-        document.body.innerHTML = GAME_UI_HTML;
-        this.container = document.body.querySelector('main');
-        this.container.style.setProperty('--tile-width', `${this.tileset.size_x}px`);
-        this.container.style.setProperty('--tile-height', `${this.tileset.size_y}px`);
-        this.level_el = this.container.querySelector('.level');
-        this.level_name_el = this.container.querySelector('.level-name');
-        this.message_el = this.container.querySelector('.message');
-        this.chips_el = this.container.querySelector('.chips output');
-        this.time_el = this.container.querySelector('.time output');
-        this.bonus_el = this.container.querySelector('.bonus output');
-        this.inventory_el = this.container.querySelector('.inventory');
-        this.bummer_el = this.container.querySelector('.bummer');
-        this.input_el = this.container.querySelector('.input');
-        this.demo_el = this.container.querySelector('.demo');
-
-        // Populate stuff
-        let header = document.body.querySelector('body > header');
-        header.querySelector('.nav-about').addEventListener('click', ev => {
-            new AboutOverlay(this).open();
-        });
-        header.querySelector('.nav-options').addEventListener('click', ev => {
-            new OptionsOverlay(this).open();
-        });
-
-        // Populate navigation
-        let nav_el = this.container.querySelector('.nav');
-        this.nav_prev_button = nav_el.querySelector('.nav-prev');
-        this.nav_next_button = nav_el.querySelector('.nav-next');
-        this.nav_prev_button.addEventListener('click', ev => {
-            // TODO confirm
-            if (this.level_index > 0) {
-                this.load_level(this.level_index - 1);
-            }
-            ev.target.blur();
-        });
-        this.nav_next_button.addEventListener('click', ev => {
-            // TODO confirm
-            if (this.level_index < this.stored_game.levels.length - 1) {
-                this.load_level(this.level_index + 1);
-            }
-            ev.target.blur();
-        });
-        nav_el.querySelector('.nav-browse').addEventListener('click', ev => {
-            new LevelBrowserOverlay(this).open();
-        });
+        this.root.style.setProperty('--tile-width', `${this.conductor.tileset.size_x}px`);
+        this.root.style.setProperty('--tile-height', `${this.conductor.tileset.size_y}px`);
+        this.level_el = this.root.querySelector('.level');
+        this.message_el = this.root.querySelector('.message');
+        this.chips_el = this.root.querySelector('.chips output');
+        this.time_el = this.root.querySelector('.time output');
+        this.bonus_el = this.root.querySelector('.bonus output');
+        this.inventory_el = this.root.querySelector('.inventory');
+        this.bummer_el = this.root.querySelector('.bummer');
+        this.input_el = this.root.querySelector('.input');
+        this.demo_el = this.root.querySelector('.demo');
 
         // Bind buttons
-        this.pause_button = this.container.querySelector('.controls .control-pause');
+        this.pause_button = this.root.querySelector('.controls .control-pause');
         this.pause_button.addEventListener('click', ev => {
             this.toggle_pause();
             ev.target.blur();
         });
-        this.restart_button = this.container.querySelector('.controls .control-restart');
+        this.restart_button = this.root.querySelector('.controls .control-restart');
         this.restart_button.addEventListener('click', ev => {
             new ConfirmOverlay(this, "Abandon this attempt and try again?", () => {
                 this.restart_level();
             }).open();
             ev.target.blur();
         });
-        this.undo_button = this.container.querySelector('.controls .control-undo');
+        this.undo_button = this.root.querySelector('.controls .control-undo');
         this.undo_button.addEventListener('click', ev => {
             let player_cell = this.level.player.cell;
             while (player_cell === this.level.player.cell && this.level.undo_stack.length > 0) {
                 this.level.undo();
             }
-            if (this.level.undo_stack.length === 0) {
-                this.set_state('waiting');
-            }
-            else {
+            // TODO set back to waiting if we hit the start of the level?  but
+            // the stack trims itself so how do we know that
+            if (this.state === 'stopped') {
                 // Be sure to undo any success or failure
                 this.set_state('playing');
             }
             this.update_ui();
+            this._redraw();
             ev.target.blur();
         });
         // Demo playback
-        this.container.querySelector('.demo-controls .demo-play').addEventListener('click', ev => {
+        this.root.querySelector('.demo-controls .demo-play').addEventListener('click', ev => {
             if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
                 new ConfirmOverlay(this, "Abandon your progress and watch the replay?", () => {
                     this.play_demo();
@@ -1200,11 +1009,11 @@ class Game {
                 this.play_demo();
             }
         });
-        this.container.querySelector('.demo-controls .demo-step-1').addEventListener('click', ev => {
+        this.root.querySelector('.demo-controls .demo-step-1').addEventListener('click', ev => {
             this.advance_by(1);
             this._redraw();
         });
-        this.container.querySelector('.demo-controls .demo-step-4').addEventListener('click', ev => {
+        this.root.querySelector('.demo-controls .demo-step-4').addEventListener('click', ev => {
             this.advance_by(4);
             this._redraw();
         });
@@ -1214,15 +1023,13 @@ class Game {
         let floor_tile = this.render_inventory_tile('floor');
         this.inventory_el.style.backgroundImage = `url(${floor_tile})`;
 
-        this.renderer = new CanvasRenderer(tileset);
+        this.renderer = new CanvasRenderer(this.conductor.tileset);
         this.level_el.append(this.renderer.canvas);
         this.renderer.canvas.addEventListener('auxclick', ev => {
             if (ev.button !== 1)
                 return;
 
-            let rect = this.renderer.canvas.getBoundingClientRect();
-            let x = Math.floor((ev.clientX - rect.x) / this.scale / this.tileset.size_x + this.renderer.viewport_x);
-            let y = Math.floor((ev.clientY - rect.y) / this.scale / this.tileset.size_y + this.renderer.viewport_y);
+            let [x, y] = this.renderer.cell_coords_from_event(ev);
             this.level.move_to(this.level.player, x, y);
         });
 
@@ -1250,7 +1057,7 @@ class Game {
                     if (this.level.state === 'success') {
                         // Advance to the next level
                         // TODO game ending?
-                        this.load_level(this.level_index + 1);
+                        this.conductor.change_level(this.conductor.level_index + 1);
                     }
                     else {
                         // Restart
@@ -1281,7 +1088,7 @@ class Game {
         });
 
         // Populate input debugger
-        this.input_el = this.container.querySelector('.input');
+        this.input_el = this.root.querySelector('.input');
         this.input_action_elements = {};
         for (let [action, label] of Object.entries(ACTION_LABELS)) {
             let el = mk('span.input-action', {'data-action': action}, label);
@@ -1302,9 +1109,6 @@ class Game {
         this.tic_offset = 0;
         this.last_advance = 0;  // performance.now timestamp
 
-        // Done with UI, now we can load a level
-        this.load_level(0);
-
         // Auto-size the level canvas, both now and on resize
         this.adjust_scale();
         window.addEventListener('resize', ev => {
@@ -1312,10 +1116,26 @@ class Game {
         });
     }
 
-    load_level(level_index) {
-        // TODO clear out input?  (when restarting, too?)
-        this.level_index = level_index;
-        this.level = new Level(this.stored_game.levels[level_index], this.compat);
+    activate() {
+        // We can't resize when we're not visible, so do it now
+        super.activate();
+        this.adjust_scale();
+    }
+
+    deactivate() {
+        // End the level when going away; the easiest way is by restarting it
+        // TODO could throw the level away entirely and create a new one on activate?
+        super.deactivate();
+        if (this.state !== 'waiting') {
+            this.restart_level();
+        }
+    }
+
+    load_game(stored_game) {
+    }
+
+    load_level(stored_level) {
+        this.level = new Level(stored_level, this.compat);
         this.renderer.set_level(this.level);
         // waiting: haven't yet pressed a key so the timer isn't going
         // playing: playing normally
@@ -1327,16 +1147,8 @@ class Game {
         this.tic_offset = 0;
         this.last_advance = 0;
 
-        // FIXME do better
-        this.level_name_el.textContent = `Level ${level_index + 1} — ${this.level.stored_level.title}`;
-
-        document.title = `${PAGE_TITLE} - ${this.level.stored_level.title}`;
-
-        this.nav_prev_button.disabled = level_index <= 0;
-        this.nav_next_button.disabled = level_index >= this.stored_game.levels.length;
-
         this.demo_faucet = null;
-        this.container.classList.toggle('--has-demo', !!this.level.stored_level.demo);
+        this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
 
         this.update_ui();
         // Force a redraw, which won't happen on its own since the game isn't running
@@ -1466,9 +1278,10 @@ class Game {
 
     render_inventory_tile(name) {
         if (! this._inventory_tiles[name]) {
-            // TODO reuse the canvas
-            let canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
-            this.tileset.draw({type: TILE_TYPES[name]}, null, canvas.getContext('2d'), 0, 0);
+            // TODO put this on the renderer
+            // TODO reuse the canvas for data urls
+            let canvas = mk('canvas', {width: this.conductor.tileset.size_x, height: this.conductor.tileset.size_y});
+            this.conductor.tileset.draw({type: TILE_TYPES[name]}, null, canvas.getContext('2d'), 0, 0);
             this._inventory_tiles[name] = canvas.toDataURL();
         }
         return this._inventory_tiles[name];
@@ -1531,7 +1344,7 @@ class Game {
             }
             else {
                 this.bummer_el.textContent = "";
-                let base = (this.level_index + 1) * 500;
+                let base = (this.conductor.level_index + 1) * 500;
                 let time = (this.level.time_remaining || 0) * 10;
                 this.bummer_el.append(
                     mk('p', "go bit buster!"),
@@ -1570,11 +1383,11 @@ class Game {
         // TODO make this optional
         // The base size is the size of the canvas, i.e. the viewport size
         // times the tile size
-        let base_x = this.tileset.size_x * this.viewport_size_x;
-        let base_y = this.tileset.size_y * this.viewport_size_y;
+        let base_x = this.conductor.tileset.size_x * this.renderer.viewport_size_x;
+        let base_y = this.conductor.tileset.size_y * this.renderer.viewport_size_y;
         // The main UI is centered in a flex item with auto margins, so the
         // extra space available is the size of those margins
-        let style = window.getComputedStyle(this.container);
+        let style = window.getComputedStyle(this.root);
         let extra_x = parseFloat(style['margin-left']) + parseFloat(style['margin-right']);
         let extra_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);
         // The total available space, then, is the current size of the
@@ -1590,9 +1403,437 @@ class Game {
 
         // FIXME the above logic doesn't take into account the inventory, which is also affected by scale
         this.scale = scale;
-        this.container.style.setProperty('--scale', scale);
+        this.root.style.setProperty('--scale', scale);
     }
 }
+
+
+class Editor extends PrimaryView {
+    constructor(conductor) {
+        super(conductor, document.body.querySelector('main#editor'));
+        // FIXME don't hardcode size here, convey this to renderer some other way
+        this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
+
+        // Level canvas and mouse handling
+        this.root.querySelector('.level').append(this.renderer.canvas);
+        this.mouse_mode = null;
+        this.mouse_cell = null;
+        this.renderer.canvas.addEventListener('mousedown', ev => {
+            this.mouse_mode = 'draw';
+
+            let [x, y] = this.renderer.cell_coords_from_event(ev);
+            this.mouse_cell = [x, y];
+
+            this.place_in_cell(x, y, this.palette_selection);
+            this.renderer.draw();
+        });
+        this.renderer.canvas.addEventListener('mousemove', ev => {
+            if (this.mouse_mode === null)
+                return;
+
+            if (this.mouse_mode === 'draw') {
+                // FIXME also fill in a trail between previous cell and here, mousemove is not fired continuously
+                let [x, y] = this.renderer.cell_coords_from_event(ev);
+                if (x === this.mouse_cell[0] && y === this.mouse_cell[1])
+                    return;
+
+                // TODO do a pixel-perfect draw too
+                for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
+                    this.place_in_cell(cx, cy, this.palette_selection);
+                }
+                this.renderer.draw();
+
+                this.mouse_cell = [x, y];
+            }
+        });
+        this.renderer.canvas.addEventListener('mouseup', ev => {
+            this.mouse_mode = null;
+        });
+        window.addEventListener('blur', ev => {
+            // Unbind the mouse if the page loses focus
+            this.mouse_mode = null;
+        });
+
+        // Misc controls
+        this.root.querySelector('#editor-test').addEventListener('click', ev => {
+            this.conductor.switch_to_player();
+        });
+
+        // Tile palette
+        let palette_el = this.root.querySelector('.palette');
+        this.palette = {};  // name => element
+        for (let name of ['floor', 'wall']) {
+            let entry = mk('canvas.palette-entry', {
+                width: this.conductor.tileset.size_x,
+                height: this.conductor.tileset.size_y,
+                'data-tile-name': name,
+            });
+            let ctx = entry.getContext('2d');
+            this.conductor.tileset.draw_type(name, null, null, ctx, 0, 0);
+            this.palette[name] = entry;
+            palette_el.append(entry);
+        }
+        palette_el.addEventListener('click', ev => {
+            let entry = ev.target.closest('canvas.palette-entry');
+            if (! entry)
+                return;
+
+            this.select_palette(entry.getAttribute('data-tile-name'));
+        });
+        this.palette_selection = null;
+        this.select_palette('floor');
+    }
+
+    load_game(stored_game) {
+    }
+
+    load_level(stored_level) {
+        // TODO support a game too i guess
+        this.stored_level = stored_level;
+
+        // XXX need this for renderer compat.  but i guess it's nice in general idk
+        this.stored_level.cells = [];
+        let row;
+        for (let [i, cell] of this.stored_level.linear_cells.entries()) {
+            if (i % this.stored_level.size_x === 0) {
+                row = [];
+                this.stored_level.cells.push(row);
+            }
+            row.push(cell);
+        }
+
+        this.renderer.set_level(stored_level);
+        this.renderer.draw();
+    }
+
+    select_palette(name) {
+        if (name === this.palette_selection)
+            return;
+
+        if (this.palette_selection) {
+            this.palette[this.palette_selection].classList.remove('--selected');
+        }
+        this.palette_selection = name;
+        if (this.palette_selection) {
+            this.palette[this.palette_selection].classList.add('--selected');
+        }
+    }
+
+    place_in_cell(x, y, name) {
+        // TODO weird api?
+        if (! name)
+            return;
+
+        let cell = this.stored_level.cells[y][x];
+        cell.push({name});
+    }
+}
+
+
+const BUILTIN_LEVEL_PACKS = [{
+    path: 'levels/CCLP1.ccl',
+    title: "Chip's Challenge Level Pack 1",
+    desc: "Intended as an introduction to Chip's Challenge 1 for new players.  Recommended.",
+}];
+
+class Splash extends PrimaryView {
+    constructor(conductor) {
+        super(conductor, document.body.querySelector('main#splash'));
+
+        // Populate the list of available level packs
+        let pack_list = document.querySelector('#level-pack-list');
+        for (let packdef of BUILTIN_LEVEL_PACKS) {
+            let li = mk('li',
+                mk('h3', packdef.title),
+                mk('p', packdef.desc),
+            );
+            li.addEventListener('click', ev => {
+                this.fetch_pack(packdef.path, packdef.title);
+            });
+            pack_list.append(li);
+        }
+
+        this.root.querySelector('#splash-create-level').addEventListener('click', ev => {
+            let stored_level = new format_util.StoredLevel;
+            stored_level.size_x = 32;
+            stored_level.size_y = 32;
+            for (let i = 0; i < 1024; i++) {
+                let cell = new format_util.StoredCell;
+                cell.push({name: 'floor'});
+                stored_level.linear_cells.push(cell);
+            }
+            stored_level.linear_cells[0].push({name: 'player'});
+
+            let stored_game = new format_util.StoredGame;
+            stored_game.levels.push(stored_level);
+            this.conductor.load_game(stored_game);
+
+            this.conductor.switch_to_editor();
+        });
+    }
+
+    async fetch_pack(path, title) {
+        // TODO indicate we're downloading something
+        // TODO handle errors
+        // TODO cancel a download if we start another one?
+        let data = await fetch(path);
+        let stored_game;
+        // TODO check magic numbers, not extensions
+        // TODO also support tile world's DAC when reading from local??
+        // TODO ah, there's more metadata in CCX, crapola
+        if (path.match(/\.(?:dat|ccl)$/i)) {
+            stored_game = dat.parse_game(data);
+        }
+        else {
+            stored_game = new format_util.StoredGame;
+            stored_game.levels.push(c2m.parse_level(data));
+        }
+        // TODO get title out of C2G when it's supported
+        this.conductor.level_pack_name_el.textContent = title || path;
+        this.conductor.load_game(stored_game);
+        this.conductor.switch_to_player();
+    }
+}
+
+
+// -------------------------------------------------------------------------------------------------
+// Central controller, thingy
+
+// About dialog
+const ABOUT_HTML = `
+<p>Welcome to Lexy's Labyrinth, an exciting old-school tile-based puzzle adventure that is compatible with — but legally distinct from — <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge</a> and its exciting sequel <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a>.</p>
+<p>This is a reimplementation from scratch of the game and uses none of its original code or assets.  It aims to match the behavior of the Steam releases (sans obvious bugs), since those are now the canonical versions of the game, but compatibility settings aren't off the table.</p>
+<p>The default level pack is the community-made <a href="https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1">Chip's Challenge Level Pack 1</a>, which I had no hand in whatsoever; please follow the link for full attribution.  With any luck, future releases will include other community level packs, the ability to play your own, and even a way to play the original levels once you've purchased them on Steam!</p>
+<p>Source code is on <a href="https://github.com/eevee/lexys-labyrinth">GitHub</a>.</p>
+<p>Special thanks to the incredibly detailed <a href="https://bitbusters.club/">Bit Busters Club</a> and its associated wiki and Discord, the latter of which is full of welcoming people who've been more than happy to answer all my burning arcane questions about Chip's Challenge mechanics.  Thank you also to <a href="https://tw2.bitbusters.club/">Tile World</a>, an open source Chip's Challenge 1 emulator whose source code was indispensable, and the origin of the default tileset.</p>
+`;
+class AboutOverlay extends DialogOverlay {
+    constructor(conductor) {
+        super(conductor);
+        this.set_title("about");
+        this.main.innerHTML = ABOUT_HTML;
+        this.add_button("cool", ev => {
+            this.close();
+        });
+    }
+}
+
+// Options dialog
+// functionality?:
+// - store local levels and tilesets in localstorage?  (will duplicate space but i'll be able to remember them)
+// aesthetics:
+// - tileset
+// - animations on or off
+// compat:
+// - flicking
+// - that cc2 hook wrapping thing
+// - that cc2 thing where a brown button sends a 1-frame pulse to a wired trap
+// - cc2 something about blue teleporters at 0, 0 forgetting they're looking for unwired only
+// - monsters go in fire
+// - rff blocks monsters
+// - rff truly random
+// - all manner of fucking bugs
+// TODO distinguish between deliberately gameplay changes and bugs, though that's kind of an arbitrary line
+const COMPAT_OPTIONS = [{
+    key: 'tiles_react_instantly',
+    label: "Tiles react instantly",
+    impls: ['lynx', 'ms'],
+    note: "In classic CC, actors moved instantly from one tile to another, so tiles would react (e.g., buttons would become pressed) instantly as well.  CC2 made actors slide smoothly between tiles, and it made more sense visually for the reactions to only happen once the sliding animation had finished.  That's technically a gameplay change, since it delays a lot of tile behavior for 4 tics (the time it takes most actors to move), so here's a compat option.  Works best in conjunction with disabling smooth scrolling; otherwise you'll see strange behavior like completing a level before actually stepping onto the exit.",
+}];
+const OPTIONS_TABS = [{
+    name: 'compat',
+    label: "Compat",
+}];
+class OptionsOverlay extends DialogOverlay {
+    constructor(conductor) {
+        super(conductor);
+        this.set_title("options");
+        this.add_button("well alright then", ev => {
+            this.close();
+        });
+
+        let tab_strip = mk('nav.tabstrip');
+        this.main.append(tab_strip);
+        this.tab_links = {};
+        this.tab_blocks = {};
+        for (let tabdef of OPTIONS_TABS) {
+            let link = mk('a', {href: 'javascript:', 'data-tab': tabdef.name}, tabdef.label);
+            tab_strip.append(link);
+            this.tab_links[tabdef.name] = link;
+            let block = mk('section');
+            this.main.append(block);
+            this.tab_blocks[tabdef.name] = block;
+        }
+
+        // Compat tab
+        this.tab_blocks['compat'].append(mk('p', "Changes to compatibility settings won't take effect until you restart the level."));
+        let ul = mk('ul');
+        this.tab_blocks['compat'].append(ul);
+        for (let optdef of COMPAT_OPTIONS) {
+            let li = mk('li');
+            let label = mk('label');
+            li.append(label);
+            label.append(mk('input', {type: 'checkbox', name: optdef.key}));
+            for (let impl of optdef.impls) {
+                label.append(mk(`span.compat-${impl}`, impl));
+            }
+            label.append(optdef.label);
+            li.append(mk('p', optdef.note));
+            ul.append(li);
+        }
+
+        this.main.append(mk('p', "Sorry!  This stuff doesn't actually work yet."));
+    }
+}
+
+// List of levels
+class LevelBrowserOverlay extends DialogOverlay {
+    constructor(conductor) {
+        super(conductor);
+        this.set_title("choose a level");
+        let table = mk('table.level-browser');
+        this.main.append(table);
+        for (let [i, stored_level] of conductor.stored_game.levels.entries()) {
+            table.append(mk('tr',
+                {'data-index': i},
+                mk('td', i + 1),
+                mk('td', stored_level.title),
+                // TODO score?
+                // TODO other stats??
+                mk('td', '▶'),
+            ));
+        }
+
+        table.addEventListener('click', ev => {
+            let tr = ev.target.closest('table.level-browser tr');
+            if (! tr)
+                return;
+
+            let index = parseInt(tr.getAttribute('data-index'), 10);
+            this.conductor.change_level(index);
+            this.close();
+        });
+
+        this.add_button("nevermind", ev => {
+            this.close();
+        });
+    }
+}
+
+// Central dispatcher of what we're doing and what we've got loaded
+class Conductor {
+    constructor(tileset) {
+        this.stored_game = null;
+        this.tileset = tileset;
+        // TODO options and whatnot should go here too
+
+        this.splash = new Splash(this);
+        this.editor = new Editor(this);
+        this.player = new Player(this);
+
+        // Bind the header buttons
+        document.querySelector('#main-about').addEventListener('click', ev => {
+            new AboutOverlay(this).open();
+        });
+        document.querySelector('#main-options').addEventListener('click', ev => {
+            new OptionsOverlay(this).open();
+        });
+
+        // Bind to the navigation headers, which list the current level pack
+        // and level
+        this.level_pack_name_el = document.querySelector('#level-pack-name');
+        this.level_name_el = document.querySelector('#level-name');
+        this.nav_prev_button = document.querySelector('#main-prev-level');
+        this.nav_next_button = document.querySelector('#main-next-level');
+        this.nav_choose_level_button = document.querySelector('#main-choose-level');
+        this.nav_prev_button.addEventListener('click', ev => {
+            // TODO confirm
+            if (this.stored_game && this.level_index > 0) {
+                this.change_level(this.level_index - 1);
+            }
+            ev.target.blur();
+        });
+        this.nav_next_button.addEventListener('click', ev => {
+            // TODO confirm
+            if (this.stored_game && this.level_index < this.stored_game.levels.length - 1) {
+                this.change_level(this.level_index + 1);
+            }
+            ev.target.blur();
+        });
+        this.nav_choose_level_button.addEventListener('click', ev => {
+            if (this.stored_game) {
+                new LevelBrowserOverlay(this).open();
+            }
+            ev.target.blur();
+        });
+        document.querySelector('#player-edit').addEventListener('click', ev => {
+            // TODO should be able to jump to editor if we started in the
+            // player too!  but should disable score tracking and have a revert
+            // button
+            this.switch_to_editor();
+        });
+
+        this.update_nav_buttons();
+        this.switch_to_splash();
+    }
+
+    switch_to_splash() {
+        if (this.current) {
+            this.current.deactivate();
+        }
+        this.splash.activate();
+        this.current = this.splash;
+        document.body.setAttribute('data-mode', 'splash');
+    }
+
+    switch_to_editor() {
+        if (this.current) {
+            this.current.deactivate();
+        }
+        this.editor.activate();
+        this.current = this.editor;
+        document.body.setAttribute('data-mode', 'editor');
+    }
+
+    switch_to_player() {
+        if (this.current) {
+            this.current.deactivate();
+        }
+        this.player.activate();
+        this.current = this.player;
+        document.body.setAttribute('data-mode', 'player');
+    }
+
+    load_game(stored_game) {
+        this.stored_game = stored_game;
+
+        this.player.load_game(stored_game);
+        this.editor.load_game(stored_game);
+
+        this.change_level(0);
+    }
+
+    change_level(level_index) {
+        this.level_index = level_index;
+        this.stored_level = this.stored_game.levels[level_index];
+
+        // FIXME do better
+        this.level_name_el.textContent = `Level ${level_index + 1} — ${this.stored_level.title}`;
+
+        document.title = `${PAGE_TITLE} - ${this.stored_level.title}`;
+        this.update_nav_buttons();
+
+        this.player.load_level(this.stored_level);
+        this.editor.load_level(this.stored_level);
+    }
+
+    update_nav_buttons() {
+        this.nav_choose_level_button.disabled = !this.stored_game;
+        this.nav_prev_button.disabled = !this.stored_game || this.level_index <= 0;
+        this.nav_next_button.disabled = !this.stored_game || this.level_index >= this.stored_game.levels.length;
+    }
+}
+
 
 async function main() {
     let query = new URLSearchParams(location.search);
@@ -1626,29 +1867,13 @@ async function main() {
     await tilesheet.decode();
     let tileset = new Tileset(tilesheet, tilelayout, tilesize, tilesize);
 
+    let conductor = new Conductor(tileset);
+
     // Pick a level (set)
     // TODO error handling  :(
-    let stored_game;
     let path = query.get('setpath');
     if (path && path.match(/^levels[/]/)) {
-        let data = await fetch(path);
-        if (path.match(/\.(?:dat|ccl)$/i)) {
-            stored_game = dat.parse_game(data);
-        }
-        else {
-            stored_game = new format_util.StoredGame;
-            stored_game.levels.push(c2m.parse_level(data));
-        }
-    }
-    else {
-        // TODO also support tile world's DAC when reading from local??
-        // TODO ah, there's more metadata in CCX, crapola
-        stored_game = dat.parse_game(await fetch('levels/CCLP1.ccl'));
-    }
-    let game = new Game(stored_game, tileset);
-
-    if (query.get('debug')) {
-        game.debug = true;
+        conductor.splash.fetch_pack(path);
     }
 }
 

@@ -7,5 +7,111 @@
     <script type="module" src="js/main.js"></script>
 </head>
 <body>
+    <header id="header-main">
+        <h1>Lexy's Labyrinth</h1>
+        <nav>
+            <button id="main-about" type="button">about</button>
+            <button id="main-help" type="button" disabled>help</button>
+            <button id="main-options" type="button">options</button>
+        </nav>
+    </header>
+    <header id="header-pack">
+        <h2 id="level-pack-name">Chip's Challenge Level Pack 1</h2>
+        <nav>
+            <button class="set-nav-return" type="button" disabled>Change pack</button>
+            <button id="player-edit" type="button">Return to editor</button>
+        </nav>
+    </header>
+    <header id="header-level">
+        <h3 id="level-name">Level 1 — Key Pyramid</h3>
+        <nav>
+            <button id="main-prev-level" type="button">⬅️&#xfe0e;</button>
+            <button id="main-choose-level" type="button">Level select</button>
+            <button id="main-next-level" type="button">➡️&#xfe0e;</button>
+        </nav>
+    </header>
+    <main id="splash">
+        <h2>Community levels</h2>
+        <ul id="level-pack-list">
+        </ul>
+
+        <!--
+        <h2>Commercial and other levels</h2>
+        <p>You can play the original levels, or any you've downloaded from the web!</p>
+        -->
+
+        <h2>Make your own</h2>
+        <p><button type="button" id="splash-create-level">Create a level</button></p>
+    </main>
+    <main id="player" hidden>
+        <div class="level"><!-- level canvas and any overlays go here --></div>
+        <div class="bummer"></div>
+        <div class="message"></div>
+        <div class="chips">
+            <h3>Chips</h3>
+            <output></output>
+        </div>
+        <div class="time">
+            <h3>Time</h3>
+            <output></output>
+        </div>
+        <div class="bonus">
+            <h3>Bonus</h3>
+            <output></output>
+        </div>
+        <div class="inventory"></div>
+        <div class="controls">
+            <div class="play-controls">
+                <button class="control-pause" type="button">Pause</button>
+                <button class="control-restart" type="button">Restart</button>
+                <button class="control-undo" type="button">Undo</button>
+                <button class="control-rewind" type="button">Rewind</button>
+            </div>
+            <div class="demo-controls">
+                <button class="demo-play" type="button">View replay</button>
+                <button class="demo-step-1" type="button">Step 1 tic</button>
+                <button class="demo-step-4" type="button">Step 1 move</button>
+                <div class="input"></div>
+            </div>
+        </div>
+    </main>
+    <main id="editor" hidden>
+        <header>
+            <!-- TODO
+            - close
+            - export
+            - delete??
+
+            - zoom
+
+            also deal with levels vs level /packs/ somehow, not sure how that'll work (including downloading them, yeargh?)
+            -->
+        </header>
+        <div class="level"><!-- level canvas and any overlays go here --></div>
+        <div class="controls">
+            <button id="editor-test" type="button">Test</button>
+        </div>
+        <div class="palette"></div>
+        <!-- TODO:
+        controls
+        - play!
+        - object palette
+        - choose direction
+        - choose layer to /modify/: terrain, item, creature, overlay
+        - stack (place item atop whatever terrain), or replace (placing a tile overwrites the whole cell)
+        [XXX mode that allows arbitrary stacking of objects?]
+        - level metadata
+        - change size
+
+        XXX how do i handle thin walls?  treat specially, allow drawing/erasing them along edges instead of tiles?  ehh then you can't control which tile they're in though...  but the game seems to prefer south+east so maybe that works...
+
+        hotkeys
+        - mod a tile on the board: rotate a creature, alter thin walls??
+        - "pick up" a tile
+
+        cool stuff
+        - set chip count by hand, set extra ones automatically
+        -->
+    </main>
 </body>
 </html>

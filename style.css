@@ -15,6 +15,9 @@ body {
 }
 
 /* Generic element styling */
+main[hidden] {
+    display: none !important;
+}
 input[type=radio],
 input[type=checkbox] {
     margin: 0.125em;
@@ -32,6 +35,11 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: normal;
     margin: 0;
 }
+ul, ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
 p {
     margin: 0.5em 0;
 }
@@ -40,22 +48,6 @@ p:first-child {
 }
 p:last-child {
     margin-bottom: 0;
-}
-
-/* Main page structure */
-body > header {
-    display: flex;
-    align-items: center;
-    padding: 0.5em;
-    background: #00080c;
-}
-body > header > h1 {
-    flex: 1;
-    font-size: 1.25rem;
-}
-body > header > nav {
-    display: flex;
-    gap: 0.5em;
 }
 
 /* Overlay styling */
@@ -139,20 +131,98 @@ table.level-browser tr:hover {
     border-radius: 0.25em;
 }
 
-/* Game area */
-main {
+
+/**************************************************************************************************/
+/* Main page structure */
+
+body > header {
+    display: flex;
+    align-items: center;
+    background: #00080c;
+}
+body > header h1,
+body > header h2,
+body > header h3 {
+    margin: 0.25rem 0.5rem;
+    line-height: 1.125;
+}
+body > header h1 {
+    font-size: 1.66rem;
+}
+body > header h2 {
+    font-size: 1.33rem;
+}
+body > header h3 {
+    font-size: 1.25rem;
+}
+body > header > nav {
+    flex: 1;
+    display: flex;
+    justify-content: end;
+    gap: 0.5em;
+    margin: 0.25rem 0.5rem;
+}
+body > header button {
+    font-size: 0.75em;
+}
+
+body[data-mode=splash] #header-pack,
+body[data-mode=splash] #header-level {
+    display: none;
+}
+
+#header-main {
+    border-bottom: 1px solid #404040;
+    box-shadow: 0 0 3px #0009;
+}
+
+/**************************************************************************************************/
+/* Splash (intro part) */
+
+#splash {
+    flex: 0;
+    margin: auto;
+    overflow: auto;
+}
+
+#level-pack-list {
+    margin: 1em 0;
+}
+#level-pack-list > li {
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    background: #ececec;
+    color: black;
+    border: 2px solid black;
+    border-radius: 0.5em;
+    box-shadow: inset 0 0 2px 2px #0006, 0 2px 0.25em #0006;
+    cursor: pointer;
+}
+#level-pack-list > li:hover {
+    background: hsl(45, 60%, 90%);
+    border-color: hsl(45, 80%, 50%);
+}
+#level-pack-list > li p {
+    font-size: 0.833em;
+    font-style: italic;
+    color: #606060;
+}
+
+/**************************************************************************************************/
+/* Player */
+
+#player {
     flex: 0;
     margin: auto;  /* center in both directions baby */
     isolation: isolate;
     display: grid;
     align-items: center;
     grid:
-        "header     header"
-        "level      chips"
-        "level      time"
-        "level      bonus"
-        "level      message"   1fr
-        "level      inventory"
+        "level      chips"      min-content
+        "level      time"       min-content
+        "level      bonus"      min-content
+        "level      message"    1fr
+        "level      inventory"  min-content
         "controls   controls"
         /* Need explicit min-content to force the hint to wrap */
         / min-content min-content
@@ -165,25 +235,6 @@ main {
     --tile-width: 32px;
     --tile-height: 32px;
     --scale: 1;
-}
-
-main > header {
-    grid-area: header;
-    display: grid;
-    grid-auto-columns: 1fr auto;
-    align-items: center;
-    gap: 0.25em;
-}
-main > header > h1,
-main > header > h2 {
-    grid-column: 1;
-    line-height: 1;
-}
-main > header > nav {
-    grid-column: 2;
-    justify-self: end;
-    display: flex;
-    gap: 0.25em;
 }
 
 .level {
@@ -261,6 +312,7 @@ dl.score-chart .-sum {
 .chips,
 .time,
 .bonus {
+    font-size: calc(0.5em * var(--scale));
     display: flex;
     align-items: center;
 }
@@ -268,13 +320,13 @@ dl.score-chart .-sum {
 .time h3,
 .bonus h3 {
     flex: 1;
-    font-size: 1.25rem;
+    font-size: 1.25em;
     line-height: 1;
 }
 .chips output,
 .time output,
 .bonus output {
-    flex: 0;
+    flex: 1;
     font-size: 2em;
     padding: 0.125em;
     min-width: 2em;
@@ -291,12 +343,16 @@ dl.score-chart .-sum {
     grid-area: message;
     align-self: stretch;
 
-    padding: 0.5em;
+    font-size: calc(0.75em * var(--scale));
+    padding: 0.25em 0.5em;
     font-family: serif;
     font-style: italic;
     color: hsl(45, 100%, 60%);
     background: #080808;
     border: 1px inset #202020;
+
+    /* FIXME find a way to enforce that the message never makes the grid get bigger */
+    overflow: auto;
 }
 .message:empty {
     display: none;
@@ -304,6 +360,7 @@ dl.score-chart .-sum {
 
 .inventory {
     grid-area: inventory;
+    justify-self: center;
     display: flex;
     flex-wrap: wrap;
     align-items: start;
@@ -364,4 +421,34 @@ main.--has-demo .demo-controls {
 .input-action.--pressed {
     color: white;
     background: hsl(225, 75%, 25%);
+}
+
+
+/**************************************************************************************************/
+/* Editor */
+
+#editor {
+    display: grid;
+    grid:
+        "level  palette"
+    ;
+
+    max-width: 95%;
+    max-height: 95%;
+    margin: auto;
+}
+
+#editor .level {
+    grid-area: level;
+    overflow: auto;
+}
+
+#editor .palette {
+    grid-area: palette;
+}
+.palette-entry {
+    margin: 0.25em;
+}
+.palette-entry.--selected {
+    outline: 2px solid gold;
 }

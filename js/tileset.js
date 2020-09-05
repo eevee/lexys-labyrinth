@@ -487,7 +487,7 @@ export class Tileset {
                 // TODO this is getting really ad-hoc and clumsy lol, maybe
                 // have tiles expose a single 'state' prop or something
                 if (coords.moving) {
-                    if (tile.animation_speed) {
+                    if (tile && tile.animation_speed) {
                         coords = coords.moving;
                     }
                     else {
@@ -499,7 +499,7 @@ export class Tileset {
         }
         if (coords[0] instanceof Array) {
             if (level) {
-                if (tile.animation_speed) {
+                if (tile && tile.animation_speed) {
                     coords = coords[Math.floor((tile.animation_progress + level.tic_offset) / tile.animation_speed * coords.length)];
                 }
                 else {
