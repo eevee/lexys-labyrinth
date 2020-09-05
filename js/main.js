@@ -1809,12 +1809,19 @@ class Conductor {
             }
             ev.target.blur();
         });
+        document.querySelector('#main-change-pack').addEventListener('click', ev => {
+            // TODO confirm
+            this.switch_to_splash();
+        });
+        /*
+         * FIXME restore, "return to editor" is bad text though
         document.querySelector('#player-edit').addEventListener('click', ev => {
             // TODO should be able to jump to editor if we started in the
             // player too!  but should disable score tracking and have a revert
             // button
             this.switch_to_editor();
         });
+        */
 
         this.update_nav_buttons();
         this.switch_to_splash();
