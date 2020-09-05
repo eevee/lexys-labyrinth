@@ -897,14 +897,17 @@ class PrimaryView {
     constructor(conductor, root) {
         this.conductor = conductor;
         this.root = root;
+        this.active = false;
     }
 
     activate() {
         this.root.removeAttribute('hidden');
+        this.active = true;
     }
 
     deactivate() {
         this.root.setAttribute('hidden', '');
+        this.active = false;
     }
 }
 
@@ -1496,6 +1499,11 @@ class Editor extends PrimaryView {
         this.select_palette('floor');
     }
 
+    activate() {
+        super.activate();
+        this.renderer.draw();
+    }
+
     load_game(stored_game) {
     }
 
@@ -1515,7 +1523,9 @@ class Editor extends PrimaryView {
         }
 
         this.renderer.set_level(stored_level);
-        this.renderer.draw();
+        if (this.active) {
+            this.renderer.draw();
+        }
     }
 
     select_palette(name) {
@@ -1613,12 +1623,11 @@ class Splash extends PrimaryView {
         // TODO ah, there's more metadata in CCX, crapola
         let magic = String.fromCharCode.apply(null, new Uint8Array(buf.slice(0, 4)));
         let stored_game;
-        console.log(magic);
         if (magic === 'CC2M' || magic === 'CCS ') {
             stored_game = new format_util.StoredGame;
             stored_game.levels.push(c2m.parse_level(buf));
         }
-        else if (magic === '\xac\x2a\x02\x00' || magic == '\xac\x2a\x02\x01') {
+        else if (magic === '\xac\xaa\x02\x00' || magic == '\xac\xaa\x02\x01') {
             stored_game = dat.parse_game(buf);
         }
         else {

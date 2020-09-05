@@ -503,7 +503,8 @@ export class Tileset {
                     coords = coords[Math.floor((tile.animation_progress + level.tic_offset) / tile.animation_speed * coords.length)];
                 }
                 else {
-                    coords = coords[Math.floor((level.tic_counter % 5 + level.tic_offset) / 5 * coords.length)];
+                    // FIXME tic_counter doesn't exist on stored levels...
+                    coords = coords[Math.floor(((level.tic_counter ?? 0) % 5 + level.tic_offset) / 5 * coords.length)];
                 }
             }
             else {
