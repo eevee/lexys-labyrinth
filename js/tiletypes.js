@@ -588,6 +588,7 @@ const TILE_TYPES = {
             'force_floor_s',
             'force_floor_e',
             'force_floor_w',
+            'force_floor_all',
         ]),
     },
     fire_boots: {
