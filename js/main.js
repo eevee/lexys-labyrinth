@@ -807,6 +807,8 @@ class Level {
 
     // Mark an actor as sliding
     make_slide(actor, mode) {
+        let current = actor.slide_mode;
+        this.pending_undo.push(() => actor.slide_mode = current);
         actor.slide_mode = mode;
     }
 
@@ -1004,8 +1006,16 @@ class Player extends PrimaryView {
         this.undo_button = this.root.querySelector('.controls .control-undo');
         this.undo_button.addEventListener('click', ev => {
             let player_cell = this.level.player.cell;
-            while (player_cell === this.level.player.cell && this.level.undo_stack.length > 0) {
+            // Keep undoing until (a) we're on another cell and (b) we're not
+            // sliding, i.e. we're about to make a conscious move
+            let moved = false;
+            while (this.level.undo_stack.length > 0 &&
+                ! (moved && this.level.player.slide_mode === null))
+            {
                 this.level.undo();
+                if (player_cell !== this.level.player.cell) {
+                    moved = true;
+                }
             }
             // TODO set back to waiting if we hit the start of the level?  but
             // the stack trims itself so how do we know that
