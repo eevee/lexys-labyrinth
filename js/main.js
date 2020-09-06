@@ -509,6 +509,9 @@ class Level {
     // Try to move the given actor one tile in the given direction and update
     // their cooldown.  Return true if successful.
     attempt_step(actor, direction, speed = null) {
+        if (actor.stuck)
+            return false;
+
         // If speed is given, we're being pushed by something so we're using
         // its speed.  Otherwise, use our movement speed.  If we're moving onto
         // a sliding tile, we'll halve it later
@@ -554,7 +557,7 @@ class Level {
                     if (! tile.blocks(actor, direction))
                         continue;
 
-                    if (actor.type.pushes && actor.type.pushes[tile.type.name]) {
+                    if (actor.type.pushes && actor.type.pushes[tile.type.name] && ! tile.stuck) {
                         this.set_actor_direction(tile, direction);
                         if (this.attempt_step(tile, direction, speed))
                             // It moved out of the way!
