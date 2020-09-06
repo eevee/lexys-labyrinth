@@ -291,16 +291,12 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     dirt: [0, 11],
     ice: [0, 12],
     force_floor_s: [0, 13],
-    // These are "moving blocks", the ones used by cloners
-    // TODO uhh which should i use here.
-    /*
-    dirt_block: {
+    clone_block: {
         north: [0, 14],
         west: [0, 15],
         south: [1, 0],
         east: [1, 1],
     },
-    */
 
     force_floor_n: [1, 2],
     force_floor_e: [1, 3],
@@ -446,7 +442,7 @@ export class Tileset {
     draw_type(name, tile, level, ctx, x, y) {
         let drawspec = this.layout[name];
         if (! drawspec) {
-            console.error(`Don't know how to draw tile type ${type.name}!`);
+            console.error(`Don't know how to draw tile type ${name}!`);
             return;
         }
 
