@@ -324,6 +324,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire']),
+        movement_speed: 4,
     },
     clone_block: {
         draw_layer: LAYER_ACTOR,
@@ -333,6 +334,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire']),
+        movement_speed: 4,
     },
     green_floor: {
         draw_layer: LAYER_TERRAIN,
