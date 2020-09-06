@@ -365,7 +365,7 @@ class Level {
                     player_direction &&
                     actor.last_move_was_force)
                 {
-                    direction_preference = [player_direction];
+                    direction_preference = [player_direction, actor.direction];
                     this._set_prop(actor, 'last_move_was_force', false);
                 }
                 else {
