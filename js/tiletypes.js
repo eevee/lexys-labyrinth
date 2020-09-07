@@ -104,7 +104,7 @@ const TILE_TYPES = {
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_red')) {
-                me.type = TILE_TYPES.floor;
+                level.transmute_tile(me, 'floor');
             }
         },
     },
@@ -113,7 +113,7 @@ const TILE_TYPES = {
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_blue')) {
-                me.type = TILE_TYPES.floor;
+                level.transmute_tile(me, 'floor');
             }
         },
     },
@@ -122,7 +122,7 @@ const TILE_TYPES = {
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_yellow')) {
-                me.type = TILE_TYPES.floor;
+                level.transmute_tile(me, 'floor');
             }
         },
     },
@@ -131,7 +131,7 @@ const TILE_TYPES = {
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_green')) {
-                me.type = TILE_TYPES.floor;
+                level.transmute_tile(me, 'floor');
             }
         },
     },
@@ -195,10 +195,10 @@ const TILE_TYPES = {
         slide_mode: 'ice',
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
-                other.direction = 'east';
+                level.set_actor_direction(other, 'east');
             }
             else {
-                other.direction = 'north';
+                level.set_actor_direction(other, 'north');
             }
         },
     },
@@ -208,10 +208,10 @@ const TILE_TYPES = {
         slide_mode: 'ice',
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
-                other.direction = 'east';
+                level.set_actor_direction(other, 'east');
             }
             else {
-                other.direction = 'south';
+                level.set_actor_direction(other, 'south');
             }
         },
     },
@@ -221,10 +221,10 @@ const TILE_TYPES = {
         slide_mode: 'ice',
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
-                other.direction = 'west';
+                level.set_actor_direction(other, 'west');
             }
             else {
-                other.direction = 'south';
+                level.set_actor_direction(other, 'south');
             }
         },
     },
@@ -234,10 +234,10 @@ const TILE_TYPES = {
         slide_mode: 'ice',
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
-                other.direction = 'west';
+                level.set_actor_direction(other, 'west');
             }
             else {
-                other.direction = 'north';
+                level.set_actor_direction(other, 'north');
             }
         },
     },
@@ -245,28 +245,28 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         on_arrive(me, level, other) {
-            other.direction = 'north';
+            level.set_actor_direction(other, 'north');
         },
     },
     force_floor_e: {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         on_arrive(me, level, other) {
-            other.direction = 'east';
+            level.set_actor_direction(other, 'east');
         },
     },
     force_floor_s: {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         on_arrive(me, level, other) {
-            other.direction = 'south';
+            level.set_actor_direction(other, 'south');
         },
     },
     force_floor_w: {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         on_arrive(me, level, other) {
-            other.direction = 'west';
+            level.set_actor_direction(other, 'west');
         },
     },
     force_floor_all: {
@@ -274,7 +274,7 @@ const TILE_TYPES = {
         slide_mode: 'force',
         // TODO ms: this is random, and an acting wall to monsters (!)
         on_arrive(me, level, other) {
-            other.direction = level.get_force_floor_direction();
+            level.set_actor_direction(other, level.get_force_floor_direction());
         },
     },
     bomb: {
@@ -430,7 +430,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (me.connection && me.connection.cell) {
                 let trap = me.connection;
-                trap.open = true;
+                level._set_prop(trap, 'open', true);
                 for (let tile of trap.cell) {
                     if (tile.type.is_actor) {
                         if (tile.stuck) {
@@ -446,7 +446,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             if (me.connection && me.connection.cell) {
                 let trap = me.connection;
-                trap.open = false;
+                level._set_prop(trap, 'open', false);
                 for (let tile of trap.cell) {
                     if (tile.is_actor) {
                         level.set_actor_stuck(tile, true);
@@ -698,7 +698,7 @@ const TILE_TYPES = {
         blocks: true,
         on_bump(me, level, other) {
             if (other.type.is_player && level.chips_remaining === 0) {
-                me.type = TILE_TYPES.floor;
+                level.transmute_tile(me, 'floor');
             }
         },
     },
