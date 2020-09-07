@@ -432,8 +432,13 @@ const TILE_TYPES = {
                 let trap = me.connection;
                 trap.open = true;
                 for (let tile of trap.cell) {
-                    if (tile.stuck) {
-                        level.set_actor_stuck(tile, false);
+                    if (tile.type.is_actor) {
+                        if (tile.stuck) {
+                            level.set_actor_stuck(tile, false);
+                        }
+                        // Forcibly move anything released from a trap, to keep
+                        // it in sync with whatever pushed the button
+                        level.attempt_step(tile, tile.direction);
                     }
                 }
             }
