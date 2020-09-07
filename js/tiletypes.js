@@ -448,7 +448,7 @@ const TILE_TYPES = {
                 let trap = me.connection;
                 level._set_prop(trap, 'open', false);
                 for (let tile of trap.cell) {
-                    if (tile.is_actor) {
+                    if (tile.type.is_actor) {
                         level.set_actor_stuck(tile, true);
                     }
                 }
