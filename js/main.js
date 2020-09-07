@@ -197,7 +197,7 @@ class Level {
 
                 let stored_cell = this.stored_level.linear_cells[n];
                 n++;
-                let has_cloner, has_forbidden;
+                let has_cloner, has_trap, has_forbidden;
 
                 for (let template_tile of stored_cell) {
                     let tile = Tile.from_template(template_tile);
@@ -206,8 +206,13 @@ class Level {
                         tile.specific_hint = template_tile.specific_hint ?? null;
                     }
 
+                    // TODO well this is pretty special-casey.  maybe come up
+                    // with a specific pass at the beginning of the level
                     if (tile.type.name === 'cloner') {
                         has_cloner = true;
+                    }
+                    if (tile.type.name === 'trap') {
+                        has_trap = true;
                     }
 
                     if (tile.type.is_player) {
@@ -224,6 +229,9 @@ class Level {
                             tile.stuck = true;
                         }
                         else {
+                            if (has_trap) {
+                                tile.stuck = true;
+                            }
                             this.actors.push(tile);
                         }
                     }
