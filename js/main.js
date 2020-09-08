@@ -52,7 +52,7 @@ class Tile {
     }
 
     blocks(other, direction) {
-        if (this.type.blocks)
+        if (this.type.blocks_all)
             return true;
 
         if (this.type.thin_walls &&
@@ -568,6 +568,8 @@ class Level {
                         speed /= 2;
                     }
 
+                    if (actor.ignores(tile.type.name))
+                        continue;
                     if (! tile.blocks(actor, direction))
                         continue;
 

@@ -32,32 +32,32 @@ const TILE_TYPES = {
     },
     wall: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
     },
     wall_custom_green: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
     },
     wall_custom_pink: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
     },
     wall_custom_yellow: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
     },
     wall_custom_blue: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
     },
     wall_invisible: {
         draw_layer: LAYER_TERRAIN,
         // TODO cc2 seems to make these flicker briefly
-        blocks: true,
+        blocks_all: true,
     },
     wall_appearing: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         on_bump(me, level, other) {
             level.transmute_tile(me, 'wall');
         },
@@ -93,14 +93,14 @@ const TILE_TYPES = {
     },
     fake_wall: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         on_bump(me, level, other) {
             level.transmute_tile(me, 'wall');
         },
     },
     fake_floor: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         on_bump(me, level, other) {
             level.transmute_tile(me, 'floor');
         },
@@ -169,7 +169,7 @@ const TILE_TYPES = {
     // Locked doors
     door_red: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_red')) {
                 level.transmute_tile(me, 'floor');
@@ -178,7 +178,7 @@ const TILE_TYPES = {
     },
     door_blue: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_blue')) {
                 level.transmute_tile(me, 'floor');
@@ -187,7 +187,7 @@ const TILE_TYPES = {
     },
     door_yellow: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_yellow')) {
                 level.transmute_tile(me, 'floor');
@@ -196,7 +196,7 @@ const TILE_TYPES = {
     },
     door_green: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         on_bump(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_green')) {
                 level.transmute_tile(me, 'floor');
@@ -222,6 +222,7 @@ const TILE_TYPES = {
     // Hazards
     fire: {
         draw_layer: LAYER_TERRAIN,
+        blocks_monsters: true,
         on_arrive(me, level, other) {
             if (other.type.name === 'ice_block') {
                 level.remove_tile(other);
@@ -398,7 +399,7 @@ const TILE_TYPES = {
     // Mechanisms
     dirt_block: {
         draw_layer: LAYER_ACTOR,
-        blocks: true,
+        blocks_all: true,
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire']),
@@ -407,7 +408,7 @@ const TILE_TYPES = {
     clone_block: {
         draw_layer: LAYER_ACTOR,
         // TODO is this in any way distinct from dirt block
-        blocks: true,
+        blocks_all: true,
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire']),
@@ -415,7 +416,7 @@ const TILE_TYPES = {
     },
     ice_block: {
         draw_layer: LAYER_ACTOR,
-        blocks: true,
+        blocks_all: true,
         is_actor: true,
         is_block: true,
         movement_speed: 4,
@@ -428,7 +429,7 @@ const TILE_TYPES = {
     },
     green_wall: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
     },
     green_chip: {
         draw_layer: LAYER_ITEM,
@@ -456,7 +457,7 @@ const TILE_TYPES = {
     },
     cloner: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         activate(me, level) {
             let cell = me.cell;
             // Copy, so we don't end up repeatedly cloning the same object
@@ -783,7 +784,7 @@ const TILE_TYPES = {
     },
     socket: {
         draw_layer: LAYER_TERRAIN,
-        blocks: true,
+        blocks_all: true,
         on_bump(me, level, other) {
             if (other.type.is_player && level.chips_remaining === 0) {
                 level.transmute_tile(me, 'floor');

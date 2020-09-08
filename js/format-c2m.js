@@ -145,9 +145,6 @@ const TILE_ENCODING = {
     // 0x50: Steel wall : 
     // 0x51: Time bomb : '#next'
     // 0x52: Helmet : '#next'
-    // 0x53: (Unused) : '#direction', '#next'
-    // 0x54: (Unused) : 
-    // 0x55: (Unused) : 
     // 0x56: Melinda : '#direction', '#next'
     // 0x57: Timid teeth : '#direction', '#next'
     // 0x58: Explosion animation (unused in main levels) : '#direction', '#next'
@@ -155,7 +152,6 @@ const TILE_ENCODING = {
     // 0x5a: Male-only sign : 
     // 0x5b: Female-only sign : 
     // 0x5c: Inverter gate (N) : Modifier allows other gates, see below
-    // 0x5d: (Unused) : '#direction', '#next'
     // 0x5e: Logic switch (ON) : 
     // 0x5f: Flame jet (OFF) : 
     // 0x60: Flame jet (ON) : 
@@ -165,25 +161,19 @@ const TILE_ENCODING = {
     // 0x64: Yellow tank button : 
     // 0x65: Mirror Chip : '#direction', '#next'
     // 0x66: Mirror Melinda : '#direction', '#next'
-    // 0x67: (Unused) : 
     // 0x68: Bowling ball : '#next'
     // 0x69: Rover : '#direction', '#next'
     // 0x6a: Time penalty : '#next'
     0x6b: ['#mod8?', ['floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue']],
-    // 0x6c: (Unused) : 
     0x6d: ['#thinwall/canopy', '#next'],
-    // 0x6e: (Unused) : 
     // 0x6f: Railroad sign : '#next'
     0x70: ['#mod8?', ['wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue']],
     0x71: ['#mod8', 'floor_letter'],
     // 0x72: Purple toggle wall : 
     // 0x73: Purple toggle floor : 
-    // 0x74: (Unused) : 
-    // 0x75: (Unused) : 
     0x76: ['#mod8', '#next'],
     // 0x77: 16-bit Modifier (see Modifier section below) : 2 modifier bytes, Tile Specification for affected tile
     // 0x78: 32-bit Modifier (see Modifier section below) : 4 modifier bytes, Tile Specification for affected tile
-    // 0x79: (Unused) : '#direction', '#next'
     0x7a: ['score_10', '#next'],
     0x7b: ['score_100', '#next'],
     0x7c: ['score_1000', '#next'],
@@ -195,8 +185,6 @@ const TILE_ENCODING = {
     // 0x82: Floor mimic : '#direction', '#next'
     0x83: ['green_bomb', '#next'],
     0x84: ['green_chip', '#next'],
-    // 0x85: (Unused) : '#next'
-    // 0x86: (Unused) : '#next'
     // 0x87: Black button : 
     // 0x88: ON/OFF switch (OFF) : 
     // 0x89: ON/OFF switch (ON) : 
@@ -207,7 +195,6 @@ const TILE_ENCODING = {
     // 0x8e: Secret eye : '#next'
     // 0x8f: Thief bribe : '#next'
     // 0x90: Speed boots : '#next'
-    // 0x91: (Unused) : 
     // 0x92: Hook : '#next' 
 };
 
