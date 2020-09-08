@@ -20,9 +20,6 @@ export class StoredLevel {
         this.size_y = 0;
         this.linear_cells = [];
 
-        this.player_start_x = 0;
-        this.player_start_y = 0;
-
         // Maps of button positions to trap/cloner positions, as scalar indexes
         // in the linear cell list
         this.custom_trap_wiring = {};

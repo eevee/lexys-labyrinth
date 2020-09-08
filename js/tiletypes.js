@@ -5,6 +5,7 @@ const LAYER_TERRAIN = 0;
 const LAYER_ITEM = 1;
 const LAYER_ACTOR = 2;
 const LAYER_OVERLAY = 3;
+// TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
 const TILE_TYPES = {
     // Floors and walls
@@ -75,6 +76,9 @@ const TILE_TYPES = {
         on_bump(me, level, other) {
             level.transmute_tile(me, 'floor');
         },
+    },
+    canopy: {
+        draw_layer: LAYER_OVERLAY,
     },
 
     // Swivel doors

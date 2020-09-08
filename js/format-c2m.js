@@ -171,7 +171,7 @@ const TILE_ENCODING = {
     // 0x6a: Time penalty : '#next'
     // 0x6b: Custom floor (green) : Modifier allows other styles, see below
     // 0x6c: (Unused) : 
-    // 0x6d: Thin wall / Canopy : Panel/Canopy bitmask (see below), '#next'
+    0x6d: ['#thinwall/canopy', '#next'],
     // 0x6e: (Unused) : 
     // 0x6f: Railroad sign : '#next'
     // 0x70: Custom wall (green) : Modifier allows other styles, see below
@@ -401,6 +401,7 @@ export function parse_level(buf) {
                     let [name, ...args] = read_spec();
                     if (name === undefined) continue;  // XXX modifier skip hack
 
+                    // Deal with modifiers
                     let modifier;
                     if (name === '#mod8') {
                         if (args[0] !== '#next')
@@ -414,17 +415,42 @@ export function parse_level(buf) {
                             throw new Error(`Expected a tile requiring a modifier`);
                     }
 
+                    // Make a tile template, possibly dealing with some special cases
+                    if (name === '#thinwall/canopy') {
+                        // Thin walls and the canopy are combined into a single
+                        // byte for some reason; split them apart here.  Which
+                        // ones we get is determined by a bitmask
+                        let mask = bytes[p];
+                        p++;
+                        // This order is important; this is the order CC2 draws them in
+                        if (mask & 0x10) {
+                            cell.push({name: 'canopy'});
+                        }
+                        if (mask & 0x08) {
+                            cell.push({name: 'thinwall_w'});
+                        }
+                        if (mask & 0x04) {
+                            cell.push({name: 'thinwall_s'});
+                        }
+                        if (mask & 0x02) {
+                            cell.push({name: 'thinwall_e'});
+                        }
+                        if (mask & 0x01) {
+                            cell.push({name: 'thinwall_n'});
+                        }
+                        // Skip the rest of the loop.  That means we don't
+                        // handle any of the other special behavior below, but
+                        // neither thin walls nor canopies should use any of
+                        // it, so that's fine
+                        continue;
+                    }
+
                     let tile = {name, modifier};
                     cell.push(tile);
                     let type = TILE_TYPES[name];
                     if (!type) console.error(name);
                     if (type.is_required_chip) {
                         level.chips_required++;
-                    }
-                    if (type.is_player) {
-                        // TODO handle multiple starts
-                        level.player_start_x = n % width;
-                        level.player_start_y = Math.floor(n / width);
                     }
                     if (type.is_hint) {
                         // Remember all the hint tiles (in reading order) so we
