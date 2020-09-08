@@ -118,6 +118,10 @@ table.level-browser tr:hover {
 }
 
 /* Bits and pieces */
+img.compat-icon {
+    margin: 0 0.25em 0.125em;
+    vertical-align: middle;
+}
 .compat-lynx,
 .compat-ms {
     font-size: 0.75em;
@@ -168,6 +172,10 @@ body > header button {
 
 body[data-mode=splash] #header-pack,
 body[data-mode=splash] #header-level {
+    display: none;
+}
+body[data-mode=editor] #player-edit,
+body[data-mode=player] #editor-play {
     display: none;
 }
 

@@ -188,6 +188,8 @@ class Level {
 
         let n = 0;
         let connectables = [];
+        // FIXME handle traps correctly:
+        // - if an actor is in the cell, set the trap to open and unstick everything in it
         for (let y = 0; y < this.height; y++) {
             let row = [];
             this.cells.push(row);
@@ -207,7 +209,8 @@ class Level {
                     }
 
                     // TODO well this is pretty special-casey.  maybe come up
-                    // with a specific pass at the beginning of the level
+                    // with a specific pass at the beginning of the level?
+                    // TODO also assumes a specific order...
                     if (tile.type.name === 'cloner') {
                         has_cloner = true;
                     }
@@ -230,6 +233,7 @@ class Level {
                         }
                         else {
                             if (has_trap) {
+                                // FIXME wait, not if the trap is open!  crap
                                 tile.stuck = true;
                             }
                             this.actors.push(tile);
@@ -316,6 +320,7 @@ class Level {
         }
 
         // XXX this entire turn order is rather different in ms rules
+        // FIXME OK, do a pass to make everyone decide their movement, and then actually do it.  the question iiis, where does that fit in with animation
         for (let actor of this.actors) {
             // Actors with no cell were destroyed
             if (! actor.cell)
@@ -1340,6 +1345,7 @@ class Player extends PrimaryView {
         this.message_el.textContent = this.level.hint_shown ?? "";
 
         this.inventory_el.textContent = '';
+        // FIXME why does this stuff run when opening the /editor/
         for (let [name, count] of Object.entries(this.level.player.inventory)) {
             if (count > 0) {
                 this.inventory_el.append(mk('img', {src: this.render_inventory_tile(name)}));
@@ -1491,11 +1497,6 @@ class Editor extends PrimaryView {
             this.mouse_mode = null;
         });
 
-        // Misc controls
-        this.root.querySelector('#editor-test').addEventListener('click', ev => {
-            this.conductor.switch_to_player();
-        });
-
         // Tile palette
         let palette_el = this.root.querySelector('.palette');
         this.palette = {};  // name => element
@@ -1510,6 +1511,13 @@ class Editor extends PrimaryView {
             'chip', // 'chip_extra', -- XXX doesn't exist in TW tileset!
             'key_blue', 'key_red', 'key_yellow', 'key_green',
             // Creatures
+            'ball', 'player',
+            'dirt_block',
+            'clone_block',
+            'cloner',
+            'bomb',
+            'button_red',
+            'tank_blue',
         ])
         {
             let entry = mk('canvas.palette-entry', {
@@ -1580,8 +1588,25 @@ class Editor extends PrimaryView {
         if (! name)
             return;
 
+        let type = TILE_TYPES[name];
         let cell = this.stored_level.cells[y][x];
-        cell.push({name});
+        // For terrain tiles, erase the whole cell.  For other tiles, only
+        // replace whatever's on the same layer
+        // TODO probably not the best heuristic yet, since i imagine you can
+        // combine e.g. the tent with thin walls
+        if (type.draw_layer === 0) {
+            cell.length = 0;
+            cell.push({name});
+        }
+        else {
+            for (let i = cell.length - 1; i >= 0; i--) {
+                if (TILE_TYPES[cell[i].name].draw_layer === type.draw_layer) {
+                    cell.splice(i, 1);
+                }
+            }
+            cell.push({name});
+            cell.sort((a, b) => TILE_TYPES[b.name].draw_layer - TILE_TYPES[a.name].draw_layer);
+        }
     }
 }
 
@@ -1711,15 +1736,26 @@ class AboutOverlay extends DialogOverlay {
 // - rff truly random
 // - all manner of fucking bugs
 // TODO distinguish between deliberately gameplay changes and bugs, though that's kind of an arbitrary line
+const AESTHETIC_OPTIONS = [{
+    
+}];
 const COMPAT_OPTIONS = [{
     key: 'tiles_react_instantly',
     label: "Tiles react instantly",
     impls: ['lynx', 'ms'],
     note: "In classic CC, actors moved instantly from one tile to another, so tiles would react (e.g., buttons would become pressed) instantly as well.  CC2 made actors slide smoothly between tiles, and it made more sense visually for the reactions to only happen once the sliding animation had finished.  That's technically a gameplay change, since it delays a lot of tile behavior for 4 tics (the time it takes most actors to move), so here's a compat option.  Works best in conjunction with disabling smooth scrolling; otherwise you'll see strange behavior like completing a level before actually stepping onto the exit.",
 }];
+const COMPAT_IMPLS = {
+    lynx: "Lynx, the original version",
+    ms: "Microsoft's Windows port",
+    cc2bug: "Bug present in CC2",
+};
 const OPTIONS_TABS = [{
+    name: 'aesthetic',
+    label: "Aesthetics",
+}, {
     name: 'compat',
-    label: "Compat",
+    label: "Compatibility",
 }];
 class OptionsOverlay extends DialogOverlay {
     constructor(conductor) {
@@ -1743,7 +1779,10 @@ class OptionsOverlay extends DialogOverlay {
         }
 
         // Compat tab
-        this.tab_blocks['compat'].append(mk('p', "Changes to compatibility settings won't take effect until you restart the level."));
+        this.tab_blocks['compat'].append(
+            mk('p', "If you don't know what any of these are for, you can pretty safely ignore them."),
+            mk('p', "Changes won't take effect until you restart the level."),
+        );
         let ul = mk('ul');
         this.tab_blocks['compat'].append(ul);
         for (let optdef of COMPAT_OPTIONS) {
@@ -1752,7 +1791,7 @@ class OptionsOverlay extends DialogOverlay {
             li.append(label);
             label.append(mk('input', {type: 'checkbox', name: optdef.key}));
             for (let impl of optdef.impls) {
-                label.append(mk(`span.compat-${impl}`, impl));
+                label.append(mk(`img.compat-icon`, {src: `compat-${impl}.png`}));
             }
             label.append(optdef.label);
             li.append(mk('p', optdef.note));
@@ -1847,15 +1886,17 @@ class Conductor {
             // TODO confirm
             this.switch_to_splash();
         });
-        /*
-         * FIXME restore, "return to editor" is bad text though
         document.querySelector('#player-edit').addEventListener('click', ev => {
             // TODO should be able to jump to editor if we started in the
-            // player too!  but should disable score tracking and have a revert
-            // button
+            // player too!  but should disable score tracking, have a revert
+            // button, not be able to save over it, have a warning about
+            // cheating...
             this.switch_to_editor();
         });
-        */
+        document.querySelector('#editor-play').addEventListener('click', ev => {
+            // FIXME also restart!  but also the player shouldn't start before switching to it anyway
+            this.switch_to_player();
+        });
 
         this.update_nav_buttons();
         this.switch_to_splash();
@@ -1952,6 +1993,7 @@ async function main() {
     let tileset = new Tileset(tilesheet, tilelayout, tilesize, tilesize);
 
     let conductor = new Conductor(tileset);
+    window._conductor = conductor;
 
     // Pick a level (set)
     // TODO error handling  :(
