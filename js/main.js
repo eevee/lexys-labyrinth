@@ -544,7 +544,8 @@ class Level {
         if (goal_x >= 0 && goal_x < this.width && goal_y >= 0 && goal_y < this.height) {
             // Check for a thin wall in our current cell first
             for (let tile of original_cell) {
-                if (tile !== actor && tile.type.thin_walls &&
+                if (tile !== actor &&
+                    ! tile.type.is_swivel && tile.type.thin_walls &&
                     tile.type.thin_walls.has(direction))
                 {
                     blocked = true;

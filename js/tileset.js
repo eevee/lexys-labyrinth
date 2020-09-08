@@ -189,7 +189,11 @@ export const CC2_TILESET_LAYOUT = {
         west: [[9, 12], [10, 12], [11, 12]],
     },
     foil: [12, 12],
-    turtle: [13, 12],  // TODO also 14 + 15 for sinking
+    turtle: {
+        // Turtles draw atop fake water, but don't act like water otherwise
+        overlay: [13, 12],  // TODO also 14 + 15 for sinking
+        base: 'water',
+    },
 
     walker: [0, 13],
     // TODO walker animations span multiple tiles, rgh

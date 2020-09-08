@@ -88,18 +88,54 @@ const TILE_TYPES = {
     swivel_ne: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north', 'east']),
+        is_swivel: true,
+        on_depart(me, level, other) {
+            if (other.direction === 'north') {
+                level.transmute_tile(me, 'swivel_se');
+            }
+            else if (other.direction === 'east') {
+                level.transmute_tile(me, 'swivel_nw');
+            }
+        },
     },
     swivel_se: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'east']),
+        is_swivel: true,
+        on_depart(me, level, other) {
+            if (other.direction === 'south') {
+                level.transmute_tile(me, 'swivel_ne');
+            }
+            else if (other.direction === 'east') {
+                level.transmute_tile(me, 'swivel_sw');
+            }
+        },
     },
     swivel_sw: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'west']),
+        is_swivel: true,
+        on_depart(me, level, other) {
+            if (other.direction === 'south') {
+                level.transmute_tile(me, 'swivel_nw');
+            }
+            else if (other.direction === 'west') {
+                level.transmute_tile(me, 'swivel_se');
+            }
+        },
     },
     swivel_nw: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north', 'west']),
+        is_swivel: true,
+        on_depart(me, level, other) {
+            if (other.direction === 'north') {
+                level.transmute_tile(me, 'swivel_ne');
+            }
+            else if (other.direction === 'west') {
+                level.transmute_tile(me, 'swivel_ne');
+            }
+        },
     },
 
     // Locked doors
@@ -186,8 +222,11 @@ const TILE_TYPES = {
         },
     },
     turtle: {
-        // XXX well not really because it goes on top of water??
         draw_layer: LAYER_TERRAIN,
+        on_depart(me, level, other) {
+            // TODO become a splash (good test: push a block on a turtle, then push again; you don't fall in water because the splash blocks you!)
+            level.transmute_tile(me, 'water');
+        },
     },
     ice: {
         draw_layer: LAYER_TERRAIN,

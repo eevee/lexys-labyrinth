@@ -203,7 +203,7 @@ const TILE_ENCODING = {
     0x8a: 'thief_keys',
     // 0x8b: Ghost : '#direction', '#next'
     // 0x8c: Steel foil : '#next'
-    0x8d: ['turtle', 'water'],
+    0x8d: 'turtle',
     // 0x8e: Secret eye : '#next'
     // 0x8f: Thief bribe : '#next'
     // 0x90: Speed boots : '#next'
