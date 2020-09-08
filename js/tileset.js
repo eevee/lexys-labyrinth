@@ -53,14 +53,15 @@ export const CC2_TILESET_LAYOUT = {
         [8, 2],
         [9, 2],
     ],
-    // ice block, xray
-    score_10: [14, 2],
-    score_100: [13, 2],
+    ice_block: [10, 2],
+    // TODO ice block xray
     score_1000: [12, 2],
+    score_100: [13, 2],
+    score_10: [14, 2],
     score_2x: [15, 2],
 
     // LCD digit font
-    green_chip: [10, 3],
+    green_chip: [9, 3],
     chip_extra: [10, 3],
     chip: [11, 3],
     // bribe
@@ -71,8 +72,14 @@ export const CC2_TILESET_LAYOUT = {
     bomb: [5, 4],
     green_bomb: [6, 4],
     // ??? tiny fireworks
-    // custom floors
-    // custom walls
+    floor_custom_green: [8, 4],
+    floor_custom_pink: [9, 4],
+    floor_custom_yellow: [10, 4],
+    floor_custom_blue: [11, 4],
+    wall_custom_green: [12, 4],
+    wall_custom_pink: [13, 4],
+    wall_custom_yellow: [14, 4],
+    wall_custom_blue: [15, 4],
 
     // explosion
     // splash

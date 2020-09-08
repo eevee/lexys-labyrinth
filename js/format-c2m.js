@@ -169,12 +169,12 @@ const TILE_ENCODING = {
     // 0x68: Bowling ball : '#next'
     // 0x69: Rover : '#direction', '#next'
     // 0x6a: Time penalty : '#next'
-    // 0x6b: Custom floor (green) : Modifier allows other styles, see below
+    0x6b: ['#mod8?', ['floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue']],
     // 0x6c: (Unused) : 
     0x6d: ['#thinwall/canopy', '#next'],
     // 0x6e: (Unused) : 
     // 0x6f: Railroad sign : '#next'
-    // 0x70: Custom wall (green) : Modifier allows other styles, see below
+    0x70: ['#mod8?', ['wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue']],
     0x71: ['#mod8', 'floor_letter'],
     // 0x72: Purple toggle wall : 
     // 0x73: Purple toggle floor : 
@@ -193,8 +193,8 @@ const TILE_ENCODING = {
     0x80: ['score_2x', '#next'],
     // 0x81: Directional block : '#direction', Directional Arrows Bitmask, '#next'
     // 0x82: Floor mimic : '#direction', '#next'
-    // 0x83: Green bomb : '#next'
-    // 0x84: Green chip : '#next'
+    0x83: ['green_bomb', '#next'],
+    0x84: ['green_chip', '#next'],
     // 0x85: (Unused) : '#next'
     // 0x86: (Unused) : '#next'
     // 0x87: Black button : 
@@ -411,8 +411,13 @@ export function parse_level(buf) {
                         p++;
                         let mod_marker;
                         [mod_marker, name, ...args] = read_spec();
-                        if (mod_marker !== '#mod8')
+                        if (mod_marker !== '#mod8' && mod_marker !== '#mod8?')
                             throw new Error(`Expected a tile requiring a modifier`);
+                    }
+                    else if (name === '#mod8?') {
+                        // This is optional, so if we didn't get one, the modifier is 0
+                        modifier = 0;
+                        [name, ...args] = args;
                     }
 
                     // Make a tile template, possibly dealing with some special cases
@@ -443,6 +448,11 @@ export function parse_level(buf) {
                         // neither thin walls nor canopies should use any of
                         // it, so that's fine
                         continue;
+                    }
+                    else if (name instanceof Array) {
+                        // Custom floors and walls are one of several options,
+                        // given by an optional modifier
+                        name = name[modifier];
                     }
 
                     let tile = {name, modifier};

@@ -18,7 +18,35 @@ const TILE_TYPES = {
             me.ascii_code = template.modifier;
         },
     },
+    floor_custom_green: {
+        draw_layer: LAYER_TERRAIN,
+    },
+    floor_custom_pink: {
+        draw_layer: LAYER_TERRAIN,
+    },
+    floor_custom_yellow: {
+        draw_layer: LAYER_TERRAIN,
+    },
+    floor_custom_blue: {
+        draw_layer: LAYER_TERRAIN,
+    },
     wall: {
+        draw_layer: LAYER_TERRAIN,
+        blocks: true,
+    },
+    wall_custom_green: {
+        draw_layer: LAYER_TERRAIN,
+        blocks: true,
+    },
+    wall_custom_pink: {
+        draw_layer: LAYER_TERRAIN,
+        blocks: true,
+    },
+    wall_custom_yellow: {
+        draw_layer: LAYER_TERRAIN,
+        blocks: true,
+    },
+    wall_custom_blue: {
         draw_layer: LAYER_TERRAIN,
         blocks: true,
     },
@@ -195,7 +223,11 @@ const TILE_TYPES = {
     fire: {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.name === 'ice_block') {
+                level.remove_tile(other);
+                level.transmute_tile(me, 'water');
+            }
+            else if (other.type.is_player) {
                 level.fail("Oops!  You can't walk on fire without fire boots!");
                 level.transmute_tile(other, 'player_burned');
             }
@@ -208,9 +240,13 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
-            if (other.type.name == 'dirt_block' || other.type.name == 'clone_block') {
+            if (other.type.name === 'dirt_block' || other.type.name === 'clone_block') {
                 level.remove_tile(other);
                 level.transmute_tile(me, 'dirt');
+            }
+            else if (other.type.name === 'ice_block') {
+                level.remove_tile(other);
+                level.transmute_tile(me, 'ice');
             }
             else if (other.type.is_player) {
                 level.fail("swimming with the fishes");
@@ -363,7 +399,6 @@ const TILE_TYPES = {
     dirt_block: {
         draw_layer: LAYER_ACTOR,
         blocks: true,
-        is_object: true,
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire']),
@@ -373,11 +408,20 @@ const TILE_TYPES = {
         draw_layer: LAYER_ACTOR,
         // TODO is this in any way distinct from dirt block
         blocks: true,
-        is_object: true,
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire']),
         movement_speed: 4,
+    },
+    ice_block: {
+        draw_layer: LAYER_ACTOR,
+        blocks: true,
+        is_actor: true,
+        is_block: true,
+        movement_speed: 4,
+        pushes: {
+            ice_block: true,
+        },
     },
     green_floor: {
         draw_layer: LAYER_TERRAIN,
@@ -385,6 +429,30 @@ const TILE_TYPES = {
     green_wall: {
         draw_layer: LAYER_TERRAIN,
         blocks: true,
+    },
+    green_chip: {
+        draw_layer: LAYER_ITEM,
+        is_chip: true,
+        is_required_chip: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.collect_chip();
+                level.remove_tile(me);
+            }
+        },
+    },
+    green_bomb: {
+        draw_layer: LAYER_ITEM,
+        on_arrive(me, level, other) {
+            // TODO explode
+            level.remove_tile(me);
+            level.remove_tile(other);
+            if (other.type.is_player) {
+                level.fail("watch where you step");
+            }
+        },
     },
     cloner: {
         draw_layer: LAYER_TERRAIN,
@@ -513,7 +581,6 @@ const TILE_TYPES = {
     bug: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -523,7 +590,6 @@ const TILE_TYPES = {
     paramecium: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -533,7 +599,6 @@ const TILE_TYPES = {
     ball: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -543,7 +608,6 @@ const TILE_TYPES = {
     walker: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -553,7 +617,6 @@ const TILE_TYPES = {
     tank_blue: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -563,7 +626,6 @@ const TILE_TYPES = {
     blob: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -573,7 +635,6 @@ const TILE_TYPES = {
     teeth: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -584,7 +645,6 @@ const TILE_TYPES = {
     fireball: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -595,7 +655,6 @@ const TILE_TYPES = {
     glider: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
-        is_object: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
@@ -607,39 +666,33 @@ const TILE_TYPES = {
     // Keys
     key_red: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_item: true,
         is_key: true,
     },
     key_blue: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_item: true,
         is_key: true,
     },
     key_yellow: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_item: true,
         is_key: true,
     },
     key_green: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_item: true,
         is_key: true,
     },
     // Tools
     cleats: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_item: true,
         is_tool: true,
         item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
     },
     suction_boots: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_item: true,
         is_tool: true,
         item_ignores: new Set([
@@ -652,14 +705,12 @@ const TILE_TYPES = {
     },
     fire_boots: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_item: true,
         is_tool: true,
         item_ignores: new Set(['fire']),
     },
     flippers: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_item: true,
         is_tool: true,
         item_ignores: new Set(['water']),
@@ -671,11 +722,11 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         has_inventory: true,
-        is_object: true,
         movement_speed: 4,
         pushes: {
             dirt_block: true,
             clone_block: true,
+            ice_block: true,
         },
         // FIXME this prevents thief from taking green key
         infinite_items: {
@@ -690,7 +741,6 @@ const TILE_TYPES = {
     },
     chip: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
         is_chip: true,
         is_required_chip: true,
         blocks_monsters: true,
@@ -705,7 +755,6 @@ const TILE_TYPES = {
     chip_extra: {
         draw_layer: LAYER_ITEM,
         is_chip: true,
-        is_object: true,
         blocks_monsters: true,
         blocks_blocks: true,
         on_arrive(me, level, other) {
@@ -717,19 +766,15 @@ const TILE_TYPES = {
     },
     score_10: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
     },
     score_100: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
     },
     score_1000: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
     },
     score_2x: {
         draw_layer: LAYER_ITEM,
-        is_object: true,
     },
 
     hint: {
