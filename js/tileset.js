@@ -81,8 +81,8 @@ export const CC2_TILESET_LAYOUT = {
     wall_custom_yellow: [14, 4],
     wall_custom_blue: [15, 4],
 
-    // explosion
-    // splash
+    explosion: [[0, 5], [1, 5], [2, 5], [3, 5]],
+    splash: [[4, 5], [5, 5], [6, 5], [7, 5]],
     // flame jet
     // green walls...?
     forbidden: [14, 5],

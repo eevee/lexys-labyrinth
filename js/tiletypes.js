@@ -256,13 +256,14 @@ const TILE_TYPES = {
             else {
                 level.remove_tile(other);
             }
+            level.spawn_animation(me.cell, 'splash');
         },
     },
     turtle: {
         draw_layer: LAYER_TERRAIN,
         on_depart(me, level, other) {
-            // TODO become a splash (good test: push a block on a turtle, then push again; you don't fall in water because the splash blocks you!)
             level.transmute_tile(me, 'water');
+            level.spawn_animation(me.cell, 'splash');
         },
     },
     ice: {
@@ -361,8 +362,10 @@ const TILE_TYPES = {
         draw_layer: LAYER_ITEM,
         // TODO explode
         on_arrive(me, level, other) {
+            let cell = me.cell;
             level.remove_tile(me);
             level.remove_tile(other);
+            level.spawn_animation(cell, 'explosion');
             if (other.type.is_player) {
                 level.fail("watch where you step");
             }
@@ -798,6 +801,20 @@ const TILE_TYPES = {
                 level.win();
             }
         },
+    },
+
+    // VFX
+    splash: {
+        draw_layer: LAYER_OVERLAY,
+        is_actor: true,
+        blocks_players: true,
+        ttl: 6,
+    },
+    explosion: {
+        draw_layer: LAYER_OVERLAY,
+        is_actor: true,
+        blocks_players: true,
+        ttl: 6,
     },
 };
 

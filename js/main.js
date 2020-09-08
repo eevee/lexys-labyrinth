@@ -39,7 +39,7 @@ class Tile {
     visual_position(tic_offset = 0) {
         let x = this.cell.x;
         let y = this.cell.y;
-        if (! this.animation_speed) {
+        if (! this.previous_cell) {
             return [x, y];
         }
         else {
@@ -336,6 +336,11 @@ class Level {
                 // Deal with movement animation
                 actor.animation_progress += 1;
                 if (actor.animation_progress >= actor.animation_speed) {
+                    if (actor.type.ttl) {
+                        // This is purely an animation so it disappears once it's played
+                        this.remove_tile(actor);
+                        continue;
+                    }
                     actor.previous_cell = null;
                     actor.animation_progress = null;
                     actor.animation_speed = null;
@@ -562,6 +567,9 @@ class Level {
             // FIXME actually, this prevents flicking!
             if (! blocked) {
                 let goal_cell = this.cells[goal_y][goal_x];
+                // FIXME splashes should block you (e.g. pushing a block off a
+                // turtle) but currently do not because of this copy; we don't
+                // notice a new thing was added to the tile  :(
                 for (let tile of Array.from(goal_cell)) {
                     if (check_for_slide && tile.type.slide_mode && ! actor.ignores(tile.type.name)) {
                         check_for_slide = false;
@@ -792,6 +800,7 @@ class Level {
     }
 
     // Tile stuff in particular
+    // TODO should add in the right layer?  maybe?
 
     remove_tile(tile) {
         let cell = tile.cell;
@@ -802,6 +811,19 @@ class Level {
     add_tile(tile, cell, index = null) {
         cell._add(tile, index);
         this.pending_undo.push(() => cell._remove(tile));
+    }
+
+    spawn_animation(cell, name) {
+        let type = TILE_TYPES[name];
+        let tile = new Tile(type);
+        tile.animation_speed = type.ttl;
+        tile.animation_progress = 0;
+        cell._add(tile);
+        this.actors.push(tile);
+        this.pending_undo.push(() => {
+            this.actors.pop();
+            cell._remove(tile);
+        });
     }
 
     transmute_tile(tile, name) {
@@ -1521,6 +1543,7 @@ class Editor extends PrimaryView {
             'bomb',
             'button_red',
             'tank_blue',
+            'turtle',
         ])
         {
             let entry = mk('canvas.palette-entry', {
