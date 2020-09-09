@@ -784,6 +784,8 @@ const TILE_TYPES = {
     hint: {
         draw_layer: LAYER_TERRAIN,
         is_hint: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
     },
     socket: {
         draw_layer: LAYER_TERRAIN,
