@@ -373,6 +373,8 @@ const TILE_TYPES = {
     },
     thief_tools: {
         draw_layer: LAYER_TERRAIN,
+        blocks_monsters: true,
+        blocks_blocks: true,
         on_arrive(me, level, other) {
             if (other.inventory) {
                 for (let [name, count] of Object.entries(other.inventory)) {
@@ -385,6 +387,8 @@ const TILE_TYPES = {
     },
     thief_keys: {
         draw_layer: LAYER_TERRAIN,
+        blocks_monsters: true,
+        blocks_blocks: true,
         on_arrive(me, level, other) {
             if (other.inventory) {
                 for (let [name, count] of Object.entries(other.inventory)) {
