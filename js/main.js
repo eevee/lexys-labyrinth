@@ -1920,7 +1920,9 @@ class Conductor {
             this.switch_to_editor();
         });
         document.querySelector('#editor-play').addEventListener('click', ev => {
-            // FIXME also restart!  but also the player shouldn't start before switching to it anyway
+            // Restart the level to ensure it takes edits into account
+            // TODO need to finish thinking out the exact flow between editor/player and what happens when...
+            this.player.restart_level();
             this.switch_to_player();
         });
 
