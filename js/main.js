@@ -1774,7 +1774,15 @@ class AboutOverlay extends DialogOverlay {
 // - all manner of fucking bugs
 // TODO distinguish between deliberately gameplay changes and bugs, though that's kind of an arbitrary line
 const AESTHETIC_OPTIONS = [{
-    
+    key: 'anim_half_speed',
+    label: "Animate at half speed",
+    default: true,
+    note: "CC2 plays animations at utterly ludicrous speeds and it looks very bad.  This option plays them at half speed (except for explosions and splashes, which have a fixed duration), which is objectively better in every way.",
+}, {
+    key: 'offset_actors',
+    label: "Offset some actors",
+    default: true,
+    note: "Chip's Challenge typically draws everything in a grid, which looks a bit funny for tall skinny objects like...  the player.  And teeth.  This option draws both of them raised up slightly, so they'll break the grid and add a slight 3D effect.  May not work for all tilesets.",
 }];
 const COMPAT_OPTIONS = [{
     key: 'tiles_react_instantly',
@@ -1797,45 +1805,82 @@ const OPTIONS_TABS = [{
 class OptionsOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
+        this.root.classList.add('dialog-options');
         this.set_title("options");
         this.add_button("well alright then", ev => {
             this.close();
         });
 
+        this.main.append(mk('p', "Sorry!  This stuff doesn't actually work yet."));
+
         let tab_strip = mk('nav.tabstrip');
         this.main.append(tab_strip);
         this.tab_links = {};
         this.tab_blocks = {};
+        this.current_tab = 'aesthetic';
         for (let tabdef of OPTIONS_TABS) {
             let link = mk('a', {href: 'javascript:', 'data-tab': tabdef.name}, tabdef.label);
+            link.addEventListener('click', ev => {
+                ev.preventDefault();
+                this.switch_tab(ev.target.getAttribute('data-tab'));
+            });
             tab_strip.append(link);
             this.tab_links[tabdef.name] = link;
-            let block = mk('section');
+            let block = mk('section.tabblock');
             this.main.append(block);
             this.tab_blocks[tabdef.name] = block;
+
+            if (tabdef.name === this.current_tab) {
+                link.classList.add('--selected');
+                block.classList.add('--selected');
+            }
         }
+
+        // Aesthetic tab
+        this._add_options(this.tab_blocks['aesthetic'], AESTHETIC_OPTIONS);
 
         // Compat tab
         this.tab_blocks['compat'].append(
             mk('p', "If you don't know what any of these are for, you can pretty safely ignore them."),
             mk('p', "Changes won't take effect until you restart the level."),
         );
-        let ul = mk('ul');
-        this.tab_blocks['compat'].append(ul);
-        for (let optdef of COMPAT_OPTIONS) {
-            let li = mk('li');
-            let label = mk('label');
-            li.append(label);
-            label.append(mk('input', {type: 'checkbox', name: optdef.key}));
-            for (let impl of optdef.impls) {
-                label.append(mk(`img.compat-icon`, {src: `compat-${impl}.png`}));
-            }
-            label.append(optdef.label);
-            li.append(mk('p', optdef.note));
-            ul.append(li);
-        }
+        this._add_options(this.tab_blocks['compat'], COMPAT_OPTIONS);
+    }
 
-        this.main.append(mk('p', "Sorry!  This stuff doesn't actually work yet."));
+    _add_options(root, options) {
+        let ul = mk('ul');
+        root.append(ul);
+        for (let optdef of options) {
+            let li = mk('li');
+            let label = mk('label.option');
+            label.append(mk('input', {type: 'checkbox', name: optdef.key}));
+            if (optdef.impls) {
+                for (let impl of optdef.impls) {
+                    label.append(mk('img.compat-icon', {src: `compat-${impl}.png`}));
+                }
+            }
+            label.append(mk('span.option-label', optdef.label));
+            let help_icon = mk('img.-help', {src: 'help.png'});
+            label.append(help_icon);
+            let help_text = mk('p.option-help', optdef.note);
+            li.append(label);
+            li.append(help_text);
+            ul.append(li);
+            help_icon.addEventListener('click', ev => {
+                help_text.classList.toggle('--visible');
+            });
+        }
+    }
+
+    switch_tab(tab) {
+        if (this.current_tab === tab)
+            return;
+
+        this.tab_links[this.current_tab].classList.remove('--selected');
+        this.tab_blocks[this.current_tab].classList.remove('--selected');
+        this.current_tab = tab;
+        this.tab_links[this.current_tab].classList.add('--selected');
+        this.tab_blocks[this.current_tab].classList.add('--selected');
     }
 }
 
