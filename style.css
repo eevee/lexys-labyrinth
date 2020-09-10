@@ -9,6 +9,7 @@ body {
     display: flex;
     flex-direction: column;
 
+    font-family: Ubuntu, Source Sans Pro, DejaVu Sans, sans-serif;
     line-height: 1.25;
     background: #101214;
     color: white;
@@ -27,6 +28,7 @@ button {
     font-size: inherit;
     padding: 0.125em 0.5em;
     border: 1px solid black;
+    font-family: inherit;
     background: #909090;
     border-image: url(button.png) 33.333% fill / auto repeat;
     text-transform: lowercase;
@@ -257,6 +259,7 @@ body[data-mode=player] #editor-play {
     grid-area: level;
 
     position: relative;
+    border: 0.125em solid black;
 }
 .level canvas {
     display: block;
