@@ -290,7 +290,7 @@ export function parse_level(buf) {
                 // for levels with multiple hint tiles, delineated by [CLUE].
                 // For my purposes, extra hints are associated with the
                 // individual tiles, so we'll map those later
-                [level.comment, ...extra_hints] = str.split(/(?<=^|\n)\[CLUE\]\n/g);
+                [level.comment, ...extra_hints] = str.split(/^\[CLUE\]$/mg);
             }
             continue;
         }
