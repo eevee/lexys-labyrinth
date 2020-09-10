@@ -64,6 +64,7 @@ export class CanvasRenderer {
         else {
             [px, py] = [0, 0];
         }
+        // Figure out where to start drawing
         let x0 = Math.max(0, Math.min(this.level.size_x - this.viewport_size_x, px - xmargin));
         let y0 = Math.max(0, Math.min(this.level.size_y - this.viewport_size_y, py - ymargin));
         // Round to the pixel grid
@@ -71,11 +72,21 @@ export class CanvasRenderer {
         y0 = Math.floor(y0 * this.tileset.size_y + 0.5) / this.tileset.size_y;
         this.viewport_x = x0;
         this.viewport_y = y0;
-        // The viewport might not be aligned to the grid, so split off any fraction
+        // The viewport might not be aligned to the grid, so split off any fractional part.
         let xf0 = Math.floor(x0);
         let yf0 = Math.floor(y0);
-        let x1 = Math.ceil(x0 + this.viewport_size_x - 1);
-        let y1 = Math.ceil(y0 + this.viewport_size_y - 1);
+        // Note that when the viewport is exactly aligned to the grid, we need to draw the cells
+        // just outside of it, or we'll miss objects partway through crossing the border
+        if (xf0 === x0) {
+            xf0 -= 1;
+        }
+        if (yf0 === y0) {
+            yf0 -= 1;
+        }
+        // Find where to stop drawing.  As with above, if we're aligned to the grid, we need to
+        // include the tiles just outside it, so we allow this fencepost problem to fly
+        let x1 = Math.ceil(x0 + this.viewport_size_x);
+        let y1 = Math.ceil(y0 + this.viewport_size_y);
         // Draw one layer at a time, so animated objects aren't overdrawn by
         // neighboring terrain
         // XXX layer count hardcoded here
