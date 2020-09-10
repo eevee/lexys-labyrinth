@@ -56,6 +56,9 @@ export class Tile {
         if (other.type.is_block && this.type.blocks_blocks)
             return true;
 
+        if (this.type.blocks)
+            return this.type.blocks(this, other);
+
         return false;
     }
 
@@ -78,10 +81,11 @@ export class Tile {
     }
 
     // Inventory stuff
-    give_item(name) {
-        this.inventory[name] = (this.inventory[name] ?? 0) + 1;
+    has_item(name) {
+        return this.inventory[name] ?? 0 > 0;
     }
 
+    // TODO remove, not undoable
     take_item(name, amount = null) {
         if (this.inventory[name] && this.inventory[name] >= 1) {
             if (amount == null && this.type.infinite_items && this.type.infinite_items[name]) {
@@ -127,6 +131,26 @@ export class Cell extends Array {
         this.splice(index, 1);
         tile.cell = null;
         return index;
+    }
+
+    blocks_leaving(actor, direction) {
+        for (let tile of this) {
+            if (tile !== actor &&
+                ! tile.type.is_swivel && tile.type.thin_walls &&
+                tile.type.thin_walls.has(direction))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    blocks_entering(actor, direction) {
+        for (let tile of this) {
+            if (tile.blocks(actor, direction) && ! actor.ignores(tile.type.name))
+                return true;
+        }
+        return false;
     }
 }
 
@@ -311,6 +335,7 @@ export class Level {
 
         // XXX this entire turn order is rather different in ms rules
         // FIXME OK, do a pass to make everyone decide their movement, and then actually do it.  the question iiis, where does that fit in with animation
+        // First pass: tick cooldowns and animations; have actors arrive in their cells
         for (let actor of this.actors) {
             // Actors with no cell were destroyed
             if (! actor.cell)
@@ -336,12 +361,19 @@ export class Level {
                     actor.animation_speed = null;
                     if (! this.compat.tiles_react_instantly) {
                         this.step_on_cell(actor);
-                        // May have been destroyed here, too!
-                        if (! actor.cell)
-                            continue;
                     }
                 }
             }
+        }
+
+        // Second pass: actors decide their upcoming movement simultaneously
+        for (let actor of this.actors) {
+            // Note that this prop is only used internally within a single iteration of this loop,
+            // so it doesn't need to be undoable
+            actor.decision = null;
+
+            if (! actor.cell)
+                continue;
 
             if (actor.movement_cooldown > 0)
                 continue;
@@ -373,7 +405,7 @@ export class Level {
                     player_direction &&
                     actor.last_move_was_force)
                 {
-                    direction_preference = [player_direction, actor.direction];
+                    direction_preference = [player_direction];
                     this._set_prop(actor, 'last_move_was_force', false);
                 }
                 else {
@@ -463,24 +495,61 @@ export class Level {
                 direction_preference = [['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
             }
 
-            if (! direction_preference)
-                continue;
+            // Check which of those directions we *can*, probably, move in
+            // TODO i think player on force floor will still have some issues here
+            if (direction_preference) {
+                // Players always move the way they want, even if blocked
+                if (actor.type.is_player) {
+                    actor.decision = direction_preference[0];
+                    continue;
+                }
 
-            let moved = false;
-            for (let direction of direction_preference) {
-                this.set_actor_direction(actor, direction);
-                if (this.attempt_step(actor, direction)) {
-                    moved = true;
-                    break;
+                for (let direction of direction_preference) {
+                    let dest_cell = this.cell_with_offset(actor.cell, direction);
+                    if (! dest_cell)
+                        continue;
+
+                    if (! actor.cell.blocks_leaving(actor, direction) &&
+                        ! dest_cell.blocks_entering(actor, direction))
+                    {
+                        // We found a good direction!  Stop here
+                        actor.decision = direction;
+                        break;
+                    }
                 }
             }
+        }
+
+        // Third pass: everyone actually moves
+        for (let actor of this.actors) {
+            if (! actor.cell)
+                continue;
+
+            if (! actor.decision)
+                continue;
+
+            this.set_actor_direction(actor, actor.decision);
+            this.attempt_step(actor, actor.decision);
 
             // TODO do i need to do this more aggressively?
             if (this.state === 'success' || this.state === 'failure')
                 break;
         }
 
-        // Pass time
+        // Strip out any destroyed actors from the acting order
+        let p = 0;
+        for (let i = 0, l = this.actors.length; i < l; i++) {
+            let actor = this.actors[i];
+            if (actor.cell) {
+                if (p !== i) {
+                    this.actors[p] = actor;
+                }
+                p++;
+            }
+        }
+        this.actors.length = p;
+
+        // Advance the clock
         let tic_counter = this.tic_counter;
         let time_remaining = this.time_remaining;
         this.tic_counter++;
@@ -502,19 +571,6 @@ export class Level {
             });
         }
 
-        // Strip out any destroyed actors from the acting order
-        let p = 0;
-        for (let i = 0, l = this.actors.length; i < l; i++) {
-            let actor = this.actors[i];
-            if (actor.cell) {
-                if (p !== i) {
-                    this.actors[p] = actor;
-                }
-                p++;
-            }
-        }
-        this.actors.length = p;
-
         // Commit the undo state at the end of each tic
         this.commit();
     }
@@ -535,22 +591,15 @@ export class Level {
         }
 
         let move = DIRECTIONS[direction].movement;
-        let original_cell = actor.cell;
-        if (!original_cell) console.error(actor);
-        let goal_x = original_cell.x + move[0];
-        let goal_y = original_cell.y + move[1];
+        if (!actor.cell) console.error(actor);
+        let goal_cell = this.cell_with_offset(actor.cell, direction);
 
+        // TODO this could be a lot simpler if i could early-return!  should ice bumping be
+        // somewhere else?
         let blocked;
-        if (goal_x >= 0 && goal_x < this.width && goal_y >= 0 && goal_y < this.height) {
-            // Check for a thin wall in our current cell first
-            for (let tile of original_cell) {
-                if (tile !== actor &&
-                    ! tile.type.is_swivel && tile.type.thin_walls &&
-                    tile.type.thin_walls.has(direction))
-                {
-                    blocked = true;
-                    break;
-                }
+        if (goal_cell) {
+            if (actor.cell.blocks_leaving(actor, direction)) {
+                blocked = true;
             }
 
             // Only bother touching the goal cell if we're not already trapped
@@ -561,7 +610,7 @@ export class Level {
             // mid-iteration.)
             // FIXME actually, this prevents flicking!
             if (! blocked) {
-                let goal_cell = this.cells[goal_y][goal_x];
+                // This is similar to Cell.blocks_entering, but we have to do a little more work
                 // FIXME splashes should block you (e.g. pushing a block off a
                 // turtle) but currently do not because of this copy; we don't
                 // notice a new thing was added to the tile  :(
@@ -604,7 +653,7 @@ export class Level {
                 this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
                 // Somewhat clumsy hack: step on the ice tile again, so if it's
                 // a corner, it'll turn us in the correct direction
-                for (let tile of original_cell) {
+                for (let tile of actor.cell) {
                     if (tile.type.slide_mode === 'ice' && tile.type.on_arrive) {
                         tile.type.on_arrive(tile, this, actor);
                     }
@@ -614,7 +663,7 @@ export class Level {
         }
 
         // We're clear!
-        this.move_to(actor, goal_x, goal_y, speed);
+        this.move_to(actor, goal_cell, speed);
 
         // Set movement cooldown since we just moved
         this._set_prop(actor, 'movement_cooldown', speed);
@@ -624,16 +673,15 @@ export class Level {
     // Move the given actor to the given position and perform any appropriate
     // tile interactions.  Does NOT check for whether the move is actually
     // legal; use attempt_step for that!
-    move_to(actor, x, y, speed) {
-        let original_cell = actor.cell;
-        if (x === original_cell.x && y === original_cell.y)
+    move_to(actor, goal_cell, speed) {
+        if (actor.cell === goal_cell)
             return;
 
         actor.previous_cell = actor.cell;
         actor.animation_speed = speed;
         actor.animation_progress = 0;
 
-        let goal_cell = this.cells[y][x];
+        let original_cell = actor.cell;
         this.remove_tile(actor);
         this.make_slide(actor, null);
         this.add_tile(actor, goal_cell);
@@ -728,6 +776,18 @@ export class Level {
                 // Otherwise, try the next one
                 goal = goal.connection;
             }
+        }
+    }
+
+    cell_with_offset(cell, direction) {
+        let move = DIRECTIONS[direction].movement;
+        let goal_x = cell.x + move[0];
+        let goal_y = cell.y + move[1];
+        if (goal_x >= 0 && goal_x < this.width && goal_y >= 0 && goal_y < this.height) {
+            return this.cells[goal_y][goal_x];
+        }
+        else {
+            return null;
         }
     }
 

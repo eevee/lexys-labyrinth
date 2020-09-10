@@ -241,7 +241,7 @@ class Player extends PrimaryView {
                 return;
 
             let [x, y] = this.renderer.cell_coords_from_event(ev);
-            this.level.move_to(this.level.player, x, y);
+            this.level.move_to(this.level.player, this.level.cells[y][x], 1);
         });
 
         let last_key;

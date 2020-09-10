@@ -169,8 +169,11 @@ const TILE_TYPES = {
     // Locked doors
     door_red: {
         draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
-        on_bump(me, level, other) {
+        blocks(me, other) {
+            // TODO not quite sure if this one is right; there are complex interactions with monsters, e.g. most monsters can eat blue keys but can't actually use them
+            return ! (other.type.has_inventory && other.has_item('key_red'));
+        },
+        on_arrive(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_red')) {
                 level.transmute_tile(me, 'floor');
             }
@@ -178,8 +181,10 @@ const TILE_TYPES = {
     },
     door_blue: {
         draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
-        on_bump(me, level, other) {
+        blocks(me, other) {
+            return ! (other.type.has_inventory && other.has_item('key_blue'));
+        },
+        on_arrive(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_blue')) {
                 level.transmute_tile(me, 'floor');
             }
@@ -187,8 +192,10 @@ const TILE_TYPES = {
     },
     door_yellow: {
         draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
-        on_bump(me, level, other) {
+        blocks(me, other) {
+            return ! (other.type.has_inventory && other.has_item('key_yellow'));
+        },
+        on_arrive(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_yellow')) {
                 level.transmute_tile(me, 'floor');
             }
@@ -196,8 +203,10 @@ const TILE_TYPES = {
     },
     door_green: {
         draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
-        on_bump(me, level, other) {
+        blocks(me, other) {
+            return ! (other.type.has_inventory && other.has_item('key_green'));
+        },
+        on_arrive(me, level, other) {
             if (other.type.has_inventory && other.take_item('key_green')) {
                 level.transmute_tile(me, 'floor');
             }
@@ -795,8 +804,12 @@ const TILE_TYPES = {
     },
     socket: {
         draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
-        on_bump(me, level, other) {
+        blocks_monsters: true,
+        blocks_blocks: true,
+        blocks(me, other) {
+            return (level.chips_remaining > 0);
+        },
+        on_arrive(me, level, other) {
             if (other.type.is_player && level.chips_remaining === 0) {
                 level.transmute_tile(me, 'floor');
             }
