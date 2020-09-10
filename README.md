@@ -10,19 +10,26 @@ Give it a try, I guess!  [https://c.eev.ee/lexys-labyrinth/](https://c.eev.ee/le
 
 ## Current status
 
-- Game runs, plays, kills you
-- Support for ~60% of Chip's Challenge 1 objects
-- Support for MS Chip's Challenge .DAT files and Steam Chip's Challenge .C2M files
+- Supports 99% of Chip's Challenge 1
+- Supports 75% of Chip's Challenge 2
+- Can load MS Chip's Challenge DAT/CCL files and Steam Chip's Challenge C2M files
+- Can load levels from your hard drive
+- Can play back replays (demos) from C2M files, though some may desync
+- Allows undoing moves, with moderate success
+- Has the beginning bits of a level editor
 
 ### Planned features
 
+- Completely original assets
+- Save your score, and compare it to the BBC leaderboards
+- Load levels directly from the BBC set list
 - Support for all of the nonsense in Chip's Challenge 2
 - Allow playing the original commercial levels by dragging the data files in from your own computer
 - Support various sets of bugs from various implementations
-- Undo moves
 - Play the game turn-based instead of realtime (i.e., nothing moves until Chip does)
-- Record and play back demos
+- Record demos
 - Mouse and touchscreen support
+- Bunches of debug features
 - Outright cheat in a variety of ways
 
 ### Noble aspirations
