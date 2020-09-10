@@ -498,8 +498,8 @@ export class Level {
             // Check which of those directions we *can*, probably, move in
             // TODO i think player on force floor will still have some issues here
             if (direction_preference) {
-                // Players always move the way they want, even if blocked
-                if (actor.type.is_player) {
+                // Players and sliding actors always move the way they want, even if blocked
+                if (actor.type.is_player || actor.slide_mode) {
                     actor.decision = direction_preference[0];
                     continue;
                 }
