@@ -41,7 +41,7 @@ export class Tile {
         }
     }
 
-    blocks(other, direction) {
+    blocks(other, direction, level) {
         if (this.type.blocks_all)
             return true;
 
@@ -57,7 +57,7 @@ export class Tile {
             return true;
 
         if (this.type.blocks)
-            return this.type.blocks(this, other);
+            return this.type.blocks(this, level, other);
 
         return false;
     }
@@ -145,9 +145,9 @@ export class Cell extends Array {
         return false;
     }
 
-    blocks_entering(actor, direction) {
+    blocks_entering(actor, direction, level) {
         for (let tile of this) {
-            if (tile.blocks(actor, direction) && ! actor.ignores(tile.type.name))
+            if (tile.blocks(actor, direction, level) && ! actor.ignores(tile.type.name))
                 return true;
         }
         return false;
@@ -510,7 +510,7 @@ export class Level {
                         continue;
 
                     if (! actor.cell.blocks_leaving(actor, direction) &&
-                        ! dest_cell.blocks_entering(actor, direction))
+                        ! dest_cell.blocks_entering(actor, direction, this))
                     {
                         // We found a good direction!  Stop here
                         actor.decision = direction;
@@ -622,7 +622,7 @@ export class Level {
 
                     if (actor.ignores(tile.type.name))
                         continue;
-                    if (! tile.blocks(actor, direction))
+                    if (! tile.blocks(actor, direction, this))
                         continue;
 
                     if (actor.type.pushes && actor.type.pushes[tile.type.name] && ! tile.stuck) {
@@ -633,7 +633,7 @@ export class Level {
                     }
                     if (tile.type.on_bump) {
                         tile.type.on_bump(tile, this, actor);
-                        if (! tile.blocks(actor, direction))
+                        if (! tile.blocks(actor, direction, this))
                             // It became something non-blocking!
                             continue;
                     }

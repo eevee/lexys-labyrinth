@@ -169,7 +169,7 @@ const TILE_TYPES = {
     // Locked doors
     door_red: {
         draw_layer: LAYER_TERRAIN,
-        blocks(me, other) {
+        blocks(me, level, other) {
             // TODO not quite sure if this one is right; there are complex interactions with monsters, e.g. most monsters can eat blue keys but can't actually use them
             return ! (other.type.has_inventory && other.has_item('key_red'));
         },
@@ -181,7 +181,7 @@ const TILE_TYPES = {
     },
     door_blue: {
         draw_layer: LAYER_TERRAIN,
-        blocks(me, other) {
+        blocks(me, level, other) {
             return ! (other.type.has_inventory && other.has_item('key_blue'));
         },
         on_arrive(me, level, other) {
@@ -192,7 +192,7 @@ const TILE_TYPES = {
     },
     door_yellow: {
         draw_layer: LAYER_TERRAIN,
-        blocks(me, other) {
+        blocks(me, level, other) {
             return ! (other.type.has_inventory && other.has_item('key_yellow'));
         },
         on_arrive(me, level, other) {
@@ -203,7 +203,7 @@ const TILE_TYPES = {
     },
     door_green: {
         draw_layer: LAYER_TERRAIN,
-        blocks(me, other) {
+        blocks(me, level, other) {
             return ! (other.type.has_inventory && other.has_item('key_green'));
         },
         on_arrive(me, level, other) {
@@ -806,7 +806,7 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         blocks_monsters: true,
         blocks_blocks: true,
-        blocks(me, other) {
+        blocks(me, level, other) {
             return (level.chips_remaining > 0);
         },
         on_arrive(me, level, other) {
