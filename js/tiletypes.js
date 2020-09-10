@@ -392,6 +392,9 @@ const TILE_TYPES = {
                     }
                 }
             }
+            if (other.type.is_player) {
+                level.adjust_bonus(0, 0.5);
+            }
         },
     },
     thief_keys: {
@@ -405,6 +408,9 @@ const TILE_TYPES = {
                         other.take_item(name, count);
                     }
                 }
+            }
+            if (other.type.is_player) {
+                level.adjust_bonus(0, 0.5);
             }
         },
     },
@@ -595,6 +601,39 @@ const TILE_TYPES = {
             }
         },
     },
+    // Time alternation
+    stopwatch_bonus: {
+        draw_layer: LAYER_ITEM,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.remove_tile(me);
+                level.adjust_timer(+10);
+            }
+        },
+    },
+    stopwatch_penalty: {
+        draw_layer: LAYER_ITEM,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.remove_tile(me);
+                level.adjust_timer(-10);
+            }
+        },
+    },
+    stopwatch_toggle: {
+        draw_layer: LAYER_ITEM,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.pause_timer();
+            }
+        },
+    },
 
     // Critters
     bug: {
@@ -683,6 +722,7 @@ const TILE_TYPES = {
     },
 
     // Keys
+    // Note that red and blue keys do NOT block monsters, but yellow and green DO
     key_red: {
         draw_layer: LAYER_ITEM,
         is_item: true,
@@ -697,11 +737,15 @@ const TILE_TYPES = {
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_key: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
     },
     key_green: {
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_key: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
     },
     // Tools
     // TODO note: ms allows blocks to pass over tools
@@ -794,15 +838,47 @@ const TILE_TYPES = {
     },
     score_10: {
         draw_layer: LAYER_ITEM,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.adjust_bonus(10);
+            }
+            level.remove_tile(me);
+        },
     },
     score_100: {
         draw_layer: LAYER_ITEM,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.adjust_bonus(100);
+            }
+            level.remove_tile(me);
+        },
     },
     score_1000: {
         draw_layer: LAYER_ITEM,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.adjust_bonus(1000);
+            }
+            level.remove_tile(me);
+        },
     },
     score_2x: {
         draw_layer: LAYER_ITEM,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_arrive(me, level, other) {
+            if (other.type.is_player) {
+                level.adjust_bonus(0, 2);
+            }
+            level.remove_tile(me);
+        },
     },
 
     hint: {

@@ -188,7 +188,7 @@ export const CC2_TILESET_LAYOUT = {
     swivel_se: [12, 11],
     swivel_floor: [13, 11],
     // TODO some kinda four-edges thing again
-    // TODO stopwatch with a - sign??
+    stopwatch_penalty: [15, 11],
     paramecium: {
         north: [[0, 12], [1, 12], [2, 12]],
         east: [[3, 12], [4, 12], [5, 12]],
@@ -205,8 +205,8 @@ export const CC2_TILESET_LAYOUT = {
     walker: [0, 13],
     // TODO walker animations span multiple tiles, rgh
     helmet: [0, 14],
-    // 14: stopwatch
-    // 15: stopwatch with +
+    stopwatch_toggle: [14, 14],
+    stopwatch_bonus: [15, 14],
 
     blob: [0, 15],
     // TODO blob animations also span multiple tiles

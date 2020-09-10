@@ -138,8 +138,8 @@ const TILE_ENCODING = {
     0x49: ['swivel_nw', 'swivel_floor'],
     0x4a: ['swivel_ne', 'swivel_floor'],
     0x4b: ['swivel_se', 'swivel_floor'],
-    // 0x4c: Time bonus : '#next'
-    // 0x4d: Stopwatch : '#next'
+    0x4c: ['stopwatch_bonus', '#next'],
+    0x4d: ['stopwatch_toggle', '#next'],
     // 0x4e: Transmogrifier : 
     // 0x4f: Railroad track (Modifier required, see section below) : 
     // 0x50: Steel wall : 
@@ -163,7 +163,7 @@ const TILE_ENCODING = {
     // 0x66: Mirror Melinda : '#direction', '#next'
     // 0x68: Bowling ball : '#next'
     // 0x69: Rover : '#direction', '#next'
-    // 0x6a: Time penalty : '#next'
+    0x6a: ['stopwatch_penalty', '#next'],
     0x6b: ['#mod8?', ['floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue']],
     0x6d: ['#thinwall/canopy', '#next'],
     // 0x6f: Railroad sign : '#next'
@@ -240,7 +240,7 @@ export function parse_level(buf) {
     let level = new util.StoredLevel;
     let full_view = new DataView(buf);
     let next_section_start = 0;
-    let extra_hints;
+    let extra_hints = [];
     let hint_tiles = [];
     while (next_section_start < buf.byteLength) {
         // Read section header and length

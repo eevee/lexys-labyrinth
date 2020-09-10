@@ -508,7 +508,7 @@ class Player extends PrimaryView {
             this.time_el.textContent = '---';
         }
         else {
-            this.time_el.textContent = this.level.time_remaining;
+            this.time_el.textContent = Math.ceil(this.level.time_remaining / 20);
         }
         this.bonus_el.textContent = this.level.bonus_points;
         this.message_el.textContent = this.level.hint_shown ?? "";
@@ -557,7 +557,7 @@ class Player extends PrimaryView {
             else {
                 this.bummer_el.textContent = "";
                 let base = (this.conductor.level_index + 1) * 500;
-                let time = (this.level.time_remaining || 0) * 10;
+                let time = Math.ceil((this.level.time_remaining ?? 0) / 20) * 10;
                 this.bummer_el.append(
                     mk('p', "go bit buster!"),
                     mk('dl.score-chart',

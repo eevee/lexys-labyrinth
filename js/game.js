@@ -178,13 +178,16 @@ export class Level {
         this.player = null;
         this.actors = [];
         this.chips_remaining = this.stored_level.chips_required;
+        this.bonus_points = 0;
+
+        // Time
         if (this.stored_level.time_limit === 0) {
             this.time_remaining = null;
         }
         else {
-            this.time_remaining = this.stored_level.time_limit;
+            this.time_remaining = this.stored_level.time_limit * 20;
         }
-        this.bonus_points = 0;
+        this.timer_paused = false;
         this.tic_counter = 0;
         // 0 to 7, indicating the first tic that teeth can move on.
         // 0 is equivalent to even step; 4 is equivalent to odd step.
@@ -551,10 +554,9 @@ export class Level {
 
         // Advance the clock
         let tic_counter = this.tic_counter;
-        let time_remaining = this.time_remaining;
-        this.tic_counter++;
-        if (this.time_remaining !== null && this.tic_counter % 20 === 0) {
-            // 20 tics means one second!  Tic that time down
+        this.tic_counter += 1;
+        if (this.time_remaining !== null && ! this.timer_paused) {
+            let time_remaining = this.time_remaining;
             this.pending_undo.push(() => {
                 this.tic_counter = tic_counter;
                 this.time_remaining = time_remaining;
@@ -831,6 +833,36 @@ export class Level {
         if (current > 0) {
             this.pending_undo.push(() => this.chips_remaining = current);
             this.chips_remaining--;
+        }
+    }
+
+    adjust_bonus(add, mult = 1) {
+        let current = this.bonus_points;
+        this.pending_undo.push(() => this.bonus_points = current);
+        this.bonus_points = Math.ceil(this.bonus_points * mult) + add;
+    }
+
+    pause_timer() {
+        if (this.time_remaining === null)
+            return;
+
+        this.pending_undo.push(() => this.timer_paused = ! this.timer_paused);
+        this.timer_paused = ! this.timer_paused;
+    }
+
+    adjust_timer(dt) {
+        let current = this.time_remaining;
+        this.pending_undo.push(() => this.time_remaining = current);
+
+        // Untimed levels become timed levels with 0 seconds remaining
+        this.time_remaining = Math.max(0, (this.time_remaining ?? 0) + dt * 20);
+        if (this.time_remaining <= 0) {
+            if (this.timer_paused) {
+                this.time_remaining = 1;
+            }
+            else {
+                this.fail("Time's up!");
+            }
         }
     }
 
