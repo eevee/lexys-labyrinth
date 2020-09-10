@@ -1648,6 +1648,10 @@ const BUILTIN_LEVEL_PACKS = [{
     path: 'levels/CCLP1.ccl',
     title: "Chip's Challenge Level Pack 1",
     desc: "Intended as an introduction to Chip's Challenge 1 for new players.  Recommended.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    title: "Chip's Challenge Level Pack 3",
+    desc: "Another community level pack.",
 }];
 
 class Splash extends PrimaryView {
