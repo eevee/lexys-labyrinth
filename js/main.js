@@ -326,8 +326,8 @@ class Level {
             if (! actor.cell)
                 continue;
 
-            // Decrement the cooldown here, but only check it later because
-            // stepping on cells in the next block might reset it
+            // Decrement the cooldown here, but don't check it quite yet,
+            // because stepping on cells in the next block might reset it
             if (actor.movement_cooldown > 0) {
                 this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
             }
@@ -490,21 +490,26 @@ class Level {
                 break;
         }
 
-        if (this.time_remaining !== null) {
-            let tic_counter = this.tic_counter;
-            let time_remaining = this.time_remaining;
+        // Pass time
+        let tic_counter = this.tic_counter;
+        let time_remaining = this.time_remaining;
+        this.tic_counter++;
+        if (this.time_remaining !== null && this.tic_counter % 20 === 0) {
+            // 20 tics means one second!  Tic that time down
             this.pending_undo.push(() => {
                 this.tic_counter = tic_counter;
                 this.time_remaining = time_remaining;
             });
 
-            this.tic_counter++;
-            if (this.tic_counter % 20 === 0) {
-                this.time_remaining -= 1;
-                if (this.time_remaining <= 0) {
-                    this.fail("Time's up!");
-                }
+            this.time_remaining -= 1;
+            if (this.time_remaining <= 0) {
+                this.fail("Time's up!");
             }
+        }
+        else {
+            this.pending_undo.push(() => {
+                this.tic_counter = tic_counter;
+            });
         }
 
         // Strip out any destroyed actors from the acting order
@@ -765,6 +770,8 @@ class Level {
 
     _set_prop(obj, key, val) {
         let old_val = obj[key];
+        if (val === old_val)
+            return;
         this.pending_undo.push(() => obj[key] = old_val);
         obj[key] = val;
     }
