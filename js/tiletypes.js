@@ -704,16 +704,21 @@ const TILE_TYPES = {
         is_key: true,
     },
     // Tools
+    // TODO note: ms allows blocks to pass over tools
     cleats: {
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
         item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
     },
     suction_boots: {
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
         item_ignores: new Set([
             'force_floor_n',
             'force_floor_s',
@@ -726,12 +731,16 @@ const TILE_TYPES = {
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
         item_ignores: new Set(['fire']),
     },
     flippers: {
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
         item_ignores: new Set(['water']),
     },
 
