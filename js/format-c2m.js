@@ -17,7 +17,10 @@ class CC2Demo {
         this.bytes = new Uint8Array(buf);
 
         // byte 0 is unknown, always 0?
-        this.force_floor_seed = this.bytes[1];
+        // Force floor seed can apparently be anything; my best guess, based on the Desert Oasis
+        // replay, is that it's just incremented and allowed to overflow, so taking it mod 4 gives
+        // the correct starting direction
+        this.initial_force_floor_direction = ['north', 'east', 'south', 'west'][this.bytes[1] % 4];
         this.blob_seed = this.bytes[2];
     }
 
@@ -132,7 +135,7 @@ const TILE_ENCODING = {
     0x43: 'cloner',
     //0x44: Clone machine : Modifier required, see below
     0x45: 'hint',
-    //0x46: 'force_floor_all',
+    0x46: 'force_floor_all',
     // 0x47: 'button_gray',
     0x48: ['swivel_sw', 'swivel_floor'],
     0x49: ['swivel_nw', 'swivel_floor'],
