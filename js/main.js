@@ -1,6 +1,6 @@
 // TODO bugs and quirks i'm aware of:
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
-import { TICS_PER_SECOND } from './defs.js';
+import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
 import * as c2m from './format-c2m.js';
 import * as dat from './format-dat.js';
 import * as format_util from './format-util.js';
@@ -639,6 +639,119 @@ class Player extends PrimaryView {
 }
 
 
+const EDITOR_TOOLS = [{
+    mode: 'pencil',
+    icon: 'icons/tool-pencil.png',
+    name: "Pencil",
+    desc: "Draw individual tiles",
+}, {
+    mode: 'line',
+    icon: 'icons/tool-line.png',
+    name: "Line",
+    desc: "Draw straight lines",
+}, {
+    mode: 'box',
+    icon: 'icons/tool-box.png',
+    name: "Box",
+    desc: "Fill a rectangular area with tiles",
+}, {
+    mode: 'fill',
+    icon: 'icons/tool-fill.png',
+    name: "Fill",
+    desc: "Flood-fill an area with tiles",
+}, {
+    mode: 'force-floors',
+    icon: 'icons/tool-force-floors.png',
+    name: "Force floors",
+    desc: "Draw force floors in the direction you draw",
+}, {
+    mode: 'adjust',
+    icon: 'icons/tool-adjust.png',
+    name: "Adjust",
+    desc: "Toggle blocks and rotate actors",
+}, {
+    mode: 'connect',
+    icon: 'icons/tool-connect.png',
+    name: "Connect",
+    desc: "Set up CC1 clone and trap connections",
+}, {
+    mode: 'wire',
+    icon: 'icons/tool-wire.png',
+    name: "Wire",
+    desc: "Draw CC2 wiring",
+    // TODO text tool; thin walls tool; map generator?; subtools for select tool (copy, paste, crop)
+}];
+// Tiles the "adjust" tool will turn into each other
+const EDITOR_ADJUST_TOGGLES = {
+    floor: 'wall',
+    wall: 'floor',
+    floor_custom_green: 'wall_custom_green',
+    floor_custom_pink: 'wall_custom_pink',
+    floor_custom_yellow: 'wall_custom_yellow',
+    floor_custom_blue: 'wall_custom_blue',
+    wall_custom_green: 'floor_custom_green',
+    wall_custom_pink: 'floor_custom_pink',
+    wall_custom_yellow: 'floor_custom_yellow',
+    wall_custom_blue: 'floor_custom_blue',
+    fake_floor: 'fake_wall',
+    fake_wall: 'fake_floor',
+    wall_invisible: 'wall_appearing',
+    wall_appearing: 'wall_invisible',
+    green_floor: 'green_wall',
+    green_wall: 'green_floor',
+    green_bomb: 'green_chip',
+    green_chip: 'green_bomb',
+    purple_floor: 'purple_wall',
+    purple_wall: 'purple_floor',
+    thief_keys: 'thief_tools',
+    thief_tools: 'thief_keys',
+};
+// TODO this MUST use a cc2 tileset!
+const EDITOR_PALETTE = [{
+    title: "Our hero",
+    tiles: ['player'],
+}, {
+    title: "Terrain",
+    tiles: [
+        'floor', 'wall', 'hint', 'socket', 'exit',
+        'popwall',
+        'fake_floor', 'fake_wall',
+        'gravel',
+        'dirt',
+        'water', 'turtle', 'fire',
+        'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
+        'force_floor_n', 'force_floor_s', 'force_floor_w', 'force_floor_e', 'force_floor_all',
+    ],
+}, {
+    title: "Items",
+    tiles: [
+        'chip', 'chip_extra',
+        'key_blue', 'key_red', 'key_yellow', 'key_green',
+        'flippers', 'fire_boots', 'cleats', 'suction_boots',
+    ],
+}, {
+    title: "Creatures",
+    tiles: [
+        'tank_blue',
+        'ball',
+        'fireball',
+        'glider',
+        'bug',
+        'paramecium',
+        'walker',
+        'teeth',
+        'blob',
+    ],
+}, {
+    title: "Mechanisms",
+    tiles: [
+        'bomb',
+        'dirt_block',
+        'button_red',
+        'cloner',
+        'trap',
+    ],
+}];
 class Editor extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#editor'));
@@ -655,12 +768,38 @@ class Editor extends PrimaryView {
             let [x, y] = this.renderer.cell_coords_from_event(ev);
             this.mouse_cell = [x, y];
 
-            this.place_in_cell(x, y, this.palette_selection);
+            if (this.current_tool === 'pencil') {
+                this.place_in_cell(x, y, this.palette_selection);
+            }
+            else if (this.current_tool === 'force-floors') {
+                // Begin by placing an all-way force floor under the mouse
+                this.place_in_cell(x, y, 'force_floor_all');
+            }
+            else if (this.current_tool === 'adjust') {
+                let cell = this.stored_level.cells[y][x];
+                for (let tile of cell) {
+                    // Toggle tiles that go in obvious pairs
+                    let other = EDITOR_ADJUST_TOGGLES[tile.name];
+                    if (other) {
+                        tile.name = other;
+                    }
+
+                    // Rotate actors
+                    if (TILE_TYPES[tile.name].is_actor) {
+                        tile.direction = DIRECTIONS[tile.direction].right;
+                    }
+                }
+            }
             this.renderer.draw();
         });
         this.renderer.canvas.addEventListener('mousemove', ev => {
             if (this.mouse_mode === null)
                 return;
+            // TODO check for the specific button we're holding
+            if (ev.buttons === 0) {
+                this.mouse_mode = null;
+                return;
+            }
 
             if (this.mouse_mode === 'draw') {
                 // FIXME also fill in a trail between previous cell and here, mousemove is not fired continuously
@@ -669,8 +808,64 @@ class Editor extends PrimaryView {
                     return;
 
                 // TODO do a pixel-perfect draw too
-                for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
-                    this.place_in_cell(cx, cy, this.palette_selection);
+                if (this.current_tool === 'pencil') {
+                    for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
+                        this.place_in_cell(cx, cy, this.palette_selection);
+                    }
+                }
+                else if (this.current_tool === 'force-floors') {
+                    // Walk the mouse movement and change each we touch to match the direction we
+                    // crossed the border
+                    let i = 0;
+                    let prevx, prevy;
+                    for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
+                        i++;
+                        // The very first cell is the one the mouse was already in, and we don't
+                        // have a movement direction yet, so leave that alone
+                        if (i === 1) {
+                            prevx = cx;
+                            prevy = cy;
+                            continue;
+                        }
+                        let name;
+                        let cell = this.stored_level.cells[cy][cx];
+                        if (cell[0].name.startsWith('force_floor_')) {
+                            // Drawing a loop with force floors creates ice
+                            name = 'ice';
+                        }
+                        else if (cx === prevx) {
+                            if (cy > prevy) {
+                                name = 'force_floor_s';
+                            }
+                            else {
+                                name = 'force_floor_n';
+                            }
+                        }
+                        else {
+                            if (cx > prevx) {
+                                name = 'force_floor_e';
+                            }
+                            else {
+                                name = 'force_floor_w';
+                            }
+                        }
+                        this.place_in_cell(cx, cy, name);
+
+                        // The second cell tells us the direction to use for the first, assuming it
+                        // had an RFF marking it
+                        if (i === 2) {
+                            let prevcell = this.stored_level.cells[prevy][prevx];
+                            if (prevcell[0].name === 'force_floor_all') {
+                                prevcell[0].name = name;
+                            }
+                        }
+                        prevx = cx;
+                        prevy = cy;
+                    }
+                }
+                else if (this.current_tool === 'adjust') {
+                    // Adjust tool doesn't support dragging
+                    // TODO should it
                 }
                 this.renderer.draw();
 
@@ -685,39 +880,52 @@ class Editor extends PrimaryView {
             this.mouse_mode = null;
         });
 
+        // Toolbox
+        let toolbox = mk('div.icon-button-set')
+        this.root.querySelector('.controls').append(toolbox);
+        this.tool_button_els = {};
+        for (let tooldef of EDITOR_TOOLS) {
+            let button = mk(
+                'button', {
+                    type: 'button',
+                    'data-tool': tooldef.mode,
+                },
+                mk('img', {
+                    src: tooldef.icon,
+                    alt: tooldef.name,
+                    title: `${tooldef.name}: ${tooldef.desc}`,
+                }),
+            );
+            this.tool_button_els[tooldef.mode] = button;
+            toolbox.append(button);
+        }
+        this.current_tool = 'pencil';
+        this.tool_button_els['pencil'].classList.add('-selected');
+        toolbox.addEventListener('click', ev => {
+            let button = ev.target.closest('.icon-button-set button');
+            if (! button)
+                return;
+
+            this.select_tool(button.getAttribute('data-tool'));
+        });
+
         // Tile palette
         let palette_el = this.root.querySelector('.palette');
         this.palette = {};  // name => element
-        for (let name of [
-            // Terrain
-            'floor', 'wall', 'hint', 'socket', 'exit',
-            'popwall',
-            'fake_floor', 'fake_wall',
-            'water', 'fire', 'ice', 'force_floor_all',
-            // TODO ice curves
-            // Items
-            'chip', // 'chip_extra', -- XXX doesn't exist in TW tileset!
-            'key_blue', 'key_red', 'key_yellow', 'key_green',
-            // Creatures
-            'ball', 'player',
-            'dirt_block',
-            'clone_block',
-            'cloner',
-            'bomb',
-            'button_red',
-            'tank_blue',
-            'turtle',
-        ])
-        {
-            let entry = mk('canvas.palette-entry', {
-                width: this.conductor.tileset.size_x,
-                height: this.conductor.tileset.size_y,
-                'data-tile-name': name,
-            });
-            let ctx = entry.getContext('2d');
-            this.conductor.tileset.draw_type(name, null, null, ctx, 0, 0);
-            this.palette[name] = entry;
-            palette_el.append(entry);
+        for (let sectiondef of EDITOR_PALETTE) {
+            let section_el = mk('section');
+            palette_el.append(mk('h2', sectiondef.title), section_el);
+            for (let name of sectiondef.tiles) {
+                let entry = mk('canvas.palette-entry', {
+                    width: this.conductor.tileset.size_x,
+                    height: this.conductor.tileset.size_y,
+                    'data-tile-name': name,
+                });
+                let ctx = entry.getContext('2d');
+                this.conductor.tileset.draw_type(name, null, null, ctx, 0, 0);
+                this.palette[name] = entry;
+                section_el.append(entry);
+            }
         }
         palette_el.addEventListener('click', ev => {
             let entry = ev.target.closest('canvas.palette-entry');
@@ -759,6 +967,17 @@ class Editor extends PrimaryView {
         }
     }
 
+    select_tool(tool) {
+        if (tool === this.current_tool)
+            return;
+        if (! this.tool_button_els[tool])
+            return;
+
+        this.tool_button_els[this.current_tool].classList.remove('-selected');
+        this.current_tool = tool;
+        this.tool_button_els[this.current_tool].classList.add('-selected');
+    }
+
     select_palette(name) {
         if (name === this.palette_selection)
             return;
@@ -769,6 +988,12 @@ class Editor extends PrimaryView {
         this.palette_selection = name;
         if (this.palette_selection) {
             this.palette[this.palette_selection].classList.add('--selected');
+        }
+
+        // Some tools obviously don't work with a palette selection, in which case changing tiles
+        // should default you back to the pencil
+        if (this.current_tool === 'adjust') {
+            this.select_tool('pencil');
         }
     }
 
@@ -1012,11 +1237,11 @@ class OptionsOverlay extends DialogOverlay {
             label.append(mk('input', {type: 'checkbox', name: optdef.key}));
             if (optdef.impls) {
                 for (let impl of optdef.impls) {
-                    label.append(mk('img.compat-icon', {src: `compat-${impl}.png`}));
+                    label.append(mk('img.compat-icon', {src: `icons/compat-${impl}.png`}));
                 }
             }
             label.append(mk('span.option-label', optdef.label));
-            let help_icon = mk('img.-help', {src: 'help.png'});
+            let help_icon = mk('img.-help', {src: 'icons/help.png'});
             label.append(help_icon);
             let help_text = mk('p.option-help', optdef.note);
             li.append(label);

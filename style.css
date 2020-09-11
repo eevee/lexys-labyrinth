@@ -469,7 +469,7 @@ dl.score-chart .-sum {
 .inventory img {
     width: calc(var(--tile-width) * var(--scale));
 }
-.controls {
+#player .controls {
     grid-area: controls;
     display: flex;
 }
@@ -528,8 +528,11 @@ main.--has-demo .demo-controls {
     flex: 1 1 auto;
     display: grid;
     grid:
-        "level  palette"
+        "controls   level"
+        "palette    level"
+        / minmax(20%, 1fr) auto
     ;
+    gap: 1em;
 
     min-height: 0;
     margin: auto;
@@ -541,8 +544,47 @@ main.--has-demo .demo-controls {
     overflow: auto;
 }
 
+#editor .controls {
+    grid-area: controls;
+}
+#editor .controls p img {
+    background: url(icons/tool-bg-unselected.png);
+}
+.icon-button-set {
+    display: flex;
+    flex-wrap: wrap;
+}
+.icon-button-set button {
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    line-height: 1;
+    background: url(icons/tool-bg-unselected.png) no-repeat;
+    border: none;
+}
+.icon-button-set button.-selected {
+    background-image: url(icons/tool-bg-selected.png);
+}
+.icon-button-set button img {
+    display: block;
+}
 #editor .palette {
     grid-area: palette;
+}
+#editor .palette h2 {
+    font-size: 1em;
+    margin-top: 1em;
+    border-bottom: 1px solid currentColor;
+    color: #909090;
+}
+#editor .palette h2:first-child {
+    margin-top: 0;
+}
+#editor .palette section {
+    display: grid;
+    grid: auto-flow 32px / repeat(auto-fit, 32px);
+    gap: 3px;
 }
 .palette-entry {
     margin: 0.25em;
