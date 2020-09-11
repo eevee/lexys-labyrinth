@@ -369,6 +369,13 @@ class Player extends PrimaryView {
     restart_level() {
         this.level.restart(this.compat);
         this.set_state('waiting');
+
+        this.chips_el.classList.remove('--done');
+        this.time_el.classList.remove('--frozen');
+        this.time_el.classList.remove('--danger');
+        this.time_el.classList.remove('--warning');
+        this.root.classList.remove('--bonus-visible');
+
         this.update_ui();
         this._redraw();
     }
@@ -504,13 +511,24 @@ class Player extends PrimaryView {
 
         // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;
+        if (this.level.chips_remaining === 0) {
+            this.chips_el.classList.add('--done');
+        }
+
+        this.time_el.classList.toggle('--frozen', this.level.time_remaining === null || this.level.timer_paused);
         if (this.level.time_remaining === null) {
             this.time_el.textContent = '---';
         }
         else {
             this.time_el.textContent = Math.ceil(this.level.time_remaining / 20);
+            this.time_el.classList.toggle('--warning', this.level.time_remaining < 30 * 20);
+            this.time_el.classList.toggle('--danger', this.level.time_remaining < 10 * 20);
         }
+
         this.bonus_el.textContent = this.level.bonus_points;
+        if (this.level.bonus_points > 0) {
+            this.root.classList.add('--bonus-visible');
+        }
         this.message_el.textContent = this.level.hint_shown ?? "";
 
         this.inventory_el.textContent = '';

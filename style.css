@@ -409,9 +409,31 @@ dl.score-chart .-sum {
     line-height: 1;
     text-align: right;
     font-family: monospace;
-    color: hsl(45, 100%, 60%);
-    background: #080808;
+    color: hsl(45, 100%, 40%);
+    background: hsl(0, 0%, 3%);
     border: 1px inset #202020;
+}
+.chips output.--done {
+    color: hsl(90, 100%, 40%);
+    background: hsl(90, 50%, 3%);
+}
+.time output.--warning {
+    color: hsl(30, 100%, 40%);
+    background: hsl(0, 50%, 5%);
+}
+.time output.--danger {
+    color: hsl(0, 100%, 40%);
+    background: hsl(0, 75%, 8%);
+}
+.time output.--frozen {
+    color: hsl(195, 100%, 40%);
+    background: hsl(195, 25%, 3%);
+}
+#player .bonus {
+    visibility: hidden;
+}
+#player.--bonus-visible .bonus {
+    visibility: initial;
 }
 
 .message {
