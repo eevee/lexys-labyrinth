@@ -619,18 +619,27 @@ class Player extends PrimaryView {
         // The main UI is centered in a flex item with auto margins, so the
         // extra space available is the size of those margins
         let style = window.getComputedStyle(this.root);
+        if (style['display'] === 'none') {
+            // the computed margins can be 'auto' in this case
+            return;
+        }
         let extra_x = parseFloat(style['margin-left']) + parseFloat(style['margin-right']);
         let extra_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);
         // The total available space, then, is the current size of the
         // canvas plus the size of the margins
         let total_x = extra_x + this.renderer.canvas.offsetWidth;
         let total_y = extra_y + this.renderer.canvas.offsetHeight;
+        let dpr = window.devicePixelRatio || 1.0;
         // Divide to find the biggest scale that still fits.  But don't
         // exceed 90% of the available space, or it'll feel cramped.
-        let scale = Math.floor(0.9 * Math.min(total_x / base_x, total_y / base_y));
-        if (scale <= 0) {
+        let scale = Math.floor(0.9 * dpr * Math.min(total_x / base_x, total_y / base_y));
+        if (scale <= 1) {
             scale = 1;
         }
+        // High DPI support: scale the canvas down by the inverse of the device
+        // pixel ratio, thus matching the canvas's resolution to the screen
+        // resolution and giving us nice, clean pixels.
+        scale /= dpr;
 
         // FIXME the above logic doesn't take into account the inventory, which is also affected by scale
         this.scale = scale;
