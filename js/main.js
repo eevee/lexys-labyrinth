@@ -761,42 +761,55 @@ class Editor extends PrimaryView {
         // Level canvas and mouse handling
         this.root.querySelector('.level').append(this.renderer.canvas);
         this.mouse_mode = null;
+        this.mouse_button = null;
         this.mouse_cell = null;
         this.renderer.canvas.addEventListener('mousedown', ev => {
-            this.mouse_mode = 'draw';
+            if (ev.button === 0) {
+                // Left button: draw
+                this.mouse_mode = 'draw';
+                this.mouse_button = ev.button;
+                this.mouse_coords = [ev.clientX, ev.clientY];
 
-            let [x, y] = this.renderer.cell_coords_from_event(ev);
-            this.mouse_cell = [x, y];
+                let [x, y] = this.renderer.cell_coords_from_event(ev);
+                this.mouse_cell = [x, y];
 
-            if (this.current_tool === 'pencil') {
-                this.place_in_cell(x, y, this.palette_selection);
-            }
-            else if (this.current_tool === 'force-floors') {
-                // Begin by placing an all-way force floor under the mouse
-                this.place_in_cell(x, y, 'force_floor_all');
-            }
-            else if (this.current_tool === 'adjust') {
-                let cell = this.stored_level.cells[y][x];
-                for (let tile of cell) {
-                    // Toggle tiles that go in obvious pairs
-                    let other = EDITOR_ADJUST_TOGGLES[tile.name];
-                    if (other) {
-                        tile.name = other;
-                    }
+                if (this.current_tool === 'pencil') {
+                    this.place_in_cell(x, y, this.palette_selection);
+                }
+                else if (this.current_tool === 'force-floors') {
+                    // Begin by placing an all-way force floor under the mouse
+                    this.place_in_cell(x, y, 'force_floor_all');
+                }
+                else if (this.current_tool === 'adjust') {
+                    let cell = this.stored_level.cells[y][x];
+                    for (let tile of cell) {
+                        // Toggle tiles that go in obvious pairs
+                        let other = EDITOR_ADJUST_TOGGLES[tile.name];
+                        if (other) {
+                            tile.name = other;
+                        }
 
-                    // Rotate actors
-                    if (TILE_TYPES[tile.name].is_actor) {
-                        tile.direction = DIRECTIONS[tile.direction].right;
+                        // Rotate actors
+                        if (TILE_TYPES[tile.name].is_actor) {
+                            tile.direction = DIRECTIONS[tile.direction].right;
+                        }
                     }
                 }
+                this.renderer.draw();
             }
-            this.renderer.draw();
+            else if (ev.button === 1) {
+                // Middle button: pan
+                this.mouse_mode = 'pan';
+                this.mouse_button = ev.button;
+                this.mouse_coords = [ev.clientX, ev.clientY];
+                ev.preventDefault();
+            }
         });
         this.renderer.canvas.addEventListener('mousemove', ev => {
             if (this.mouse_mode === null)
                 return;
             // TODO check for the specific button we're holding
-            if (ev.buttons === 0) {
+            if ((ev.buttons & (2 << this.mouse_button)) === 0) {
                 this.mouse_mode = null;
                 return;
             }
@@ -870,6 +883,13 @@ class Editor extends PrimaryView {
                 this.renderer.draw();
 
                 this.mouse_cell = [x, y];
+            }
+            else if (this.mouse_mode === 'pan') {
+                let dx = ev.clientX - this.mouse_coords[0];
+                let dy = ev.clientY - this.mouse_coords[1];
+                this.renderer.canvas.parentNode.scrollLeft -= dx;
+                this.renderer.canvas.parentNode.scrollTop -= dy;
+                this.mouse_coords = [ev.clientX, ev.clientY];
             }
         });
         this.renderer.canvas.addEventListener('mouseup', ev => {
