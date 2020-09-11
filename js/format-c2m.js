@@ -81,12 +81,12 @@ const TILE_ENCODING = {
     0x0d: 'force_floor_w',
     0x0e: 'green_wall',
     0x0f: 'green_floor',
-    //0x10: 'teleport_red',
+    0x10: 'teleport_red',
     0x11: 'teleport_blue',
-    //0x12: 'teleport_yellow',
-    //0x13: 'teleport_green',
+    0x12: 'teleport_yellow',
+    0x13: 'teleport_green',
     0x14: 'exit',
-    //0x15: 'slime',
+    0x15: 'slime',
     0x16: ['player', '#direction', '#next'],
     0x17: ['dirt_block', '#direction', '#next'],
     0x18: ['walker', '#direction', '#next'],
@@ -145,20 +145,20 @@ const TILE_ENCODING = {
     0x4d: ['stopwatch_toggle', '#next'],
     // 0x4e: Transmogrifier : 
     // 0x4f: Railroad track (Modifier required, see section below) : 
-    // 0x50: Steel wall : 
-    // 0x51: Time bomb : '#next'
+    0x50: ['steel'],
+    0x51: ['dynamite', '#next'],
     // 0x52: Helmet : '#next'
-    // 0x56: Melinda : '#direction', '#next'
+    0x56: ['player2', '#direction', '#next'],
     // 0x57: Timid teeth : '#direction', '#next'
     // 0x58: Explosion animation (unused in main levels) : '#direction', '#next'
-    // 0x59: Hiking boots : '#next'
+    0x59: ['hiking_boots', '#next'],
     // 0x5a: Male-only sign : 
     // 0x5b: Female-only sign : 
     // 0x5c: Inverter gate (N) : Modifier allows other gates, see below
     // 0x5e: Logic switch (ON) : 
-    // 0x5f: Flame jet (OFF) : 
-    // 0x60: Flame jet (ON) : 
-    // 0x61: Orange button : 
+    0x5f: 'flame_jet_off',
+    0x60: 'flame_jet_on',
+    0x61: 'button_orange',
     // 0x62: Lightning bolt : '#next'
     // 0x63: Yellow tank : '#direction', '#next'
     // 0x64: Yellow tank button : 
@@ -180,8 +180,8 @@ const TILE_ENCODING = {
     0x7a: ['score_10', '#next'],
     0x7b: ['score_100', '#next'],
     0x7c: ['score_1000', '#next'],
-    // 0x7d: Solid green wall : 
-    // 0x7e: False green wall : 
+    0x7d: ['popdown_wall'],
+    0x7e: ['popdown_floor'],
     0x7f: ['forbidden', '#next'],
     0x80: ['score_2x', '#next'],
     // 0x81: Directional block : '#direction', Directional Arrows Bitmask, '#next'

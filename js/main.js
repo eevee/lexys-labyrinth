@@ -680,6 +680,9 @@ const EDITOR_TOOLS = [{
     name: "Wire",
     desc: "Draw CC2 wiring",
     // TODO text tool; thin walls tool; ice tool; map generator?; subtools for select tool (copy, paste, crop)
+    // TODO interesting option: rotate an actor as you draw it by dragging?  or hold a key like in
+    // slade when you have some selected?
+    // TODO ah, railroads...
 }];
 // Tiles the "adjust" tool will turn into each other
 const EDITOR_ADJUST_TOGGLES = {

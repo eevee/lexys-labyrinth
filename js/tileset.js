@@ -68,10 +68,11 @@ export const CC2_TILESET_LAYOUT = {
     // mercury boot
     // canopy, xray
 
-    // tnt
+    // TODO lit
+    dynamite: [0, 4],
     bomb: [5, 4],
     green_bomb: [6, 4],
-    // ??? tiny fireworks
+    // TODO bomb fuse tile, ugh
     floor_custom_green: [8, 4],
     floor_custom_pink: [9, 4],
     floor_custom_yellow: [10, 4],
@@ -83,8 +84,11 @@ export const CC2_TILESET_LAYOUT = {
 
     explosion: [[0, 5], [1, 5], [2, 5], [3, 5]],
     splash: [[4, 5], [5, 5], [6, 5], [7, 5]],
-    // flame jet
-    // green walls...?
+    flame_jet_off: [8, 5],
+    flame_jet_on: [[9, 5], [10, 5], [11, 5]],
+    popdown_wall: [12, 5],
+    popdown_floor: [12, 5],
+    popdown_floor_visible: [13, 5],
     forbidden: [14, 5],
     // directional block frame, i think?
 
@@ -269,7 +273,20 @@ export const CC2_TILESET_LAYOUT = {
         [15, 24],
     ],
 
-    // TODO melinda, same layout as chip
+    player2: {
+        moving: {
+            north: [[0, 27], [1, 27], [2, 27], [3, 27], [4, 27], [5, 27], [6, 27], [7, 27]],
+            south: [[0, 28], [1, 28], [2, 28], [3, 28], [4, 28], [5, 28], [6, 28], [7, 28]],
+            west: [[8, 28], [9, 28], [10, 28], [11, 28], [12, 28], [13, 28], [14, 28], [15, 28]],
+            east: [[8, 27], [9, 27], [10, 27], [11, 27], [12, 27], [13, 27], [14, 27], [15, 27]],
+        },
+        standing: {
+            north: [0, 27],
+            south: [0, 28],
+            west: [8, 28],
+            east: [8, 27],
+        },
+    },
     fire: [
         [12, 29],
         [13, 29],

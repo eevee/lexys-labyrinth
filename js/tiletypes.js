@@ -52,7 +52,7 @@ const TILE_TYPES = {
     },
     wall_invisible: {
         draw_layer: LAYER_TERRAIN,
-        // TODO cc2 seems to make these flicker briefly
+        // FIXME cc2 seems to make these flicker briefly
         blocks_all: true,
     },
     wall_appearing: {
@@ -104,6 +104,28 @@ const TILE_TYPES = {
         on_bump(me, level, other) {
             level.transmute_tile(me, 'floor');
         },
+    },
+    popdown_wall: {
+        draw_layer: LAYER_TERRAIN,
+        blocks_all: true,
+    },
+    popdown_floor: {
+        draw_layer: LAYER_TERRAIN,
+        on_arrive(me, level, other) {
+            // FIXME could probably do this with state?  or, eh
+            level.transmute_tile(me, 'popdown_floor_visible');
+        },
+    },
+    popdown_floor_visible: {
+        draw_layer: LAYER_TERRAIN,
+        on_depart(me, level, other) {
+            // FIXME possibly changes back too fast, not even visible for a tic for me (much like stepping on a button oops)
+            level.transmute_tile(me, 'popdown_floor');
+        },
+    },
+    steel: {
+        draw_layer: LAYER_TERRAIN,
+        blocks_all: true,
     },
     canopy: {
         draw_layer: LAYER_OVERLAY,
@@ -367,6 +389,16 @@ const TILE_TYPES = {
             level.set_actor_direction(other, level.get_force_floor_direction());
         },
     },
+    slime: {
+        draw_layer: LAYER_TERRAIN,
+        // FIXME kills everything except ghosts, blobs, blocks
+        // FIXME blobs spread slime onto floor tiles, even destroying wiring
+        on_arrive(me, level, other) {
+            if (other.type.name === 'dirt_block' || other.type.name === 'clone_block' || other.type.name === 'ice_block') {
+                level.transmute_tile(me, 'floor');
+            }
+        },
+    },
     bomb: {
         draw_layer: LAYER_ITEM,
         // TODO explode
@@ -519,7 +551,34 @@ const TILE_TYPES = {
         connects_to: 'teleport_blue',
         connect_order: 'backward',
         is_teleporter: true,
-        // TODO to make this work, i need to be able to check if a spot is blocked /ahead of time/
+    },
+    teleport_red: {
+        draw_layer: LAYER_TERRAIN,
+        connects_to: 'teleport_red',
+        connect_order: 'forward',
+        is_teleporter: true,
+    },
+    teleport_green: {
+        draw_layer: LAYER_TERRAIN,
+        // connects_to: 'teleport_red',
+        // connect_order: 'forward',
+        // is_teleporter: true,
+        // FIXME completely different behavior from other teleporters
+    },
+    teleport_yellow: {
+        draw_layer: LAYER_TERRAIN,
+        connects_to: 'teleport_yellow',
+        connect_order: 'backward',
+        is_teleporter: true,
+        // FIXME special pickup behavior
+    },
+    // FIXME do i want these as separate objects?  what would they do, turn into each other?  or should it be one with state?
+    flame_jet_off: {
+        draw_layer: LAYER_TERRAIN,
+    },
+    flame_jet_on: {
+        draw_layer: LAYER_TERRAIN,
+        // FIXME every tic, kills every actor in the cell
     },
     // Buttons
     button_blue: {
@@ -601,7 +660,12 @@ const TILE_TYPES = {
             }
         },
     },
-    // Time alternation
+    button_orange: {
+        draw_layer: LAYER_TERRAIN,
+        // FIXME toggles flame jets, connected somehow, ???
+    },
+
+    // Time alteration
     stopwatch_bonus: {
         draw_layer: LAYER_ITEM,
         blocks_monsters: true,
@@ -747,7 +811,7 @@ const TILE_TYPES = {
         blocks_monsters: true,
         blocks_blocks: true,
     },
-    // Tools
+    // Boots
     // TODO note: ms allows blocks to pass over tools
     cleats: {
         draw_layer: LAYER_ITEM,
@@ -787,6 +851,23 @@ const TILE_TYPES = {
         blocks_blocks: true,
         item_ignores: new Set(['water']),
     },
+    hiking_boots: {
+        draw_layer: LAYER_ITEM,
+        is_item: true,
+        is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        // FIXME uhh these "ignore" that dirt and gravel block us, but they don't ignore the on_arrive, so, uhhhh
+    },
+    // Other tools
+    dynamite: {
+        draw_layer: LAYER_ITEM,
+        is_item: true,
+        is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        // FIXME does a thing when dropped, but that isn't implemented at all yet
+    },
 
     // Progression
     player: {
@@ -800,9 +881,23 @@ const TILE_TYPES = {
             clone_block: true,
             ice_block: true,
         },
-        // FIXME this prevents thief from taking green key
         infinite_items: {
             key_green: true,
+        },
+    },
+    player2: {
+        draw_layer: LAYER_ACTOR,
+        is_actor: true,
+        is_player: true,
+        has_inventory: true,
+        movement_speed: 4,
+        pushes: {
+            dirt_block: true,
+            clone_block: true,
+            ice_block: true,
+        },
+        infinite_items: {
+            key_yellow: true,
         },
     },
     player_drowned: {
