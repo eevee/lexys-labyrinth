@@ -843,6 +843,8 @@ class Editor extends PrimaryView {
                 else if (this.current_tool === 'force-floors') {
                     // Walk the mouse movement and change each we touch to match the direction we
                     // crossed the border
+                    // FIXME occasionally i draw a tetris S kinda shape and both middle parts point
+                    // the same direction, but shouldn't
                     let i = 0;
                     let prevx, prevy;
                     for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
@@ -855,12 +857,7 @@ class Editor extends PrimaryView {
                             continue;
                         }
                         let name;
-                        let cell = this.stored_level.cells[cy][cx];
-                        if (cell[0].name.startsWith('force_floor_')) {
-                            // Drawing a loop with force floors creates ice
-                            name = 'ice';
-                        }
-                        else if (cx === prevx) {
+                        if (cx === prevx) {
                             if (cy > prevy) {
                                 name = 'force_floor_s';
                             }
@@ -876,16 +873,24 @@ class Editor extends PrimaryView {
                                 name = 'force_floor_w';
                             }
                         }
-                        this.place_in_cell(cx, cy, name);
 
                         // The second cell tells us the direction to use for the first, assuming it
-                        // had an RFF marking it
+                        // had some kind of force floor
                         if (i === 2) {
                             let prevcell = this.stored_level.cells[prevy][prevx];
-                            if (prevcell[0].name === 'force_floor_all') {
+                            if (prevcell[0].name.startsWith('force_floor_')) {
                                 prevcell[0].name = name;
                             }
                         }
+
+                        // Drawing a loop with force floors creates ice (but not in the previous
+                        // cell, obviously)
+                        let cell = this.stored_level.cells[cy][cx];
+                        if (cell[0].name.startsWith('force_floor_') && cell[0].name !== name) {
+                            name = 'ice';
+                        }
+                        this.place_in_cell(cx, cy, name);
+
                         prevx = cx;
                         prevy = cy;
                     }
