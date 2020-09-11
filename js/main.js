@@ -771,7 +771,7 @@ class Editor extends PrimaryView {
             if (ev.button === 0) {
                 // Left button: draw
                 this.mouse_mode = 'draw';
-                this.mouse_button = ev.button;
+                this.mouse_button_mask = 1;
                 this.mouse_coords = [ev.clientX, ev.clientY];
 
                 let [x, y] = this.renderer.cell_coords_from_event(ev);
@@ -804,7 +804,7 @@ class Editor extends PrimaryView {
             else if (ev.button === 1) {
                 // Middle button: pan
                 this.mouse_mode = 'pan';
-                this.mouse_button = ev.button;
+                this.mouse_button_mask = 4;
                 this.mouse_coords = [ev.clientX, ev.clientY];
                 ev.preventDefault();
             }
@@ -813,7 +813,7 @@ class Editor extends PrimaryView {
             if (this.mouse_mode === null)
                 return;
             // TODO check for the specific button we're holding
-            if ((ev.buttons & (2 << this.mouse_button)) === 0) {
+            if ((ev.buttons & this.mouse_button_mask) === 0) {
                 this.mouse_mode = null;
                 return;
             }
