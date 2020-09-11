@@ -528,11 +528,11 @@ main.--has-demo .demo-controls {
     flex: 1 1 auto;
     display: grid;
     grid:
-        "controls   level"
-        "palette    level"
-        / minmax(20%, 1fr) auto
+        "controls   level" min-content
+        "palette    level" 1fr
+        / minmax(25%, auto) auto
     ;
-    gap: 1em;
+    gap: 0.5em;
 
     min-height: 0;
     margin: auto;
@@ -571,6 +571,9 @@ main.--has-demo .demo-controls {
 }
 #editor .palette {
     grid-area: palette;
+    min-width: 20vw;
+    padding-right: 0.25em;  /* in case of scrollbar */
+    overflow-y: auto;
 }
 #editor .palette h2 {
     font-size: 1em;
@@ -590,5 +593,5 @@ main.--has-demo .demo-controls {
     margin: 0.25em;
 }
 .palette-entry.--selected {
-    outline: 2px solid gold;
+    box-shadow: 0 0 0 1px black, 0 0 0 2px white;
 }

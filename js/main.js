@@ -679,7 +679,7 @@ const EDITOR_TOOLS = [{
     icon: 'icons/tool-wire.png',
     name: "Wire",
     desc: "Draw CC2 wiring",
-    // TODO text tool; thin walls tool; map generator?; subtools for select tool (copy, paste, crop)
+    // TODO text tool; thin walls tool; ice tool; map generator?; subtools for select tool (copy, paste, crop)
 }];
 // Tiles the "adjust" tool will turn into each other
 const EDITOR_ADJUST_TOGGLES = {
@@ -708,16 +708,21 @@ const EDITOR_ADJUST_TOGGLES = {
 };
 // TODO this MUST use a cc2 tileset!
 const EDITOR_PALETTE = [{
-    title: "Our hero",
-    tiles: ['player'],
+    title: "Basics",
+    tiles: [
+        'player',
+        'chip', 'chip_extra',
+        'floor', 'wall', 'hint', 'socket', 'exit',
+    ],
 }, {
     title: "Terrain",
     tiles: [
-        'floor', 'wall', 'hint', 'socket', 'exit',
         'popwall',
         'fake_floor', 'fake_wall',
+        'wall_invisible', 'wall_appearing',
         'gravel',
         'dirt',
+        'door_blue', 'door_red', 'door_yellow', 'door_green',
         'water', 'turtle', 'fire',
         'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
         'force_floor_n', 'force_floor_s', 'force_floor_w', 'force_floor_e', 'force_floor_all',
@@ -725,7 +730,6 @@ const EDITOR_PALETTE = [{
 }, {
     title: "Items",
     tiles: [
-        'chip', 'chip_extra',
         'key_blue', 'key_red', 'key_yellow', 'key_green',
         'flippers', 'fire_boots', 'cleats', 'suction_boots',
     ],
@@ -747,9 +751,9 @@ const EDITOR_PALETTE = [{
     tiles: [
         'bomb',
         'dirt_block',
-        'button_red',
-        'cloner',
-        'trap',
+        'button_blue',
+        'button_red', 'cloner',
+        'button_brown', 'trap',
     ],
 }];
 class Editor extends PrimaryView {
