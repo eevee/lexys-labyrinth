@@ -96,6 +96,7 @@ export class CanvasRenderer {
                     for (let tile of this.level.cells[y][x]) {
                         let type;
                         if (tile.name) {
+                            // FIXME editor hack
                             type = TILE_TYPES[tile.name];
                         }
                         else {
@@ -106,7 +107,8 @@ export class CanvasRenderer {
                             continue;
 
                         if (! tile.type) {
-                            this.tileset.draw_type(tile.name, null, this.level, ctx, x - x0, y - y0);
+                            // FIXME not a real tile, really not ideal, editor hack
+                            this.tileset.draw_type(tile.name, tile, this.level, ctx, x - x0, y - y0);
                         }
                         else if (type.is_actor) {
                             // Handle smooth scrolling

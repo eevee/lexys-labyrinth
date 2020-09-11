@@ -683,8 +683,6 @@ const EDITOR_TOOLS = [{
 }];
 // Tiles the "adjust" tool will turn into each other
 const EDITOR_ADJUST_TOGGLES = {
-    floor: 'wall',
-    wall: 'floor',
     floor_custom_green: 'wall_custom_green',
     floor_custom_pink: 'wall_custom_pink',
     floor_custom_yellow: 'wall_custom_yellow',
@@ -795,7 +793,7 @@ class Editor extends PrimaryView {
 
                         // Rotate actors
                         if (TILE_TYPES[tile.name].is_actor) {
-                            tile.direction = DIRECTIONS[tile.direction].right;
+                            tile.direction = DIRECTIONS[tile.direction ?? 'south'].right;
                         }
                     }
                 }
