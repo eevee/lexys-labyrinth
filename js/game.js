@@ -336,6 +336,10 @@ export class Level {
             return;
         }
 
+        // Player's secondary direction is set immediately; it applies on arrival to cells even if
+        // it wasn't held the last time the player started moving
+        this._set_prop(this.player, 'secondary_direction', p1_secondary_direction);
+
         // XXX this entire turn order is rather different in ms rules
         // FIXME OK, do a pass to make everyone decide their movement, and then actually do it.  the question iiis, where does that fit in with animation
         // First pass: tick cooldowns and animations; have actors arrive in their cells
@@ -390,10 +394,6 @@ export class Level {
             // can be adjusted
             if (actor.type.uses_teeth_hesitation && (this.tic_counter + this.step_parity) % 8 >= 4)
                 continue;
-
-            if (actor.type.is_player) {
-                this._set_prop(actor, 'secondary_direction', p1_secondary_direction);
-            }
 
             let direction_preference;
             // Actors can't make voluntary moves on ice, so they're stuck with
