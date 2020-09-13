@@ -340,6 +340,9 @@ export class Level {
         // it wasn't held the last time the player started moving
         this._set_prop(this.player, 'secondary_direction', p1_secondary_direction);
 
+        // Used to check for a monster chomping the player's tail
+        this.player_leaving_cell = this.player.cell;
+
         // XXX this entire turn order is rather different in ms rules
         // FIXME OK, do a pass to make everyone decide their movement, and then actually do it.  the question iiis, where does that fit in with animation
         // First pass: tick cooldowns and animations; have actors arrive in their cells
@@ -727,6 +730,13 @@ export class Level {
                 this.fail("squish");
                 return;
             }
+        }
+
+        // If we're stepping directly on the player, that kills them too
+        // TODO this only works because i have the player move first; in lynx the check is the other
+        // way around
+        if (goal_cell === this.player_leaving_cell) {
+            this.fail("Oops!  Watch out for creatures!");
         }
 
         if (this.compat.tiles_react_instantly) {
