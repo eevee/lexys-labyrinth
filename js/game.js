@@ -929,6 +929,11 @@ export class Level {
         this.pending_undo.push(() => cell._remove(tile));
     }
 
+    add_actor(actor) {
+        this.actors.push(actor);
+        this.pending_undo.push(() => this.actors.pop());
+    }
+
     spawn_animation(cell, name) {
         let type = TILE_TYPES[name];
         let tile = new Tile(type);

@@ -532,7 +532,7 @@ const TILE_TYPES = {
                     // abort the clone
                     level.set_actor_stuck(tile, false);
                     if (level.attempt_step(tile, direction)) {
-                        level.actors.push(tile);
+                        level.add_actor(tile);
                         // FIXME add this underneath, just above the cloner
                         let new_tile = new tile.constructor(type, direction);
                         level.add_tile(new_tile, cell);
