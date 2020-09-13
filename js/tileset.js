@@ -549,6 +549,7 @@ export class Tileset {
                 w, h);
         }
         else {
+            if (!coords) console.error(name, tile);
             this.blit(ctx, coords[0], coords[1], x, y);
         }
 

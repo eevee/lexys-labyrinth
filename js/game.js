@@ -356,16 +356,16 @@ export class Level {
 
             if (actor.animation_speed) {
                 // Deal with movement animation
-                actor.animation_progress += 1;
+                this._set_prop(actor, 'animation_progress', actor.animation_progress + 1);
                 if (actor.animation_progress >= actor.animation_speed) {
                     if (actor.type.ttl) {
                         // This is purely an animation so it disappears once it's played
                         this.remove_tile(actor);
                         continue;
                     }
-                    actor.previous_cell = null;
-                    actor.animation_progress = null;
-                    actor.animation_speed = null;
+                    this._set_prop(actor, 'previous_cell', null);
+                    this._set_prop(actor, 'animation_progress', null);
+                    this._set_prop(actor, 'animation_speed', null);
                     if (! this.compat.tiles_react_instantly) {
                         this.step_on_cell(actor);
                     }
@@ -544,6 +544,7 @@ export class Level {
         }
 
         // Strip out any destroyed actors from the acting order
+        // FIXME this is O(n), where n is /usually/ small, but i still don't love it
         let p = 0;
         for (let i = 0, l = this.actors.length; i < l; i++) {
             let actor = this.actors[i];
@@ -552,6 +553,10 @@ export class Level {
                     this.actors[p] = actor;
                 }
                 p++;
+            }
+            else {
+                let local_p = p;
+                this.pending_undo.push(() => this.actors.splice(local_p, 0, actor));
             }
         }
         this.actors.length = p;
