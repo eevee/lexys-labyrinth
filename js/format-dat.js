@@ -187,6 +187,18 @@ function parse_level(buf) {
             throw new Error(`Expected 1024 cells (32x32 map); found ${c}`);
     }
 
+    // The MSCC1 format allows a lot of weird things, so check all the cells.  In particular we want
+    // to be sure there's terrain in every cell; MSCC1 allows a block on the top layer and an item
+    // on the bottom layer, and will consider the item to be the "terrain" and draw a floor under it
+    for (let cell of level.linear_cells) {
+        if (TILE_TYPES[cell[0].name].draw_layer !== 0) {
+            // No terrain; insert a floor
+            cell.unshift({ name: 'floor' });
+        }
+        // TODO we could also deal with weird cases where there's terrain /on top of/ something
+        // else: things underwater, the quirk where a glider will erase the item underneath...
+    }
+
     // Optional metadata fields
     let meta_length = view.getUint16(p, true);
     p += 2;
