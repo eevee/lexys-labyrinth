@@ -240,7 +240,9 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         blocks_monsters: true,
         blocks_blocks: true,
-        // TODO block melinda only without the hiking boots; can't use ignore because then she wouldn't step on it  :S  also ignore doesn't apply to blocks anyway.
+        blocks(me, level, other) {
+            return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
+        },
         on_arrive(me, level, other) {
             level.transmute_tile(me, 'floor');
         },
@@ -248,6 +250,9 @@ const TILE_TYPES = {
     gravel: {
         draw_layer: LAYER_TERRAIN,
         blocks_monsters: true,
+        blocks(me, level, other) {
+            return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
+        },
     },
 
     // Hazards
@@ -891,6 +896,7 @@ const TILE_TYPES = {
         is_player: true,
         has_inventory: true,
         movement_speed: 4,
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
         pushes: {
             dirt_block: true,
             clone_block: true,
