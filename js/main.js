@@ -490,6 +490,8 @@ class Player extends PrimaryView {
 
     // Redraws every frame, unless the game isn't running
     redraw() {
+        // FIXME draw one more frame after losing, so we can see the player explode or whatever
+        // TODO for bonus points, also finish the player animation (but don't advance the game any further)
         if (this.state !== 'playing' && this.state !== 'rewinding') {
             this._redraw_handle = null;
             return;

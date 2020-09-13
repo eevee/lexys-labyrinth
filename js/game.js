@@ -946,7 +946,15 @@ export class Level {
         let current = tile.type.name;
         this.pending_undo.push(() => tile.type = TILE_TYPES[current]);
         tile.type = TILE_TYPES[name];
-        // TODO adjust anything else?
+
+        // For transmuting into an animation, set up the timer immediately
+        if (tile.type.ttl) {
+            if (! TILE_TYPES[current].is_actor) {
+                console.warn("Transmuting a non-actor into an animation!");
+            }
+            this._set_prop(tile, 'animation_speed', tile.type.ttl);
+            this._set_prop(tile, 'animation_progress', 0);
+        }
     }
 
     give_actor(actor, name) {

@@ -291,15 +291,15 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'player_drowned');
             }
             else {
-                level.remove_tile(other);
+                level.transmute_tile(other, 'splash');
             }
-            level.spawn_animation(me.cell, 'splash');
         },
     },
     turtle: {
         draw_layer: LAYER_TERRAIN,
         on_depart(me, level, other) {
             level.transmute_tile(me, 'water');
+            // TODO feels like we should spawn water underneath us, then transmute ourselves into the splash?
             level.spawn_animation(me.cell, 'splash');
         },
     },
@@ -411,11 +411,11 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             let cell = me.cell;
             level.remove_tile(me);
-            level.remove_tile(other);
-            level.spawn_animation(cell, 'explosion');
             if (other.type.is_player) {
+                // Check this /before/ we change it...
                 level.fail("watch where you step");
             }
+            level.transmute_tile(other, 'explosion');
         },
     },
     thief_tools: {
@@ -509,10 +509,11 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             // TODO explode
             level.remove_tile(me);
-            level.remove_tile(other);
             if (other.type.is_player) {
+                // Check this /before/ we change it...
                 level.fail("watch where you step");
             }
+            level.transmute_tile(other, 'explosion');
         },
     },
     cloner: {
