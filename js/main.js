@@ -414,41 +414,57 @@ class Player extends PrimaryView {
     advance_by(tics) {
         for (let i = 0; i < tics; i++) {
             let input = this.get_input();
-            let current_input = input;
-            if (! input.has('up') && ! input.has('down') && ! input.has('left') && ! input.has('right')) {
-                //input = this.previous_input;
-            }
 
-            // Choose the movement direction based on the held keys.  A
-            // newly pressed action takes priority; in the case of a tie,
-            // um, XXX ????
-            let chosen_action = null;
-            let any_action = null;
-            for (let action of ['up', 'down', 'left', 'right']) {
-                if (input.has(action)) {
-                    if (this.previous_input.has(action)) {
-                        chosen_action = action;
+            // Replica of CC2 input handling, based on experimentation
+            // FIXME unclear how this should interact with undo when playing normally, and
+            // definitely wrong when playing a replay; should this be in Level??
+            if ((input.has('up') && input.has('down')) || (input.has('left') && input.has('right'))) {
+                // If opposing keys are ever held, stop moving and forget our state
+                this.primary_action = null;
+                this.secondary_action = null;
+            }
+            else if (this.primary_action && input.has(this.primary_action)) {
+                // Our primary action is locked in as long as it's held down, but check for a
+                // newly pressed secondary action; remember, there can't be two opposing keys held,
+                // because we already checked for that above, so this is only necessary if there's
+                // not already a secondary action
+                if (! this.secondary_action) {
+                    for (let action of ['down', 'left', 'right', 'up']) {
+                        if (action !== this.primary_action &&
+                            input.has(action) && ! this.previous_input.has(action))
+                        {
+                            this.secondary_action = action;
+                            break;
+                        }
                     }
-                    any_action = action;
                 }
             }
-            if (! chosen_action) {
-                // No keys are new, so check whether we were previously
-                // holding a key and are still doing it
-                if (this.previous_action && input.has(this.previous_action)) {
-                    chosen_action = this.previous_action;
-                }
-                else {
-                    // No dice, so use an arbitrary action
-                    chosen_action = any_action;
+            else {
+                // Either we weren't holding any keys, or we let go of our primary action; either
+                // way, act like we're starting from scratch and check keys in priority order
+                this.primary_action = null;
+                this.secondary_action = null;
+                for (let action of ['down', 'left', 'right', 'up']) {
+                    if (! input.has(action))
+                        continue;
+
+                    if (! this.primary_action) {
+                        this.primary_action = action;
+                    }
+                    else {
+                        // Note that because of the opposing keys check, there can never be more
+                        // than two keys held down here
+                        this.secondary_action = action;
+                    }
                 }
             }
 
-            let player_move = chosen_action ? ACTION_DIRECTIONS[chosen_action] : null;
-            this.previous_action = chosen_action;
-            this.previous_input = current_input;
+            this.previous_input = input;
 
-            this.level.advance_tic(player_move);
+            this.level.advance_tic(
+                this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null,
+                this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null,
+            );
 
             if (this.level.state !== 'playing') {
                 // We either won or lost!

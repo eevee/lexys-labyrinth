@@ -111,6 +111,7 @@ const TILE_TYPES = {
     },
     popdown_floor: {
         draw_layer: LAYER_TERRAIN,
+        // FIXME should be on_approach
         on_arrive(me, level, other) {
             // FIXME could probably do this with state?  or, eh
             level.transmute_tile(me, 'popdown_floor_visible');

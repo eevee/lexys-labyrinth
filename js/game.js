@@ -330,7 +330,7 @@ export class Level {
     }
 
     // Move the game state forwards by one tic
-    advance_tic(player_direction) {
+    advance_tic(p1_primary_direction, p1_secondary_direction) {
         if (this.state !== 'playing') {
             console.warn(`Level.advance_tic() called when state is ${this.state}`);
             return;
@@ -391,6 +391,10 @@ export class Level {
             if (actor.type.uses_teeth_hesitation && (this.tic_counter + this.step_parity) % 8 >= 4)
                 continue;
 
+            if (actor.type.is_player) {
+                this._set_prop(actor, 'secondary_direction', p1_secondary_direction);
+            }
+
             let direction_preference;
             // Actors can't make voluntary moves on ice, so they're stuck with
             // whatever they've got
@@ -405,10 +409,10 @@ export class Level {
                 // can override forwards??) and DEFINITELY all kinds of stuff
                 // in ms
                 if (actor === this.player &&
-                    player_direction &&
+                    p1_primary_direction &&
                     actor.last_move_was_force)
                 {
-                    direction_preference = [player_direction];
+                    direction_preference = [p1_primary_direction];
                     this._set_prop(actor, 'last_move_was_force', false);
                 }
                 else {
@@ -419,8 +423,8 @@ export class Level {
                 }
             }
             else if (actor === this.player) {
-                if (player_direction) {
-                    direction_preference = [player_direction];
+                if (p1_primary_direction) {
+                    direction_preference = [p1_primary_direction];
                     this._set_prop(actor, 'last_move_was_force', false);
                 }
             }
@@ -750,6 +754,24 @@ export class Level {
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
+            }
+        }
+
+        // Players can also bump the tiles next to where they landed
+        if (actor.type.is_player && actor.secondary_direction) {
+            let neighbor = this.cell_with_offset(actor.cell, actor.secondary_direction);
+            if (neighbor) {
+                for (let tile of neighbor) {
+                    // TODO repeating myself with tile.stuck (also should technically check for actor)
+                    if (actor.type.pushes && actor.type.pushes[tile.type.name] && ! tile.stuck) {
+                        // Block slapping: you can shove a block by walking past it sideways
+                        this.set_actor_direction(tile, actor.secondary_direction);
+                        this.attempt_step(tile, actor.secondary_direction);
+                    }
+                    else if (tile.type.on_bump) {
+                        tile.type.on_bump(tile, this, actor);
+                    }
+                }
             }
         }
 
