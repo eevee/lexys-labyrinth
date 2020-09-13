@@ -386,8 +386,7 @@ export class Level {
                 continue;
 
             // XXX does the cooldown drop while in a trap?  is this even right?
-            // TODO should still attempt to move (so chip turns), just will be stuck (but wait, do monsters turn?  i don't think so)
-            if (actor.stuck)
+            if (actor.stuck && ! actor.type.is_player)
                 continue;
 
             // Teeth can only move the first 4 of every 8 tics, though "first"
