@@ -133,7 +133,7 @@ const TILE_ENCODING = {
     //0x41: Open trap (unused in main levels) : 
     0x42: 'trap',
     0x43: 'cloner',
-    //0x44: Clone machine : Modifier required, see below
+    0x44: ['#mod8', 'cloner'],
     0x45: 'hint',
     0x46: 'force_floor_all',
     // 0x47: 'button_gray',
@@ -143,7 +143,7 @@ const TILE_ENCODING = {
     0x4b: ['swivel_se', 'swivel_floor'],
     0x4c: ['stopwatch_bonus', '#next'],
     0x4d: ['stopwatch_toggle', '#next'],
-    // 0x4e: Transmogrifier : 
+    0x4e: ['transmogrifier'],
     // 0x4f: Railroad track (Modifier required, see section below) : 
     0x50: ['steel'],
     0x51: ['dynamite', '#next'],
@@ -152,16 +152,16 @@ const TILE_ENCODING = {
     // 0x57: Timid teeth : '#direction', '#next'
     // 0x58: Explosion animation (unused in main levels) : '#direction', '#next'
     0x59: ['hiking_boots', '#next'],
-    // 0x5a: Male-only sign : 
-    // 0x5b: Female-only sign : 
+    0x5a: ['no_player2_sign'],
+    0x5b: ['no_player1_sign'],
     // 0x5c: Inverter gate (N) : Modifier allows other gates, see below
     // 0x5e: Logic switch (ON) : 
     0x5f: 'flame_jet_off',
     0x60: 'flame_jet_on',
     0x61: 'button_orange',
     // 0x62: Lightning bolt : '#next'
-    // 0x63: Yellow tank : '#direction', '#next'
-    // 0x64: Yellow tank button : 
+    0x63: ['tank_yellow', '#direction', '#next'],
+    0x64: 'button_yellow',
     // 0x65: Mirror Chip : '#direction', '#next'
     // 0x66: Mirror Melinda : '#direction', '#next'
     // 0x68: Bowling ball : '#next'
@@ -184,8 +184,8 @@ const TILE_ENCODING = {
     0x7e: ['popdown_floor'],
     0x7f: ['forbidden', '#next'],
     0x80: ['score_2x', '#next'],
-    // 0x81: Directional block : '#direction', Directional Arrows Bitmask, '#next'
-    // 0x82: Floor mimic : '#direction', '#next'
+    0x81: ['directional_block', '#direction', '#directional_block_mask', '#next'],
+    0x82: ['floor_mimic', '#direction', '#next'],
     0x83: ['green_bomb', '#next'],
     0x84: ['green_chip', '#next'],
     // 0x87: Black button : 
@@ -195,7 +195,7 @@ const TILE_ENCODING = {
     // 0x8b: Ghost : '#direction', '#next'
     // 0x8c: Steel foil : '#next'
     0x8d: 'turtle',
-    // 0x8e: Secret eye : '#next'
+    0x8e: ['xray_eye', '#next'],
     // 0x8f: Thief bribe : '#next'
     // 0x90: Speed boots : '#next'
     // 0x92: Hook : '#next' 
@@ -475,6 +475,25 @@ export function parse_level(buf) {
                         }
                         else if (arg === '#next') {
                             has_next = true;
+                        }
+                        else if (arg === '#directional_block_mask') {
+                            // Direction mask used specifically for the directional block
+                            let mask = bytes[p];
+                            p++;
+                            let arrows = new Set;
+                            if (mask & 0x01) {
+                                arrows.add('north');
+                            }
+                            if (mask & 0x02) {
+                                arrows.add('east');
+                            }
+                            if (mask & 0x04) {
+                                arrows.add('south');
+                            }
+                            if (mask & 0x08) {
+                                arrows.add('west');
+                            }
+                            tile.directional_block_arrows = arrows;
                         }
                         else {
                             // Anything else is an implicit next tile, e.g.

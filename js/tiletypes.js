@@ -7,6 +7,7 @@ const LAYER_ACTOR = 2;
 const LAYER_OVERLAY = 3;
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
+// TODO get rid of mentions of 'modifier' here, put them in the c2m loader
 const TILE_TYPES = {
     // Floors and walls
     floor: {
@@ -111,6 +112,7 @@ const TILE_TYPES = {
     },
     popdown_floor: {
         draw_layer: LAYER_TERRAIN,
+        blocks_blocks: true,
         // FIXME should be on_approach
         on_arrive(me, level, other) {
             // FIXME could probably do this with state?  or, eh
@@ -119,9 +121,23 @@ const TILE_TYPES = {
     },
     popdown_floor_visible: {
         draw_layer: LAYER_TERRAIN,
+        blocks_blocks: true,
         on_depart(me, level, other) {
             // FIXME possibly changes back too fast, not even visible for a tic for me (much like stepping on a button oops)
             level.transmute_tile(me, 'popdown_floor');
+        },
+    },
+    // TODO these also block the corresponding mirror actors
+    no_player1_sign: {
+        draw_layer: LAYER_TERRAIN,
+        blocks(me, level, other) {
+            return (other.type.name === 'player');
+        },
+    },
+    no_player2_sign: {
+        draw_layer: LAYER_TERRAIN,
+        blocks(me, level, other) {
+            return (other.type.name === 'player2');
         },
     },
     steel: {
@@ -482,6 +498,28 @@ const TILE_TYPES = {
         movement_speed: 4,
         pushes: {
             ice_block: true,
+            directional_block: true,
+        },
+    },
+    directional_block: {
+        // TODO directional, obviously
+        // TODO floor in water
+        // TODO destroyed in fire, flame jet, slime
+        // TODO rotate on train tracks
+        draw_layer: LAYER_ACTOR,
+        blocks_all: true,
+        is_actor: true,
+        is_block: true,
+        load(me, template) {
+            me.arrows = template.directional_block_arrows;
+        },
+        ignores: new Set(['fire']),
+        movement_speed: 4,
+        pushes: {
+            dirt_block: true,
+            clone_block: true,
+            ice_block: true,
+            directional_block: true,
         },
     },
     green_floor: {
@@ -519,7 +557,12 @@ const TILE_TYPES = {
     },
     cloner: {
         draw_layer: LAYER_TERRAIN,
+        // TODO not the case for an empty one in cc2, apparently
         blocks_all: true,
+        load(me, template) {
+            // FIXME not actually right, this is a bitmask
+            me.clone_direction = template.modifier;
+        },
         activate(me, level) {
             let cell = me.cell;
             // Copy, so we don't end up repeatedly cloning the same object
@@ -551,6 +594,44 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (! me.open) {
                 level.set_actor_stuck(other, true);
+            }
+        },
+    },
+    transmogrifier: {
+        draw_layer: LAYER_TERRAIN,
+        _mogrifications: {
+            player: 'player2',
+            player2: 'player',
+            // TODO mirror players too
+
+            dirt_block: 'ice_block',
+            clone_block: 'ice_block',
+            ice_block: 'dirt_block',
+
+            ball: 'walker',
+            walker: 'ball',
+
+            fireball: 'bug',
+            bug: 'glider',
+            glider: 'paramecium',
+            paramecium: 'fireball',
+
+            tank_blue: 'tank_yellow',
+            tank_yellow: 'tank_blue',
+
+            // TODO teeth, timid teeth
+        },
+        _blob_mogrifications: ['ball', 'walker', 'fireball', 'glider', 'paramecium', 'bug', 'tank_blue', 'teeth', /* TODO 'timid_teeth' */ ],
+        // TODO can be wired, in which case only works when powered; other minor concerns, see wiki
+        on_arrive(me, level, other) {
+            let name = other.type.name;
+            if (me.type._mogrifications[name]) {
+                level.transmute_tile(other, me.type._mogrifications[name]);
+            }
+            else if (name === 'blob') {
+                // TODO how is this randomness determined?  important for replays!
+                let options = me.type._blob_mogrifications;
+                level.transmute_tile(other, options[Math.floor(Math.random() * options.length)]);
             }
         },
     },
@@ -592,11 +673,24 @@ const TILE_TYPES = {
     button_blue: {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
-            // Flip direction of all tanks
+            // Flip direction of all blue tanks
             for (let actor of level.actors) {
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_blue') {
                     level.set_actor_direction(actor, DIRECTIONS[actor.direction].opposite);
+                }
+            }
+        },
+    },
+    button_yellow: {
+        draw_layer: LAYER_TERRAIN,
+        on_arrive(me, level, other) {
+            // Move all yellow tanks one tile in the direction of the pressing actor
+            for (let actor of level.actors) {
+                // TODO generify somehow??
+                if (actor.type.name === 'tank_yellow') {
+                    level.set_actor_direction(actor, other.direction);
+                    level.attempt_step(actor, other.direction);
                 }
             }
         },
@@ -753,6 +847,20 @@ const TILE_TYPES = {
         movement_mode: 'forward',
         movement_speed: 4,
     },
+    tank_yellow: {
+        draw_layer: LAYER_ACTOR,
+        is_actor: true,
+        is_monster: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        pushes: {
+            dirt_block: true,
+            clone_block: true,
+            ice_block: true,
+            directional_block: true,
+        },
+        movement_speed: 4,
+    },
     blob: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
@@ -791,6 +899,17 @@ const TILE_TYPES = {
         movement_mode: 'turn-left',
         movement_speed: 4,
         ignores: new Set(['water']),
+    },
+    floor_mimic: {
+        draw_layer: LAYER_ACTOR,
+        is_actor: true,
+        is_monster: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        // TODO not like teeth; always pursues
+        // TODO takes 3 turns off!
+        movement_mode: 'pursue',
+        movement_speed: 4,
     },
 
     // Keys
@@ -876,6 +995,13 @@ const TILE_TYPES = {
         blocks_blocks: true,
         // FIXME does a thing when dropped, but that isn't implemented at all yet
     },
+    xray_eye: {
+        draw_layer: LAYER_ITEM,
+        is_item: true,
+        is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+    },
 
     // Progression
     player: {
@@ -888,6 +1014,7 @@ const TILE_TYPES = {
             dirt_block: true,
             clone_block: true,
             ice_block: true,
+            directional_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -904,6 +1031,7 @@ const TILE_TYPES = {
             dirt_block: true,
             clone_block: true,
             ice_block: true,
+            directional_block: true,
         },
         infinite_items: {
             key_yellow: true,

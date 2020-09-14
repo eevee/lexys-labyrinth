@@ -90,7 +90,8 @@ export const CC2_TILESET_LAYOUT = {
     popdown_floor: [12, 5],
     popdown_floor_visible: [13, 5],
     forbidden: [14, 5],
-    // directional block frame, i think?
+    // TODO arrows overlay at [3, 10]
+    directional_block: [15, 5],
 
     flippers: [0, 6],
     fire_boots: [1, 6],
@@ -215,7 +216,7 @@ export const CC2_TILESET_LAYOUT = {
     blob: [0, 15],
     // TODO blob animations also span multiple tiles
     // TODO [0, 16] some kinda red/blue outline
-    mimic: [14, 16],
+    floor_mimic: [0, 2],  // TODO [14, 16] with xray
     // TODO [15, 16] some kinda yellow/black outline
 
     // timid teeth
@@ -228,7 +229,7 @@ export const CC2_TILESET_LAYOUT = {
     },
 
     // TODO saucer, has layers and moves and stuff
-    eyeball: [11, 18],
+    xray_eye: [11, 18],
     ghost: {
         north: [12, 18],
         east: [13, 18],
@@ -242,7 +243,7 @@ export const CC2_TILESET_LAYOUT = {
     force_floor_w: [[2, 20], [3, 20]],
     teleport_green: [[4, 19], [5, 19], [6, 19], [7, 19]],
     teleport_yellow: [[8, 19], [9, 19], [10, 19], [11, 19]],
-    // TODO round, thing, not sure what
+    transmogrifier: [[12, 19], [13, 19], [14, 19], [15, 19]],
     teleport_red: [[4, 20], [5, 20], [6, 20], [7, 20]],
     slime: [[8, 20], [9, 20], [10, 20], [11, 20], [12, 20], [13, 20], [14, 20], [15, 20]],
 
@@ -300,6 +301,8 @@ export const CC2_TILESET_LAYOUT = {
 
     // train tracks, which are layered...
     dirt: [4, 31],
+    no_player2_sign: [5, 31],
+    no_player1_sign: [6, 31],
     // misc other stuff
 };
 
