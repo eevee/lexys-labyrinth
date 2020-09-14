@@ -506,6 +506,7 @@ const TILE_TYPES = {
     },
     green_bomb: {
         draw_layer: LAYER_ITEM,
+        is_required_chip: true,
         on_arrive(me, level, other) {
             // TODO explode
             level.remove_tile(me);
