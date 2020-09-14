@@ -66,7 +66,7 @@ class CC2Demo {
 
 // TODO assert that direction + next match the tile types
 const TILE_ENCODING = {
-    0x01: 'floor',
+    0x01: ['#mod', 'floor'],  // XXX wire
     0x02: 'wall',
     0x03: 'ice',
     0x04: 'ice_sw',
@@ -81,8 +81,8 @@ const TILE_ENCODING = {
     0x0d: 'force_floor_w',
     0x0e: 'green_wall',
     0x0f: 'green_floor',
-    0x10: 'teleport_red',
-    0x11: 'teleport_blue',
+    0x10: ['#mod', 'teleport_red'],  // XXX wire
+    0x11: ['#mod', 'teleport_blue'],  // XXX wire
     0x12: 'teleport_yellow',
     0x13: 'teleport_green',
     0x14: 'exit',
@@ -133,7 +133,7 @@ const TILE_ENCODING = {
     //0x41: Open trap (unused in main levels) : 
     0x42: 'trap',
     0x43: 'cloner',
-    0x44: ['#mod8', 'cloner'],
+    0x44: ['#mod', 'cloner'],
     0x45: 'hint',
     0x46: 'force_floor_all',
     // 0x47: 'button_gray',
@@ -143,11 +143,11 @@ const TILE_ENCODING = {
     0x4b: ['swivel_se', 'swivel_floor'],
     0x4c: ['stopwatch_bonus', '#next'],
     0x4d: ['stopwatch_toggle', '#next'],
-    0x4e: ['transmogrifier'],
-    // 0x4f: Railroad track (Modifier required, see section below) : 
-    0x50: ['steel'],
+    0x4e: ['#mod', 'transmogrifier'],  // XXX wire
+    0x4f: ['#mod', 'railroad'],
+    0x50: ['#mod', 'steel'],  // XXX wire
     0x51: ['dynamite', '#next'],
-    // 0x52: Helmet : '#next'
+    0x52: ['helmet', '#next'],
     0x56: ['player2', '#direction', '#next'],
     // 0x57: Timid teeth : '#direction', '#next'
     // 0x58: Explosion animation (unused in main levels) : '#direction', '#next'
@@ -155,7 +155,7 @@ const TILE_ENCODING = {
     0x5a: ['no_player2_sign'],
     0x5b: ['no_player1_sign'],
     // 0x5c: Inverter gate (N) : Modifier allows other gates, see below
-    // 0x5e: Logic switch (ON) : 
+    0x5e: ['#mod', 'button_pink'],  // XXX wire
     0x5f: 'flame_jet_off',
     0x60: 'flame_jet_on',
     0x61: 'button_orange',
@@ -164,19 +164,19 @@ const TILE_ENCODING = {
     0x64: 'button_yellow',
     // 0x65: Mirror Chip : '#direction', '#next'
     // 0x66: Mirror Melinda : '#direction', '#next'
-    // 0x68: Bowling ball : '#next'
-    // 0x69: Rover : '#direction', '#next'
+    0x68: ['bowling_ball', '#next'],
+    0x69: ['rover', '#direction', '#next'],
     0x6a: ['stopwatch_penalty', '#next'],
-    0x6b: ['#mod8?', ['floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue']],
+    0x6b: ['#mod', ['floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue']],
     0x6d: ['#thinwall/canopy', '#next'],
-    // 0x6f: Railroad sign : '#next'
-    0x70: ['#mod8?', ['wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue']],
-    0x71: ['#mod8', 'floor_letter'],
-    // 0x72: Purple toggle wall : 
-    // 0x73: Purple toggle floor : 
+    0x6f: ['railroad_sign', '#next'],
+    0x70: ['#mod', ['wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue']],
+    0x71: ['#mod', 'floor_letter'],
+    0x72: 'purple_wall',
+    0x73: 'purple_floor',
     0x76: ['#mod8', '#next'],
-    // 0x77: 16-bit Modifier (see Modifier section below) : 2 modifier bytes, Tile Specification for affected tile
-    // 0x78: 32-bit Modifier (see Modifier section below) : 4 modifier bytes, Tile Specification for affected tile
+    0x77: ['#mod16', '#next'],
+    0x78: ['#mod32', '#next'],
     0x7a: ['score_10', '#next'],
     0x7b: ['score_100', '#next'],
     0x7c: ['score_1000', '#next'],
@@ -188,12 +188,12 @@ const TILE_ENCODING = {
     0x82: ['floor_mimic', '#direction', '#next'],
     0x83: ['green_bomb', '#next'],
     0x84: ['green_chip', '#next'],
-    // 0x87: Black button : 
+    0x87: ['#mod', 'button_black'],  // XXX wire
     // 0x88: ON/OFF switch (OFF) : 
     // 0x89: ON/OFF switch (ON) : 
     0x8a: 'thief_keys',
-    // 0x8b: Ghost : '#direction', '#next'
-    // 0x8c: Steel foil : '#next'
+    0x8b: ['ghost', '#direction', '#next'],
+    0x8c: ['foil', '#next'],
     0x8d: 'turtle',
     0x8e: ['xray_eye', '#next'],
     // 0x8f: Thief bribe : '#next'
@@ -357,6 +357,7 @@ export function parse_level(buf) {
                 data = decompress(data);
             }
             let bytes = new Uint8Array(data);
+            let map_view = new DataView(data);
             let width = bytes[0];
             let height = bytes[1];
             level.size_x = width;
@@ -392,21 +393,27 @@ export function parse_level(buf) {
                     if (name === undefined) continue;  // XXX modifier skip hack
 
                     // Deal with modifiers
-                    let modifier;
-                    if (name === '#mod8') {
-                        if (args[0] !== '#next')
-                            throw new Error(`Tile requires a preceding modifier`);
-
-                        modifier = bytes[p];
-                        p++;
+                    let modifier = 0;  // defaults to zero
+                    if (name === '#mod8' || name === '#mod16' || name === '#mod32') {
+                        if (name === '#mod8') {
+                            modifier = bytes[p];
+                            p++;
+                        }
+                        else if (name === '#mod16') {
+                            modifier = map_view.getUint16(p, true);
+                            p += 2;
+                        }
+                        else if (name === '#mod32') {
+                            modifier = map_view.getUint32(p, true);
+                            p += 4;
+                        }
                         let mod_marker;
                         [mod_marker, name, ...args] = read_spec();
-                        if (mod_marker !== '#mod8' && mod_marker !== '#mod8?')
-                            throw new Error(`Expected a tile requiring a modifier`);
+                        if (mod_marker !== '#mod')
+                            throw new Error(`Expected a tile requiring a modifier; got ${name}`);
                     }
-                    else if (name === '#mod8?') {
-                        // This is optional, so if we didn't get one, the modifier is 0
-                        modifier = 0;
+
+                    if (name === '#mod') {
                         [name, ...args] = args;
                     }
 

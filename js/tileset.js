@@ -4,7 +4,7 @@
 // - slime and walkers have double-size tiles when moving
 // - wired tiles are a whole thing
 // - thin walls are packed into just two tiles
-// - saucer has a half-tile overlay for its direction?
+// - rover has a half-tile overlay for its direction?
 // - railroad tracks overlay a Lot
 // - directional blocks have arrows in an awkward layout, not 4x4 grid but actually positioned on the edges
 // - green and purple toggle walls use an overlay
@@ -220,7 +220,7 @@ export const CC2_TILESET_LAYOUT = {
     // TODO [15, 16] some kinda yellow/black outline
 
     // timid teeth
-    // bowling ball
+    bowling_ball: [6, 17],  // TODO also +18 when rolling
     tank_yellow: {
         north: [[8, 17], [9, 17]],
         east: [[10, 17], [11, 17]],
@@ -228,7 +228,8 @@ export const CC2_TILESET_LAYOUT = {
         west: [[14, 17], [15, 17]],
     },
 
-    // TODO saucer, has layers and moves and stuff
+    // TODO rover has layers and moves and stuff
+    rover: [0, 18],
     xray_eye: [11, 18],
     ghost: {
         north: [12, 18],
@@ -299,7 +300,9 @@ export const CC2_TILESET_LAYOUT = {
     player_drowned: [[4, 5], [5, 5], [6, 5], [7, 5]],
     player_burned: [[0, 5], [1, 5], [2, 5], [3, 5]],
 
-    // train tracks, which are layered...
+    // TODO handle train tracks!  this is gonna be complicated.
+    railroad: [9, 10],
+    railroad_sign: [4, 31],
     dirt: [4, 31],
     no_player2_sign: [5, 31],
     no_player1_sign: [6, 31],

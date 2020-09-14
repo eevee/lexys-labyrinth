@@ -205,6 +205,12 @@ const TILE_TYPES = {
         },
     },
 
+    // Railroad
+    railroad: {
+        draw_layer: LAYER_TERRAIN,
+        // TODO a lot!!
+    },
+
     // Locked doors
     door_red: {
         draw_layer: LAYER_TERRAIN,
@@ -555,6 +561,15 @@ const TILE_TYPES = {
             level.transmute_tile(other, 'explosion');
         },
     },
+    purple_floor: {
+        // TODO wired
+        draw_layer: LAYER_TERRAIN,
+    },
+    purple_wall: {
+        // TODO wired
+        draw_layer: LAYER_TERRAIN,
+        blocks_all: true,
+    },
     cloner: {
         draw_layer: LAYER_TERRAIN,
         // TODO not the case for an empty one in cc2, apparently
@@ -766,6 +781,14 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         // FIXME toggles flame jets, connected somehow, ???
     },
+    button_pink: {
+        // TODO not implemented
+        draw_layer: LAYER_TERRAIN,
+    },
+    button_black: {
+        // TODO not implemented
+        draw_layer: LAYER_TERRAIN,
+    },
 
     // Time alteration
     stopwatch_bonus: {
@@ -900,6 +923,17 @@ const TILE_TYPES = {
         movement_speed: 4,
         ignores: new Set(['water']),
     },
+    ghost: {
+        draw_layer: LAYER_ACTOR,
+        is_actor: true,
+        is_monster: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        movement_mode: 'turn-right',
+        movement_speed: 4,
+        ignores: new Set(['wall']),
+        // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
+    },
     floor_mimic: {
         draw_layer: LAYER_ACTOR,
         is_actor: true,
@@ -909,6 +943,16 @@ const TILE_TYPES = {
         // TODO not like teeth; always pursues
         // TODO takes 3 turns off!
         movement_mode: 'pursue',
+        movement_speed: 4,
+    },
+    rover: {
+        // TODO this guy is a nightmare
+        draw_layer: LAYER_ACTOR,
+        is_actor: true,
+        is_monster: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        movement_mode: 'random',
         movement_speed: 4,
     },
 
@@ -995,7 +1039,40 @@ const TILE_TYPES = {
         blocks_blocks: true,
         // FIXME does a thing when dropped, but that isn't implemented at all yet
     },
+    bowling_ball: {
+        // TODO not implemented, rolls when dropped, has an inventory, yadda yadda
+        draw_layer: LAYER_ITEM,
+        is_item: true,
+        is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+    },
     xray_eye: {
+        // TODO not implemented
+        draw_layer: LAYER_ITEM,
+        is_item: true,
+        is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+    },
+    helmet: {
+        // TODO not implemented
+        draw_layer: LAYER_ITEM,
+        is_item: true,
+        is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+    },
+    railroad_sign: {
+        draw_layer: LAYER_ITEM,
+        is_item: true,
+        is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        item_ignores: new Set(['railroad']),
+    },
+    foil: {
+        // TODO not implemented
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_tool: true,
