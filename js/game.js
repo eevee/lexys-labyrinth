@@ -590,18 +590,13 @@ export class Level {
 
     // Try to move the given actor one tile in the given direction and update
     // their cooldown.  Return true if successful.
-    attempt_step(actor, direction, speed = null) {
+    attempt_step(actor, direction, pusher_speed = null) {
         if (actor.stuck)
             return false;
 
-        // If speed is given, we're being pushed by something so we're using
-        // its speed.  Otherwise, use our movement speed.  If we're moving onto
-        // a sliding tile, we'll halve it later
-        let check_for_slide = false;
-        if (speed === null) {
-            speed = actor.type.movement_speed;
-            check_for_slide = true;
-        }
+        // Record our speed, and remember to halve it if we're stepping onto a sliding tile
+        let check_for_slide = true;
+        let speed = actor.type.movement_speed;
 
         let move = DIRECTIONS[direction].movement;
         if (!actor.cell) console.error(actor);
@@ -638,8 +633,10 @@ export class Level {
                     if (! tile.blocks(actor, direction, this))
                         continue;
 
-                    if (actor.type.pushes && actor.type.pushes[tile.type.name] && ! tile.stuck) {
+                    if (actor.type.pushes && actor.type.pushes[tile.type.name] && tile.movement_cooldown === 0 && ! tile.stuck) {
                         this.set_actor_direction(tile, direction);
+                        // FIXME the speed adjustment at the end of all this should go before this
+                        // call, but this all needs splitting up anyway
                         if (this.attempt_step(tile, direction, speed))
                             // It moved out of the way!
                             continue;
@@ -673,6 +670,11 @@ export class Level {
                 }
             }
             return false;
+        }
+
+        // We cannot possibly move more slowly than something pushing us
+        if (pusher_speed !== null) {
+            speed = Math.min(speed, pusher_speed);
         }
 
         // We're clear!
@@ -777,7 +779,7 @@ export class Level {
             if (neighbor) {
                 for (let tile of neighbor) {
                     // TODO repeating myself with tile.stuck (also should technically check for actor)
-                    if (actor.type.pushes && actor.type.pushes[tile.type.name] && ! tile.stuck) {
+                    if (actor.type.pushes && actor.type.pushes[tile.type.name] && tile.movement_cooldown === 0 && ! tile.stuck) {
                         // Block slapping: you can shove a block by walking past it sideways
                         this.set_actor_direction(tile, actor.secondary_direction);
                         this.attempt_step(tile, actor.secondary_direction);
