@@ -1,3 +1,5 @@
+import { DIRECTIONS } from './defs.js';
+
 // TODO really need to specify this format more concretely, whoof
 // XXX special kinds of drawing i know this has for a fact:
 // - letter tiles draw from a block of half-tiles onto the center of the base
@@ -9,6 +11,8 @@
 // - directional blocks have arrows in an awkward layout, not 4x4 grid but actually positioned on the edges
 // - green and purple toggle walls use an overlay
 export const CC2_TILESET_LAYOUT = {
+    '#wire-width': 1/16,
+
     door_red: [0, 1],
     door_blue: [1, 1],
     door_yellow: [2, 1],
@@ -27,7 +31,12 @@ export const CC2_TILESET_LAYOUT = {
     ice_nw: [14, 1],
     cloner: [15, 1],
 
-    floor: [0, 2],
+    floor: {
+        // Wiring!
+        base: [0, 2],
+        wired: [8, 26],
+        is_wired_optional: true,
+    },
     wall_invisible: [0, 2],
     wall_appearing: [0, 2],
     wall: [1, 2],
@@ -105,8 +114,14 @@ export const CC2_TILESET_LAYOUT = {
     button_green: [9, 6],
     button_red: [10, 6],
     button_brown: [11, 6],
-    button_pink: [12, 6],
-    button_black: [13, 6],
+    button_pink: {
+        base: [0, 2],
+        wired: [12, 6],
+    },
+    button_black: {
+        base: [0, 2],
+        wired: [13, 6],
+    },
     button_orange: [14, 6],
     button_yellow: [15, 6],
 
@@ -274,6 +289,9 @@ export const CC2_TILESET_LAYOUT = {
         [14, 24],
         [15, 24],
     ],
+
+    '#unpowered': [13, 26],
+    '#powered': [15, 26],
 
     player2: {
         moving: {
@@ -500,6 +518,47 @@ export class Tileset {
             // Some tiles (OK, just the thin walls) don't actually draw a full
             // tile, so some adjustments are needed; see below
             coords = drawspec.tile;
+        }
+        else if (drawspec.wired) {
+            if (tile && tile.wire_directions !== undefined && tile.wire_directions !== 0) {
+                // TODO all four is a different thing entirely
+                // Draw the appropriate wire underlay
+                this.draw_type('#unpowered', tile, level, ctx, x, y);
+
+                // Draw a masked part of the base tile
+                let wiredir = tile.wire_directions;
+                let wire_radius = this.layout['#wire-width'] / 2;
+                let wire0 = 0.5 - wire_radius;
+                let wire1 = 0.5 + wire_radius;
+                let [bx, by] = drawspec.base;
+                if ((wiredir & DIRECTIONS['north'].bit) === 0) {
+                    this.blit(ctx, bx, by, x, y, 1, wire0);
+                }
+                if ((wiredir & DIRECTIONS['south'].bit) === 0) {
+                    this.blit(ctx, bx, by + wire1, x, y + wire1, 1, wire0);
+                }
+                if ((wiredir & DIRECTIONS['west'].bit) === 0) {
+                    this.blit(ctx, bx, by, x, y, wire0, 1);
+                }
+                if ((wiredir & DIRECTIONS['east'].bit) === 0) {
+                    this.blit(ctx, bx + wire1, by, x + wire1, y, wire0, 1);
+                }
+
+                // Then draw the wired tile as normal
+                coords = drawspec.wired;
+            }
+            else {
+                // There's no wiring here, so just draw the base and then draw the wired part on top
+                // as normal.  If the wired part is optional (as is the case for flooring in the CC2
+                // tileset), draw the base as normal instead.
+                if (drawspec.is_wired_optional) {
+                    coords = drawspec.base;
+                }
+                else {
+                    this.blit(ctx, drawspec.base[0], drawspec.base[1], x, y);
+                    coords = drawspec.wired;
+                }
+            }
         }
 
         // Unwrap animations etc.

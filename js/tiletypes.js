@@ -8,10 +8,15 @@ const LAYER_OVERLAY = 3;
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
 // TODO get rid of mentions of 'modifier' here, put them in the c2m loader
+// TODO maybe get rid of 'load' entirely and copy everything from the tile template.  also make the template ref the type instead of just having a name.  in fact just make them fucking tiles?  (ah but they shouldn't have state like inventory)
 const TILE_TYPES = {
     // Floors and walls
     floor: {
         draw_layer: LAYER_TERRAIN,
+        load(me, template) {
+            me.wire_directions = template.wire_directions;
+            me.wire_tunnel_directions = template.wire_tunnel_directions;
+        },
     },
     floor_letter: {
         draw_layer: LAYER_TERRAIN,
@@ -784,6 +789,10 @@ const TILE_TYPES = {
     button_pink: {
         // TODO not implemented
         draw_layer: LAYER_TERRAIN,
+        load(me, template) {
+            me.wire_directions = template.wire_directions;
+            me.wire_tunnel_directions = template.wire_tunnel_directions;
+        },
     },
     button_black: {
         // TODO not implemented

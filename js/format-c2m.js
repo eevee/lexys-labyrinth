@@ -64,9 +64,15 @@ class CC2Demo {
     }
 }
 
+
+function parse_modifier_wire(tile, modifier) {
+    tile.wire_directions = modifier & 0x0f;
+    tile.wire_tunnel_directions = (modifier & 0xf0) >> 4;
+}
+
 // TODO assert that direction + next match the tile types
 const TILE_ENCODING = {
-    0x01: ['#mod', 'floor'],  // XXX wire
+    0x01: ['floor', parse_modifier_wire],
     0x02: 'wall',
     0x03: 'ice',
     0x04: 'ice_sw',
@@ -81,8 +87,8 @@ const TILE_ENCODING = {
     0x0d: 'force_floor_w',
     0x0e: 'green_wall',
     0x0f: 'green_floor',
-    0x10: ['#mod', 'teleport_red'],  // XXX wire
-    0x11: ['#mod', 'teleport_blue'],  // XXX wire
+    0x10: ['teleport_red', parse_modifier_wire],
+    0x11: ['teleport_blue', parse_modifier_wire],
     0x12: 'teleport_yellow',
     0x13: 'teleport_green',
     0x14: 'exit',
@@ -143,9 +149,9 @@ const TILE_ENCODING = {
     0x4b: ['swivel_se', 'swivel_floor'],
     0x4c: ['stopwatch_bonus', '#next'],
     0x4d: ['stopwatch_toggle', '#next'],
-    0x4e: ['#mod', 'transmogrifier'],  // XXX wire
+    0x4e: ['transmogrifier', parse_modifier_wire],
     0x4f: ['#mod', 'railroad'],
-    0x50: ['#mod', 'steel'],  // XXX wire
+    0x50: ['steel', parse_modifier_wire],
     0x51: ['dynamite', '#next'],
     0x52: ['helmet', '#next'],
     0x56: ['player2', '#direction', '#next'],
@@ -155,7 +161,7 @@ const TILE_ENCODING = {
     0x5a: ['no_player2_sign'],
     0x5b: ['no_player1_sign'],
     // 0x5c: Inverter gate (N) : Modifier allows other gates, see below
-    0x5e: ['#mod', 'button_pink'],  // XXX wire
+    0x5e: ['button_pink', parse_modifier_wire],
     0x5f: 'flame_jet_off',
     0x60: 'flame_jet_on',
     0x61: 'button_orange',
@@ -188,7 +194,7 @@ const TILE_ENCODING = {
     0x82: ['floor_mimic', '#direction', '#next'],
     0x83: ['green_bomb', '#next'],
     0x84: ['green_chip', '#next'],
-    0x87: ['#mod', 'button_black'],  // XXX wire
+    0x87: ['button_black', parse_modifier_wire],
     // 0x88: ON/OFF switch (OFF) : 
     // 0x89: ON/OFF switch (ON) : 
     0x8a: 'thief_keys',
@@ -407,10 +413,14 @@ export function parse_level(buf) {
                             modifier = map_view.getUint32(p, true);
                             p += 4;
                         }
+                        [name, ...args] = read_spec();
+                        /*
+                         * TODO check for modifier expected and warn?
                         let mod_marker;
                         [mod_marker, name, ...args] = read_spec();
                         if (mod_marker !== '#mod')
                             throw new Error(`Expected a tile requiring a modifier; got ${name}`);
+                        */
                     }
 
                     if (name === '#mod') {
@@ -501,6 +511,10 @@ export function parse_level(buf) {
                                 arrows.add('west');
                             }
                             tile.directional_block_arrows = arrows;
+                        }
+                        else if (arg instanceof Function) {
+                            // Functions handle modifiers
+                            arg(tile, modifier);
                         }
                         else {
                             // Anything else is an implicit next tile, e.g.
