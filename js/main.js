@@ -444,6 +444,14 @@ class Player extends PrimaryView {
                 // way, act like we're starting from scratch and check keys in priority order
                 this.primary_action = null;
                 this.secondary_action = null;
+
+                // As a tiebreaker, first check if we're holding the key corresponding to the
+                // player's facing direction
+                let player_facing_action = DIRECTIONS[this.level.player.direction].action;
+                if (input.has(player_facing_action)) {
+                    this.primary_action = player_facing_action;
+                }
+
                 for (let action of ['down', 'left', 'right', 'up']) {
                     if (! input.has(action))
                         continue;
@@ -451,10 +459,11 @@ class Player extends PrimaryView {
                     if (! this.primary_action) {
                         this.primary_action = action;
                     }
-                    else {
+                    else if (action !== this.primary_action) {
                         // Note that because of the opposing keys check, there can never be more
                         // than two keys held down here
                         this.secondary_action = action;
+                        break;
                     }
                 }
             }

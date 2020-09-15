@@ -538,11 +538,31 @@ export class Level {
                 continue;
 
             this.set_actor_direction(actor, actor.decision);
+            let old_cell = actor.cell;
             this.attempt_step(actor, actor.decision);
 
             // TODO do i need to do this more aggressively?
             if (this.state === 'success' || this.state === 'failure')
                 break;
+
+            // Players can also bump the tiles in the cell next to the one they're leaving
+            if (actor.type.is_player && actor.secondary_direction) {
+                let neighbor = this.cell_with_offset(old_cell, actor.secondary_direction);
+                if (neighbor) {
+                    for (let tile of neighbor) {
+                        // TODO only works if tile can be entered!
+                        // TODO repeating myself with tile.stuck (also should technically check for actor)
+                        if (actor.type.pushes && actor.type.pushes[tile.type.name] && tile.movement_cooldown === 0 && ! tile.stuck) {
+                            // Block slapping: you can shove a block by walking past it sideways
+                            this.set_actor_direction(tile, actor.secondary_direction);
+                            this.attempt_step(tile, actor.secondary_direction);
+                        }
+                        else if (tile.type.on_bump) {
+                            tile.type.on_bump(tile, this, actor);
+                        }
+                    }
+                }
+            }
         }
 
         // Strip out any destroyed actors from the acting order
@@ -763,24 +783,6 @@ export class Level {
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
-            }
-        }
-
-        // Players can also bump the tiles next to where they landed
-        if (actor.type.is_player && actor.secondary_direction) {
-            let neighbor = this.cell_with_offset(actor.cell, actor.secondary_direction);
-            if (neighbor) {
-                for (let tile of neighbor) {
-                    // TODO repeating myself with tile.stuck (also should technically check for actor)
-                    if (actor.type.pushes && actor.type.pushes[tile.type.name] && tile.movement_cooldown === 0 && ! tile.stuck) {
-                        // Block slapping: you can shove a block by walking past it sideways
-                        this.set_actor_direction(tile, actor.secondary_direction);
-                        this.attempt_step(tile, actor.secondary_direction);
-                    }
-                    else if (tile.type.on_bump) {
-                        tile.type.on_bump(tile, this, actor);
-                    }
-                }
             }
         }
 
