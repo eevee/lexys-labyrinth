@@ -590,7 +590,7 @@ export class Level {
 
     // Try to move the given actor one tile in the given direction and update
     // their cooldown.  Return true if successful.
-    attempt_step(actor, direction, pusher_speed = null) {
+    attempt_step(actor, direction) {
         if (actor.stuck)
             return false;
 
@@ -635,9 +635,7 @@ export class Level {
 
                     if (actor.type.pushes && actor.type.pushes[tile.type.name] && tile.movement_cooldown === 0 && ! tile.stuck) {
                         this.set_actor_direction(tile, direction);
-                        // FIXME the speed adjustment at the end of all this should go before this
-                        // call, but this all needs splitting up anyway
-                        if (this.attempt_step(tile, direction, speed))
+                        if (this.attempt_step(tile, direction))
                             // It moved out of the way!
                             continue;
                     }
@@ -670,11 +668,6 @@ export class Level {
                 }
             }
             return false;
-        }
-
-        // We cannot possibly move more slowly than something pushing us
-        if (pusher_speed !== null) {
-            speed = Math.min(speed, pusher_speed);
         }
 
         // We're clear!
