@@ -80,6 +80,13 @@ export class Tile {
         return false;
     }
 
+    can_push(tile) {
+        return (
+            this.type.pushes && this.type.pushes[tile.type.name] &&
+            tile.movement_cooldown === 0 &&
+            ! tile.stuck);
+    }
+
     // Inventory stuff
     has_item(name) {
         return this.inventory[name] ?? 0 > 0;
@@ -145,10 +152,14 @@ export class Cell extends Array {
         return false;
     }
 
-    blocks_entering(actor, direction, level) {
+    blocks_entering(actor, direction, level, ignore_pushables = false) {
         for (let tile of this) {
-            if (tile.blocks(actor, direction, level) && ! actor.ignores(tile.type.name))
+            if (tile.blocks(actor, direction, level) &&
+                ! actor.ignores(tile.type.name) &&
+                ! (ignore_pushables && actor.can_push(tile)))
+            {
                 return true;
+            }
         }
         return false;
     }
@@ -519,7 +530,7 @@ export class Level {
                         continue;
 
                     if (! actor.cell.blocks_leaving(actor, direction) &&
-                        ! dest_cell.blocks_entering(actor, direction, this))
+                        ! dest_cell.blocks_entering(actor, direction, this, true))
                     {
                         // We found a good direction!  Stop here
                         actor.decision = direction;
@@ -546,19 +557,20 @@ export class Level {
                 break;
 
             // Players can also bump the tiles in the cell next to the one they're leaving
-            if (actor.type.is_player && actor.secondary_direction) {
-                let neighbor = this.cell_with_offset(old_cell, actor.secondary_direction);
-                if (neighbor) {
-                    for (let tile of neighbor) {
-                        // TODO only works if tile can be entered!
-                        // TODO repeating myself with tile.stuck (also should technically check for actor)
-                        if (actor.type.pushes && actor.type.pushes[tile.type.name] && tile.movement_cooldown === 0 && ! tile.stuck) {
-                            // Block slapping: you can shove a block by walking past it sideways
-                            this.set_actor_direction(tile, actor.secondary_direction);
-                            this.attempt_step(tile, actor.secondary_direction);
-                        }
-                        else if (tile.type.on_bump) {
+            let dir2 = actor.secondary_direction;
+            if (actor.type.is_player && dir2 &&
+                ! old_cell.blocks_leaving(actor, dir2))
+            {
+                let neighbor = this.cell_with_offset(old_cell, dir2);
+                if (neighbor && ! neighbor.blocks_entering(actor, dir2, this, true)) {
+                    for (let tile of Array.from(neighbor)) {
+                        if (tile.type.on_bump) {
                             tile.type.on_bump(tile, this, actor);
+                        }
+                        if (actor.can_push(tile)) {
+                            // Block slapping: you can shove a block by walking past it sideways
+                            this.set_actor_direction(tile, dir2);
+                            this.attempt_step(tile, dir2);
                         }
                     }
                 }
@@ -614,8 +626,7 @@ export class Level {
         if (actor.stuck)
             return false;
 
-        // Record our speed, and remember to halve it if we're stepping onto a sliding tile
-        let check_for_slide = true;
+        // Record our speed, and halve it below if we're stepping onto a sliding tile
         let speed = actor.type.movement_speed;
 
         let move = DIRECTIONS[direction].movement;
@@ -626,47 +637,64 @@ export class Level {
         // somewhere else?
         let blocked;
         if (goal_cell) {
+            // Only bother touching the goal cell if we're not already trapped in this one
             if (actor.cell.blocks_leaving(actor, direction)) {
                 blocked = true;
             }
 
-            // Only bother touching the goal cell if we're not already trapped
-            // in this one
             // (Note that here, and anywhere else that has any chance of
             // altering the cell's contents, we iterate over a copy of the cell
             // to insulate ourselves from tiles appearing or disappearing
             // mid-iteration.)
             // FIXME actually, this prevents flicking!
             if (! blocked) {
-                // This is similar to Cell.blocks_entering, but we have to do a little more work
-                // FIXME splashes should block you (e.g. pushing a block off a
-                // turtle) but currently do not because of this copy; we don't
-                // notice a new thing was added to the tile  :(
-                for (let tile of Array.from(goal_cell)) {
-                    if (check_for_slide && tile.type.slide_mode && ! actor.ignores(tile.type.name)) {
-                        check_for_slide = false;
-                        speed /= 2;
-                    }
-
+                // Try to move into the cell.  This is usually a simple check of whether we can
+                // enter it (similar to Cell.blocks_entering), but if the only thing blocking us is
+                // a pushable object, we have to do two more passes: one to push anything pushable,
+                // then one to check whether we're blocked again.
+                let has_slide_tile = false;
+                let blocked_by_pushable = false;
+                for (let tile of goal_cell) {
                     if (actor.ignores(tile.type.name))
                         continue;
-                    if (! tile.blocks(actor, direction, this))
-                        continue;
 
-                    if (actor.type.pushes && actor.type.pushes[tile.type.name] && tile.movement_cooldown === 0 && ! tile.stuck) {
-                        this.set_actor_direction(tile, direction);
-                        if (this.attempt_step(tile, direction))
-                            // It moved out of the way!
-                            continue;
+                    if (tile.type.slide_mode) {
+                        has_slide_tile = true;
                     }
+
+                    // Bump tiles that we're even attempting to move into; this mostly reveals
+                    // invisible walls, blue floors, etc.
                     if (tile.type.on_bump) {
                         tile.type.on_bump(tile, this, actor);
-                        if (! tile.blocks(actor, direction, this))
-                            // It became something non-blocking!
-                            continue;
                     }
-                    blocked = true;
-                    // XXX should i break here, or bump everything?
+
+                    if (tile.blocks(actor, direction, this)) {
+                        if (actor.can_push(tile)) {
+                            blocked_by_pushable = true;
+                        }
+                        else {
+                            blocked = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (has_slide_tile) {
+                    speed /= 2;
+                }
+
+                // If the only thing blocking us can be pushed, give that a shot
+                if (! blocked && blocked_by_pushable) {
+                    // This time make a copy, since we're modifying the contents of the cell
+                    for (let tile of Array.from(goal_cell)) {
+                        if (actor.can_push(tile)) {
+                            this.set_actor_direction(tile, direction);
+                            this.attempt_step(tile, direction);
+                        }
+                    }
+
+                    // Now check if we're still blocked
+                    blocked = goal_cell.blocks_entering(actor, direction, this);
                 }
             }
         }
