@@ -791,6 +791,10 @@ const EDITOR_PALETTE = [{
         'button_blue',
         'button_red', 'cloner',
         'button_brown', 'trap',
+        'teleport_blue',
+        'teleport_red',
+        'teleport_green',
+        'teleport_yellow',
     ],
 }];
 class Editor extends PrimaryView {

@@ -306,7 +306,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
             if (other.type.name === 'dirt_block' || other.type.name === 'clone_block') {
-                level.remove_tile(other);
+                level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'dirt');
             }
             else if (other.type.name === 'ice_block') {

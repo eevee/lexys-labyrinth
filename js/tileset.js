@@ -385,11 +385,12 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     thinwall_se: [3, 0],
     cloner: [3, 1],
     force_floor_all: [3, 2],
+    splash: [3, 3],
     player_drowned: [3, 3],
     player_burned: [3, 4],
     player_bombed: [3, 5],
-    explosion_bomb: [3, 6],
-    explosion_other: [3, 7],
+    explosion: [3, 6],
+    explosion_other: [3, 7],  // TODO ???
     // 3, 8 unused
     player_exiting: [3, 9],
     // 3, 10 and 11 are "exit_extra_{1,2}" 
