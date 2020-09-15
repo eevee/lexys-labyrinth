@@ -790,6 +790,7 @@ const EDITOR_PALETTE = [{
     tiles: [
         'bomb',
         'dirt_block',
+        'ice_block',
         'button_blue',
         'button_red', 'cloner',
         'button_brown', 'trap',

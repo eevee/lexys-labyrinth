@@ -65,7 +65,9 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
         on_bump(me, level, other) {
-            level.transmute_tile(me, 'wall');
+            if (other.type.can_reveal_walls) {
+                level.transmute_tile(me, 'wall');
+            }
         },
     },
     popwall: {
@@ -101,14 +103,18 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
         on_bump(me, level, other) {
-            level.transmute_tile(me, 'wall');
+            if (other.type.can_reveal_walls) {
+                level.transmute_tile(me, 'wall');
+            }
         },
     },
     fake_floor: {
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
         on_bump(me, level, other) {
-            level.transmute_tile(me, 'floor');
+            if (other.type.can_reveal_walls) {
+                level.transmute_tile(me, 'floor');
+            }
         },
     },
     popdown_wall: {
@@ -506,6 +512,7 @@ const TILE_TYPES = {
         blocks_all: true,
         is_actor: true,
         is_block: true,
+        can_reveal_walls: true,
         movement_speed: 4,
         pushes: {
             ice_block: true,
@@ -521,6 +528,7 @@ const TILE_TYPES = {
         blocks_all: true,
         is_actor: true,
         is_block: true,
+        can_reveal_walls: true,
         load(me, template) {
             me.arrows = template.directional_block_arrows;
         },
@@ -956,11 +964,13 @@ const TILE_TYPES = {
     },
     rover: {
         // TODO this guy is a nightmare
+        // TODO pushes blocks apparently??
         draw_layer: LAYER_ACTOR,
         is_actor: true,
         is_monster: true,
         blocks_monsters: true,
         blocks_blocks: true,
+        can_reveal_walls: true,
         movement_mode: 'random',
         movement_speed: 4,
     },
@@ -1095,6 +1105,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         has_inventory: true,
+        can_reveal_walls: true,
         movement_speed: 4,
         pushes: {
             dirt_block: true,
@@ -1111,6 +1122,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         has_inventory: true,
+        can_reveal_walls: true,
         movement_speed: 4,
         ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
         pushes: {
