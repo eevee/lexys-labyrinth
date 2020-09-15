@@ -791,18 +791,15 @@ export class Level {
 
         // Handle teleporting, now that the dust has cleared
         // FIXME something funny happening here, your input isn't ignore while walking out of it?
-        let current_cell = actor.cell;
         if (teleporter) {
             let goal = teleporter.connection;
             // TODO in pathological cases this might infinite loop
             while (true) {
                 // Physically move the actor to the new teleporter
                 // XXX is this right, compare with tile world?  i overhear it's actually implemented as a slide?
-                // XXX will probably play badly with undo lol
-                let tele_cell = goal.cell;
-                current_cell._remove(actor);
-                tele_cell._add(actor);
-                current_cell = tele_cell;
+                // XXX not especially undo-efficient
+                this.remove_tile(actor);
+                this.add_tile(actor, goal.cell);
                 if (this.attempt_step(actor, actor.direction))
                     // Success, teleportation complete
                     break;
