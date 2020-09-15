@@ -442,6 +442,8 @@ class Player extends PrimaryView {
             else {
                 // Either we weren't holding any keys, or we let go of our primary action; either
                 // way, act like we're starting from scratch and check keys in priority order
+                // TODO actually i'm not sure these are necessary if we check the player's facing
+                // first?
                 this.primary_action = null;
                 this.secondary_action = null;
 

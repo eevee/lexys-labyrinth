@@ -405,8 +405,12 @@ export class Level {
 
             // Teeth can only move the first 4 of every 8 tics, though "first"
             // can be adjusted
-            if (actor.type.uses_teeth_hesitation && (this.tic_counter + this.step_parity) % 8 >= 4)
+            if (actor.slide_mode == null &&
+                actor.type.uses_teeth_hesitation &&
+                (this.tic_counter + this.step_parity) % 8 >= 4)
+            {
                 continue;
+            }
 
             let direction_preference;
             // Actors can't make voluntary moves on ice, so they're stuck with
