@@ -980,7 +980,9 @@ class Editor extends PrimaryView {
         this.root.querySelector('#editor-share-url').addEventListener('click', ev => {
             let buf = c2m.synthesize_level(this.stored_level);
             // FIXME Not ideal, but btoa() wants a string rather than any of the myriad binary types
-            let data = btoa(Array.from(new Uint8Array(buf)).map(n => String.fromCharCode(n)).join(''));
+            let stringy_buf = Array.from(new Uint8Array(buf)).map(n => String.fromCharCode(n)).join('');
+            // Make URL-safe and strip trailing padding
+            let data = btoa(stringy_buf).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
             let url = new URL(location);
             url.searchParams.delete('level');
             url.searchParams.delete('setpath');
@@ -1577,7 +1579,8 @@ async function main() {
     else if (b64level) {
         // TODO all the more important to show errors!!
         // FIXME Not ideal, but atob() returns a string rather than any of the myriad binary types
-        let buf = Uint8Array.from(atob(b64level), c => c.charCodeAt(0)).buffer;
+        let stringy_buf = atob(b64level.replace(/-/g, '+').replace(/_/g, '/'));
+        let buf = Uint8Array.from(stringy_buf, c => c.charCodeAt(0)).buffer;
         conductor.splash.load_file(buf);
     }
 }

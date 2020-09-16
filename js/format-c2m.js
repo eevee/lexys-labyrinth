@@ -941,6 +941,81 @@ function write_n_bytes(view, start, n, value) {
 }
 
 
+// Compress map data or a replay, using an LZ77-esque scheme
+function compress(buf) {
+    let bytes = new Uint8Array(buf);
+    // Can't be longer than the original; if it is, don't bother compressing!
+    let outbytes = new Uint8Array(buf.byteLength);
+    // First two bytes are uncompressed size
+    new DataView(outbytes.buffer).setUint16(0, buf.byteLength, true);
+    let p = 0;
+    let q = 2;
+    let pending_data_length = 0;
+    while (p < buf.byteLength) {
+        // Look back through the window (the previous 255 bytes, since that's the furthest back we
+        // can look) for a match that matches as much of the upcoming data as possible
+        let best_start = null;
+        let best_length = 0;
+        for (let b = Math.max(0, p - 255); b < p; b++) {
+            if (bytes[b] !== bytes[p])
+                continue;
+
+            // First byte matches; let's keep going and see how much else does, up to 127 max
+            let length = 1;
+            while (length < 127 && b + length < buf.byteLength) {
+                if (bytes[b + length] === bytes[p + length]) {
+                    length++;
+                }
+                else {
+                    break;
+                }
+            }
+
+            if (length > best_length) {
+                best_start = b;
+                best_length = length;
+            }
+        }
+
+        // If we found a match that's worth copying (i.e. shorter than just writing a data block),
+        // then do so
+        let do_copy = (best_length > 3);
+        // Write out any pending data block if necessary -- i.e. if we're about to write a copy
+        // block, if we're at the max size of a data block, or if this is the end of the data
+        if (pending_data_length > 0 &&
+            (do_copy || pending_data_length === 127 || p === buf.byteLength - 1))
+        {
+            outbytes[q] = pending_data_length;
+            q++;
+            for (let i = p - pending_data_length; i < p; i++) {
+                outbytes[q] = bytes[i];
+                q++;
+            }
+            pending_data_length = 0;
+        }
+
+        if (do_copy) {
+            outbytes[q] = 0x80 + best_length;
+            outbytes[q + 1] = p - best_start;
+            q += 2;
+            // Update p, noting that we might've done a copy into the future
+            p += best_length;
+        }
+        else {
+            // Otherwise, add this to a pending data block
+            pending_data_length += 1;
+            p++;
+        }
+
+        // If we ever exceed the uncompressed length, don't even bother
+        if (q > buf.byteLength) {
+            return null;
+        }
+    }
+    // FIXME don't love this slice
+    return outbytes.buffer.slice(0, q);
+}
+
 class C2M {
     constructor() {
         this._sections = [];  // array of [name, arraybuffer]
@@ -988,12 +1063,10 @@ class C2M {
             p += buf.byteLength;
         }
 
-        console.log(this);
-        console.log(total_length);
-        console.log(array);
         return ret;
     }
 }
+
 export function synthesize_level(stored_level) {
     let c2m = new C2M;
     c2m.add_section('CC2M', '133');
@@ -1004,7 +1077,6 @@ export function synthesize_level(stored_level) {
     map_bytes[0] = stored_level.size_x;
     map_bytes[1] = stored_level.size_y;
     let p = 2;
-    console.log(stored_level);
     for (let cell of stored_level.linear_cells) {
         for (let i = cell.length - 1; i >= 0; i--) {
             let tile = cell[i];
@@ -1052,7 +1124,15 @@ export function synthesize_level(stored_level) {
     }
 
     // FIXME ack, ArrayBuffer.slice makes a copy actually!  and i use it a lot in this file i think!!
-    c2m.add_section('MAP ', map_bytes.buffer.slice(0, p));
+    let map_buf = map_bytes.buffer.slice(0, p);
+    let compressed_map = compress(map_buf);
+    if (compressed_map) {
+        c2m.add_section('PACK', compressed_map);
+    }
+    else {
+        c2m.add_section('MAP ', map_buf);
+    }
+
     c2m.add_section('END ', '');
 
     return c2m.serialize();
