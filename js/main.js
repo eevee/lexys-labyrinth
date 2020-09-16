@@ -832,13 +832,13 @@ class Editor extends PrimaryView {
                     let cell = this.stored_level.cells[y][x];
                     for (let tile of cell) {
                         // Toggle tiles that go in obvious pairs
-                        let other = EDITOR_ADJUST_TOGGLES[tile.name];
+                        let other = EDITOR_ADJUST_TOGGLES[tile.type.name];
                         if (other) {
-                            tile.name = other;
+                            tile.type = TILE_TYPES[other];
                         }
 
                         // Rotate actors
-                        if (TILE_TYPES[tile.name].is_actor) {
+                        if (TILE_TYPES[tile.type.name].is_actor) {
                             tile.direction = DIRECTIONS[tile.direction ?? 'south'].right;
                         }
                     }
@@ -912,15 +912,17 @@ class Editor extends PrimaryView {
                         // had some kind of force floor
                         if (i === 2) {
                             let prevcell = this.stored_level.cells[prevy][prevx];
-                            if (prevcell[0].name.startsWith('force_floor_')) {
-                                prevcell[0].name = name;
+                            if (prevcell[0].type.name.startsWith('force_floor_')) {
+                                prevcell[0].type = TILE_TYPES[name];
                             }
                         }
 
                         // Drawing a loop with force floors creates ice (but not in the previous
                         // cell, obviously)
                         let cell = this.stored_level.cells[cy][cx];
-                        if (cell[0].name.startsWith('force_floor_') && cell[0].name !== name) {
+                        if (cell[0].type.name.startsWith('force_floor_') &&
+                            cell[0].type.name !== name)
+                        {
                             name = 'ice';
                         }
                         this.place_in_cell(cx, cy, name);
@@ -1083,16 +1085,16 @@ class Editor extends PrimaryView {
         // combine e.g. the tent with thin walls
         if (type.draw_layer === 0) {
             cell.length = 0;
-            cell.push({name});
+            cell.push({type});
         }
         else {
             for (let i = cell.length - 1; i >= 0; i--) {
-                if (TILE_TYPES[cell[i].name].draw_layer === type.draw_layer) {
+                if (cell[i].type.draw_layer === type.draw_layer) {
                     cell.splice(i, 1);
                 }
             }
-            cell.push({name});
-            cell.sort((a, b) => TILE_TYPES[b.name].draw_layer - TILE_TYPES[a.name].draw_layer);
+            cell.push({type});
+            cell.sort((a, b) => b.type.draw_layer - a.type.draw_layer);
         }
     }
 }
@@ -1144,10 +1146,10 @@ class Splash extends PrimaryView {
             stored_level.size_y = 32;
             for (let i = 0; i < 1024; i++) {
                 let cell = new format_util.StoredCell;
-                cell.push({name: 'floor'});
+                cell.push({type: TILE_TYPES['floor']});
                 stored_level.linear_cells.push(cell);
             }
-            stored_level.linear_cells[0].push({name: 'player'});
+            stored_level.linear_cells[0].push({type: TILE_TYPES['player']});
 
             let stored_game = new format_util.StoredGame;
             stored_game.levels.push(stored_level);

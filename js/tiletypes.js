@@ -7,22 +7,13 @@ const LAYER_ACTOR = 2;
 const LAYER_OVERLAY = 3;
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
-// TODO get rid of mentions of 'modifier' here, put them in the c2m loader
-// TODO maybe get rid of 'load' entirely and copy everything from the tile template.  also make the template ref the type instead of just having a name.  in fact just make them fucking tiles?  (ah but they shouldn't have state like inventory)
 const TILE_TYPES = {
     // Floors and walls
     floor: {
         draw_layer: LAYER_TERRAIN,
-        load(me, template) {
-            me.wire_directions = template.wire_directions;
-            me.wire_tunnel_directions = template.wire_tunnel_directions;
-        },
     },
     floor_letter: {
         draw_layer: LAYER_TERRAIN,
-        load(me, template) {
-            me.ascii_code = template.modifier;
-        },
     },
     floor_custom_green: {
         draw_layer: LAYER_TERRAIN,
@@ -529,9 +520,6 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
-        load(me, template) {
-            me.arrows = template.directional_block_arrows;
-        },
         ignores: new Set(['fire']),
         movement_speed: 4,
         pushes: {
@@ -587,10 +575,6 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         // TODO not the case for an empty one in cc2, apparently
         blocks_all: true,
-        load(me, template) {
-            // FIXME not actually right, this is a bitmask
-            me.clone_direction = template.modifier;
-        },
         activate(me, level) {
             let cell = me.cell;
             // Copy, so we don't end up repeatedly cloning the same object
@@ -797,10 +781,6 @@ const TILE_TYPES = {
     button_pink: {
         // TODO not implemented
         draw_layer: LAYER_TERRAIN,
-        load(me, template) {
-            me.wire_directions = template.wire_directions;
-            me.wire_tunnel_directions = template.wire_tunnel_directions;
-        },
     },
     button_black: {
         // TODO not implemented

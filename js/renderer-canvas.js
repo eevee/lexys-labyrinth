@@ -94,23 +94,13 @@ export class CanvasRenderer {
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
                     for (let tile of this.level.cells[y][x]) {
-                        let type;
-                        if (tile.name) {
-                            // FIXME editor hack
-                            type = TILE_TYPES[tile.name];
-                        }
-                        else {
-                            type = tile.type;
-                        }
-
-                        if (type.draw_layer !== layer)
+                        if (tile.type.draw_layer !== layer)
                             continue;
 
-                        if (! tile.type) {
-                            // FIXME not a real tile, really not ideal, editor hack
-                            this.tileset.draw_type(tile.name, tile, this.level, ctx, x - x0, y - y0);
-                        }
-                        else if (type.is_actor) {
+                        if (tile.type.is_actor &&
+                            // FIXME kind of a hack for the editor, which uses bare tile objects
+                            tile.visual_position)
+                        {
                             // Handle smooth scrolling
                             let [vx, vy] = tile.visual_position(tic_offset);
                             // Round this to the pixel grid too!

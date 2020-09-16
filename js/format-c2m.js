@@ -1,3 +1,4 @@
+import { DIRECTIONS } from './defs.js';
 import * as util from './format-util.js';
 import TILE_TYPES from './tiletypes.js';
 
@@ -65,147 +66,538 @@ class CC2Demo {
 }
 
 
-function parse_modifier_wire(tile, modifier) {
-    tile.wire_directions = modifier & 0x0f;
-    tile.wire_tunnel_directions = (modifier & 0xf0) >> 4;
-}
+let modifier_wire = {
+    decode(tile, modifier) {
+        tile.wire_directions = modifier & 0x0f;
+        tile.wire_tunnel_directions = (modifier & 0xf0) >> 4;
+    },
+};
+
+let arg_direction = {
+    size: 1,
+    decode(tile, dirbyte) {
+        let direction = ['north', 'east', 'south', 'west'][dirbyte & 0x03];
+        tile.direction = direction;
+    },
+};
 
 // TODO assert that direction + next match the tile types
 const TILE_ENCODING = {
-    0x01: ['floor', parse_modifier_wire],
-    0x02: 'wall',
-    0x03: 'ice',
-    0x04: 'ice_sw',
-    0x05: 'ice_nw',
-    0x06: 'ice_ne',
-    0x07: 'ice_se',
-    0x08: 'water',
-    0x09: 'fire',
-    0x0a: 'force_floor_n',
-    0x0b: 'force_floor_e',
-    0x0c: 'force_floor_s',
-    0x0d: 'force_floor_w',
-    0x0e: 'green_wall',
-    0x0f: 'green_floor',
-    0x10: ['teleport_red', parse_modifier_wire],
-    0x11: ['teleport_blue', parse_modifier_wire],
-    0x12: 'teleport_yellow',
-    0x13: 'teleport_green',
-    0x14: 'exit',
-    0x15: 'slime',
-    0x16: ['player', '#direction', '#next'],
-    0x17: ['dirt_block', '#direction', '#next'],
-    0x18: ['walker', '#direction', '#next'],
-    0x19: ['glider', '#direction', '#next'],
-    0x1a: ['ice_block', '#direction', '#next'],
-    0x1b: ['thinwall_s', '#next'],
-    0x1c: ['thinwall_e', '#next'],
-    0x1d: ['thinwall_se', '#next'],
-    0x1e: 'gravel',
-    0x1f: 'button_green',
-    0x20: 'button_blue',
-    0x21: ['tank_blue', '#direction', '#next'],
-    0x22: 'door_red',
-    0x23: 'door_blue',
-    0x24: 'door_yellow',
-    0x25: 'door_green',
-    0x26: ['key_red', '#next'],
-    0x27: ['key_blue', '#next'],
-    0x28: ['key_yellow', '#next'],
-    0x29: ['key_green', '#next'],
-    0x2a: ['chip', '#next'],
-    0x2b: ['chip_extra', '#next'],
-    0x2c: 'socket',
-    0x2d: 'popwall',
-    0x2e: 'wall_appearing',
-    0x2f: 'wall_invisible',
-    0x30: 'fake_wall',
-    0x31: 'fake_floor',
-    0x32: 'dirt',
-    0x33: ['bug', '#direction', '#next'],
-    0x34: ['paramecium', '#direction', '#next'],
-    0x35: ['ball', '#direction', '#next'],
-    0x36: ['blob', '#direction', '#next'],
-    0x37: ['teeth', '#direction', '#next'],
-    0x38: ['fireball', '#direction', '#next'],
-    0x39: 'button_red',
-    0x3a: 'button_brown',
-    0x3b: ['cleats', '#next'],
-    0x3c: ['suction_boots', '#next'],
-    0x3d: ['fire_boots', '#next'],
-    0x3e: ['flippers', '#next'],
-    0x3f: 'thief_tools',
-    0x40: ['bomb', '#next'],
+    0x01: {
+        name: 'floor',
+        modifier: modifier_wire,
+    },
+    0x02: {
+        name: 'wall',
+    },
+    0x03: {
+        name: 'ice',
+    },
+    0x04: {
+        name: 'ice_sw',
+    },
+    0x05: {
+        name: 'ice_nw',
+    },
+    0x06: {
+        name: 'ice_ne',
+    },
+    0x07: {
+        name: 'ice_se',
+    },
+    0x08: {
+        name: 'water',
+    },
+    0x09: {
+        name: 'fire',
+    },
+    0x0a: {
+        name: 'force_floor_n',
+    },
+    0x0b: {
+        name: 'force_floor_e',
+    },
+    0x0c: {
+        name: 'force_floor_s',
+    },
+    0x0d: {
+        name: 'force_floor_w',
+    },
+    0x0e: {
+        name: 'green_wall',
+    },
+    0x0f: {
+        name: 'green_floor',
+    },
+    0x10: {
+        name: 'teleport_red',
+        modifier: modifier_wire,
+    },
+    0x11: {
+        name: 'teleport_blue',
+        modifier: modifier_wire,
+    },
+    0x12: {
+        name: 'teleport_yellow',
+    },
+    0x13: {
+        name: 'teleport_green',
+    },
+    0x14: {
+        name: 'exit',
+    },
+    0x15: {
+        name: 'slime',
+    },
+    0x16: {
+        name: 'player',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x17: {
+        name: 'dirt_block',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x18: {
+        name: 'walker',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x19: {
+        name: 'glider',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x1a: {
+        name: 'ice_block',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x1b: {
+        name: 'thinwall_s',
+        has_next: true,
+    },
+    0x1c: {
+        name: 'thinwall_e',
+        has_next: true,
+    },
+    0x1d: {
+        name: 'thinwall_se',
+        has_next: true,
+    },
+    0x1e: {
+        name: 'gravel',
+    },
+    0x1f: {
+        name: 'button_green',
+    },
+    0x20: {
+        name: 'button_blue',
+    },
+    0x21: {
+        name: 'tank_blue',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x22: {
+        name: 'door_red',
+    },
+    0x23: {
+        name: 'door_blue',
+    },
+    0x24: {
+        name: 'door_yellow',
+    },
+    0x25: {
+        name: 'door_green',
+    },
+    0x26: {
+        name: 'key_red',
+        has_next: true,
+    },
+    0x27: {
+        name: 'key_blue',
+        has_next: true,
+    },
+    0x28: {
+        name: 'key_yellow',
+        has_next: true,
+    },
+    0x29: {
+        name: 'key_green',
+        has_next: true,
+    },
+    0x2a: {
+        name: 'chip',
+        has_next: true,
+    },
+    0x2b: {
+        name: 'chip_extra',
+        has_next: true,
+    },
+    0x2c: {
+        name: 'socket',
+    },
+    0x2d: {
+        name: 'popwall',
+    },
+    0x2e: {
+        name: 'wall_appearing',
+    },
+    0x2f: {
+        name: 'wall_invisible',
+    },
+    0x30: {
+        name: 'fake_wall',
+    },
+    0x31: {
+        name: 'fake_floor',
+    },
+    0x32: {
+        name: 'dirt',
+    },
+    0x33: {
+        name: 'bug',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x34: {
+        name: 'paramecium',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x35: {
+        name: 'ball',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x36: {
+        name: 'blob',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x37: {
+        name: 'teeth',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x38: {
+        name: 'fireball',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x39: {
+        name: 'button_red',
+    },
+    0x3a: {
+        name: 'button_brown',
+    },
+    0x3b: {
+        name: 'cleats',
+        has_next: true,
+    },
+    0x3c: {
+        name: 'suction_boots',
+        has_next: true,
+    },
+    0x3d: {
+        name: 'fire_boots',
+        has_next: true,
+    },
+    0x3e: {
+        name: 'flippers',
+        has_next: true,
+    },
+    0x3f: {
+        name: 'thief_tools',
+    },
+    0x40: {
+        name: 'bomb',
+        has_next: true,
+    },
     //0x41: Open trap (unused in main levels) : 
-    0x42: 'trap',
-    0x43: 'cloner',
-    0x44: ['#mod', 'cloner'],
-    0x45: 'hint',
-    0x46: 'force_floor_all',
+    0x42: {
+        name: 'trap',
+    },
+    0x43: {
+        name: 'cloner',
+    },
+    0x44: {
+        name: 'cloner',
+        // TODO visual directions bitmask, no gameplay impact, possible editor impact
+        modifier: null,
+    },
+    0x45: {
+        name: 'hint',
+    },
+    0x46: {
+        name: 'force_floor_all',
+    },
     // 0x47: 'button_gray',
-    0x48: ['swivel_sw', 'swivel_floor'],
-    0x49: ['swivel_nw', 'swivel_floor'],
-    0x4a: ['swivel_ne', 'swivel_floor'],
-    0x4b: ['swivel_se', 'swivel_floor'],
-    0x4c: ['stopwatch_bonus', '#next'],
-    0x4d: ['stopwatch_toggle', '#next'],
-    0x4e: ['transmogrifier', parse_modifier_wire],
-    0x4f: ['#mod', 'railroad'],
-    0x50: ['steel', parse_modifier_wire],
-    0x51: ['dynamite', '#next'],
-    0x52: ['helmet', '#next'],
-    0x56: ['player2', '#direction', '#next'],
+    // FIXME swivel floors...  argh...
+    0x48: {
+        name: 'swivel_sw',
+    },
+    0x49: {
+        name: 'swivel_nw',
+    },
+    0x4a: {
+        name: 'swivel_ne',
+    },
+    0x4b: {
+        name: 'swivel_se',
+    },
+    0x4c: {
+        name: 'stopwatch_bonus',
+        has_next: true,
+    },
+    0x4d: {
+        name: 'stopwatch_toggle',
+        has_next: true,
+    },
+    0x4e: {
+        name: 'transmogrifier',
+        modifier: modifier_wire,
+    },
+    0x4f: {
+        name: 'railroad',
+        modifier: {
+            decode(tile, mask) {
+                // TODO railroad props
+            },
+        },
+    },
+    0x50: {
+        name: 'steel',
+        modifier: modifier_wire,
+    },
+    0x51: {
+        name: 'dynamite',
+        has_next: true,
+    },
+    0x52: {
+        name: 'helmet',
+        has_next: true,
+    },
+    0x56: {
+        name: 'player2',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
     // 0x57: Timid teeth : '#direction', '#next'
     // 0x58: Explosion animation (unused in main levels) : '#direction', '#next'
-    0x59: ['hiking_boots', '#next'],
-    0x5a: ['no_player2_sign'],
-    0x5b: ['no_player1_sign'],
+    0x59: {
+        name: 'hiking_boots',
+        has_next: true,
+    },
+    0x5a: {
+        name: 'no_player2_sign',
+    },
+    0x5b: {
+        name: 'no_player1_sign',
+    },
     // 0x5c: Inverter gate (N) : Modifier allows other gates, see below
-    0x5e: ['button_pink', parse_modifier_wire],
-    0x5f: 'flame_jet_off',
-    0x60: 'flame_jet_on',
-    0x61: 'button_orange',
+    0x5e: {
+        name: 'button_pink',
+        modifier: modifier_wire,
+    },
+    0x5f: {
+        name: 'flame_jet_off',
+    },
+    0x60: {
+        name: 'flame_jet_on',
+    },
+    0x61: {
+        name: 'button_orange',
+    },
     // 0x62: Lightning bolt : '#next'
-    0x63: ['tank_yellow', '#direction', '#next'],
-    0x64: 'button_yellow',
+    0x63: {
+        name: 'tank_yellow',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x64: {
+        name: 'button_yellow',
+    },
     // 0x65: Mirror Chip : '#direction', '#next'
     // 0x66: Mirror Melinda : '#direction', '#next'
-    0x68: ['bowling_ball', '#next'],
-    0x69: ['rover', '#direction', '#next'],
-    0x6a: ['stopwatch_penalty', '#next'],
-    0x6b: ['#mod', ['floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue']],
-    0x6d: ['#thinwall/canopy', '#next'],
-    0x6f: ['railroad_sign', '#next'],
-    0x70: ['#mod', ['wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue']],
-    0x71: ['#mod', 'floor_letter'],
-    0x72: 'purple_wall',
-    0x73: 'purple_floor',
-    0x76: ['#mod8', '#next'],
-    0x77: ['#mod16', '#next'],
-    0x78: ['#mod32', '#next'],
-    0x7a: ['score_10', '#next'],
-    0x7b: ['score_100', '#next'],
-    0x7c: ['score_1000', '#next'],
-    0x7d: ['popdown_wall'],
-    0x7e: ['popdown_floor'],
-    0x7f: ['forbidden', '#next'],
-    0x80: ['score_2x', '#next'],
-    0x81: ['directional_block', '#direction', '#directional_block_mask', '#next'],
-    0x82: ['floor_mimic', '#direction', '#next'],
-    0x83: ['green_bomb', '#next'],
-    0x84: ['green_chip', '#next'],
-    0x87: ['button_black', parse_modifier_wire],
+    0x68: {
+        name: 'bowling_ball',
+        has_next: true,
+    },
+    0x69: {
+        name: 'rover',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x6a: {
+        name: 'stopwatch_penalty',
+        has_next: true,
+    },
+    0x6b: {
+        name: ['floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue'],
+    },
+    0x6d: {
+        // TODO oh this one is probably gonna be hard
+        name: '#thinwall/canopy',
+        has_next: true,
+    },
+    0x6f: {
+        name: 'railroad_sign',
+        has_next: true,
+    },
+    0x70: {
+        name: ['wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue'],
+    },
+    0x71: {
+        name: 'floor_letter',
+        modifier: {
+            decode(tile, ascii_code) {
+                tile.ascii_code = ascii_code;
+            },
+        },
+    },
+    0x72: {
+        name: 'purple_wall',
+    },
+    0x73: {
+        name: 'purple_floor',
+    },
+    0x76: {
+        name: '#mod8',
+    },
+    0x77: {
+        name: '#mod16',
+    },
+    0x78: {
+        name: '#mod32',
+    },
+    0x7a: {
+        name: 'score_10',
+        has_next: true,
+    },
+    0x7b: {
+        name: 'score_100',
+        has_next: true,
+    },
+    0x7c: {
+        name: 'score_1000',
+        has_next: true,
+    },
+    0x7d: {
+        name: 'popdown_wall',
+    },
+    0x7e: {
+        name: 'popdown_floor',
+    },
+    0x7f: {
+        name: 'forbidden',
+        has_next: true,
+    },
+    0x80: {
+        name: 'score_2x',
+        has_next: true,
+    },
+    0x81: {
+        name: 'directional_block',
+        extra_args: [
+            arg_direction,
+            {
+                size: 1,
+                decode(tile, mask) {
+                    let arrows = new Set;
+                    for (let [direction, info] of Object.entries(DIRECTIONS)) {
+                        if (mask & info.bit) {
+                            arrows.add(direction);
+                        }
+                    }
+                    tile.arrows = arrows;
+                },
+            },
+        ],
+        has_next: true,
+    },
+    0x82: {
+        name: 'floor_mimic',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x83: {
+        name: 'green_bomb',
+        has_next: true,
+    },
+    0x84: {
+        name: 'green_chip',
+        has_next: true,
+    },
+    0x87: {
+        name: 'button_black',
+        modifier: modifier_wire,
+    },
     // 0x88: ON/OFF switch (OFF) : 
     // 0x89: ON/OFF switch (ON) : 
-    0x8a: 'thief_keys',
-    0x8b: ['ghost', '#direction', '#next'],
-    0x8c: ['foil', '#next'],
-    0x8d: 'turtle',
-    0x8e: ['xray_eye', '#next'],
+    0x8a: {
+        name: 'thief_keys',
+    },
+    0x8b: {
+        name: 'ghost',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0x8c: {
+        name: 'foil',
+        has_next: true,
+    },
+    0x8d: {
+        name: 'turtle',
+    },
+    0x8e: {
+        name: 'xray_eye',
+        has_next: true,
+    },
     // 0x8f: Thief bribe : '#next'
     // 0x90: Speed boots : '#next'
     // 0x92: Hook : '#next' 
 };
+const REVERSE_TILE_ENCODING = {};
+for (let [tile_byte, spec] of Object.entries(TILE_ENCODING)) {
+    spec.tile_byte = tile_byte;
+
+    if (spec.name instanceof Array) {
+        // Custom floor/wall
+        for (let [i, name] of spec.name.entries()) {
+            // Copy the spec with a hardcoded modifier
+            let new_spec = Object.assign({}, spec);
+            new_spec.name = name;
+            new_spec.modifier = {
+                encode(tile) {
+                    return i;
+                },
+            };
+            REVERSE_TILE_ENCODING[name] = new_spec;
+        }
+    }
+    else {
+        REVERSE_TILE_ENCODING[spec.name] = spec;
+    }
+}
+
+// Read 1, 2, or 4 bytes from a DataView
+function read_n_bytes(view, start, n) {
+    if (n === 1) {
+        return view.getUint8(start, true);
+    }
+    else if (n === 2) {
+        return view.getUint16(start, true);
+    }
+    else if (n === 4) {
+        return view.getUint32(start, true);
+    }
+    else {
+        throw new Error(`Can't read ${n} bytes`);
+    }
+}
 
 // Decompress the little ad-hoc compression scheme used for both map data and
 // solution playback
@@ -373,157 +765,103 @@ export function parse_level(buf) {
             function read_spec() {
                 let tile_byte = bytes[p];
                 p++;
-                if (tile_byte >= 0x77 && tile_byte <= 0x78) {
-                    // XXX handle these modifier "tiles"
-                    p += tile_byte - 0x75;
-                    return [];
-                }
                 let spec = TILE_ENCODING[tile_byte];
                 if (! spec)
                     throw new Error(`Unrecognized tile type 0x${tile_byte.toString(16)}`);
 
-                let name;
-                let args = [];
-                if (spec instanceof Array) {
-                    return spec;
-                }
-                else {
-                    return [spec];
-                }
+                return spec;
             }
 
             for (let n = 0; n < width * height; n++) {
                 let cell = new util.StoredCell;
                 while (true) {
-                    let [name, ...args] = read_spec();
-                    if (name === undefined) continue;  // XXX modifier skip hack
+                    let spec = read_spec();
 
                     // Deal with modifiers
                     let modifier = 0;  // defaults to zero
-                    if (name === '#mod8' || name === '#mod16' || name === '#mod32') {
-                        if (name === '#mod8') {
+                    if (spec.name === '#mod8' || spec.name === '#mod16' || spec.name === '#mod32') {
+                        if (spec.name === '#mod8') {
                             modifier = bytes[p];
                             p++;
                         }
-                        else if (name === '#mod16') {
+                        else if (spec.name === '#mod16') {
                             modifier = map_view.getUint16(p, true);
                             p += 2;
                         }
-                        else if (name === '#mod32') {
+                        else if (spec.name === '#mod32') {
                             modifier = map_view.getUint32(p, true);
                             p += 4;
                         }
-                        [name, ...args] = read_spec();
-                        /*
-                         * TODO check for modifier expected and warn?
-                        let mod_marker;
-                        [mod_marker, name, ...args] = read_spec();
-                        if (mod_marker !== '#mod')
-                            throw new Error(`Expected a tile requiring a modifier; got ${name}`);
-                        */
+                        spec = read_spec();
+                        if (! spec.modifier) {
+                            console.warn("Got unexpected modifier for tile:", spec.name);
+                        }
                     }
 
-                    if (name === '#mod') {
-                        [name, ...args] = args;
-                    }
+                    let name = spec.name;
 
                     // Make a tile template, possibly dealing with some special cases
+                    // FIXME restore this
                     if (name === '#thinwall/canopy') {
-                        // Thin walls and the canopy are combined into a single
-                        // byte for some reason; split them apart here.  Which
-                        // ones we get is determined by a bitmask
+                        // Thin walls and the canopy are combined into a single byte for some
+                        // reason; split them apart here.  Which ones we get is determined by a
+                        // bitmask
                         let mask = bytes[p];
                         p++;
                         // This order is important; this is the order CC2 draws them in
                         if (mask & 0x10) {
-                            cell.push({name: 'canopy'});
+                            cell.push({type: TILE_TYPES['canopy']});
                         }
                         if (mask & 0x08) {
-                            cell.push({name: 'thinwall_w'});
+                            cell.push({type: TILE_TYPES['thinwall_w']});
                         }
                         if (mask & 0x04) {
-                            cell.push({name: 'thinwall_s'});
+                            cell.push({type: TILE_TYPES['thinwall_s']});
                         }
                         if (mask & 0x02) {
-                            cell.push({name: 'thinwall_e'});
+                            cell.push({type: TILE_TYPES['thinwall_e']});
                         }
                         if (mask & 0x01) {
-                            cell.push({name: 'thinwall_n'});
+                            cell.push({type: TILE_TYPES['thinwall_n']});
                         }
-                        // Skip the rest of the loop.  That means we don't
-                        // handle any of the other special behavior below, but
-                        // neither thin walls nor canopies should use any of
-                        // it, so that's fine
+                        // Skip the rest of the loop.  That means we don't handle any of the other
+                        // special behavior below, but neither thin walls nor canopies should use
+                        // any of it, so that's fine
                         continue;
                     }
                     else if (name instanceof Array) {
-                        // Custom floors and walls are one of several options,
-                        // given by an optional modifier
+                        // Custom floors and walls are one of several options, chosen by modifier
                         name = name[modifier];
                     }
 
-                    let tile = {name, modifier};
-                    cell.push(tile);
                     let type = TILE_TYPES[name];
-                    if (!type) console.error(name);
+                    if (!type) console.error(name, spec);
+                    let tile = {type};
+                    cell.push(tile);
+                    if (spec.modifier) {
+                        spec.modifier.decode(tile, modifier);
+                    }
+
                     if (type.is_required_chip) {
                         level.chips_required++;
                     }
                     if (type.is_hint) {
-                        // Remember all the hint tiles (in reading order) so we
-                        // can map extra hints to them later.  Don't do it now,
-                        // since the format doesn't technically guarantee that
-                        // the metadata sections appear before the map data!
+                        // Remember all the hint tiles (in reading order) so we can map extra hints
+                        // to them later.  Don't do it now, since the format doesn't technically
+                        // guarantee that the metadata sections appear before the map data!
                         hint_tiles.push(tile);
                     }
 
                     // Handle extra arguments
-                    let has_next = false;
-                    for (let arg of args) {
-                        if (arg === '#direction') {
-                            let dirbyte = bytes[p];
-                            p++;
-                            let direction = ['north', 'east', 'south', 'west'][dirbyte];
-                            if (! direction) {
-                                console.warn(`'${name}' tile at ${n % width}, ${Math.floor(n / width)} has bogus direction byte ${dirbyte}; defaulting to south`);
-                                direction = 'south';
-                            }
-                            tile.direction = direction;
-                        }
-                        else if (arg === '#next') {
-                            has_next = true;
-                        }
-                        else if (arg === '#directional_block_mask') {
-                            // Direction mask used specifically for the directional block
-                            let mask = bytes[p];
-                            p++;
-                            let arrows = new Set;
-                            if (mask & 0x01) {
-                                arrows.add('north');
-                            }
-                            if (mask & 0x02) {
-                                arrows.add('east');
-                            }
-                            if (mask & 0x04) {
-                                arrows.add('south');
-                            }
-                            if (mask & 0x08) {
-                                arrows.add('west');
-                            }
-                            tile.directional_block_arrows = arrows;
-                        }
-                        else if (arg instanceof Function) {
-                            // Functions handle modifiers
-                            arg(tile, modifier);
-                        }
-                        else {
-                            // Anything else is an implicit next tile, e.g.
-                            // turtles imply water underneath
-                            cell.push({name: arg});
+                    if (spec.extra_args) {
+                        for (let argspec of spec.extra_args) {
+                            let arg = read_n_bytes(map_view, p, argspec.size);
+                            p += argspec.size;
+                            argspec.decode(tile, arg);
                         }
                     }
 
-                    if (! has_next)
+                    if (! spec.has_next)
                         break;
                 }
                 cell.reverse();
@@ -561,4 +899,24 @@ export function parse_level(buf) {
     }
 
     return level;
+}
+
+export function synthesize_level(stored_level) {
+    add_section('CC2M', '133');
+
+    // FIXME well this will not do
+    let map_bytes = new Uint8Array(1024);
+    map_bytes[0] = stored_level.size_x;
+    map_bytes[1] = stored_level.size_y;
+    let p = 2;
+    for (let cell of stored_level.linear_cells) {
+        // TODO can i allocate less here?  iterate in reverse, avoid slicing?
+        // TODO assert that the bottom tile has no next, and all the others do
+        for (let tile of cell.reverse()) {
+            let [tile_byte, ...args] = REVERSE_TILE_ENCODING[tile.type.name];
+        }
+    }
+
+    add_section('MAP ', '');
+    add_section('END ', '');
 }

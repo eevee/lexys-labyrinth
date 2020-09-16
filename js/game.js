@@ -16,13 +16,11 @@ export class Tile {
     }
 
     static from_template(tile_template) {
-        let type = TILE_TYPES[tile_template.name];
-        if (! type) console.error(tile_template.name);
+        let type = tile_template.type;
+        if (! type) console.error(tile_template);
         let tile = new this(type, tile_template.direction);
-        if (type.load) {
-            type.load(tile, tile_template);
-        }
-        return tile;
+        // Copy any extra properties in verbatim
+        return Object.assign(tile, tile_template);
     }
 
     // Gives the effective position of an actor in motion, given smooth scrolling
@@ -782,7 +780,7 @@ export class Level {
         // If we're stepping directly on the player, that kills them too
         // TODO this only works because i have the player move first; in lynx the check is the other
         // way around
-        if (goal_cell === this.player_leaving_cell) {
+        if (actor.type.is_monster && goal_cell === this.player_leaving_cell) {
             this.fail("Oops!  Watch out for creatures!");
         }
 
