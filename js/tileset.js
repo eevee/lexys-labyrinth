@@ -283,6 +283,16 @@ export const CC2_TILESET_LAYOUT = {
             east: [8, 22],
         },
     },
+    bogus_player_win: {
+        overlay: [0, 23],
+        base: 'exit',
+    },
+    bogus_player_swimming: {
+        north: [[0, 24], [1, 24]],
+        east: [[2, 24], [3, 24]],
+        south: [[4, 24], [5, 24]],
+        west: [[6, 24], [7, 24]],
+    },
     water: [
         [12, 24],
         [13, 24],
@@ -392,9 +402,14 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     explosion: [3, 6],
     explosion_other: [3, 7],  // TODO ???
     // 3, 8 unused
-    player_exiting: [3, 9],
-    // 3, 10 and 11 are "exit_extra_{1,2}" 
+    bogus_player_win: [3, 9],  // TODO 10 and 11 too?  does this animate?
     // TODO player swimming is 3, 12-15
+    bogus_player_swimming: {
+        north: [3, 12],
+        west: [3, 13],
+        south: [3, 14],
+        east: [3, 15],
+    },
 
     bug: {
         north: [4, 0],

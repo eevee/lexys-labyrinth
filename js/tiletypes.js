@@ -1234,6 +1234,17 @@ const TILE_TYPES = {
         blocks_players: true,
         ttl: 6,
     },
+
+    // Invalid tiles that appear in some CCL levels because community level
+    // designers love to make nonsense
+    bogus_player_win: {
+        draw_layer: LAYER_TERRAIN,
+        blocks_all: true,
+    },
+    bogus_player_swimming: {
+        draw_layer: LAYER_TERRAIN,
+        blocks_all: true,
+    },
 };
 
 // Tell them all their own names

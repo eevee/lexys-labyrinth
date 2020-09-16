@@ -59,10 +59,13 @@ const TILE_ENCODING = {
     0x36: 'wall_invisible',  // unused
     0x37: 'wall_invisible',  // unused
     0x38: 'wall_invisible',  // unused
-    //0x39: exit_player,
-    0x3a: 'exit',
-    0x3b: 'exit',  // i think this is for the second frame of the exit animation?
-    // FIXME??? 0x3c - 0x3f are player swimming!
+    0x39: 'bogus_player_win',
+    0x3a: 'bogus_player_win',
+    0x3b: 'bogus_player_win',
+    0x3c: ['bogus_player_swimming', 'north'],
+    0x3d: ['bogus_player_swimming', 'west'],
+    0x3e: ['bogus_player_swimming', 'south'],
+    0x3f: ['bogus_player_swimming', 'east'],
     0x40: ['bug', 'north'],
     0x41: ['bug', 'west'],
     0x42: ['bug', 'south'],
