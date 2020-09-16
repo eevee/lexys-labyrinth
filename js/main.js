@@ -229,11 +229,6 @@ class Player extends PrimaryView {
             this._redraw();
         });
 
-        // Populate inventory
-        this._inventory_tiles = {};
-        let floor_tile = this.render_inventory_tile('floor');
-        this.inventory_el.style.backgroundImage = `url(${floor_tile})`;
-
         this.renderer = new CanvasRenderer(this.conductor.tileset);
         this.level_el.append(this.renderer.canvas);
         this.renderer.canvas.addEventListener('auxclick', ev => {
@@ -243,6 +238,11 @@ class Player extends PrimaryView {
             let [x, y] = this.renderer.cell_coords_from_event(ev);
             this.level.move_to(this.level.player, this.level.cells[y][x], 1);
         });
+
+        // Populate inventory
+        this._inventory_tiles = {};
+        let floor_tile = this.render_inventory_tile('floor');
+        this.inventory_el.style.backgroundImage = `url(${floor_tile})`;
 
         let last_key;
         this.pending_player_move = null;
@@ -526,10 +526,8 @@ class Player extends PrimaryView {
 
     render_inventory_tile(name) {
         if (! this._inventory_tiles[name]) {
-            // TODO put this on the renderer
             // TODO reuse the canvas for data urls
-            let canvas = mk('canvas', {width: this.conductor.tileset.size_x, height: this.conductor.tileset.size_y});
-            this.conductor.tileset.draw({type: TILE_TYPES[name]}, null, canvas.getContext('2d'), 0, 0);
+            let canvas = this.renderer.create_tile_type_canvas(name);
             this._inventory_tiles[name] = canvas.toDataURL();
         }
         return this._inventory_tiles[name];
@@ -1026,13 +1024,9 @@ class Editor extends PrimaryView {
             let section_el = mk('section');
             palette_el.append(mk('h2', sectiondef.title), section_el);
             for (let name of sectiondef.tiles) {
-                let entry = mk('canvas.palette-entry', {
-                    width: this.conductor.tileset.size_x,
-                    height: this.conductor.tileset.size_y,
-                    'data-tile-name': name,
-                });
-                let ctx = entry.getContext('2d');
-                this.conductor.tileset.draw_type(name, null, null, ctx, 0, 0);
+                let entry = this.renderer.create_tile_type_canvas(name);
+                entry.setAttribute('data-tile-name', name);
+                entry.classList = 'palette-entry';
                 this.palette[name] = entry;
                 section_el.append(entry);
             }

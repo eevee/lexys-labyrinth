@@ -22,6 +22,7 @@ export class CanvasRenderer {
         this.canvas = mk('canvas', {width: tileset.size_x * this.viewport_size_x, height: tileset.size_y * this.viewport_size_y});
         this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
         this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
+        this.ctx = this.canvas.getContext('2d');
         this.viewport_x = 0;
         this.viewport_y = 0;
     }
@@ -40,6 +41,16 @@ export class CanvasRenderer {
         return [x, y];
     }
 
+    // Draw to a canvas using tile coordinates
+    blit(ctx, sx, sy, dx, dy, w = 1, h = w) {
+        let tw = this.tileset.size_x;
+        let th = this.tileset.size_y;
+        ctx.drawImage(
+            this.tileset.image,
+            sx * tw, sy * th, w * tw, h * th,
+            dx * tw, dy * th, w * tw, h * th);
+    }
+
     draw(tic_offset = 0) {
         if (! this.level) {
             console.warn("CanvasRenderer.draw: No level to render");
@@ -48,9 +59,9 @@ export class CanvasRenderer {
 
         // TODO StoredLevel may not have a tic_counter
         let tic = (this.level.tic_counter ?? 0) + tic_offset;
-
-        let ctx = this.canvas.getContext('2d');
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        let tw = this.tileset.size_x;
+        let th = this.tileset.size_y;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         // TODO only recompute if the player moved?
         // TODO what about levels smaller than the viewport...?  shrink the canvas in set_level?
@@ -68,8 +79,8 @@ export class CanvasRenderer {
         let x0 = Math.max(0, Math.min(this.level.size_x - this.viewport_size_x, px - xmargin));
         let y0 = Math.max(0, Math.min(this.level.size_y - this.viewport_size_y, py - ymargin));
         // Round to the pixel grid
-        x0 = Math.floor(x0 * this.tileset.size_x + 0.5) / this.tileset.size_x;
-        y0 = Math.floor(y0 * this.tileset.size_y + 0.5) / this.tileset.size_y;
+        x0 = Math.floor(x0 * tw + 0.5) / tw;
+        y0 = Math.floor(y0 * th + 0.5) / th;
         this.viewport_x = x0;
         this.viewport_y = y0;
         // The viewport might not be aligned to the grid, so split off any fractional part.
@@ -89,10 +100,11 @@ export class CanvasRenderer {
         let y1 = Math.min(this.level.size_y - 1, Math.ceil(y0 + this.viewport_size_y));
         // Draw one layer at a time, so animated objects aren't overdrawn by
         // neighboring terrain
+        let x, y;
         // XXX layer count hardcoded here
         for (let layer = 0; layer < 4; layer++) {
-            for (let x = xf0; x <= x1; x++) {
-                for (let y = yf0; y <= y1; y++) {
+            for (x = xf0; x <= x1; x++) {
+                for (y = yf0; y <= y1; y++) {
                     for (let tile of this.level.cells[y][x]) {
                         if (tile.type.draw_layer !== layer)
                             continue;
@@ -104,18 +116,28 @@ export class CanvasRenderer {
                             // Handle smooth scrolling
                             let [vx, vy] = tile.visual_position(tic_offset);
                             // Round this to the pixel grid too!
-                            vx = Math.floor(vx * this.tileset.size_x + 0.5) / this.tileset.size_x;
-                            vy = Math.floor(vy * this.tileset.size_y + 0.5) / this.tileset.size_y;
-                            this.tileset.draw(tile, tic, ctx, vx - x0, vy - y0);
+                            vx = Math.floor(vx * tw + 0.5) / tw;
+                            vy = Math.floor(vy * th + 0.5) / th;
+                            this.tileset.draw(tile, tic, (sx, sy, dx = 0, dy = 0, w = 1, h = w) =>
+                                this.blit(this.ctx, sx, sy, vx - x0 + dx, vy - y0 + dy, w, h));
                         }
                         else {
                             // Non-actors can't move
-                            this.tileset.draw(tile, tic, ctx, x - x0, y - y0);
+                            this.tileset.draw(tile, tic, (sx, sy, dx = 0, dy = 0, w = 1, h = w) =>
+                                this.blit(this.ctx, sx, sy, x - x0 + dx, y - y0 + dy, w, h));
                         }
                     }
                 }
             }
         }
+    }
+
+    create_tile_type_canvas(name) {
+        let canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
+        let ctx = canvas.getContext('2d');
+        this.tileset.draw_type(name, null, 0, (sx, sy, dx = 0, dy = 0, w = 1, h = w) =>
+            this.blit(ctx, sx, sy, dx, dy, w, h));
+        return canvas;
     }
 }
 

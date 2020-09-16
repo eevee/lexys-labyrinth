@@ -491,23 +491,13 @@ export class Tileset {
         this.size_y = size_y;
     }
 
-    // Helper to draw to a canvas using tile coordinates
-    blit(ctx, sx, sy, dx, dy, scale_x = 1, scale_y = scale_x) {
-        let w = this.size_x * scale_x;
-        let h = this.size_y * scale_y;
-        ctx.drawImage(
-            this.image,
-            sx * this.size_x, sy * this.size_y, w, h,
-            dx * this.size_x, dy * this.size_y, w, h);
-    }
-
-    draw(tile, tic, ctx, x, y) {
-        this.draw_type(tile.type.name, tile, tic, ctx, x, y);
+    draw(tile, tic, blit) {
+        this.draw_type(tile.type.name, tile, tic, blit);
     }
 
     // Draws a tile type, given by name.  Passing in a tile is optional, but
     // without it you'll get defaults.
-    draw_type(name, tile, tic, ctx, x, y) {
+    draw_type(name, tile, tic, blit) {
         let drawspec = this.layout[name];
         if (! drawspec) {
             console.error(`Don't know how to draw tile type ${name}!`);
@@ -519,9 +509,9 @@ export class Tileset {
             // southeast thin walls.  Draw the base (a type name), then draw
             // the overlay (either a type name or a regular draw spec).
             // TODO chance of infinite recursion here
-            this.draw_type(drawspec.base, tile, tic, ctx, x, y);
+            this.draw_type(drawspec.base, tile, tic, blit);
             if (typeof drawspec.overlay === 'string') {
-                this.draw_type(drawspec.overlay, tile, tic, ctx, x, y);
+                this.draw_type(drawspec.overlay, tile, tic, blit);
                 return;
             }
             else {
@@ -539,7 +529,7 @@ export class Tileset {
             if (tile && tile.wire_directions !== undefined && tile.wire_directions !== 0) {
                 // TODO all four is a different thing entirely
                 // Draw the appropriate wire underlay
-                this.draw_type('#unpowered', tile, tic, ctx, x, y);
+                this.draw_type('#unpowered', tile, tic, blit);
 
                 // Draw a masked part of the base tile
                 let wiredir = tile.wire_directions;
@@ -548,16 +538,16 @@ export class Tileset {
                 let wire1 = 0.5 + wire_radius;
                 let [bx, by] = drawspec.base;
                 if ((wiredir & DIRECTIONS['north'].bit) === 0) {
-                    this.blit(ctx, bx, by, x, y, 1, wire0);
+                    blit(bx, by, 0, 0, 1, wire0);
                 }
                 if ((wiredir & DIRECTIONS['south'].bit) === 0) {
-                    this.blit(ctx, bx, by + wire1, x, y + wire1, 1, wire0);
+                    blit(bx, by + wire1, 0, wire1, 1, wire0);
                 }
                 if ((wiredir & DIRECTIONS['west'].bit) === 0) {
-                    this.blit(ctx, bx, by, x, y, wire0, 1);
+                    blit(bx, by, 0, 0, wire0, 1);
                 }
                 if ((wiredir & DIRECTIONS['east'].bit) === 0) {
-                    this.blit(ctx, bx + wire1, by, x + wire1, y, wire0, 1);
+                    blit(bx + wire1, by, wire1, 0, wire0, 1);
                 }
 
                 // Then draw the wired tile as normal
@@ -571,7 +561,7 @@ export class Tileset {
                     coords = drawspec.base;
                 }
                 else {
-                    this.blit(ctx, drawspec.base[0], drawspec.base[1], x, y);
+                    blit(drawspec.base[0], drawspec.base[1]);
                     coords = drawspec.wired;
                 }
             }
@@ -621,17 +611,11 @@ export class Tileset {
             // Continue on with masking
             coords = drawspec.tile;
             let [x0, y0, w, h] = drawspec.mask;
-            this.blit(
-                ctx,
-                coords[0] + x0,
-                coords[1] + y0,
-                x + x0,
-                y + y0,
-                w, h);
+            blit(coords[0] + x0, coords[1] + y0, x0, y0, w, h);
         }
         else {
             if (!coords) console.error(name, tile);
-            this.blit(ctx, coords[0], coords[1], x, y);
+            blit(coords[0], coords[1]);
         }
 
         // Special behavior for special objects
@@ -661,9 +645,7 @@ export class Tileset {
                 sy = (letter_spec.y0 + Math.floor(n / w)) * scale;
             }
             let offset = (1 - scale) / 2;
-            this.blit(
-                ctx, sx, sy,
-                x + offset, y + offset, scale);
+            blit(sx, sy, offset, offset, scale, scale);
         }
     }
 }
