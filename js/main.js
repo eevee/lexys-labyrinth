@@ -1129,7 +1129,7 @@ class Editor extends PrimaryView {
                 }
             }
             cell.push({type});
-            cell.sort((a, b) => b.type.draw_layer - a.type.draw_layer);
+            cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
         }
     }
 }
