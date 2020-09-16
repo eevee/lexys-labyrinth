@@ -46,8 +46,8 @@ export class CanvasRenderer {
             return;
         }
 
-        // FIXME XXX bad dumb hack but man tileset.draw takes a lot of arguments, that'll probably have to change for webgl anyway
-        this.level.tic_offset = tic_offset;
+        // TODO StoredLevel may not have a tic_counter
+        let tic = (this.level.tic_counter ?? 0) + tic_offset;
 
         let ctx = this.canvas.getContext('2d');
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -106,11 +106,11 @@ export class CanvasRenderer {
                             // Round this to the pixel grid too!
                             vx = Math.floor(vx * this.tileset.size_x + 0.5) / this.tileset.size_x;
                             vy = Math.floor(vy * this.tileset.size_y + 0.5) / this.tileset.size_y;
-                            this.tileset.draw(tile, this.level, ctx, vx - x0, vy - y0);
+                            this.tileset.draw(tile, tic, ctx, vx - x0, vy - y0);
                         }
                         else {
                             // Non-actors can't move
-                            this.tileset.draw(tile, this.level, ctx, x - x0, y - y0);
+                            this.tileset.draw(tile, tic, ctx, x - x0, y - y0);
                         }
                     }
                 }

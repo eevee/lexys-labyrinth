@@ -501,13 +501,13 @@ export class Tileset {
             dx * this.size_x, dy * this.size_y, w, h);
     }
 
-    draw(tile, level, ctx, x, y) {
-        this.draw_type(tile.type.name, tile, level, ctx, x, y);
+    draw(tile, tic, ctx, x, y) {
+        this.draw_type(tile.type.name, tile, tic, ctx, x, y);
     }
 
     // Draws a tile type, given by name.  Passing in a tile is optional, but
     // without it you'll get defaults.
-    draw_type(name, tile, level, ctx, x, y) {
+    draw_type(name, tile, tic, ctx, x, y) {
         let drawspec = this.layout[name];
         if (! drawspec) {
             console.error(`Don't know how to draw tile type ${name}!`);
@@ -519,9 +519,9 @@ export class Tileset {
             // southeast thin walls.  Draw the base (a type name), then draw
             // the overlay (either a type name or a regular draw spec).
             // TODO chance of infinite recursion here
-            this.draw_type(drawspec.base, tile, level, ctx, x, y);
+            this.draw_type(drawspec.base, tile, tic, ctx, x, y);
             if (typeof drawspec.overlay === 'string') {
-                this.draw_type(drawspec.overlay, tile, level, ctx, x, y);
+                this.draw_type(drawspec.overlay, tile, tic, ctx, x, y);
                 return;
             }
             else {
@@ -539,7 +539,7 @@ export class Tileset {
             if (tile && tile.wire_directions !== undefined && tile.wire_directions !== 0) {
                 // TODO all four is a different thing entirely
                 // Draw the appropriate wire underlay
-                this.draw_type('#unpowered', tile, level, ctx, x, y);
+                this.draw_type('#unpowered', tile, tic, ctx, x, y);
 
                 // Draw a masked part of the base tile
                 let wiredir = tile.wire_directions;
@@ -603,13 +603,13 @@ export class Tileset {
             }
         }
         if (coords[0] instanceof Array) {
-            if (level) {
+            if (tic !== null) {
                 if (tile && tile.animation_speed) {
-                    coords = coords[Math.floor((tile.animation_progress + level.tic_offset) / tile.animation_speed * coords.length)];
+                    coords = coords[Math.floor((tile.animation_progress + tic % 1) / tile.animation_speed * coords.length)];
                 }
                 else {
                     // FIXME tic_counter doesn't exist on stored levels...
-                    coords = coords[Math.floor(((level.tic_counter ?? 0) % 5 + level.tic_offset) / 5 * coords.length)];
+                    coords = coords[Math.floor(tic % 5 / 5 * coords.length)];
                 }
             }
             else {
