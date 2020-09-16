@@ -282,6 +282,12 @@ export const CC2_TILESET_LAYOUT = {
             west: [8, 23],
             east: [8, 22],
         },
+        swimming: {
+            north: [[0, 24], [1, 24]],
+            east: [[2, 24], [3, 24]],
+            south: [[4, 24], [5, 24]],
+            west: [[6, 24], [7, 24]],
+        },
     },
     bogus_player_win: {
         overlay: [0, 23],
@@ -582,7 +588,19 @@ export class Tileset {
                 // TODO this is getting really ad-hoc and clumsy lol, maybe
                 // have tiles expose a single 'state' prop or something
                 if (coords.moving) {
-                    if (tile && tile.animation_speed) {
+                    if (! tile) {
+                        coords = coords.standing;
+                    }
+                    else if (coords.swimming &&
+                        // Count as swimming if we're in water, but NOT if we're midway through
+                        // stepping into water from a non-water tile
+                        // TODO umm, only if we have flippers?
+                        tile.cell.some(t => t.type.name === 'water') &&
+                        (! tile.previous_cell || tile.previous_cell.some(t => t.type.name === 'water')))
+                    {
+                        coords = coords.swimming;
+                    }
+                    else if (tile.animation_speed) {
                         coords = coords.moving;
                     }
                     else {
@@ -592,6 +610,7 @@ export class Tileset {
                 coords = coords[(tile && tile.direction) ?? 'south'];
             }
         }
+        // Deal with animation
         if (coords[0] instanceof Array) {
             if (tic !== null) {
                 if (tile && tile.animation_speed) {
