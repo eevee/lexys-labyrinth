@@ -1212,6 +1212,8 @@ const TILE_TYPES = {
     },
     exit: {
         draw_layer: LAYER_TERRAIN,
+        blocks_monsters: true,
+        blocks_blocks: true,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.win();
