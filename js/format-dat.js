@@ -164,9 +164,8 @@ function parse_level(buf) {
             else {
                 name = spec;
             }
-            let tile_type = TILE_TYPES[name];
+            let type = TILE_TYPES[name];
 
-            let tile = {name: name, direction: direction};
             for (let i = 0; i < count; i++) {
                 if (c >= 1024)
                     throw new Error("Too many cells found");
@@ -180,7 +179,7 @@ function parse_level(buf) {
                     continue;
                 }
 
-                cell.unshift({name, direction});
+                cell.unshift({type, direction});
             }
         }
         if (c !== 1024)
@@ -191,9 +190,9 @@ function parse_level(buf) {
     // to be sure there's terrain in every cell; MSCC1 allows a block on the top layer and an item
     // on the bottom layer, and will consider the item to be the "terrain" and draw a floor under it
     for (let cell of level.linear_cells) {
-        if (TILE_TYPES[cell[0].name].draw_layer !== 0) {
+        if (cell[0].type.draw_layer !== 0) {
             // No terrain; insert a floor
-            cell.unshift({ name: 'floor' });
+            cell.unshift({ type: TILE_TYPES['floor'] });
         }
         // TODO we could also deal with weird cases where there's terrain /on top of/ something
         // else: things underwater, the quirk where a glider will erase the item underneath...
