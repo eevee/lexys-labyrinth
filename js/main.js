@@ -677,6 +677,27 @@ class Player extends PrimaryView {
 }
 
 
+class EditorShareOverlay extends DialogOverlay {
+    constructor(conductor, url) {
+        super(conductor);
+        this.set_title("give this to friends");
+        this.main.append(mk('p', "Give this URL out to let others try your level:"));
+        this.main.append(mk('p.editor-share-url', {}, url));
+        let copy_button = mk('button', {type: 'button'}, "Copy to clipboard");
+        copy_button.addEventListener('click', ev => {
+            navigator.clipboard.writeText(url);
+            // TODO feedback?
+        });
+        this.main.append(copy_button);
+
+        let ok = mk('button', {type: 'button'}, "neato");
+        ok.addEventListener('click', ev => {
+            this.close();
+        });
+        this.footer.append(ok);
+    }
+}
+
 const EDITOR_TOOLS = [{
     mode: 'pencil',
     icon: 'icons/tool-pencil.png',
@@ -955,6 +976,18 @@ class Editor extends PrimaryView {
             this.mouse_mode = null;
         });
 
+        // Toolbar buttons
+        this.root.querySelector('#editor-share-url').addEventListener('click', ev => {
+            let buf = c2m.synthesize_level(this.stored_level);
+            // FIXME Not ideal, but btoa() wants a string rather than any of the myriad binary types
+            let data = btoa(Array.from(new Uint8Array(buf)).map(n => String.fromCharCode(n)).join(''));
+            let url = new URL(location);
+            url.searchParams.delete('level');
+            url.searchParams.delete('setpath');
+            url.searchParams.append('level', data);
+            new EditorShareOverlay(this.conductor, url.toString()).open();
+        });
+
         // Toolbox
         let toolbox = mk('div.icon-button-set')
         this.root.querySelector('.controls').append(toolbox);
@@ -1164,7 +1197,6 @@ class Splash extends PrimaryView {
         // TODO handle errors
         // TODO cancel a download if we start another one?
         let buf = await fetch(path);
-        let stored_game;
         this.load_file(buf);
         // TODO get title out of C2G when it's supported
         this.conductor.level_pack_name_el.textContent = title || path;
@@ -1538,8 +1570,15 @@ async function main() {
     // Pick a level (set)
     // TODO error handling  :(
     let path = query.get('setpath');
+    let b64level = query.get('level');
     if (path && path.match(/^levels[/]/)) {
         conductor.splash.fetch_pack(path);
+    }
+    else if (b64level) {
+        // TODO all the more important to show errors!!
+        // FIXME Not ideal, but atob() returns a string rather than any of the myriad binary types
+        let buf = Uint8Array.from(atob(b64level), c => c.charCodeAt(0)).buffer;
+        conductor.splash.load_file(buf);
     }
 }
 

@@ -71,6 +71,9 @@ let modifier_wire = {
         tile.wire_directions = modifier & 0x0f;
         tile.wire_tunnel_directions = (modifier & 0xf0) >> 4;
     },
+    encode(tile) {
+        return tile.wire_directions | (tile.wire_tunnel_directions << 4);
+    },
 };
 
 let arg_direction = {
@@ -78,6 +81,9 @@ let arg_direction = {
     decode(tile, dirbyte) {
         let direction = ['north', 'east', 'south', 'west'][dirbyte & 0x03];
         tile.direction = direction;
+    },
+    encode(tile) {
+        return {north: 0, east: 1, south: 2, west: 3}[tile.direction];
     },
 };
 
@@ -366,6 +372,10 @@ const TILE_ENCODING = {
             decode(tile, mask) {
                 // TODO railroad props
             },
+            encode(tile) {
+                // TODO
+                return 0;
+            },
         },
     },
     0x50: {
@@ -456,6 +466,9 @@ const TILE_ENCODING = {
             decode(tile, ascii_code) {
                 tile.ascii_code = ascii_code;
             },
+            encode(tile) {
+                return tile.ascii_code;
+            },
         },
     },
     0x72: {
@@ -513,6 +526,10 @@ const TILE_ENCODING = {
                         }
                     }
                     tile.arrows = arrows;
+                },
+                encode(tile) {
+                    // TODO
+                    return 0;
                 },
             },
         ],
@@ -762,9 +779,14 @@ export function parse_level(buf) {
             level.size_y = height;
             let p = 2;
 
+            let n;
+
             function read_spec() {
                 let tile_byte = bytes[p];
                 p++;
+                if (tile_byte === undefined)
+                    throw new Error(`Read past end of file in cell ${n}`);
+
                 let spec = TILE_ENCODING[tile_byte];
                 if (! spec)
                     throw new Error(`Unrecognized tile type 0x${tile_byte.toString(16)}`);
@@ -772,7 +794,7 @@ export function parse_level(buf) {
                 return spec;
             }
 
-            for (let n = 0; n < width * height; n++) {
+            for (n = 0; n < width * height; n++) {
                 let cell = new util.StoredCell;
                 while (true) {
                     let spec = read_spec();
@@ -901,22 +923,137 @@ export function parse_level(buf) {
     return level;
 }
 
+
+// Write 1, 2, or 4 bytes to a DataView
+function write_n_bytes(view, start, n, value) {
+    if (n === 1) {
+        view.setUint8(start, value, true);
+    }
+    else if (n === 2) {
+        view.setUint16(start, value, true);
+    }
+    else if (n === 4) {
+        view.setUint32(start, value, true);
+    }
+    else {
+        throw new Error(`Can't write ${n} bytes`);
+    }
+}
+
+
+class C2M {
+    constructor() {
+        this._sections = [];  // array of [name, arraybuffer]
+    }
+
+    add_section(name, buf) {
+        if (name.length !== 4) {
+            throw new Error(`Section names must be four characters, not '${name}'`);
+        }
+
+        if (typeof buf === 'string' || buf instanceof String) {
+            let str = buf;
+            // C2M also includes the trailing NUL
+            buf = new ArrayBuffer(str.length + 1);
+            let array = new Uint8Array(buf);
+            for (let i = 0, l = str.length; i < l; i++) {
+                array[i] = str.charCodeAt(i);
+            }
+        }
+
+        this._sections.push([name, buf]);
+    }
+
+    serialize() {
+        let parts = [];
+        let total_length = 0;
+        for (let [name, buf] of this._sections) {
+            total_length += buf.byteLength + 8;
+        }
+
+        let ret = new ArrayBuffer(total_length);
+        let array = new Uint8Array(ret);
+        let view = new DataView(ret);
+        let p = 0;
+        for (let [name, buf] of this._sections) {
+            // Write the header
+            for (let i = 0; i < 4; i++) {
+                view.setUint8(p + i, name.charCodeAt(i));
+            }
+            view.setUint32(p + 4, buf.byteLength, true);
+            p += 8;
+
+            // Copy in the section contents
+            array.set(new Uint8Array(buf), p);
+            p += buf.byteLength;
+        }
+
+        console.log(this);
+        console.log(total_length);
+        console.log(array);
+        return ret;
+    }
+}
 export function synthesize_level(stored_level) {
-    add_section('CC2M', '133');
+    let c2m = new C2M;
+    c2m.add_section('CC2M', '133');
 
     // FIXME well this will not do
-    let map_bytes = new Uint8Array(1024);
+    let map_bytes = new Uint8Array(4096);
+    let map_view = new DataView(map_bytes.buffer);
     map_bytes[0] = stored_level.size_x;
     map_bytes[1] = stored_level.size_y;
     let p = 2;
+    console.log(stored_level);
     for (let cell of stored_level.linear_cells) {
-        // TODO can i allocate less here?  iterate in reverse, avoid slicing?
-        // TODO assert that the bottom tile has no next, and all the others do
-        for (let tile of cell.reverse()) {
-            let [tile_byte, ...args] = REVERSE_TILE_ENCODING[tile.type.name];
+        for (let i = cell.length - 1; i >= 0; i--) {
+            let tile = cell[i];
+            // FIXME does not yet support canopy or thin walls  >:S
+            let spec = REVERSE_TILE_ENCODING[tile.type.name];
+
+            if (spec.modifier) {
+                let mod = spec.modifier.encode(tile);
+                if (mod === 0) {
+                    // Zero is optional; do nothing
+                }
+                else if (mod < 256) {
+                    // Encode in one byte
+                    map_bytes[p] = REVERSE_TILE_ENCODING['#mod8'].tile_byte;
+                    map_bytes[p + 1] = mod;
+                    p += 2;
+                }
+                else if (mod < 65536) {
+                    // Encode in two bytes
+                    map_bytes[p] = REVERSE_TILE_ENCODING['#mod16'].tile_byte;
+                    map_view.setUint16(p + 1, mod, true);
+                    p += 3;
+                }
+                else {
+                    // Encode in four (!) bytes
+                    map_bytes[p] = REVERSE_TILE_ENCODING['#mod32'].tile_byte;
+                    map_view.setUint16(p + 1, mod, true);
+                    p += 5;
+                }
+            }
+
+            map_bytes[p] = spec.tile_byte;
+            p++;
+
+            if (spec.extra_args) {
+                for (let argspec of spec.extra_args) {
+                    let arg = argspec.encode(tile);
+                    write_n_bytes(map_view, p, argspec.size, arg);
+                    p += argspec.size;
+                }
+            }
+
+            // TODO assert that the bottom tile has no next, and all the others do
         }
     }
 
-    add_section('MAP ', '');
-    add_section('END ', '');
+    // FIXME ack, ArrayBuffer.slice makes a copy actually!  and i use it a lot in this file i think!!
+    c2m.add_section('MAP ', map_bytes.buffer.slice(0, p));
+    c2m.add_section('END ', '');
+
+    return c2m.serialize();
 }
