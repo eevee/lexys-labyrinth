@@ -1,4 +1,5 @@
 import { DIRECTIONS } from './defs.js';
+import TILE_TYPES from './tiletypes.js';
 
 // TODO really need to specify this format more concretely, whoof
 // XXX special kinds of drawing i know this has for a fact:
@@ -268,19 +269,24 @@ export const CC2_TILESET_LAYOUT = {
     // switch
     thief_keys: [15, 21],
 
-    // TODO moving + swimming + pushing animations
     player: {
+        normal: {
+            north: [0, 22],
+            south: [0, 23],
+            west: [8, 23],
+            east: [8, 22],
+        },
         moving: {
             north: [[0, 22], [1, 22], [2, 22], [3, 22], [4, 22], [5, 22], [6, 22], [7, 22]],
             south: [[0, 23], [1, 23], [2, 23], [3, 23], [4, 23], [5, 23], [6, 23], [7, 23]],
             west: [[8, 23], [9, 23], [10, 23], [11, 23], [12, 23], [13, 23], [14, 23], [15, 23]],
             east: [[8, 22], [9, 22], [10, 22], [11, 22], [12, 22], [13, 22], [14, 22], [15, 22]],
         },
-        standing: {
-            north: [0, 22],
-            south: [0, 23],
-            west: [8, 23],
-            east: [8, 22],
+        pushing: {
+            north: [8, 24],
+            east: [9, 24],
+            south: [10, 24],
+            west: [11, 24],
         },
         swimming: {
             north: [[0, 24], [1, 24]],
@@ -288,6 +294,11 @@ export const CC2_TILESET_LAYOUT = {
             south: [[4, 24], [5, 24]],
             west: [[6, 24], [7, 24]],
         },
+        // These are frames from the splash/explosion animations
+        drowned: [5, 5],
+        burned: [1, 5],
+        exploded: [1, 5],
+        failed: [1, 5],
     },
     bogus_player_win: {
         overlay: [0, 23],
@@ -316,7 +327,7 @@ export const CC2_TILESET_LAYOUT = {
             west: [[8, 28], [9, 28], [10, 28], [11, 28], [12, 28], [13, 28], [14, 28], [15, 28]],
             east: [[8, 27], [9, 27], [10, 27], [11, 27], [12, 27], [13, 27], [14, 27], [15, 27]],
         },
-        standing: {
+        normal: {
             north: [0, 27],
             south: [0, 28],
             west: [8, 28],
@@ -409,7 +420,6 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     explosion_other: [3, 7],  // TODO ???
     // 3, 8 unused
     bogus_player_win: [3, 9],  // TODO 10 and 11 too?  does this animate?
-    // TODO player swimming is 3, 12-15
     bogus_player_swimming: {
         north: [3, 12],
         west: [3, 13],
@@ -482,10 +492,23 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     cleats: [6, 10],
     suction_boots: [6, 11],
     player: {
-        north: [6, 12],
-        south: [6, 14],
-        west: [6, 13],
-        east: [6, 15],
+        normal: {
+            north: [6, 12],
+            south: [6, 14],
+            west: [6, 13],
+            east: [6, 15],
+        },
+        moving: 'normal',
+        pushing: 'normal',
+        swimming: {
+            north: [3, 12],
+            west: [3, 13],
+            south: [3, 14],
+            east: [3, 15],
+        },
+        burned: [3, 4],  // TODO TW's lynx mode doesn't use this!  it uses the generic failed
+        exploded: [3, 6],
+        failed: [3, 7],
     },
 };
 
@@ -573,43 +596,29 @@ export class Tileset {
             }
         }
 
-        // Unwrap animations etc.
-        if (!(coords instanceof Array)) {
-            // Must be an object of either tile-specific state, or directions
-            if (name === 'trap') {
-                if (tile && tile.open) {
-                    coords = coords.open;
-                }
-                else {
-                    coords = coords.closed;
-                }
+        // Apply custom per-type visual states
+        if (TILE_TYPES[name].visual_state) {
+            // Note that these accept null, too, and return a default
+            let state = TILE_TYPES[name].visual_state(tile);
+            // If it's a string, that's an alias for another state
+            if (typeof coords[state] === 'string') {
+                coords = coords[coords[state]];
             }
             else {
-                // TODO this is getting really ad-hoc and clumsy lol, maybe
-                // have tiles expose a single 'state' prop or something
-                if (coords.moving) {
-                    if (! tile) {
-                        coords = coords.standing;
-                    }
-                    else if (coords.swimming &&
-                        // Count as swimming if we're in water, but NOT if we're midway through
-                        // stepping into water from a non-water tile
-                        // TODO umm, only if we have flippers?
-                        tile.cell.some(t => t.type.name === 'water') &&
-                        (! tile.previous_cell || tile.previous_cell.some(t => t.type.name === 'water')))
-                    {
-                        coords = coords.swimming;
-                    }
-                    else if (tile.animation_speed) {
-                        coords = coords.moving;
-                    }
-                    else {
-                        coords = coords.standing;
-                    }
-                }
-                coords = coords[(tile && tile.direction) ?? 'south'];
+                coords = coords[state];
+            }
+
+            if (! coords) {
+                console.warn("No such state", state, "for tile", name, tile);
             }
         }
+
+        // Generic sprite definitions from here on!
+        // If we still have an object, it must be a table of directions
+        if (!(coords instanceof Array)) {
+            coords = coords[(tile && tile.direction) ?? 'south'];
+        }
+
         // Deal with animation
         if (coords[0] instanceof Array) {
             if (tic !== null) {

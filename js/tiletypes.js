@@ -7,6 +7,36 @@ const LAYER_ACTOR = 2;
 const LAYER_OVERLAY = 3;
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
+function player_visual_state(me) {
+    if (! me) {
+        return 'normal';
+    }
+
+    if (me.fail_reason === 'drowned') {
+        return 'drowned';
+    }
+    else if (me.fail_reason === 'burned') {
+        return 'burned';
+    }
+    else if (me.fail_reason === 'exploded') {
+        return 'exploded';
+    }
+    else if (me.fail_reason) {
+        return 'failed';
+    }
+    else if (me.cell.some(t => t.type.name === 'water') &&
+        (! me.previous_cell || me.previous_cell.some(t => t.type.name === 'water')))
+    {
+        return 'swimming';
+    }
+    else if (me.animation_speed) {
+        return 'moving';
+    }
+    else {
+        return 'normal';
+    }
+}
+
 const TILE_TYPES = {
     // Floors and walls
     floor: {
@@ -290,7 +320,6 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'water');
             }
             else if (other.type.is_player) {
-                level.transmute_tile(other, 'player_burned');
                 level.fail('burned');
             }
             else {
@@ -311,7 +340,6 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'ice');
             }
             else if (other.type.is_player) {
-                level.transmute_tile(other, 'splash');
                 level.fail('drowned');
             }
             else {
@@ -433,10 +461,11 @@ const TILE_TYPES = {
         draw_layer: LAYER_ITEM,
         on_arrive(me, level, other) {
             level.remove_tile(me);
-            let was_player = other.type.is_player;
-            level.transmute_tile(other, 'explosion');
-            if (was_player) {
+            if (other.type.is_player) {
                 level.fail('exploded');
+            }
+            else {
+                level.transmute_tile(other, 'explosion');
             }
         },
     },
@@ -552,10 +581,11 @@ const TILE_TYPES = {
         is_required_chip: true,
         on_arrive(me, level, other) {
             level.remove_tile(me);
-            let was_player = other.type.is_player;
-            level.transmute_tile(other, 'explosion');
-            if (was_player) {
+            if (other.type.is_player) {
                 level.fail('exploded');
+            }
+            else {
+                level.transmute_tile(other, 'explosion');
             }
         },
     },
@@ -603,6 +633,14 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (! me.open) {
                 level.set_actor_stuck(other, true);
+            }
+        },
+        visual_state(me) {
+            if (me && me.open) {
+                return 'open';
+            }
+            else {
+                return 'closed';
             }
         },
     },
@@ -1093,6 +1131,7 @@ const TILE_TYPES = {
         infinite_items: {
             key_green: true,
         },
+        visual_state: player_visual_state,
     },
     player2: {
         draw_layer: LAYER_ACTOR,

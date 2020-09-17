@@ -934,13 +934,15 @@ export class Level {
         }
     }
 
-    fail(message) {
+    fail(reason) {
         this.pending_undo.push(() => {
             this.state = 'playing';
             this.fail_reason = null;
+            this.player.fail_reason = null;
         });
         this.state = 'failure';
-        this.fail_reason = message;
+        this.fail_reason = reason;
+        this.player.fail_reason = reason;
         throw new GameEnded;
     }
 
