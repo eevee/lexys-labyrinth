@@ -268,6 +268,12 @@ class Player extends PrimaryView {
             this._redraw();
             ev.target.blur();
         });
+        this.rewind_button = this.root.querySelector('.controls .control-rewind');
+        this.rewind_button.addEventListener('click', ev => {
+            if (this.level.undo_stack.length > 0) {
+                this.state = 'rewinding';
+            }
+        });
         // Demo playback
         this.root.querySelector('.demo-controls .demo-play').addEventListener('click', ev => {
             if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
@@ -339,6 +345,14 @@ class Player extends PrimaryView {
                 ev.preventDefault();
             }
 
+            if (ev.key === 'z') {
+                if (this.level.undo_stack.length > 0 &&
+                    (this.state === 'stopped' || this.state === 'playing' || this.state === 'paused'))
+                {
+                    this.set_state('rewinding');
+                }
+            }
+
             if (this.key_mapping[ev.key]) {
                 this.current_keys.add(ev.key);
                 ev.stopPropagation();
@@ -350,10 +364,25 @@ class Player extends PrimaryView {
             }
         });
         key_target.addEventListener('keyup', ev => {
+            if (ev.key === 'z') {
+                if (this.state === 'rewinding') {
+                    this.set_state('playing');
+                }
+            }
+
             if (this.key_mapping[ev.key]) {
                 this.current_keys.delete(ev.key);
                 ev.stopPropagation();
                 ev.preventDefault();
+            }
+        });
+
+        // When we lose focus, act as though every key was released, and pause the game
+        window.addEventListener('blur', ev => {
+            this.current_keys.clear();
+
+            if (this.state === 'playing' || this.state === 'rewinding') {
+                this.set_state('paused');
             }
         });
 
@@ -365,13 +394,6 @@ class Player extends PrimaryView {
             this.input_el.append(el);
             this.input_action_elements[action] = el;
         }
-
-        // Auto pause when we lose focus
-        window.addEventListener('blur', ev => {
-            if (this.state === 'playing' || this.state === 'rewinding') {
-                this.set_state('paused');
-            }
-        });
 
         this._advance_bound = this.advance.bind(this);
         this._redraw_bound = this.redraw.bind(this);
@@ -554,7 +576,22 @@ class Player extends PrimaryView {
         }
 
         this.last_advance = performance.now();
-        this.advance_by(1);
+        if (this.state === 'playing') {
+            this.advance_by(1);
+        }
+        else if (this.state === 'rewinding') {
+            if (this.level.undo_stack.length === 0) {
+                // TODO detect if we hit the start of the level (rather than just running the undo
+                // buffer dry) and change to 'waiting' instead
+                // TODO pausing seems rude actually, it should just hover in-place?
+                this._advance_handle = null;
+                this.set_state('paused');
+            }
+            else {
+                // Rewind by undoing one tic every tic
+                this.level.undo();
+            }
+        }
         this._advance_handle = window.setTimeout(this._advance_bound, 1000 / TICS_PER_SECOND);
     }
 
@@ -566,6 +603,9 @@ class Player extends PrimaryView {
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
         this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
+        if (this.state === 'rewinding') {
+            this.tic_offset = 1 - this.tic_offset;
+        }
 
         this._redraw();
 
@@ -637,7 +677,7 @@ class Player extends PrimaryView {
         if (this.state === 'paused') {
             this.set_state('playing');
         }
-        else if (this.state === 'playing') {
+        else if (this.state === 'playing' || this.state === 'rewinding') {
             this.set_state('paused');
         }
     }
@@ -653,6 +693,7 @@ class Player extends PrimaryView {
         let overlay_top = '';
         let overlay_middle = null;
         let overlay_bottom = '';
+        let overlay_keyhint = '';
         if (this.state === 'waiting') {
             overlay_reason = 'waiting';
             overlay_middle = "Ready!";
@@ -660,6 +701,7 @@ class Player extends PrimaryView {
         else if (this.state === 'paused') {
             overlay_reason = 'paused';
             overlay_bottom = "/// paused ///";
+            overlay_keyhint = "press P to resume";
         }
         else if (this.state === 'stopped') {
             if (this.level.state === 'failure') {
@@ -667,6 +709,7 @@ class Player extends PrimaryView {
                 overlay_top = "whoops";
                 let obits = OBITUARIES[this.level.fail_reason] ?? OBITUARIES['generic'];
                 overlay_bottom = random_choice(obits);
+                overlay_keyhint = "press space to try again, or Z to rewind";
             }
             else {
                 overlay_reason = 'success';
@@ -706,7 +749,7 @@ class Player extends PrimaryView {
                         "alphanumeric!", "nice dynamic typing!", 
                     ]);
                 }
-                overlay_bottom = "press spacebar to continue";
+                overlay_keyhint = "press space to move on";
 
                 overlay_middle = mk('dl.score-chart',
                     mk('dt', "base score"),
@@ -727,10 +770,20 @@ class Player extends PrimaryView {
         this.overlay_message_el.setAttribute('data-reason', overlay_reason);
         this.overlay_message_el.querySelector('.-top').textContent = overlay_top;
         this.overlay_message_el.querySelector('.-bottom').textContent = overlay_bottom;
+        this.overlay_message_el.querySelector('.-keyhint').textContent = overlay_keyhint;
         let middle = this.overlay_message_el.querySelector('.-middle');
         middle.textContent = '';
         if (overlay_middle) {
             middle.append(overlay_middle);
+        }
+
+        // Ask the renderer to apply a rewind effect only when rewinding, or when paused from
+        // rewinding
+        if (this.state === 'rewinding') {
+            this.renderer.use_rewind_effect = true;
+        }
+        else if (this.state !== 'paused') {
+            this.renderer.use_rewind_effect = false;
         }
 
         // The advance and redraw methods run in a loop, but they cancel

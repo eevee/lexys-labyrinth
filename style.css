@@ -328,13 +328,13 @@ body[data-mode=player] #editor-play {
     place-self: stretch;
 
     display: grid;
-    grid-template-rows: 1fr 3fr 1fr;
+    grid-template-rows: 2fr 6fr 2fr 1fr;
     justify-content: center;
     align-items: center;
 
     z-index: 1;
     font-size: calc(0.5 * var(--tile-width) * var(--scale));
-    padding: 6.25%;
+    padding: 2%;
     background: #0009;
     color: white;
     text-align: center;
@@ -349,6 +349,11 @@ body[data-mode=player] #editor-play {
 #player .overlay-message .-middle {
 }
 #player .overlay-message .-bottom {
+}
+#player .overlay-message .-keyhint {
+    align-self: end;
+    font-size: 0.5em;
+    color: #c0c0c0;
 }
 #player .overlay-message[data-reason=""] {
     display: none;

@@ -25,6 +25,7 @@ export class CanvasRenderer {
         this.ctx = this.canvas.getContext('2d');
         this.viewport_x = 0;
         this.viewport_y = 0;
+        this.use_rewind_effect = false;
     }
 
     set_level(level) {
@@ -127,6 +128,24 @@ export class CanvasRenderer {
                         }
                     }
                 }
+            }
+        }
+
+        if (this.use_rewind_effect) {
+            this.draw_rewind_effect(tic);
+        }
+    }
+
+    draw_rewind_effect(tic) {
+        // Shift several rows over
+        let rewind_start = 1 - tic / 20 % 1;
+        for (let chunk = 0; chunk < 4; chunk++) {
+            let y = Math.floor(this.canvas.height * (chunk + rewind_start) / 4);
+            for (let dy = 1; dy < 5; dy++) {
+                this.ctx.drawImage(
+                    this.canvas,
+                    0, y + dy, this.canvas.width, 1,
+                    -dy * dy, y + dy, this.canvas.width, 1);
             }
         }
     }

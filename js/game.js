@@ -745,6 +745,7 @@ export class Level {
         if (actor.cell === goal_cell)
             return;
 
+        // TODO undo this stuff?
         actor.previous_cell = actor.cell;
         actor.animation_speed = speed;
         actor.animation_progress = 0;
