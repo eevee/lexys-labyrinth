@@ -98,11 +98,18 @@ class PrimaryView {
         this.conductor = conductor;
         this.root = root;
         this.active = false;
+        this._done_setup = false;
     }
+
+    setup() {}
 
     activate() {
         this.root.removeAttribute('hidden');
         this.active = true;
+        if (! this._done_setup) {
+            this.setup();
+            this._done_setup = true;
+        }
     }
 
     deactivate() {
@@ -984,9 +991,12 @@ const EDITOR_PALETTE = [{
 class Editor extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#editor'));
+
         // FIXME don't hardcode size here, convey this to renderer some other way
         this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
+    }
 
+    setup() {
         // Level canvas and mouse handling
         this.root.querySelector('.level').append(this.renderer.canvas);
         this.mouse_mode = null;
