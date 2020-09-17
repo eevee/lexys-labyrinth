@@ -163,6 +163,8 @@ export class Cell extends Array {
     }
 }
 
+class GameEnded extends Error {}
+
 export class Level {
     constructor(stored_level, compat = {}) {
         this.stored_level = stored_level;
@@ -345,6 +347,23 @@ export class Level {
             return;
         }
 
+        try {
+            this._advance_tic(p1_primary_direction, p1_secondary_direction);
+        }
+        catch (e) {
+            if (e instanceof GameEnded) {
+                // Do nothing, the game ended and we just wanted to skip the rest
+            }
+            else {
+                throw e;
+            }
+        }
+
+        // Commit the undo state at the end of each tic
+        this.commit();
+    }
+
+    _advance_tic(p1_primary_direction, p1_secondary_direction) {
         // Player's secondary direction is set immediately; it applies on arrival to cells even if
         // it wasn't held the last time the player started moving
         this._set_prop(this.player, 'secondary_direction', p1_secondary_direction);
@@ -352,8 +371,6 @@ export class Level {
         // Used to check for a monster chomping the player's tail
         this.player_leaving_cell = this.player.cell;
 
-        // XXX this entire turn order is rather different in ms rules
-        // FIXME OK, do a pass to make everyone decide their movement, and then actually do it.  the question iiis, where does that fit in with animation
         // First pass: tick cooldowns and animations; have actors arrive in their cells
         for (let actor of this.actors) {
             // Actors with no cell were destroyed
@@ -554,10 +571,6 @@ export class Level {
             let old_cell = actor.cell;
             this.attempt_step(actor, actor.decision);
 
-            // TODO do i need to do this more aggressively?
-            if (this.state === 'success' || this.state === 'failure')
-                break;
-
             // Players can also bump the tiles in the cell next to the one they're leaving
             let dir2 = actor.secondary_direction;
             if (actor.type.is_player && dir2 &&
@@ -617,9 +630,6 @@ export class Level {
                 this.tic_counter = tic_counter;
             });
         }
-
-        // Commit the undo state at the end of each tic
-        this.commit();
     }
 
     // Try to move the given actor one tile in the given direction and update
@@ -933,11 +943,13 @@ export class Level {
         });
         this.state = 'failure';
         this.fail_message = message;
+        throw new GameEnded;
     }
 
     win() {
         this.pending_undo.push(() => this.state = 'playing');
         this.state = 'success';
+        throw new GameEnded;
     }
 
     // Get the next direction a random force floor will use.  They share global

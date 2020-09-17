@@ -290,8 +290,8 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'water');
             }
             else if (other.type.is_player) {
-                level.fail("Oops!  You can't walk on fire without fire boots!");
                 level.transmute_tile(other, 'player_burned');
+                level.fail("Oops!  You can't walk on fire without fire boots!");
             }
             else {
                 level.remove_tile(other);
@@ -311,8 +311,8 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'ice');
             }
             else if (other.type.is_player) {
+                level.transmute_tile(other, 'splash');
                 level.fail("swimming with the fishes");
-                level.transmute_tile(other, 'player_drowned');
             }
             else {
                 level.transmute_tile(other, 'splash');
@@ -431,15 +431,13 @@ const TILE_TYPES = {
     },
     bomb: {
         draw_layer: LAYER_ITEM,
-        // TODO explode
         on_arrive(me, level, other) {
-            let cell = me.cell;
             level.remove_tile(me);
-            if (other.type.is_player) {
-                // Check this /before/ we change it...
+            let was_player = other.type.is_player;
+            level.transmute_tile(other, 'explosion');
+            if (was_player) {
                 level.fail("watch where you step");
             }
-            level.transmute_tile(other, 'explosion');
         },
     },
     thief_tools: {
@@ -553,13 +551,12 @@ const TILE_TYPES = {
         draw_layer: LAYER_ITEM,
         is_required_chip: true,
         on_arrive(me, level, other) {
-            // TODO explode
             level.remove_tile(me);
-            if (other.type.is_player) {
-                // Check this /before/ we change it...
+            let was_player = other.type.is_player;
+            level.transmute_tile(other, 'explosion');
+            if (was_player) {
                 level.fail("watch where you step");
             }
-            level.transmute_tile(other, 'explosion');
         },
     },
     purple_floor: {

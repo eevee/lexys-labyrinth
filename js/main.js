@@ -501,13 +501,6 @@ class Player extends PrimaryView {
 
     // Redraws every frame, unless the game isn't running
     redraw() {
-        // FIXME draw one more frame after losing, so we can see the player explode or whatever
-        // TODO for bonus points, also finish the player animation (but don't advance the game any further)
-        if (this.state !== 'playing' && this.state !== 'rewinding') {
-            this._redraw_handle = null;
-            return;
-        }
-
         // Calculate this here, not in _redraw, because that's called at weird
         // times when the game might not have actually advanced at all yet
         // TODO this is not gonna be right while pausing lol
@@ -516,7 +509,16 @@ class Player extends PrimaryView {
         this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
 
         this._redraw();
-        this._redraw_handle = requestAnimationFrame(this._redraw_bound);
+
+        // Check for a stopped game *after* drawing, so that if the game ends, we still draw its
+        // final result before stopping the draw loop
+        // TODO for bonus points, also finish the player animation (but don't advance the game any further)
+        if (this.state === 'playing' || this.state === 'rewinding') {
+            this._redraw_handle = requestAnimationFrame(this._redraw_bound);
+        }
+        else {
+            this._redraw_handle = null;
+        }
     }
 
     // Actually redraw.  Used to force drawing outside of normal play

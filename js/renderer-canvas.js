@@ -100,11 +100,10 @@ export class CanvasRenderer {
         let y1 = Math.min(this.level.size_y - 1, Math.ceil(y0 + this.viewport_size_y));
         // Draw one layer at a time, so animated objects aren't overdrawn by
         // neighboring terrain
-        let x, y;
         // XXX layer count hardcoded here
         for (let layer = 0; layer < 4; layer++) {
-            for (x = xf0; x <= x1; x++) {
-                for (y = yf0; y <= y1; y++) {
+            for (let x = xf0; x <= x1; x++) {
+                for (let y = yf0; y <= y1; y++) {
                     for (let tile of this.level.cells[y][x]) {
                         if (tile.type.draw_layer !== layer)
                             continue;
