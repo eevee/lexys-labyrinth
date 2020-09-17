@@ -801,9 +801,10 @@ class Player extends PrimaryView {
     // Auto-size the game canvas to fit the screen, if possible
     adjust_scale() {
         // TODO make this optional
-        // The base size is the size of the canvas, i.e. the viewport size
-        // times the tile size
-        let base_x = this.conductor.tileset.size_x * this.renderer.viewport_size_x;
+        // The base size is the size of the canvas, i.e. the viewport size times the tile size --
+        // but note that horizontally we have 4 extra tiles for the inventory
+        // TODO if there's ever a portrait view for phones, this will need adjusting
+        let base_x = this.conductor.tileset.size_x * (this.renderer.viewport_size_x + 4);
         let base_y = this.conductor.tileset.size_y * this.renderer.viewport_size_y;
         // The main UI is centered in a flex item with auto margins, so the
         // extra space available is the size of those margins
@@ -814,9 +815,9 @@ class Player extends PrimaryView {
         }
         let extra_x = parseFloat(style['margin-left']) + parseFloat(style['margin-right']);
         let extra_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);
-        // The total available space, then, is the current size of the
-        // canvas plus the size of the margins
-        let total_x = extra_x + this.renderer.canvas.offsetWidth;
+        // The total available space, then, is the current size of the canvas (and inventory, when
+        // appropriate) plus the size of the margins
+        let total_x = extra_x + this.renderer.canvas.offsetWidth + this.inventory_el.offsetWidth;
         let total_y = extra_y + this.renderer.canvas.offsetHeight;
         let dpr = window.devicePixelRatio || 1.0;
         // Divide to find the biggest scale that still fits.  But don't
@@ -830,7 +831,6 @@ class Player extends PrimaryView {
         // resolution and giving us nice, clean pixels.
         scale /= dpr;
 
-        // FIXME the above logic doesn't take into account the inventory, which is also affected by scale
         this.scale = scale;
         this.root.style.setProperty('--scale', scale);
     }
