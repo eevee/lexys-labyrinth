@@ -24,7 +24,7 @@ function player_visual_state(me) {
     else if (me.fail_reason) {
         return 'failed';
     }
-    else if (me.cell.some(t => t.type.name === 'water') &&
+    else if (me.cell && me.cell.some(t => t.type.name === 'water') &&
         (! me.previous_cell || me.previous_cell.some(t => t.type.name === 'water')))
     {
         return 'swimming';

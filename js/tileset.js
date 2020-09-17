@@ -189,7 +189,10 @@ export const CC2_TILESET_LAYOUT = {
         overlay: 'thinwall_e',
     },
     // TODO directional block arrows
-    teleport_blue: [[4, 10], [5, 10], [6, 10], [7, 10]],
+    teleport_blue: {
+        base: [0, 2],
+        wired: [[4, 10], [5, 10], [6, 10], [7, 10]],
+    },
     popwall: [8, 10],
     gravel: [9, 10],
     ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
@@ -261,7 +264,10 @@ export const CC2_TILESET_LAYOUT = {
     teleport_green: [[4, 19], [5, 19], [6, 19], [7, 19]],
     teleport_yellow: [[8, 19], [9, 19], [10, 19], [11, 19]],
     transmogrifier: [[12, 19], [13, 19], [14, 19], [15, 19]],
-    teleport_red: [[4, 20], [5, 20], [6, 20], [7, 20]],
+    teleport_red: {
+        base: [0, 2],
+        wired: [[4, 20], [5, 20], [6, 20], [7, 20]],
+    },
     slime: [[8, 20], [9, 20], [10, 20], [11, 20], [12, 20], [13, 20], [14, 20], [15, 20]],
 
     force_floor_all: [[0, 21], [1, 21], [2, 21], [3, 21], [4, 21], [5, 21], [6, 21], [7, 21]],
