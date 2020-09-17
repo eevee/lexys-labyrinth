@@ -137,8 +137,8 @@ export class CanvasRenderer {
     }
 
     draw_rewind_effect(tic) {
-        // Shift several rows over
-        let rewind_start = 1 - tic / 20 % 1;
+        // Shift several rows over in a recurring pattern, like a VHS, whatever that is
+        let rewind_start = tic / 20 % 1;
         for (let chunk = 0; chunk < 4; chunk++) {
             let y = Math.floor(this.canvas.height * (chunk + rewind_start) / 4);
             for (let dy = 1; dy < 5; dy++) {
