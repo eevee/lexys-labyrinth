@@ -291,7 +291,7 @@ const TILE_TYPES = {
             }
             else if (other.type.is_player) {
                 level.transmute_tile(other, 'player_burned');
-                level.fail("Oops!  You can't walk on fire without fire boots!");
+                level.fail('burned');
             }
             else {
                 level.remove_tile(other);
@@ -312,7 +312,7 @@ const TILE_TYPES = {
             }
             else if (other.type.is_player) {
                 level.transmute_tile(other, 'splash');
-                level.fail("swimming with the fishes");
+                level.fail('drowned');
             }
             else {
                 level.transmute_tile(other, 'splash');
@@ -436,7 +436,7 @@ const TILE_TYPES = {
             let was_player = other.type.is_player;
             level.transmute_tile(other, 'explosion');
             if (was_player) {
-                level.fail("watch where you step");
+                level.fail('exploded');
             }
         },
     },
@@ -555,7 +555,7 @@ const TILE_TYPES = {
             let was_player = other.type.is_player;
             level.transmute_tile(other, 'explosion');
             if (was_player) {
-                level.fail("watch where you step");
+                level.fail('exploded');
             }
         },
     },

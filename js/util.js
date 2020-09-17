@@ -1,3 +1,7 @@
+export function random_choice(list) {
+    return list[Math.floor(Math.random() * list.length)];
+}
+
 export function mk(tag_selector, ...children) {
     let [tag, ...classes] = tag_selector.split('.');
     let el = document.createElement(tag);

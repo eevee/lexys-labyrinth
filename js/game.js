@@ -622,7 +622,7 @@ export class Level {
 
             this.time_remaining -= 1;
             if (this.time_remaining <= 0) {
-                this.fail("Time's up!");
+                this.fail('time');
             }
         }
         else {
@@ -767,23 +767,20 @@ export class Level {
         }
 
         // Check for a couple effects that always apply immediately
-        // TODO i guess this covers blocks too
         // TODO do blocks smash monsters?
         for (let tile of goal_cell) {
+            if (actor.type.is_player && tile.type.is_monster) {
+                this.fail(tile.type.name);
+            }
+            else if (actor.type.is_monster && tile.type.is_player) {
+                this.fail(actor.type.name);
+            }
+            else if (actor.type.is_block && tile.type.is_player) {
+                this.fail('squished');
+            }
+
             if (tile.type.slide_mode && ! actor.ignores(tile.type.name)) {
                 this.make_slide(actor, tile.type.slide_mode);
-            }
-            if ((actor.type.is_player && tile.type.is_monster) ||
-                (actor.type.is_monster && tile.type.is_player))
-            {
-                // TODO ooh, obituaries
-                this.fail("Oops!  Watch out for creatures!");
-                return;
-            }
-            if (actor.type.is_block && tile.type.is_player) {
-                // TODO ooh, obituaries
-                this.fail("squish");
-                return;
             }
         }
 
@@ -791,7 +788,7 @@ export class Level {
         // TODO this only works because i have the player move first; in lynx the check is the other
         // way around
         if (actor.type.is_monster && goal_cell === this.player_leaving_cell) {
-            this.fail("Oops!  Watch out for creatures!");
+            this.fail(actor.type.name);
         }
 
         if (this.compat.tiles_react_instantly) {
@@ -931,7 +928,7 @@ export class Level {
                 this.time_remaining = 1;
             }
             else {
-                this.fail("Time's up!");
+                this.fail('time');
             }
         }
     }
@@ -939,10 +936,10 @@ export class Level {
     fail(message) {
         this.pending_undo.push(() => {
             this.state = 'playing';
-            this.fail_message = null;
+            this.fail_reason = null;
         });
         this.state = 'failure';
-        this.fail_message = message;
+        this.fail_reason = message;
         throw new GameEnded;
     }
 

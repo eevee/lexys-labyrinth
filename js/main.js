@@ -8,7 +8,7 @@ import { Level } from './game.js';
 import CanvasRenderer from './renderer-canvas.js';
 import { Tileset, CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
-import { mk, promise_event, fetch, walk_grid } from './util.js';
+import { random_choice, mk, promise_event, fetch, walk_grid } from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
 // Stackable modal overlay of some kind, usually a dialog
@@ -136,6 +136,65 @@ const ACTION_DIRECTIONS = {
     left: 'west',
     right: 'east',
 };
+const OBITUARIES = {
+    drowned: [
+        "player tried out water cooling",
+        "player fell into the c",
+    ],
+    burned: [
+        "player's core temp got too high",
+        "player's plans went up in smoke",
+    ],
+    exploded: [
+        "player didn't watch where they step",
+        "player is having a blast",
+        "player tripped over something of mine",
+    ],
+    squished: [
+        "player was overwhelmed by a block of ram",
+        "player became two-dimensional",
+    ],
+    time: [
+        "player tried to overclock",
+        "player's time ran out",
+        "player's speedrun went badly",
+    ],
+    generic: [
+        "player had a bad time",
+    ],
+
+    // Specific creatures
+    ball: [
+        "player is having a ball",
+    ],
+    walker: [
+        "player let it walk all over them",
+    ],
+    fireball: [
+        "player had a meltdown",
+    ],
+    glider: [
+        "player's ship came in",
+    ],
+    tank_blue: [
+        "player didn't watch where they tread",
+    ],
+    tank_yellow: [
+        "player let things get out of control",
+    ],
+    bug: [
+        "player has ants in their pants",
+    ],
+    paramecium: [
+        "player has the creepy crawlies",
+    ],
+    teeth: [
+        "player got a mega bite",
+    ],
+    blob: [
+        "player didn't do a gooed job",
+    ],
+};
 class Player extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#player'));
@@ -163,12 +222,12 @@ class Player extends PrimaryView {
         this.root.style.setProperty('--tile-width', `${this.conductor.tileset.size_x}px`);
         this.root.style.setProperty('--tile-height', `${this.conductor.tileset.size_y}px`);
         this.level_el = this.root.querySelector('.level');
+        this.overlay_message_el = this.root.querySelector('.overlay-message');
         this.message_el = this.root.querySelector('.message');
         this.chips_el = this.root.querySelector('.chips output');
         this.time_el = this.root.querySelector('.time output');
         this.bonus_el = this.root.querySelector('.bonus output');
         this.inventory_el = this.root.querySelector('.inventory');
-        this.bummer_el = this.root.querySelector('.bummer');
         this.input_el = this.root.querySelector('.input');
         this.demo_el = this.root.querySelector('.demo');
 
@@ -589,41 +648,89 @@ class Player extends PrimaryView {
 
         this.state = new_state;
 
+        // Populate the overlay
+        let overlay_reason = '';
+        let overlay_top = '';
+        let overlay_middle = null;
+        let overlay_bottom = '';
         if (this.state === 'waiting') {
-            this.bummer_el.textContent = "Ready!";
-        }
-        else if (this.state === 'playing' || this.state === 'rewinding') {
-            this.bummer_el.textContent = "";
+            overlay_reason = 'waiting';
+            overlay_middle = "Ready!";
         }
         else if (this.state === 'paused') {
-            this.bummer_el.textContent = "/// paused ///";
+            overlay_reason = 'paused';
+            overlay_bottom = "/// paused ///";
         }
         else if (this.state === 'stopped') {
             if (this.level.state === 'failure') {
-                this.bummer_el.textContent = this.level.fail_message;
+                overlay_reason = 'failure';
+                overlay_top = "whoops";
+                let obits = OBITUARIES[this.level.fail_reason] ?? OBITUARIES['generic'];
+                overlay_bottom = random_choice(obits);
             }
             else {
-                this.bummer_el.textContent = "";
+                overlay_reason = 'success';
                 let base = (this.conductor.level_index + 1) * 500;
                 let time = Math.ceil((this.level.time_remaining ?? 0) / 20) * 10;
-                this.bummer_el.append(
-                    mk('p', "go bit buster!"),
-                    mk('dl.score-chart',
-                        mk('dt', "base score"),
-                        mk('dd', base),
-                        mk('dt', "time bonus"),
-                        mk('dd', `+ ${time}`),
-                        mk('dt', "score bonus"),
-                        mk('dd', `+ ${this.level.bonus_points}`),
-                        mk('dt.-sum', "level score"),
-                        mk('dd.-sum', base + time + this.level.bonus_points),
-                        mk('dt', "improvement"),
-                        mk('dd', "(TODO)"),
-                        mk('dt', "total score"),
-                        mk('dd', "(TODO)"),
-                    ),
+                // Pick a success message
+                // TODO done on first try; took many tries
+                let time_left_fraction = null;
+                if (this.level.time_remaining !== null && this.level.stored_level.time_limit !== null) {
+                    time_left_fraction = this.level.time_remaining / 20 / this.level.stored_level.time_limit;
+                }
+
+                if (this.level.chips_remaining > 0) {
+                    overlay_top = random_choice([
+                        "socket to em!", "go bug blaster!",
+                    ]);
+                }
+                else if (this.level.time_remaining && this.level.time_remaining < 200) {
+                    overlay_top = random_choice([
+                        "in the nick of time!", "cutting it close!",
+                    ]);
+                }
+                else if (time_left_fraction !== null && time_left_fraction > 1) {
+                    overlay_top = random_choice([
+                        "faster than light!", "impossible speed!", "pipelined!",
+                    ]);
+                }
+                else if (time_left_fraction !== null && time_left_fraction > 0.75) {
+                    overlay_top = random_choice([
+                        "lightning quick!", "nice speedrun!", "eagerly evaluated!",
+                    ]);
+                }
+                else {
+                    overlay_top = random_choice([
+                        "you did it!", "nice going!", "great job!", "good work!",
+                        "onwards!", "tubular!", "yeehaw!", "hot damn!",
+                        "alphanumeric!", "nice dynamic typing!", 
+                    ]);
+                }
+                overlay_bottom = "press spacebar to continue";
+
+                overlay_middle = mk('dl.score-chart',
+                    mk('dt', "base score"),
+                    mk('dd', base),
+                    mk('dt', "time bonus"),
+                    mk('dd', `+ ${time}`),
+                    mk('dt', "score bonus"),
+                    mk('dd', `+ ${this.level.bonus_points}`),
+                    mk('dt.-sum', "level score"),
+                    mk('dd.-sum', base + time + this.level.bonus_points),
+                    mk('dt', "improvement"),
+                    mk('dd', "(TODO)"),
+                    mk('dt', "total score"),
+                    mk('dd', "(TODO)"),
                 );
             }
+        }
+        this.overlay_message_el.setAttribute('data-reason', overlay_reason);
+        this.overlay_message_el.querySelector('.-top').textContent = overlay_top;
+        this.overlay_message_el.querySelector('.-bottom').textContent = overlay_bottom;
+        let middle = this.overlay_message_el.querySelector('.-middle');
+        middle.textContent = '';
+        if (overlay_middle) {
+            middle.append(overlay_middle);
         }
 
         // The advance and redraw methods run in a loop, but they cancel

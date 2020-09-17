@@ -323,34 +323,46 @@ body[data-mode=player] #editor-play {
     --viewport-width: 9;
     --viewport-height: 9;
 }
-.bummer {
+#player .overlay-message {
     grid-area: level;
     place-self: stretch;
 
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: 1fr 3fr 1fr;
     justify-content: center;
     align-items: center;
 
     z-index: 1;
-    font-size: 48px;
-    padding: 10%;
+    font-size: calc(0.5 * var(--tile-width) * var(--scale));
+    padding: 6.25%;
     background: #0009;
     color: white;
     text-align: center;
-    font-weight: bold;
     text-shadow: 0 2px 1px black;
 }
-.bummer:empty {
+#player .overlay-message p {
+    margin: 0;
+}
+#player .overlay-message .-top {
+    font-size: 1.5em;
+}
+#player .overlay-message .-middle {
+}
+#player .overlay-message .-bottom {
+}
+#player .overlay-message[data-reason=""] {
     display: none;
 }
-.bummer p {
-    margin: 0;
+#player .overlay-message[data-reason=failure] {
+    box-shadow: inset 0 0 calc(4 * var(--tile-width)) var(--tile-width) black;
+}
+#player .overlay-message[data-reason=success] {
+    box-shadow: inset 0 0 var(--tile-width) white;
 }
 dl.score-chart {
     display: grid;
     grid-auto-columns: 1fr 1fr;
-    font-size: 1.25rem;
+    margin: auto;
     font-weight: normal;
 }
 dl.score-chart dt {
