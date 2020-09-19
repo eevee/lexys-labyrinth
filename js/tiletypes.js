@@ -331,7 +331,7 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
-            if (other.type.name === 'dirt_block' || other.type.name === 'clone_block') {
+            if (other.type.name === 'dirt_block') {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'dirt');
             }
@@ -452,7 +452,7 @@ const TILE_TYPES = {
         // FIXME kills everything except ghosts, blobs, blocks
         // FIXME blobs spread slime onto floor tiles, even destroying wiring
         on_arrive(me, level, other) {
-            if (other.type.name === 'dirt_block' || other.type.name === 'clone_block' || other.type.name === 'ice_block') {
+            if (other.type.name === 'dirt_block' || other.type.name === 'ice_block') {
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -516,15 +516,6 @@ const TILE_TYPES = {
         ignores: new Set(['fire']),
         movement_speed: 4,
     },
-    clone_block: {
-        draw_layer: LAYER_ACTOR,
-        // TODO is this in any way distinct from dirt block
-        blocks_all: true,
-        is_actor: true,
-        is_block: true,
-        ignores: new Set(['fire']),
-        movement_speed: 4,
-    },
     ice_block: {
         draw_layer: LAYER_ACTOR,
         blocks_all: true,
@@ -551,7 +542,6 @@ const TILE_TYPES = {
         movement_speed: 4,
         pushes: {
             dirt_block: true,
-            clone_block: true,
             ice_block: true,
             directional_block: true,
         },
@@ -652,7 +642,6 @@ const TILE_TYPES = {
             // TODO mirror players too
 
             dirt_block: 'ice_block',
-            clone_block: 'ice_block',
             ice_block: 'dirt_block',
 
             ball: 'walker',
@@ -910,7 +899,6 @@ const TILE_TYPES = {
         blocks_blocks: true,
         pushes: {
             dirt_block: true,
-            clone_block: true,
             ice_block: true,
             directional_block: true,
         },
@@ -1124,7 +1112,6 @@ const TILE_TYPES = {
         movement_speed: 4,
         pushes: {
             dirt_block: true,
-            clone_block: true,
             ice_block: true,
             directional_block: true,
         },
@@ -1143,7 +1130,6 @@ const TILE_TYPES = {
         ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
         pushes: {
             dirt_block: true,
-            clone_block: true,
             ice_block: true,
             directional_block: true,
         },

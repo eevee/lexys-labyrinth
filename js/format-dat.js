@@ -12,14 +12,17 @@ const TILE_ENCODING = {
     0x07: 'thinwall_w',
     0x08: 'thinwall_s',
     0x09: 'thinwall_e',
-    0x0a: 'dirt_block',
+    // This is MSCC's incomprehensible non-directional dirt block, which needs a direction for Lynx
+    // purposes; Tile World defaults it to north
+    0x0a: ['dirt_block', 'north'],
     0x0b: 'dirt',
     0x0c: 'ice',
     0x0d: 'force_floor_s',
-    0x0e: ['clone_block', 'north'],
-    0x0f: ['clone_block', 'west'],
-    0x10: ['clone_block', 'south'],
-    0x11: ['clone_block', 'east'],
+    // These are the "clone blocks", which for us are just regular blocks
+    0x0e: ['dirt_block', 'north'],
+    0x0f: ['dirt_block', 'west'],
+    0x10: ['dirt_block', 'south'],
+    0x11: ['dirt_block', 'east'],
     0x12: 'force_floor_n',
     0x13: 'force_floor_e',
     0x14: 'force_floor_w',
