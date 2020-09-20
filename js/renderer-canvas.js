@@ -58,7 +58,6 @@ export class CanvasRenderer {
             return;
         }
 
-        // TODO StoredLevel may not have a tic_counter
         let tic = (this.level.tic_counter ?? 0) + tic_offset;
         let tw = this.tileset.size_x;
         let th = this.tileset.size_y;

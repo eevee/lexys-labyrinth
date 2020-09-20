@@ -356,7 +356,11 @@ export class Level {
         // Used to check for a monster chomping the player's tail
         this.player_leaving_cell = this.player.cell;
 
-        // First pass: tick cooldowns and animations; have actors arrive in their cells
+        // First pass: tick cooldowns and animations; have actors arrive in their cells.  We do the
+        // arrival as its own mini pass, for one reason: if the player dies (which will end the game
+        // immediately), we still want every time's animation to finish, or it'll look like some
+        // objects move backwards when the death screen appears!
+        let cell_steppers = [];
         for (let actor of this.actors) {
             // Actors with no cell were destroyed
             if (! actor.cell)
@@ -381,10 +385,13 @@ export class Level {
                     this._set_prop(actor, 'animation_progress', null);
                     this._set_prop(actor, 'animation_speed', null);
                     if (! this.compat.tiles_react_instantly) {
-                        this.step_on_cell(actor);
+                        cell_steppers.push(actor);
                     }
                 }
             }
+        }
+        for (let actor of cell_steppers) {
+            this.step_on_cell(actor);
         }
 
         // Second pass: actors decide their upcoming movement simultaneously
