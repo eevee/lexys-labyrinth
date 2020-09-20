@@ -318,7 +318,9 @@ const TILE_TYPES = {
     // Hazards
     fire: {
         draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
+        blocks(me, level, other) {
+            return (other.type.is_monster && other.type.name !== 'fireball');
+        },
         on_arrive(me, level, other) {
             if (other.type.name === 'ice_block') {
                 level.remove_tile(other);
