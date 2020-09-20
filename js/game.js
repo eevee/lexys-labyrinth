@@ -822,9 +822,15 @@ export class Level {
         // Handle teleporting, now that the dust has cleared
         // FIXME something funny happening here, your input isn't ignore while walking out of it?
         if (teleporter) {
-            let goal = teleporter.connection;
+            let goal = teleporter;
             // TODO in pathological cases this might infinite loop
             while (true) {
+                goal = goal.connection;
+
+                // Teleporters already containing an actor are blocked and unusable
+                if (goal.cell.some(tile => tile.type.is_actor && tile !== actor))
+                    continue;
+
                 // Physically move the actor to the new teleporter
                 // XXX is this right, compare with tile world?  i overhear it's actually implemented as a slide?
                 // XXX not especially undo-efficient
@@ -839,7 +845,6 @@ export class Level {
                     break;
 
                 // Otherwise, try the next one
-                goal = goal.connection;
             }
         }
     }
