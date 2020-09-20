@@ -1005,14 +1005,14 @@ export class Level {
 
         let type = TILE_TYPES[name];
         if (type.is_key) {
-            actor.keyring ??= {};
-            actor.keyring[name] ??= 0;
+            actor.keyring ||= {};
+            actor.keyring[name] ||= 0;
             actor.keyring[name] += 1;
             this.pending_undo.push(() => actor.keyring[name] -= 1);
         }
         else {
             // tool, presumably
-            actor.toolbelt ??= [];
+            actor.toolbelt ||= [];
             actor.toolbelt.push(name);
             this.pending_undo.push(() => actor.toolbelt.pop());
         }
