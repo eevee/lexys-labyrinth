@@ -24,10 +24,15 @@ function player_visual_state(me) {
     else if (me.fail_reason) {
         return 'failed';
     }
-    else if (me.cell && me.cell.some(t => t.type.name === 'water') &&
-        (! me.previous_cell || me.previous_cell.some(t => t.type.name === 'water')))
-    {
+    else if (me.cell && (me.previous_cell || me.cell).some(t => t.type.name === 'water')) {
+        // CC2 shows a swimming pose while still in water, or moving away from water
         return 'swimming';
+    }
+    else if (me.slide_mode === 'ice') {
+        return 'skating';
+    }
+    else if (me.slide_mode === 'force') {
+        return 'forced';
     }
     else if (me.animation_speed) {
         return 'moving';

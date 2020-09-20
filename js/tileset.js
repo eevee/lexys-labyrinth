@@ -288,9 +288,9 @@ export const CC2_TILESET_LAYOUT = {
         },
         moving: {
             north: [[0, 22], [1, 22], [2, 22], [3, 22], [4, 22], [5, 22], [6, 22], [7, 22]],
+            east: [[8, 22], [9, 22], [10, 22], [11, 22], [12, 22], [13, 22], [14, 22], [15, 22]],
             south: [[0, 23], [1, 23], [2, 23], [3, 23], [4, 23], [5, 23], [6, 23], [7, 23]],
             west: [[8, 23], [9, 23], [10, 23], [11, 23], [12, 23], [13, 23], [14, 23], [15, 23]],
-            east: [[8, 22], [9, 22], [10, 22], [11, 22], [12, 22], [13, 22], [14, 22], [15, 22]],
         },
         pushing: {
             north: [8, 24],
@@ -303,6 +303,15 @@ export const CC2_TILESET_LAYOUT = {
             east: [[2, 24], [3, 24]],
             south: [[4, 24], [5, 24]],
             west: [[6, 24], [7, 24]],
+        },
+        // The classic CC2 behavior, spinning on ice
+        skating: [[0, 22], [8, 22], [0, 23], [8, 23]],
+        // TODO i don't know what CC2 does
+        forced: {
+            north: [2, 22],
+            east: [10, 22],
+            south: [2, 23],
+            west: [10, 23],
         },
         // These are frames from the splash/explosion animations
         drowned: [5, 5],
@@ -517,6 +526,8 @@ export const TILE_WORLD_TILESET_LAYOUT = {
             south: [3, 14],
             east: [3, 15],
         },
+        skating: 'normal',
+        forced: 'normal',
         burned: [3, 4],  // TODO TW's lynx mode doesn't use this!  it uses the generic failed
         exploded: [3, 6],
         failed: [3, 7],
