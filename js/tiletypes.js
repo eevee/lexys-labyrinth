@@ -720,7 +720,6 @@ const TILE_TYPES = {
             for (let actor of level.actors) {
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_yellow') {
-                    level.set_actor_direction(actor, other.direction);
                     level.attempt_step(actor, other.direction);
                 }
             }

@@ -365,6 +365,10 @@ export class Level {
             if (! actor.cell)
                 continue;
 
+            // Clear any old decisions ASAP.  Note that this prop is only used internally within a
+            // single tic, so it doesn't need to be undoable
+            actor.decision = null;
+
             // Decrement the cooldown here, but don't check it quite yet,
             // because stepping on cells in the next block might reset it
             if (actor.movement_cooldown > 0) {
@@ -395,10 +399,6 @@ export class Level {
 
         // Second pass: actors decide their upcoming movement simultaneously
         for (let actor of this.actors) {
-            // Note that this prop is only used internally within a single iteration of this loop,
-            // so it doesn't need to be undoable
-            actor.decision = null;
-
             if (! actor.cell)
                 continue;
 
@@ -558,7 +558,6 @@ export class Level {
             if (! actor.decision)
                 continue;
 
-            this.set_actor_direction(actor, actor.decision);
             let old_cell = actor.cell;
             this.attempt_step(actor, actor.decision);
 
@@ -576,7 +575,6 @@ export class Level {
                         }
                         if (could_push && actor.can_push(tile)) {
                             // Block slapping: you can shove a block by walking past it sideways
-                            this.set_actor_direction(tile, dir2);
                             this.attempt_step(tile, dir2);
                         }
                     }
@@ -627,6 +625,12 @@ export class Level {
     // Try to move the given actor one tile in the given direction and update
     // their cooldown.  Return true if successful.
     attempt_step(actor, direction) {
+        // In mid-movement, we can't even change direction!
+        if (actor.movement_cooldown > 0)
+            return false;
+
+        this.set_actor_direction(actor, direction);
+
         if (actor.stuck)
             return false;
 
@@ -692,7 +696,6 @@ export class Level {
                     // This time make a copy, since we're modifying the contents of the cell
                     for (let tile of Array.from(goal_cell)) {
                         if (actor.can_push(tile)) {
-                            this.set_actor_direction(tile, direction);
                             this.attempt_step(tile, direction);
                         }
                     }
