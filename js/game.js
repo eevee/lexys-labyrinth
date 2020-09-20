@@ -577,12 +577,13 @@ export class Level {
                 ! old_cell.blocks_leaving(actor, dir2))
             {
                 let neighbor = this.cell_with_offset(old_cell, dir2);
-                if (neighbor && ! neighbor.blocks_entering(actor, dir2, this, true)) {
+                if (neighbor) {
+                    let could_push = ! neighbor.blocks_entering(actor, dir2, this, true);
                     for (let tile of Array.from(neighbor)) {
                         if (tile.type.on_bump) {
                             tile.type.on_bump(tile, this, actor);
                         }
-                        if (actor.can_push(tile)) {
+                        if (could_push && actor.can_push(tile)) {
                             // Block slapping: you can shove a block by walking past it sideways
                             this.set_actor_direction(tile, dir2);
                             this.attempt_step(tile, dir2);
