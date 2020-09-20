@@ -534,6 +534,30 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     },
 };
 
+export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
+    // Completed teeth sprites
+    teeth: Object.assign({}, CC2_TILESET_LAYOUT.teeth, {
+        north: [[0, 32], [1, 32], [2, 32], [1, 32]],
+    }),
+
+    // Extra player sprites
+    player: Object.assign({}, CC2_TILESET_LAYOUT.player, {
+        skating: {
+            north: [0, 33],
+            east: [1, 33],
+            south: [2, 33],
+            west: [3, 33],
+        },
+        forced: 'skating',
+        burned: {
+            north: [4, 33],
+            east: [5, 33],
+            south: [6, 33],
+            west: [7, 33],
+        },
+    }),
+});
+
 export class Tileset {
     constructor(image, layout, size_x, size_y) {
         this.image = image;

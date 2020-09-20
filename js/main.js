@@ -6,7 +6,7 @@ import * as dat from './format-dat.js';
 import * as format_util from './format-util.js';
 import { Level } from './game.js';
 import CanvasRenderer from './renderer-canvas.js';
-import { Tileset, CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
+import { Tileset, CC2_TILESET_LAYOUT, LL_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, promise_event, fetch, walk_grid } from './util.js';
 
@@ -1758,7 +1758,7 @@ async function main() {
     else if (query.get('tileset') === 'lexy') {
         tilesheet.src = 'tileset-lexy.png';
         tilesize = 32;
-        tilelayout = CC2_TILESET_LAYOUT;
+        tilelayout = LL_TILESET_LAYOUT;
     }
     else {
         tilesheet.src = 'tileset-tworld.png';
