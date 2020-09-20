@@ -161,7 +161,11 @@ export const CC2_TILESET_LAYOUT = {
         open: [10, 9],
     },
     button_gray: [11, 9],
-    fireball: [[12, 9], [13, 9], [14, 9], [15, 9]],
+    // Fireball animation is REALLY FAST, runs roughly twice per move
+    fireball: [
+        [12, 9], [13, 9], [14, 9], [15, 9],
+        [12, 9], [13, 9], [14, 9], [15, 9],
+    ],
 
     fake_wall: [0, 10],
     fake_floor: [0, 10],
@@ -197,6 +201,7 @@ export const CC2_TILESET_LAYOUT = {
     ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
     steel: [15, 10],
 
+    // TODO only animates while moving
     teeth: {
         // NOTE: CC2 inexplicably dropped north teeth and just uses the south
         // sprites instead
@@ -524,6 +529,7 @@ export class Tileset {
         this.layout = layout;
         this.size_x = size_x;
         this.size_y = size_y;
+        this.animation_slowdown = 2;
     }
 
     draw(tile, tic, blit) {
@@ -629,11 +635,33 @@ export class Tileset {
         if (coords[0] instanceof Array) {
             if (tic !== null) {
                 if (tile && tile.animation_speed) {
-                    coords = coords[Math.floor((tile.animation_progress + tic % 1) / tile.animation_speed * coords.length)];
+                    // This tile reports its own animation timing (in tics), so trust that, and just
+                    // use the current tic's fraction.
+                    // That said: adjusting animation speed complicates this slightly.  Consider the
+                    // player's walk animation, which takes 4 tics to complete, during which time we
+                    // cycle through 8 frames.  Playing that at half speed means only half the
+                    // animation actually plays, but if the player continues walking, then on the
+                    // NEXT four tics, we should play the other half.  To make this work, use the
+                    // tic as a global timer as well: if the animation started on tics 0-4, play the
+                    // first half; if it started on tics 5-8, play the second half.  They could get
+                    // out of sync if the player hesitates, but no one will notice that, and this
+                    // approach minimizes storing extra state.
+                    let i = (tile.animation_progress + tic % 1) / tile.animation_speed;
+                    // But do NOT do this for explosions or splashes, which have a fixed duration
+                    // and only play once
+                    if (this.animation_slowdown > 1 && ! tile.type.ttl) {
+                        // i ranges from [0, 1), but a slowdown of N means we'll only play the first
+                        // 1/N of it before the game ends (or loops) the animation.
+                        // So increase by [0..N-1] to get it in some other range, then divide by N
+                        // to scale back down to [0, 1)
+                        i += Math.floor(tic / tile.animation_speed % this.animation_slowdown);
+                        i /= this.animation_slowdown;
+                    }
+                    coords = coords[Math.floor(i * coords.length)];
                 }
                 else {
-                    // FIXME tic_counter doesn't exist on stored levels...
-                    coords = coords[Math.floor(tic % 5 / 5 * coords.length)];
+                    // This tile animates on a global timer, one cycle every quarter of a second
+                    coords = coords[Math.floor(tic / this.animation_slowdown % 5 / 5 * coords.length)];
                 }
             }
             else {
