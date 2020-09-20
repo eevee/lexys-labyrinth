@@ -138,7 +138,6 @@ export class Cell extends Array {
     blocks_entering(actor, direction, level, ignore_pushables = false) {
         for (let tile of this) {
             if (tile.blocks(actor, direction, level) &&
-                ! actor.ignores(tile.type.name) &&
                 ! (ignore_pushables && actor.can_push(tile)))
             {
                 return true;
@@ -660,6 +659,16 @@ export class Level {
                 let has_slide_tile = false;
                 let blocked_by_pushable = false;
                 for (let tile of goal_cell) {
+                    if (tile.blocks(actor, direction, this)) {
+                        if (actor.can_push(tile)) {
+                            blocked_by_pushable = true;
+                        }
+                        else {
+                            blocked = true;
+                            // Don't break here, because we might still want to bump other tiles
+                        }
+                    }
+
                     if (actor.ignores(tile.type.name))
                         continue;
 
@@ -671,16 +680,6 @@ export class Level {
                     // invisible walls, blue floors, etc.
                     if (tile.type.on_bump) {
                         tile.type.on_bump(tile, this, actor);
-                    }
-
-                    if (tile.blocks(actor, direction, this)) {
-                        if (actor.can_push(tile)) {
-                            blocked_by_pushable = true;
-                        }
-                        else {
-                            blocked = true;
-                            break;
-                        }
                     }
                 }
 

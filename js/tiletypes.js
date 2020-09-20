@@ -939,7 +939,6 @@ const TILE_TYPES = {
         blocks_blocks: true,
         movement_mode: 'turn-right',
         movement_speed: 4,
-        ignores: new Set(['wall']),
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
     },
     floor_mimic: {
@@ -1079,6 +1078,7 @@ const TILE_TYPES = {
         is_tool: true,
         blocks_monsters: true,
         blocks_blocks: true,
+        // FIXME this doesn't work any more, need to put it in railroad blocks impl
         item_ignores: new Set(['railroad']),
     },
     foil: {
