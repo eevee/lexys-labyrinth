@@ -261,10 +261,22 @@ export const CC2_TILESET_LAYOUT = {
         west: [15, 18],
     },
 
-    force_floor_n: [[0, 19], [0, 20]],
-    force_floor_e: [[2, 19], [3, 19]],
-    force_floor_s: [[1, 19], [1, 20]],
-    force_floor_w: [[2, 20], [3, 20]],
+    force_floor_n: {
+        base: [0, 19],
+        animate_height: 1,
+    },
+    force_floor_e: {
+        base: [3, 19],
+        animate_width: -1,
+    },
+    force_floor_s: {
+        base: [1, 20],
+        animate_height: -1,
+    },
+    force_floor_w: {
+        base: [2, 20],
+        animate_width: 1,
+    },
     teleport_green: [[4, 19], [5, 19], [6, 19], [7, 19]],
     teleport_yellow: [[8, 19], [9, 19], [10, 19], [11, 19]],
     transmogrifier: [[12, 19], [13, 19], [14, 19], [15, 19]],
@@ -641,6 +653,24 @@ export class Tileset {
                     coords = drawspec.wired;
                 }
             }
+        }
+        else if (drawspec.animate_width) {
+            // Force floors animate their...  cutout, I guess?
+            let [x, y] = drawspec.base;
+            let duration = 3 * this.animation_slowdown;
+            x += drawspec.animate_width * (tic % duration / duration);
+            // Round to tile width
+            x = Math.floor(x * this.size_x + 0.5) / this.size_x;
+            coords = [x, y];
+        }
+        else if (drawspec.animate_height) {
+            // Same, but along the other axis
+            let [x, y] = drawspec.base;
+            let duration = 3 * this.animation_slowdown;
+            y += drawspec.animate_height * (tic % duration / duration);
+            // Round to tile height
+            y = Math.floor(y * this.size_y + 0.5) / this.size_y;
+            coords = [x, y];
         }
 
         // Apply custom per-type visual states
