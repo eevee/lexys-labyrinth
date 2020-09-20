@@ -251,7 +251,7 @@ const TILE_TYPES = {
             return ! (other.type.has_inventory && other.has_item('key_red'));
         },
         on_arrive(me, level, other) {
-            if (other.type.has_inventory && other.take_item('key_red')) {
+            if (level.take_key_from_actor(other, 'key_red')) {
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -262,7 +262,7 @@ const TILE_TYPES = {
             return ! (other.type.has_inventory && other.has_item('key_blue'));
         },
         on_arrive(me, level, other) {
-            if (other.type.has_inventory && other.take_item('key_blue')) {
+            if (level.take_key_from_actor(other, 'key_blue')) {
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -273,7 +273,7 @@ const TILE_TYPES = {
             return ! (other.type.has_inventory && other.has_item('key_yellow'));
         },
         on_arrive(me, level, other) {
-            if (other.type.has_inventory && other.take_item('key_yellow')) {
+            if (level.take_key_from_actor(other, 'key_yellow')) {
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -284,7 +284,7 @@ const TILE_TYPES = {
             return ! (other.type.has_inventory && other.has_item('key_green'));
         },
         on_arrive(me, level, other) {
-            if (other.type.has_inventory && other.take_item('key_green')) {
+            if (level.take_key_from_actor(other, 'key_green')) {
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -474,13 +474,7 @@ const TILE_TYPES = {
         blocks_monsters: true,
         blocks_blocks: true,
         on_arrive(me, level, other) {
-            if (other.inventory) {
-                for (let [name, count] of Object.entries(other.inventory)) {
-                    if (count > 0 && TILE_TYPES[name].is_tool) {
-                        other.take_item(name, count);
-                    }
-                }
-            }
+            level.take_all_tools_from_actor(other);
             if (other.type.is_player) {
                 level.adjust_bonus(0, 0.5);
             }
@@ -491,13 +485,7 @@ const TILE_TYPES = {
         blocks_monsters: true,
         blocks_blocks: true,
         on_arrive(me, level, other) {
-            if (other.inventory) {
-                for (let [name, count] of Object.entries(other.inventory)) {
-                    if (count > 0 && TILE_TYPES[name].is_key) {
-                        other.take_item(name, count);
-                    }
-                }
-            }
+            level.take_all_keys_from_actor(other);
             if (other.type.is_player) {
                 level.adjust_bonus(0, 0.5);
             }

@@ -11,7 +11,8 @@ export class Tile {
         this.movement_cooldown = 0;
 
         if (type.has_inventory) {
-            this.inventory = {};
+            this.keyring = {};
+            this.toolbelt = [];
         }
     }
 
@@ -64,11 +65,8 @@ export class Tile {
         if (this.type.ignores && this.type.ignores.has(name))
             return true;
 
-        if (this.inventory) {
-            for (let [item, count] of Object.entries(this.inventory)) {
-                if (count === 0)
-                    continue;
-
+        if (this.toolbelt) {
+            for (let item of this.toolbelt) {
                 let item_type = TILE_TYPES[item];
                 if (item_type.item_ignores && item_type.item_ignores.has(name))
                     return true;
@@ -87,24 +85,11 @@ export class Tile {
 
     // Inventory stuff
     has_item(name) {
-        return this.inventory[name] ?? 0 > 0;
-    }
-
-    // TODO remove, not undoable
-    take_item(name, amount = null) {
-        if (this.inventory[name] && this.inventory[name] >= 1) {
-            if (amount == null && this.type.infinite_items && this.type.infinite_items[name]) {
-                // Some items can't be taken away normally, by which I mean,
-                // green keys
-                ;
-            }
-            else {
-                this.inventory[name] = Math.max(0, this.inventory[name] - (amount || 1));
-            }
-            return true;
+        if (TILE_TYPES[name].is_key) {
+            return this.keyring && (this.keyring[name] ?? 0) > 0;
         }
         else {
-            return false;
+            return this.toolbelt && this.toolbelt.some(item => item === name);
         }
     }
 }
@@ -1009,13 +994,54 @@ export class Level {
     }
 
     give_actor(actor, name) {
-        if (! actor.type.has_inventory)
+        if (! actor.type.is_actor)
             return false;
 
-        let current = actor.inventory[name];
-        this.pending_undo.push(() => actor.inventory[name] = current);
-        actor.inventory[name] = (current ?? 0) + 1;
+        let type = TILE_TYPES[name];
+        if (type.is_key) {
+            actor.keyring ??= {};
+            actor.keyring[name] ??= 0;
+            actor.keyring[name] += 1;
+            this.pending_undo.push(() => actor.keyring[name] -= 1);
+        }
+        else {
+            // tool, presumably
+            actor.toolbelt ??= [];
+            actor.toolbelt.push(name);
+            this.pending_undo.push(() => actor.toolbelt.pop());
+        }
         return true;
+    }
+
+    take_key_from_actor(actor, name) {
+        if (actor.keyring && (actor.keyring[name] ?? 0) > 0) {
+            if (actor.type.infinite_items && actor.type.infinite_items[name]) {
+                // Some items can't be taken away normally, by which I mean, green or yellow keys
+                return true;
+            }
+
+            this.pending_undo.push(() => actor.keyring[name] += 1);
+            actor.keyring[name] -= 1;
+            return true;
+        }
+
+        return false;
+    }
+
+    take_all_keys_from_actor(actor) {
+        if (actor.keyring) {
+            let keyring = actor.keyring;
+            this.pending_undo.push(() => actor.keyring = keyring);
+            actor.keyring = {};
+        }
+    }
+
+    take_all_tools_from_actor(actor) {
+        if (actor.toolbelt) {
+            let toolbelt = actor.toolbelt;
+            this.pending_undo.push(() => actor.toolbelt = toolbelt);
+            actor.toolbelt = [];
+        }
     }
 
     // Mark an actor as sliding

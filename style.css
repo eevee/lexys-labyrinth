@@ -472,19 +472,37 @@ dl.score-chart .-sum {
     display: none;
 }
 
-.inventory {
+#player .inventory {
     grid-area: inventory;
     justify-self: center;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: start;
+    display: grid;
+    grid: auto-flow calc(var(--tile-height) * var(--scale)) / repeat(4, calc(var(--tile-width) * var(--scale)));
 
     background-size: calc(var(--tile-width) * var(--scale)) calc(var(--tile-height) * var(--scale));
     width: calc(4 * var(--tile-width) * var(--scale));
     min-height: calc(2 * var(--tile-height) * var(--scale));
 }
-.inventory img {
+#player .inventory img {
     width: calc(var(--tile-width) * var(--scale));
+}
+#player .inventory .--hidden {
+    visibility: hidden;
+    pointer-events: none;
+}
+#player .inventory > span {
+    position: relative;
+}
+#player .inventory .-count {
+    font-size: calc(0.25 * var(--tile-height) * var(--scale));
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0.25em 0.5em;
+    margin: 0.25em;  /* 2px, for a 32px tileset */
+    line-height: 1;
+    border-radius: 0.25em;
+    background: #0009;
+    color: white;
 }
 #player .controls {
     grid-area: controls;

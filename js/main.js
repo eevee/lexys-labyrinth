@@ -315,6 +315,20 @@ class Player extends PrimaryView {
         this._inventory_tiles = {};
         let floor_tile = this.render_inventory_tile('floor');
         this.inventory_el.style.backgroundImage = `url(${floor_tile})`;
+        this.inventory_key_nodes = {};
+        this.inventory_tool_nodes = [];
+        for (let key of ['key_red', 'key_blue', 'key_yellow', 'key_green']) {
+            let img = mk('img', {src: this.render_inventory_tile(key)});
+            let count = mk('span.-count');
+            let root = mk('span', img, count);
+            this.inventory_key_nodes[key] = {root, img, count};
+            this.inventory_el.append(root);
+        }
+        for (let i = 0; i < 4; i++) {
+            let img = mk('img');
+            this.inventory_tool_nodes.push(img);
+            this.inventory_el.append(img);
+        }
 
         let last_key;
         this.pending_player_move = null;
@@ -436,27 +450,24 @@ class Player extends PrimaryView {
     load_level(stored_level) {
         this.level = new Level(stored_level, this.compat);
         this.renderer.set_level(this.level);
-        // waiting: haven't yet pressed a key so the timer isn't going
-        // playing: playing normally
-        // paused: um, paused
-        // rewinding: playing backwards
-        // stopped: level has ended one way or another
-        this.set_state('waiting');
-
-        this.tic_offset = 0;
-        this.last_advance = 0;
-
-        this.demo_faucet = null;
         this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
-
-        this.update_ui();
-        // Force a redraw, which won't happen on its own since the game isn't running
-        this._redraw();
+        this._clear_state();
     }
 
     restart_level() {
         this.level.restart(this.compat);
+        this._clear_state();
+    }
+
+    // Call after loading or restarting a level
+    _clear_state() {
         this.set_state('waiting');
+
+        this.tic_offset = 0;
+        this.last_advance = 0;
+        this.demo_faucet = null;
+        this.current_keyring = {};
+        this.current_toolbelt = [];
 
         this.chips_el.classList.remove('--done');
         this.time_el.classList.remove('--frozen');
@@ -465,6 +476,7 @@ class Player extends PrimaryView {
         this.root.classList.remove('--bonus-visible');
 
         this.update_ui();
+        // Force a redraw, which won't happen on its own since the game isn't running
         this._redraw();
     }
 
@@ -597,6 +609,7 @@ class Player extends PrimaryView {
             else {
                 // Rewind by undoing one tic every tic
                 this.level.undo();
+                this.update_ui();
             }
         }
         this._advance_handle = window.setTimeout(this._advance_bound, 1000 / TICS_PER_SECOND);
@@ -667,12 +680,30 @@ class Player extends PrimaryView {
         }
         this.message_el.textContent = this.level.hint_shown ?? "";
 
-        this.inventory_el.textContent = '';
-        // FIXME why does this stuff run when opening the /editor/
-        for (let [name, count] of Object.entries(this.level.player.inventory)) {
-            if (count > 0) {
-                this.inventory_el.append(mk('img', {src: this.render_inventory_tile(name)}));
+        // Keys appear in a consistent order
+        for (let [key, nodes] of Object.entries(this.inventory_key_nodes)) {
+            let count = this.level.player.keyring[key] ?? 0;
+            if (this.current_keyring[key] === count)
+                continue;
+
+            nodes.root.classList.toggle('--hidden', count <= 0);
+            nodes.count.classList.toggle('--hidden', count <= 1);
+            nodes.count.textContent = count;
+
+            this.current_keyring[key] = count;
+        }
+        // Tools are whatever order we picked them up
+        for (let [i, node] of this.inventory_tool_nodes.entries()) {
+            let tool = this.level.player.toolbelt[i] ?? null;
+            if (this.current_toolbelt[i] === tool)
+                continue;
+
+            node.classList.toggle('--hidden', tool === null);
+            if (tool) {
+                node.src = this.render_inventory_tile(tool);
             }
+
+            this.current_toolbelt[i] = tool;
         }
 
         for (let action of Object.keys(ACTION_LABELS)) {
@@ -689,6 +720,11 @@ class Player extends PrimaryView {
         }
     }
 
+    // waiting: haven't yet pressed a key so the timer isn't going
+    // playing: playing normally
+    // paused: um, paused
+    // rewinding: playing backwards
+    // stopped: level has ended one way or another
     set_state(new_state) {
         if (new_state === this.state)
             return;
