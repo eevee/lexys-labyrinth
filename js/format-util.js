@@ -26,6 +26,14 @@ export class StoredLevel {
         this.custom_cloner_wiring = {};
     }
 
+    scalar_to_coords(n) {
+        return [n % this.size_x, Math.floor(n / this.size_x)];
+    }
+
+    coords_to_scalar(x, y) {
+        return x + y * this.size_x;
+    }
+
     check() {
     }
 }

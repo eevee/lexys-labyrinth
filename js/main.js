@@ -8,7 +8,7 @@ import { Level } from './game.js';
 import CanvasRenderer from './renderer-canvas.js';
 import { Tileset, CC2_TILESET_LAYOUT, LL_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
-import { random_choice, mk, promise_event, fetch, walk_grid } from './util.js';
+import { random_choice, mk, mk_svg, promise_event, fetch, walk_grid } from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
 // Stackable modal overlay of some kind, usually a dialog
@@ -1046,11 +1046,19 @@ class Editor extends PrimaryView {
 
         // FIXME don't hardcode size here, convey this to renderer some other way
         this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
+
+        // FIXME need this in load_level which is called even if we haven't been setup yet
+        this.connections_g = mk_svg('g');
     }
 
     setup() {
         // Level canvas and mouse handling
-        this.root.querySelector('.level').append(this.renderer.canvas);
+        // This SVG draws vectors on top of the editor, like monster paths and button connections
+        // FIXME change viewBox in load_level, can't right now because order of ops
+        this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'}, this.connections_g);
+        this.root.querySelector('.level').append(
+            this.renderer.canvas,
+            this.svg_overlay);
         this.mouse_mode = null;
         this.mouse_button = null;
         this.mouse_cell = null;
@@ -1287,6 +1295,16 @@ class Editor extends PrimaryView {
                 this.stored_level.cells.push(row);
             }
             row.push(cell);
+        }
+
+        // Load connections
+        for (let [src, dest] of Object.entries(this.stored_level.custom_trap_wiring)) {
+            let [sx, sy] = this.stored_level.scalar_to_coords(src);
+            let [dx, dy] = this.stored_level.scalar_to_coords(dest);
+            this.connections_g.append(
+                mk_svg('rect.overlay-cxn', {x: sx, y: sy, width: 1, height: 1}),
+                mk_svg('line.overlay-cxn', {x1: sx + 0.5, y1: sy + 0.5, x2: dx + 0.5, y2: dy + 0.5}),
+            );
         }
 
         this.renderer.set_level(stored_level);

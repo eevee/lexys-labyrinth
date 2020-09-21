@@ -2,10 +2,7 @@ export function random_choice(list) {
     return list[Math.floor(Math.random() * list.length)];
 }
 
-export function mk(tag_selector, ...children) {
-    let [tag, ...classes] = tag_selector.split('.');
-    let el = document.createElement(tag);
-    el.classList = classes.join(' ');
+function _mk(el, children) {
     if (children.length > 0) {
         if (!(children[0] instanceof Node) && children[0] !== undefined && typeof(children[0]) !== "string" && typeof(children[0]) !== "number") {
             let [attrs] = children.splice(0, 1);
@@ -16,6 +13,20 @@ export function mk(tag_selector, ...children) {
         el.append(...children);
     }
     return el;
+}
+
+export function mk(tag_selector, ...children) {
+    let [tag, ...classes] = tag_selector.split('.');
+    let el = document.createElement(tag);
+    el.classList = classes.join(' ');
+    return _mk(el, children);
+}
+
+export function mk_svg(tag_selector, ...children) {
+    let [tag, ...classes] = tag_selector.split('.');
+    let el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    el.classList = classes.join(' ');
+    return _mk(el, children);
 }
 
 export function promise_event(element, success_event, failure_event) {
