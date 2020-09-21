@@ -145,61 +145,77 @@ const ACTION_DIRECTIONS = {
 };
 const OBITUARIES = {
     drowned: [
-        "player tried out water cooling",
-        "player fell into the c",
+        "you tried out water cooling",
+        "you fell into the c",
     ],
     burned: [
-        "player's core temp got too high",
-        "player's plans went up in smoke",
+        "your core temp got too high",
+        "your plans went up in smoke",
     ],
     exploded: [
-        "player didn't watch where they step",
-        "player is having a blast",
-        "player tripped over something of mine",
+        "watch where you step",
+        "looks like you're having a blast",
+        "you tripped over something of mine",
+        "you were blown to bits",
     ],
     squished: [
-        "player was overwhelmed by a block of ram",
-        "player became two-dimensional",
+        "that block of ram was too much for you",
+        "you became two-dimensional",
     ],
     time: [
-        "player tried to overclock",
-        "player's time ran out",
-        "player's speedrun went badly",
+        "you tried to overclock",
+        "your time ran out",
+        "your speedrun went badly",
     ],
     generic: [
-        "player had a bad time",
+        "you had a bad time",
     ],
 
     // Specific creatures
     ball: [
-        "player is having a ball",
+        "you're having a ball",
+        "you'll bounce back from this",
     ],
     walker: [
-        "player let it walk all over them",
+        "you let it walk all over you",
+        "step into, step over, step out",
     ],
     fireball: [
-        "player had a meltdown",
+        "you had a meltdown",
+        "you haven't been flamed like that since usenet",
     ],
     glider: [
-        "player's ship came in",
+        "your ship came in",
+        "don't worry, everything's fin now",
     ],
     tank_blue: [
-        "player didn't watch where they tread",
+        "you didn't watch where they tread",
+        "please and tank blue",
     ],
     tank_yellow: [
-        "player let things get out of control",
+        "you let things get out of control",
+        "you need more direction in your life",
+        "your chances of surviving that were remote",
     ],
     bug: [
-        "player has ants in their pants",
+        "you got ants in your pants",
+        "there's a bug in your code",
+        "time for some debugging",
     ],
     paramecium: [
-        "player has the creepy crawlies",
+        "you got the creepy crawlies",
+        "you couldn't wriggle out of that one",
     ],
     teeth: [
-        "player got a mega bite",
+        "you got a mega bite",
+        "you got a little nybble",
+        "you're quite a mouthful",
+        "if it helps, apparently you're delicious",
     ],
     blob: [
-        "player didn't do a gooed job",
+        "gooed job there",
+        "blame the rng for that one",
+        "goo another way next time",
     ],
 };
 class Player extends PrimaryView {
