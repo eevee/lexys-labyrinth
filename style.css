@@ -20,7 +20,8 @@ main[hidden] {
     display: none !important;
 }
 input[type=radio],
-input[type=checkbox] {
+input[type=checkbox],
+input[type=range] {
     margin: 0.125em;
     vertical-align: middle;
 }
@@ -292,16 +293,17 @@ body[data-mode=player] #editor-play {
     display: grid;
     align-items: center;
     grid:
+        "controls   controls"   min-content
         "level      chips"      min-content
         "level      time"       min-content
         "level      bonus"      min-content
         "level      message"    1fr
         "level      inventory"  min-content
-        "controls   controls"
+        "music      ."          min-content
         /* Need explicit min-content to force the hint to wrap */
         / min-content min-content
     ;
-    column-gap: 1em;
+    column-gap: 2em;
     row-gap: 0.5em;
 
     image-rendering: optimizeSpeed;
@@ -504,6 +506,43 @@ dl.score-chart .-sum {
     background: #0009;
     color: white;
 }
+
+#player-music {
+    grid-area: music;
+    display: flex;
+    text-transform: lowercase;
+    color: #909090;
+}
+#player-music #player-music-left {
+    flex: 1 0 auto;
+}
+#player-music #player-music-right {
+    text-align: right;
+}
+#player-music a {
+    color: #c0c0c0;
+}
+#player-music a:link,
+#player-music a:visited {
+    text-decoration: underline dotted;
+}
+#player-music a:link {
+    color: hsl(225, 50%, 75%);
+}
+#player-music a:visited {
+    color: hsl(300, 50%, 75%);
+}
+#player-music a:link:hover,
+#player-music a:visited:hover {
+    text-decoration: underline;
+}
+#player-music a:active {
+    color: hsl(0, 50%, 75%);
+}
+#player-music #player-music-volume {
+    width: 8em;
+}
+
 #player .controls {
     grid-area: controls;
     display: flex;

@@ -72,12 +72,22 @@
             <output></output>
         </div>
         <div class="inventory"></div>
+        <div id="player-music">
+            <div id="player-music-left">
+                🎵 <a id="player-music-title">title</a> by <a id="player-music-author">author</a>
+            </div>
+            <div id="player-music-right">
+                <input id="player-music-volume" type="range" min="0" max="1" step="0.05" value="1">
+                <input id="player-music-unmute" type="checkbox" checked>
+            </div>
+            <audio loop preload="auto">
+        </div>
         <div class="controls">
             <div class="play-controls">
-                <button class="control-pause" type="button">Pause</button>
+                <button class="control-pause" type="button">Pause (p)</button>
                 <button class="control-restart" type="button">Restart</button>
                 <button class="control-undo" type="button">Undo</button>
-                <button class="control-rewind" type="button">Rewind</button>
+                <button class="control-rewind" type="button">Rewind (z)</button>
             </div>
             <div class="demo-controls">
                 <button class="demo-play" type="button">View replay</button>

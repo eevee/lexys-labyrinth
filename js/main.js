@@ -6,6 +6,7 @@ import * as dat from './format-dat.js';
 import * as format_util from './format-util.js';
 import { Level } from './game.js';
 import CanvasRenderer from './renderer-canvas.js';
+import SOUNDTRACK from './soundtrack.js';
 import { Tileset, CC2_TILESET_LAYOUT, LL_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, mk_svg, promise_event, fetch, walk_grid } from './util.js';
@@ -254,6 +255,36 @@ class Player extends PrimaryView {
         this.input_el = this.root.querySelector('.input');
         this.demo_el = this.root.querySelector('.demo');
 
+        this.music_el = this.root.querySelector('#player-music');
+        this.music_audio_el = this.music_el.querySelector('audio');
+        this.music_index = null;
+        let volume_el = this.music_el.querySelector('#player-music-volume');
+        this.music_audio_el.volume = this.conductor.options.music_volume ?? 1.0;
+        volume_el.value = this.music_audio_el.volume;
+        volume_el.addEventListener('input', ev => {
+            let volume = ev.target.value;
+            this.conductor.options.music_volume = volume;
+            this.conductor.save_stash();
+
+            this.music_audio_el.volume = ev.target.value;
+        });
+        let enabled_el = this.music_el.querySelector('#player-music-unmute');
+        this.music_enabled = this.conductor.options.music_enabled ?? true;
+        enabled_el.checked = this.music_enabled;
+        enabled_el.addEventListener('change', ev => {
+            this.music_enabled = ev.target.checked;
+            this.conductor.options.music_enabled = this.music_enabled;
+            this.conductor.save_stash();
+
+            // TODO also hide most of the music stuff
+            if (this.music_enabled) {
+                this.update_music_playback_state();
+            }
+            else {
+                this.music_audio_el.pause();
+            }
+        });
+
         // Bind buttons
         this.pause_button = this.root.querySelector('.controls .control-pause');
         this.pause_button.addEventListener('click', ev => {
@@ -467,6 +498,8 @@ class Player extends PrimaryView {
         this.level = new Level(stored_level, this.compat);
         this.renderer.set_level(this.level);
         this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
+        // TODO base this on a hash of the UA + some identifier for the pack + the level index.  StoredLevel doesn't know its own index atm...
+        this.change_music(Math.floor(Math.random() * SOUNDTRACK.length));
         this._clear_state();
     }
 
@@ -845,6 +878,8 @@ class Player extends PrimaryView {
             this.renderer.use_rewind_effect = false;
         }
 
+        this.update_music_playback_state();
+
         // The advance and redraw methods run in a loop, but they cancel
         // themselves if the game isn't running, so restart them here
         if (this.state === 'playing' || this.state === 'rewinding') {
@@ -854,6 +889,56 @@ class Player extends PrimaryView {
             if (! this._redraw_handle) {
                 this.redraw();
             }
+        }
+    }
+
+    // Music stuff
+
+    change_music(index) {
+        if (index === this.music_index)
+            return;
+        this.music_index = index;
+
+        let track = SOUNDTRACK[index];
+        this.music_audio_el.src = track.path;
+
+        let title_el = this.music_el.querySelector('#player-music-title');
+        title_el.textContent = track.title;
+        if (track.beepbox) {
+            title_el.setAttribute('href', track.beepbox);
+        }
+        else {
+            title_el.removeAttribute('href');
+        }
+
+        let author_el = this.music_el.querySelector('#player-music-author');
+        author_el.textContent = track.author;
+        if (track.twitter) {
+            author_el.setAttribute('href', 'https://twitter.com/' + track.twitter);
+        }
+        else {
+            author_el.removeAttribute('href');
+        }
+    }
+
+    update_music_playback_state() {
+        if (! this.music_enabled)
+            return;
+
+        // Audio tends to match the game state
+        // TODO rewind audio when rewinding the game?  would need to use the audio api, so high effort low reward
+        if (this.state === 'waiting') {
+            this.music_audio_el.pause();
+            this.music_audio_el.currentTime = 0;
+        }
+        if (this.state === 'playing' || this.state === 'rewinding') {
+            this.music_audio_el.play();
+        }
+        else if (this.state === 'paused') {
+            this.music_audio_el.pause();
+        }
+        else if (this.state === 'stopped') {
+            this.music_audio_el.pause();
         }
     }
 
@@ -1645,11 +1730,22 @@ class LevelBrowserOverlay extends DialogOverlay {
 }
 
 // Central dispatcher of what we're doing and what we've got loaded
+const STORAGE_KEY = "Lexy's Labyrinth";
 class Conductor {
     constructor(tileset) {
         this.stored_game = null;
         this.tileset = tileset;
-        // TODO options and whatnot should go here too
+
+        this.stash = JSON.parse(window.localStorage.getItem(STORAGE_KEY));
+        // TODO more robust way to ensure this is shaped how i expect?
+        if (! this.stash) {
+            this.stash = {};
+        }
+        if (! this.stash.options) {
+            this.stash.options = {};
+        }
+        // Handy aliases
+        this.options = this.stash.options;
 
         this.splash = new Splash(this);
         this.editor = new Editor(this);
@@ -1766,6 +1862,10 @@ class Conductor {
         this.nav_choose_level_button.disabled = !this.stored_game;
         this.nav_prev_button.disabled = !this.stored_game || this.level_index <= 0;
         this.nav_next_button.disabled = !this.stored_game || this.level_index >= this.stored_game.levels.length;
+    }
+
+    save_stash() {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.stash));
     }
 }
 
