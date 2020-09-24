@@ -7,8 +7,10 @@ export class Tile {
         this.direction = direction;
         this.cell = null;
 
-        this.slide_mode = null;
-        this.movement_cooldown = 0;
+        if (type.is_actor) {
+            this.slide_mode = null;
+            this.movement_cooldown = 0;
+        }
 
         if (type.has_inventory) {
             this.keyring = {};
@@ -392,13 +394,17 @@ export class Level {
                     this._set_prop(actor, 'animation_progress', null);
                     this._set_prop(actor, 'animation_speed', null);
                     if (! this.compat.tiles_react_instantly) {
-                        cell_steppers.push(actor);
+                        // We need to track the actor AND the cell explicitly, because it's possible
+                        // that one actor's step will cause another actor to start another move, and
+                        // then they'd end up stepping on the new cell they're moving to instead of
+                        // the one they just landed on!
+                        cell_steppers.push([actor, actor.cell]);
                     }
                 }
             }
         }
-        for (let actor of cell_steppers) {
-            this.step_on_cell(actor);
+        for (let [actor, cell] of cell_steppers) {
+            this.step_on_cell(actor, cell);
         }
 
         // Only reset the player's is_pushing between movement, so it lasts for the whole push
@@ -562,6 +568,11 @@ export class Level {
         // Third pass: everyone actually moves
         for (let actor of this.actors) {
             if (! actor.cell)
+                continue;
+
+            // Check this again, because one actor's movement might caused a later actor to move
+            // (e.g. by pressing a red or brown button)
+            if (actor.movement_cooldown > 0)
                 continue;
 
             if (! actor.decision)
@@ -813,14 +824,14 @@ export class Level {
         }
 
         if (this.compat.tiles_react_instantly) {
-            this.step_on_cell(actor);
+            this.step_on_cell(actor, actor.cell);
         }
     }
 
     // Step on every tile in a cell we just arrived in
-    step_on_cell(actor) {
+    step_on_cell(actor, cell) {
         let teleporter;
-        for (let tile of Array.from(actor.cell)) {
+        for (let tile of Array.from(cell)) {
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))
