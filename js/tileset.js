@@ -436,7 +436,10 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     button_blue: [2, 8],
     teleport_blue: [2, 9],
     bomb: [2, 10],
-    trap: [2, 11],
+    trap: {
+        closed: [2, 11],
+        open: [2, 11],
+    },
     wall_appearing: [2, 12],
     gravel: [2, 13],
     popwall: [2, 14],
