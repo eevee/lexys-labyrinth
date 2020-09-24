@@ -499,7 +499,7 @@ class Player extends PrimaryView {
         this.renderer.set_level(this.level);
         this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
         // TODO base this on a hash of the UA + some identifier for the pack + the level index.  StoredLevel doesn't know its own index atm...
-        this.change_music(Math.floor(Math.random() * SOUNDTRACK.length));
+        this.change_music(this.conductor.level_index % SOUNDTRACK.length);
         this._clear_state();
     }
 
@@ -918,7 +918,10 @@ class Player extends PrimaryView {
 
         let author_el = this.music_el.querySelector('#player-music-author');
         author_el.textContent = track.author;
-        if (track.twitter) {
+        if (track.url) {
+            author_el.setAttribute('href', track.url);
+        }
+        else if (track.twitter) {
             author_el.setAttribute('href', 'https://twitter.com/' + track.twitter);
         }
         else {
