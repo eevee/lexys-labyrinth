@@ -622,7 +622,11 @@ const TILE_TYPES = {
     trap: {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
-            if (! me.open) {
+            if (me.open) {
+                // Traps immediately eject their contents, if possible
+                level.attempt_step(other, other.direction);
+            }
+            else {
                 level.set_actor_stuck(other, true);
             }
         },
