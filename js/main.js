@@ -530,8 +530,8 @@ class Player extends PrimaryView {
     }
 
     play_demo() {
-        this.demo_faucet = this.level.stored_level.demo[Symbol.iterator]();
         this.restart_level();
+        this.demo_faucet = this.level.stored_level.demo[Symbol.iterator]();
         this.level.force_floor_direction = this.level.stored_level.demo.initial_force_floor_direction;
         // FIXME should probably start playback on first real input
         this.set_state('playing');
