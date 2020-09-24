@@ -509,8 +509,16 @@ export class Level {
             }
             else if (actor.type.movement_mode === 'pursue') {
                 // teeth behavior: always move towards the player
-                let dx = actor.cell.x - this.player.cell.x;
-                let dy = actor.cell.y - this.player.cell.y;
+                let target_cell = this.player.cell;
+                // CC2 behavior (not Lynx (TODO compat?)): pursue the cell the player is leaving, if
+                // they're still mostly in it
+                if (this.player.previous_cell && this.player.animation_speed &&
+                    this.player.animation_progress <= this.player.animation_speed / 2)
+                {
+                    target_cell = this.player.previous_cell;
+                }
+                let dx = actor.cell.x - target_cell.x;
+                let dy = actor.cell.y - target_cell.y;
                 let preferred_horizontal, preferred_vertical;
                 if (dx > 0) {
                     preferred_horizontal = 'west';
