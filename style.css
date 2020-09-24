@@ -619,13 +619,15 @@ main.--has-demo .demo-controls {
     position: relative;
     overflow: auto;
 }
-#editor .level-editor-overlay {
+#editor svg.level-editor-overlay {
     position: absolute;
     top: 0;
     left: 0;
     /* FIXME get real size */
     width: 1024px;
     height: 1024px;
+    /* allow clicks to go through us! */
+    pointer-events: none;
 }
 #editor .level-editor-overlay rect.overlay-cxn {
     stroke-width: 0.0625;
