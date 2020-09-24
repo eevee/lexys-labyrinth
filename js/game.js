@@ -782,6 +782,9 @@ export class Level {
 
         // Check for a couple effects that always apply immediately
         // TODO do blocks smash monsters?
+        if (actor === this.player) {
+            this._set_prop(this, 'hint_shown', null);
+        }
         for (let tile of goal_cell) {
             if (actor.type.is_player && tile.type.is_monster) {
                 this.fail(tile.type.name);
@@ -795,6 +798,10 @@ export class Level {
 
             if (tile.type.slide_mode && ! actor.ignores(tile.type.name)) {
                 this.make_slide(actor, tile.type.slide_mode);
+            }
+
+            if (actor === this.player && tile.type.is_hint) {
+                this._set_prop(this, 'hint_shown', tile.specific_hint ?? this.stored_level.hint);
             }
         }
 
@@ -812,19 +819,12 @@ export class Level {
 
     // Step on every tile in a cell we just arrived in
     step_on_cell(actor) {
-        if (actor === this.player) {
-            this._set_prop(this, 'hint_shown', null);
-        }
         let teleporter;
         for (let tile of Array.from(actor.cell)) {
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))
                 continue;
-
-            if (actor === this.player && tile.type.is_hint) {
-                this._set_prop(this, 'hint_shown', tile.specific_hint ?? this.stored_level.hint);
-            }
 
             if (tile.type.is_item && this.give_actor(actor, tile.type.name)) {
                 this.remove_tile(tile);
