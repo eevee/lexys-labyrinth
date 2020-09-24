@@ -661,7 +661,12 @@ class Player extends PrimaryView {
                 this.update_ui();
             }
         }
-        this._advance_handle = window.setTimeout(this._advance_bound, 1000 / TICS_PER_SECOND);
+        let dt = 1000 / TICS_PER_SECOND;
+        if (this.state === 'rewinding') {
+            // Rewind faster than normal time
+            dt *= 0.5;
+        }
+        this._advance_handle = window.setTimeout(this._advance_bound, dt);
     }
 
     // Redraws every frame, unless the game isn't running
