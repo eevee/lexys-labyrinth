@@ -34,6 +34,12 @@ function player_visual_state(me) {
     else if (me.slide_mode === 'force') {
         return 'forced';
     }
+    else if (me.is_blocked) {
+        return 'blocked';
+    }
+    else if (me.is_pushing) {
+        return 'pushing';
+    }
     else if (me.animation_speed) {
         return 'moving';
     }

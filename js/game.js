@@ -354,6 +354,10 @@ export class Level {
 
         // Used to check for a monster chomping the player's tail
         this.player_leaving_cell = this.player.cell;
+        // Used for visual effect and updated later; don't need to be undoable
+        // because they only apply while holding a key down anyway
+        // TODO but maybe they should be undone anyway so rewind looks better
+        this.player.is_blocked = false;
 
         // First pass: tick cooldowns and animations; have actors arrive in their cells.  We do the
         // arrival as its own mini pass, for one reason: if the player dies (which will end the game
@@ -395,6 +399,11 @@ export class Level {
         }
         for (let actor of cell_steppers) {
             this.step_on_cell(actor);
+        }
+
+        // Only reset the player's is_pushing between movement, so it lasts for the whole push
+        if (this.player.movement_cooldown <= 0) {
+            this.player.is_pushing = false;
         }
 
         // Second pass: actors decide their upcoming movement simultaneously
@@ -559,7 +568,12 @@ export class Level {
                 continue;
 
             let old_cell = actor.cell;
-            this.attempt_step(actor, actor.decision);
+            let success = this.attempt_step(actor, actor.decision);
+
+            // Track whether the player is blocked, for visual effect
+            if (actor === this.player && p1_primary_direction && ! success) {
+                actor.is_blocked = true;
+            }
 
             // Players can also bump the tiles in the cell next to the one they're leaving
             let dir2 = actor.secondary_direction;
@@ -575,6 +589,7 @@ export class Level {
                         }
                         if (could_push && actor.can_push(tile)) {
                             // Block slapping: you can shove a block by walking past it sideways
+                            // TODO i think cc2 uses the push pose and possibly even turns you here?
                             this.attempt_step(tile, dir2);
                         }
                     }
@@ -697,6 +712,9 @@ export class Level {
                     for (let tile of Array.from(goal_cell)) {
                         if (actor.can_push(tile)) {
                             this.attempt_step(tile, direction);
+                            if (actor === this.player) {
+                                actor.is_pushing = true;
+                            }
                         }
                     }
 

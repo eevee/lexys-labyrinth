@@ -298,6 +298,7 @@ export const CC2_TILESET_LAYOUT = {
             west: [8, 23],
             east: [8, 22],
         },
+        blocked: 'pushing',
         moving: {
             north: [[0, 22], [1, 22], [2, 22], [3, 22], [4, 22], [5, 22], [6, 22], [7, 22]],
             east: [[8, 22], [9, 22], [10, 22], [11, 22], [12, 22], [13, 22], [14, 22], [15, 22]],
@@ -532,6 +533,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
         },
         moving: 'normal',
         pushing: 'normal',
+        blocked: 'normal',
         swimming: {
             north: [3, 12],
             west: [3, 13],
