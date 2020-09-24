@@ -89,7 +89,7 @@ p:last-child {
 }
 .dialog > footer {
     display: flex;
-    justify-content: end;
+    justify-content: flex-end;
     gap: 0.5em;
 
     padding: 0.5em;
@@ -221,7 +221,7 @@ body > header h3 {
 body > header > nav {
     flex: 1;
     display: flex;
-    justify-content: end;
+    justify-content: flex-end;
     gap: 0.5em;
     margin: 0.25rem 0.5rem;
 }
@@ -559,7 +559,7 @@ dl.score-chart .-sum {
 .demo-controls {
     display: none;
     flex: 1;
-    justify-content: end;
+    justify-content: flex-end;
 }
 main.--has-demo .demo-controls {
     display: flex;
