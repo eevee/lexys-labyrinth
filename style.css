@@ -306,7 +306,8 @@ body[data-mode=player] #editor-play {
     column-gap: 2em;
     row-gap: 0.5em;
 
-    image-rendering: optimizeSpeed;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
 
     --tile-width: 32px;
     --tile-height: 32px;
