@@ -176,6 +176,7 @@ export class Level {
         this.actors = [];
         this.chips_remaining = this.stored_level.chips_required;
         this.bonus_points = 0;
+        this.aid = 0;
 
         // Time
         if (this.stored_level.time_limit === 0) {
@@ -185,6 +186,8 @@ export class Level {
             this.time_remaining = this.stored_level.time_limit * 20;
         }
         this.timer_paused = false;
+        // Note that this clock counts *up*, even on untimed levels, and is unaffected by CC2's
+        // clock alteration shenanigans
         this.tic_counter = 0;
         // 0 to 7, indicating the first tic that teeth can move on.
         // 0 is equivalent to even step; 4 is equivalent to odd step.
@@ -932,6 +935,8 @@ export class Level {
     }
 
     undo() {
+        this.aid = Math.max(1, this.aid);
+
         let entry = this.undo_stack.pop();
         // Undo in reverse order!  There's no redo, so it's okay to destroy this
         entry.reverse();
@@ -1016,6 +1021,21 @@ export class Level {
         this.pending_undo.push(() => this.state = 'playing');
         this.state = 'success';
         throw new GameEnded;
+    }
+
+    get_scorecard() {
+        if (this.state !== 'success') {
+            return null;
+        }
+
+        let time = Math.floor((this.time_remaining ?? 0) / 20);
+        return {
+            time: time,
+            abstime: this.tic_counter,
+            bonus: this.bonus_points,
+            score: this.stored_level.number * 500 + time * 10 + this.bonus_points,
+            aid: this.aid,
+        };
     }
 
     // Get the next direction a random force floor will use.  They share global

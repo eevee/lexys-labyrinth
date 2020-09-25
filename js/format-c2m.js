@@ -654,8 +654,8 @@ function decompress(buf) {
     return out;
 }
 
-export function parse_level(buf) {
-    let level = new util.StoredLevel;
+export function parse_level(buf, number = 1) {
+    let level = new util.StoredLevel(number);
     let full_view = new DataView(buf);
     let next_section_start = 0;
     let extra_hints = [];

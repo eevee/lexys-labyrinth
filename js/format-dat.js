@@ -119,8 +119,8 @@ const TILE_ENCODING = {
     0x6f: ['player', 'east'],
 };
     
-function parse_level(buf) {
-    let level = new util.StoredLevel;
+function parse_level(buf, number) {
+    let level = new util.StoredLevel(number);
     // Map size is always fixed as 32x32 in CC1
     level.size_x = 32;
     level.size_y = 32;
@@ -304,7 +304,7 @@ export function parse_game(buf) {
         let level_buf = buf.slice(p + 2, p + 2 + length);
         p += 2 + length;
 
-        let level = parse_level(level_buf);
+        let level = parse_level(level_buf, l);
         game.levels.push(level);
     }
 

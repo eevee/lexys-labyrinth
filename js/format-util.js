@@ -6,7 +6,8 @@ export class StoredCell extends Array {
 }
 
 export class StoredLevel {
-    constructor() {
+    constructor(number) {
+        this.number = number;  // one-based
         this.title = '';
         this.password = null;
         this.hint = '';
@@ -39,7 +40,8 @@ export class StoredLevel {
 }
 
 export class StoredGame {
-    constructor() {
+    constructor(identifier) {
+        this.identifier = identifier;
         this.levels = [];
     }
 }

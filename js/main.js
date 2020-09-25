@@ -121,14 +121,7 @@ class PrimaryView {
 
 
 // TODO:
-// - some kinda visual theme i guess lol
 // - level password, if any
-// - bonus points (cc2 only, or maybe only if got any so far this level)
-// - intro splash with list of available level packs
-// - button: quit to splash
-// - implement winning and show score for this level
-// - show current score so far
-// - about, help
 const ACTION_LABELS = {
     up: '⬆️\ufe0f',
     down: '⬇️\ufe0f',
@@ -621,6 +614,15 @@ class Player extends PrimaryView {
     }
 
     load_level(stored_level) {
+        // Do this here because we care about the latest level played, not the latest level opened
+        // in the editor or whatever
+        let savefile = this.conductor.current_pack_savefile;
+        savefile.current_level = stored_level.number;
+        if (savefile.highest_level < stored_level.number) {
+            savefile.highest_level = stored_level.number;
+        }
+        this.conductor.save_savefile();
+
         this.level = new Level(stored_level, this.compat);
         this.level.sfx = this.sfx_player;
         this.renderer.set_level(this.level);
@@ -937,9 +939,32 @@ class Player extends PrimaryView {
                 overlay_keyhint = "press space to try again, or Z to rewind";
             }
             else {
+                // We just beat the level!  Hey, that's cool.
+                // Let's save the score while we're here.
+                let level_number = this.level.stored_level.number;
+                let level_index = level_number - 1;
+                let scorecard = this.level.get_scorecard();
+                let savefile = this.conductor.current_pack_savefile;
+                let old_scorecard;
+                if (! savefile.scorecards[level_index] ||
+                    savefile.scorecards[level_index].score < scorecard.score)
+                {
+                    old_scorecard = savefile.scorecards[level_index];
+
+                    // Adjust the total score
+                    savefile.total_score = savefile.total_score ?? 0;
+                    if (old_scorecard) {
+                        savefile.total_score -= old_scorecard.score;
+                    }
+                    savefile.total_score += scorecard.score;
+
+                    savefile.scorecards[level_index] = scorecard;
+                    this.conductor.save_savefile();
+                }
+
                 overlay_reason = 'success';
-                let base = (this.conductor.level_index + 1) * 500;
-                let time = Math.ceil((this.level.time_remaining ?? 0) / 20) * 10;
+                let base = level_number * 500;
+                let time = scorecard.time * 10;
                 // Pick a success message
                 // TODO done on first try; took many tries
                 let time_left_fraction = null;
@@ -981,14 +1006,39 @@ class Player extends PrimaryView {
                     mk('dd', base),
                     mk('dt', "time bonus"),
                     mk('dd', `+ ${time}`),
-                    mk('dt', "score bonus"),
-                    mk('dd', `+ ${this.level.bonus_points}`),
+                );
+                // It should be impossible to ever have a bonus and then drop back to 0 with CC2
+                // rules; thieves can halve it, but the amount taken is rounded down.
+                // That is to say, I don't need to track whether we ever got a score bonus
+                if (this.level.bonus_points) {
+                    overlay_middle.append(
+                        mk('dt', "score bonus"),
+                        mk('dd', `+ ${this.level.bonus_points}`),
+                    );
+                }
+                else {
+                    overlay_middle.append(mk('dt', ""), mk('dd', ""));
+                }
+
+                // TODO show your time, bold time...?
+                overlay_middle.append(
                     mk('dt.-sum', "level score"),
-                    mk('dd.-sum', base + time + this.level.bonus_points),
-                    mk('dt', "improvement"),
-                    mk('dd', "(TODO)"),
+                    mk('dd.-sum', `${scorecard.score} ${scorecard.aid === 0 ? '★' : ''}`),
+                );
+
+                if (old_scorecard) {
+                    overlay_middle.append(
+                        mk('dt', "improvement"),
+                        mk('dd', `+ ${scorecard.score - old_scorecard.score}`),
+                    );
+                }
+                else {
+                    overlay_middle.append(mk('dt', ""), mk('dd', ""));
+                }
+
+                overlay_middle.append(
                     mk('dt', "total score"),
-                    mk('dd', "(TODO)"),
+                    mk('dd', savefile.total_score),
                 );
             }
         }
@@ -1594,18 +1644,22 @@ class Editor extends PrimaryView {
 
 const BUILTIN_LEVEL_PACKS = [{
     path: 'levels/CCLP1.ccl',
+    ident: 'cclp1',
     title: "Chip's Challenge Level Pack 1",
     desc: "Designed and recommended for new players, starting with gentle introductory levels.  A prequel to the other packs.",
 }, {
     path: 'levels/CCLP4.ccl',
+    ident: 'cclp4',
     title: "Chip's Challenge Level Pack 4",
     desc: "Moderately difficult, but not unfair.",
 }, {
     path: 'levels/CCLXP2.ccl',
+    ident: 'cclxp2',
     title: "Chip's Challenge Level Pack 2-X",
     desc: "The first community pack released, tricky and rough around the edges.",
 }, {
     path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
     title: "Chip's Challenge Level Pack 3",
     desc: "A tough challenge, by and for veteran players.",
 }];
@@ -1617,10 +1671,21 @@ class Splash extends PrimaryView {
         // Populate the list of available level packs
         let pack_list = document.querySelector('#splash-stock-levels');
         for (let packdef of BUILTIN_LEVEL_PACKS) {
+            let score;
+            let packinfo = conductor.stash.packs[packdef.ident];
+            if (packinfo && packinfo.total_score !== undefined) {
+                // TODO tack on a star if the game is "beaten"?  what's that mean?  every level
+                // beaten i guess?
+                score = packinfo.total_score.toLocaleString();
+            }
+            else {
+                score = "unplayed";
+            }
+
             let button = mk('button.button-big.level-pack-button',
                 mk('h3', packdef.title),
                 mk('p', packdef.desc),
-                mk('span.-score', "unplayed"),
+                mk('span.-score', score),
             );
             button.addEventListener('click', ev => {
                 this.fetch_pack(packdef.path, packdef.title);
@@ -1638,7 +1703,7 @@ class Splash extends PrimaryView {
         upload_el.addEventListener('change', async ev => {
             let file = ev.target.files[0];
             let buf = await file.arrayBuffer();
-            this.load_file(buf);
+            this.load_file(buf, this.extract_identifier_from_path(file.name));
             // TODO get title out of C2G when it's supported
             this.conductor.level_pack_name_el.textContent = file.name;
         });
@@ -1655,7 +1720,8 @@ class Splash extends PrimaryView {
             }
             stored_level.linear_cells[0].push({type: TILE_TYPES['player']});
 
-            let stored_game = new format_util.StoredGame;
+            // FIXME definitely gonna need a name here chief
+            let stored_game = new format_util.StoredGame(null);
             stored_game.levels.push(stored_level);
             this.conductor.load_game(stored_game);
 
@@ -1663,17 +1729,28 @@ class Splash extends PrimaryView {
         });
     }
 
+    extract_identifier_from_path(path) {
+        let ident = path.match(/^(?:.*\/)?[.]*([^.]+)(?:[.]|$)/)[1];
+        if (ident) {
+            return ident.toLowerCase();
+        }
+        else {
+            return null;
+        }
+    }
+
+    // TODO wait why aren't these just on conductor
     async fetch_pack(path, title) {
         // TODO indicate we're downloading something
         // TODO handle errors
         // TODO cancel a download if we start another one?
         let buf = await fetch(path);
-        this.load_file(buf);
+        this.load_file(buf, this.extract_identifier_from_path(path));
         // TODO get title out of C2G when it's supported
         this.conductor.level_pack_name_el.textContent = title || path;
     }
 
-    load_file(buf) {
+    load_file(buf, identifier = null) {
         // TODO also support tile world's DAC when reading from local??
         // TODO ah, there's more metadata in CCX, crapola
         let magic = String.fromCharCode.apply(null, new Uint8Array(buf.slice(0, 4)));
@@ -1681,6 +1758,8 @@ class Splash extends PrimaryView {
         if (magic === 'CC2M' || magic === 'CCS ') {
             stored_game = new format_util.StoredGame;
             stored_game.levels.push(c2m.parse_level(buf));
+            // Don't make a savefile for individual levels
+            identifier = null;
         }
         else if (magic === '\xac\xaa\x02\x00' || magic == '\xac\xaa\x02\x01') {
             stored_game = dat.parse_game(buf);
@@ -1688,7 +1767,7 @@ class Splash extends PrimaryView {
         else {
             throw new Error("Unrecognized file format");
         }
-        this.conductor.load_game(stored_game);
+        this.conductor.load_game(stored_game, identifier);
         this.conductor.switch_to_player();
     }
 }
@@ -1855,20 +1934,58 @@ class LevelBrowserOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
         this.set_title("choose a level");
-        let table = mk('table.level-browser');
+        let thead = mk('thead', mk('tr',
+            mk('th', ""),
+            mk('th', "Level"),
+            mk('th', "Your time"),
+            mk('th', mk('abbr', {
+                title: "Actual time it took you to play the level, even on untimed levels, and ignoring any CC2 clock altering effects",
+            }, "Real time")),
+            mk('th', "Your score"),
+        ));
+        let tbody = mk('tbody');
+        let table = mk('table.level-browser', thead, tbody);
         this.main.append(table);
+        let savefile = conductor.current_pack_savefile;
+        // TODO if i stop eagerloading everything in a .DAT then this will not make sense any more
         for (let [i, stored_level] of conductor.stored_game.levels.entries()) {
-            table.append(mk('tr',
+            let scorecard = savefile.scorecards[i];
+            let score = "—", time = "—", abstime = "—";
+            if (scorecard) {
+                score = scorecard.score.toLocaleString();
+                if (scorecard.aid === 0) {
+                    score += '★';
+                }
+
+                if (scorecard.time === 0) {
+                    // This level is untimed
+                    time = "n/a";
+                }
+                else {
+                    time = String(scorecard.time);
+                }
+
+                // Express absolute time as mm:ss, with two decimals on the seconds (which should be
+                // able to exactly count a number of tics)
+                abstime = `${Math.floor(scorecard.abstime / 20 / 60)}:${(scorecard.abstime / 20 % 60).toFixed(2)}`;
+            }
+
+            tbody.append(mk(i >= savefile.highest_level ? 'tr.--unvisited' : 'tr',
                 {'data-index': i},
-                mk('td', i + 1),
-                mk('td', stored_level.title),
-                // TODO score?
-                // TODO other stats??
-                mk('td', '▶'),
+                mk('td.-number', i + 1),
+                mk('td.-title', stored_level.title),
+                mk('td.-time', time),
+                mk('td.-time', abstime),
+                mk('td.-score', score),
+                // TODO show your time?  include 999 times for untimed levels (which i don't know at
+                // this point whoops but i guess if the time is zero then that answers that)?  show
+                // your wallclock time also?
+                // TODO other stats??  num chips, time limit?  don't know that without loading all
+                // the levels upfront though, which i currently do but want to stop doing
             ));
         }
 
-        table.addEventListener('click', ev => {
+        tbody.addEventListener('click', ev => {
             let tr = ev.target.closest('table.level-browser tr');
             if (! tr)
                 return;
@@ -1886,6 +2003,7 @@ class LevelBrowserOverlay extends DialogOverlay {
 
 // Central dispatcher of what we're doing and what we've got loaded
 const STORAGE_KEY = "Lexy's Labyrinth";
+const STORAGE_PACK_PREFIX = "Lexy's Labyrinth: ";
 class Conductor {
     constructor(tileset) {
         this.stored_game = null;
@@ -1898,6 +2016,9 @@ class Conductor {
         }
         if (! this.stash.options) {
             this.stash.options = {};
+        }
+        if (! this.stash.packs) {
+            this.stash.packs = {};
         }
         // Handy aliases
         this.options = this.stash.options;
@@ -1990,8 +2111,24 @@ class Conductor {
         document.body.setAttribute('data-mode', 'player');
     }
 
-    load_game(stored_game) {
+    load_game(stored_game, identifier = null) {
         this.stored_game = stored_game;
+
+        this._pack_identifier = identifier;
+        this.current_pack_savefile = null;
+        if (identifier !== null) {
+            // TODO again, enforce something about the shape here
+            this.current_pack_savefile = JSON.parse(window.localStorage.getItem(STORAGE_PACK_PREFIX + identifier));
+        }
+        if (! this.current_pack_savefile) {
+            this.current_pack_savefile = {
+                total_score: 0,
+                current_level: 1,
+                highest_level: 1,
+                // level scorecard: { time, abstime, bonus, score, aid } or null
+                scorecards: [],
+            };
+        }
 
         this.player.load_game(stored_game);
         this.editor.load_game(stored_game);
@@ -2021,6 +2158,25 @@ class Conductor {
 
     save_stash() {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.stash));
+    }
+
+    save_savefile() {
+        if (! this._pack_identifier)
+            return;
+
+        window.localStorage.setItem(STORAGE_PACK_PREFIX + this._pack_identifier, JSON.stringify(this.current_pack_savefile));
+
+        // Also remember the total score in the stash, if it changed, so we can read it without
+        // having to parse every single one of these things
+        let packinfo = this.stash.packs[this._pack_identifier];
+        if (! packinfo || packinfo.total_score !== this.current_pack_savefile.total_score) {
+            if (! packinfo) {
+                packinfo = {};
+                this.stash.packs[this._pack_identifier] = packinfo;
+            }
+            packinfo.total_score = this.current_pack_savefile.total_score;
+            this.save_stash();
+        }
     }
 }
 

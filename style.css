@@ -160,13 +160,40 @@ table.level-browser {
     margin-bottom: 1em;
     line-height: 1.25;
     border-spacing: 0;
-    cursor: pointer;
+}
+table.level-browser thead {
+    position: sticky;
+    top: -1em;  /* counteract padding so cells don't appear above us */
+    background: #f4f4f4;  /* match dialog background */
+}
+table.level-browser thead tr th {
+    border-bottom: 2px solid hsl(225, 20%, 60%);
 }
 table.level-browser td {
-    padding: 0 0.25em;
+    padding: 0.25em;
 }
-table.level-browser tr:hover {
-    background: hsl(225, 60%, 90%);
+table.level-browser td.-number {
+    color: #404040;
+    text-align: right;
+}
+table.level-browser td.-time {
+    text-align: right;
+}
+table.level-browser td.-score {
+    text-align: right;
+}
+table.level-browser tr.--unvisited {
+    color: #606060;
+    font-style: italic;
+}
+table.level-browser tbody tr {
+    cursor: pointer;
+}
+table.level-browser tbody tr:hover {
+    background: hsl(225, 60%, 85%);
+}
+table.level-browser tbody tr:nth-child(10n) td {
+    border-bottom: 2px solid hsl(225, 20%, 80%);
 }
 
 /* Options dialog */
@@ -534,10 +561,20 @@ dl.score-chart .-sum {
     color: hsl(225, 10%, 30%);
 }
 .time output.--warning {
-    color: hsl(30, 100%, 40%);
+    color: hsl(345, 60%, 60%);
 }
 .time output.--danger {
-    color: hsl(345, 60%, 60%);
+    color: hsl(330, 60%, 60%);
+    /* TODO this can get out of sync and keeps going at 0, but is a neat idea */
+    /* animation: time-pulse 1s linear infinite; */
+}
+@keyframes time-pulse {
+    0% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 .time output.--frozen {
     color: hsl(225, 10%, 30%);
