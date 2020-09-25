@@ -1569,6 +1569,7 @@ class Editor extends PrimaryView {
         }
 
         // Load connections
+        this.connections_g.textContent = '';
         for (let [src, dest] of Object.entries(this.stored_level.custom_trap_wiring)) {
             let [sx, sy] = this.stored_level.scalar_to_coords(src);
             let [dx, dy] = this.stored_level.scalar_to_coords(dest);

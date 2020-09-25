@@ -767,6 +767,7 @@ main.--has-demo .demo-controls {
     line-height: 1;
     background: url(icons/tool-bg-unselected.png) no-repeat;
     border: none;
+    border-radius: 0;
 }
 .icon-button-set button.-selected {
     background-image: url(icons/tool-bg-selected.png);
