@@ -342,6 +342,18 @@ export const CC2_TILESET_LAYOUT = {
         south: [[4, 24], [5, 24]],
         west: [[6, 24], [7, 24]],
     },
+    bogus_player_drowned: {
+        overlay: [3, 3],  // splash
+        base: 'water',
+    },
+    bogus_player_burned_fire: {
+        overlay: [2, 5],  // explosion frame 3
+        base: 'fire',
+    },
+    bogus_player_burned: {
+        overlay: [2, 5],  // explosion frame 3
+        base: 'floor',
+    },
     water: [
         [12, 24],
         [13, 24],
@@ -372,10 +384,6 @@ export const CC2_TILESET_LAYOUT = {
         [14, 29],
         [15, 29],
     ],
-
-    // TODO these shouldn't loop and also seem to be more general
-    player_drowned: [[4, 5], [5, 5], [6, 5], [7, 5]],
-    player_burned: [[0, 5], [1, 5], [2, 5], [3, 5]],
 
     // TODO handle train tracks!  this is gonna be complicated.
     railroad: [9, 10],
@@ -449,9 +457,9 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     cloner: [3, 1],
     force_floor_all: [3, 2],
     splash: [3, 3],
-    player_drowned: [3, 3],
-    player_burned: [3, 4],
-    player_bombed: [3, 5],
+    bogus_player_drowned: [3, 3],
+    bogus_player_burned_fire: [3, 4],
+    bogus_player_burned: [3, 5],
     explosion: [3, 6],
     explosion_other: [3, 7],  // TODO ???
     // 3, 8 unused
@@ -573,6 +581,14 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
             west: [7, 33],
         },
     }),
+    bogus_player_burned_fire: {
+        overlay: [6, 33],
+        base: 'fire',
+    },
+    bogus_player_burned: {
+        overlay: [6, 33],
+        base: 'floor',
+    },
 });
 
 export class Tileset {

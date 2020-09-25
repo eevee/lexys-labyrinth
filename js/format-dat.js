@@ -56,9 +56,9 @@ const TILE_ENCODING = {
     0x30: 'thinwall_se',
     0x31: 'cloner',
     0x32: 'force_floor_all',
-    0x33: 'player_drowned',
-    0x34: 'player_burned',
-    //0x35: player_burned,  XXX is this burned off a tile or?
+    0x33: 'bogus_player_drowned',
+    0x34: 'bogus_player_burned_fire',
+    0x35: 'bogus_player_burned',
     0x36: 'wall_invisible',  // unused
     0x37: 'wall_invisible',  // unused
     0x38: 'wall_invisible',  // unused
@@ -159,9 +159,10 @@ function parse_level(buf, number) {
 
             let spec = TILE_ENCODING[tile_byte];
             // TODO could be more forgiving for goofy levels doing goofy things
-            if (! spec)
-                // TODO doesn't say what level or where in the file, come on
-                throw new Error(`Invalid tile byte: 0x${tile_byte.toString(16)}`);
+            if (! spec) {
+                let [x, y] = level.scalar_to_coords(c);
+                throw new Error(`Invalid tile byte 0x${tile_byte.toString(16)} at (${x}, ${y}) in level ${number}`);
+            }
 
             let name, direction;
             if (spec instanceof Array) {

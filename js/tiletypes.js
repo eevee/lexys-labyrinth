@@ -1176,12 +1176,6 @@ const TILE_TYPES = {
             key_yellow: true,
         },
     },
-    player_drowned: {
-        draw_layer: LAYER_ACTOR,
-    },
-    player_burned: {
-        draw_layer: LAYER_ACTOR,
-    },
     chip: {
         draw_layer: LAYER_ITEM,
         is_chip: true,
@@ -1304,6 +1298,18 @@ const TILE_TYPES = {
         blocks_all: true,
     },
     bogus_player_swimming: {
+        draw_layer: LAYER_TERRAIN,
+        blocks_all: true,
+    },
+    bogus_player_drowned: {
+        draw_layer: LAYER_TERRAIN,
+        blocks_all: true,
+    },
+    bogus_player_burned_fire: {
+        draw_layer: LAYER_TERRAIN,
+        blocks_all: true,
+    },
+    bogus_player_burned: {
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
     },
