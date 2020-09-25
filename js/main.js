@@ -1879,34 +1879,37 @@ class Conductor {
 
 
 async function main() {
+    let local = !! location.host.match(/localhost/);
     let query = new URLSearchParams(location.search);
 
     // Pick a tileset
-    // These alternative ones only exist locally for me at the moment, since
-    // they're part of the commercial games!
+    // These alternative ones only work locally for me for testing purposes, since they're part of
+    // the commercial games!
     let tilesheet = new Image();
     let tilesize;
     let tilelayout;
-    if (query.get('tileset') === 'ms') {
+    if (local && query.get('tileset') === 'ms') {
         tilesheet.src = 'tileset-ms.png';
         tilesize = 32;
         tilelayout = CC2_TILESET_LAYOUT;
     }
-    else if (query.get('tileset') === 'steam') {
+    else if (local && query.get('tileset') === 'steam') {
         tilesheet.src = 'tileset-steam.png';
         tilesize = 32;
         tilelayout = CC2_TILESET_LAYOUT;
     }
-    else if (query.get('tileset') === 'lexy') {
-        tilesheet.src = 'tileset-lexy.png';
-        tilesize = 32;
-        tilelayout = LL_TILESET_LAYOUT;
-    }
-    else {
+    else if (query.get('tileset') === 'tworld') {
         tilesheet.src = 'tileset-tworld.png';
         tilesize = 48;
         tilelayout = TILE_WORLD_TILESET_LAYOUT;
     }
+    else {
+        // Default to Lexy's Labyrinth tileset
+        tilesheet.src = 'tileset-lexy.png';
+        tilesize = 32;
+        tilelayout = LL_TILESET_LAYOUT;
+    }
+    // TODO would be fabulous to not wait on this before creating conductor
     await tilesheet.decode();
     let tileset = new Tileset(tilesheet, tilelayout, tilesize, tilesize);
 
