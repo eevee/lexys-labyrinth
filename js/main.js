@@ -469,8 +469,7 @@ class Player extends PrimaryView {
         this.tic_offset = 0;
         this.last_advance = 0;  // performance.now timestamp
 
-        // Auto-size the level canvas, both now and on resize
-        this.adjust_scale();
+        // Auto-size the level canvas on resize
         window.addEventListener('resize', ev => {
             this.adjust_scale();
         });
@@ -1467,11 +1466,19 @@ class Editor extends PrimaryView {
 const BUILTIN_LEVEL_PACKS = [{
     path: 'levels/CCLP1.ccl',
     title: "Chip's Challenge Level Pack 1",
-    desc: "Intended as an introduction to Chip's Challenge 1 for new players.  Recommended.",
+    desc: "Designed and recommended for new players, starting with gentle introductory levels.  A prequel to the other packs.",
+}, {
+    path: 'levels/CCLP4.ccl',
+    title: "Chip's Challenge Level Pack 4",
+    desc: "Moderately difficult, but not unfair.",
+}, {
+    path: 'levels/CCLXP2.ccl',
+    title: "Chip's Challenge Level Pack 2-X",
+    desc: "The first community pack released, tricky and rough around the edges.",
 }, {
     path: 'levels/CCLP3.ccl',
     title: "Chip's Challenge Level Pack 3",
-    desc: "Another community level pack.",
+    desc: "A tough challenge, by and for veteran players.",
 }];
 
 class Splash extends PrimaryView {
@@ -1479,22 +1486,26 @@ class Splash extends PrimaryView {
         super(conductor, document.body.querySelector('main#splash'));
 
         // Populate the list of available level packs
-        let pack_list = document.querySelector('#level-pack-list');
+        let pack_list = document.querySelector('#splash-stock-levels');
         for (let packdef of BUILTIN_LEVEL_PACKS) {
-            let li = mk('li',
+            let button = mk('button.button-big.level-pack-button',
                 mk('h3', packdef.title),
                 mk('p', packdef.desc),
+                mk('span.-score', "unplayed"),
             );
-            li.addEventListener('click', ev => {
+            button.addEventListener('click', ev => {
                 this.fetch_pack(packdef.path, packdef.title);
             });
-            pack_list.append(li);
+            pack_list.append(button);
         }
 
         // Bind to file upload control
         let upload_el = this.root.querySelector('#splash-upload');
         // Clear it out in case of refresh
         upload_el.value = '';
+        this.root.querySelector('#splash-upload-button').addEventListener('click', ev => {
+            upload_el.click();
+        });
         upload_el.addEventListener('change', async ev => {
             let file = ev.target.files[0];
             let buf = await file.arrayBuffer();
@@ -1559,11 +1570,18 @@ class Splash extends PrimaryView {
 
 // About dialog
 const ABOUT_HTML = `
-<p>Welcome to Lexy's Labyrinth, an exciting old-school tile-based puzzle adventure that is compatible with — but legally distinct from — <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge</a> and its exciting sequel <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a>.</p>
+<p>Welcome to Lexy's Labyrinth, an exciting old-school tile-based puzzle adventure that is compatible with — but legally distinct from! — <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge</a> and its long-awaited sequel <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a>.</p>
 <p>This is a reimplementation from scratch of the game and uses none of its original code or assets.  It aims to match the behavior of the Steam releases (sans obvious bugs), since those are now the canonical versions of the game, but compatibility settings aren't off the table.</p>
-<p>The default level pack is the community-made <a href="https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1">Chip's Challenge Level Pack 1</a>, which I had no hand in whatsoever; please follow the link for full attribution.  With any luck, future releases will include other community level packs, the ability to play your own, and even a way to play the original levels once you've purchased them on Steam!</p>
+<p>The default level pack is the community-made <a href="https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1">Chip's Challenge Level Pack 1</a>, which I had no hand in whatsoever; please follow the link for full attribution.</p>
 <p>Source code is on <a href="https://github.com/eevee/lexys-labyrinth">GitHub</a>.</p>
-<p>Special thanks to the incredibly detailed <a href="https://bitbusters.club/">Bit Busters Club</a> and its associated wiki and Discord, the latter of which is full of welcoming people who've been more than happy to answer all my burning arcane questions about Chip's Challenge mechanics.  Thank you also to <a href="https://tw2.bitbusters.club/">Tile World</a>, an open source Chip's Challenge 1 emulator whose source code was indispensable, and the origin of the default tileset.</p>
+<p>Special thanks to:</p>
+<ul class="normal-list">
+    <li>The lovingly maintained <a href="https://bitbusters.club/">Bit Busters Club</a>, its incredibly detailed <a href="https://wiki.bitbusters.club/Main_Page">wiki</a>, and its <a href="https://discord.gg/Xd4dUY9">Discord</a> full of welcoming and patient folks who've been more than happy to playtest this thing and answer all kinds of arcane questions about Chip's Challenge mechanics.</li>
+    <li><a href="https://tw2.bitbusters.club/">Tile World</a>, the original Chip's Challenge 1 emulator whose source code was indispensable.</li>
+    <li>Everyone who contributed to the soundtrack, without whom there would still only be one song.</li>
+    <li>Chuck Somerville, for creating the original game!</li>
+</ul>
+<p>Not affiliated with, endorsed by, aided by, or done with the permission of Chuck Somerville, Niffler Inc., or Alpha Omega Productions.</p>
 `;
 class AboutOverlay extends DialogOverlay {
     constructor(conductor) {

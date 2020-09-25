@@ -11,8 +11,9 @@
     <meta name="og:title" content="Lexy's Labyrinth">
     <meta name="og:description" content="A (work in progress) reimplementation of Chip's Challenge 1 and 2, using entirely free assets.">
 </head>
-<body>
+<body data-mode="splash">
     <header id="header-main">
+        <img src="icon.png" alt="">
         <h1>Lexy's Labyrinth</h1>
         <nav>
             <button id="main-about" type="button">about</button>
@@ -31,47 +32,77 @@
     <header id="header-level">
         <h3 id="level-name">Level 1 — Key Pyramid</h3>
         <nav>
-            <button id="main-prev-level" type="button">⬅️&#xfe0e;</button>
+            <button id="main-prev-level" type="button">←</button>
             <button id="main-choose-level" type="button">Level select</button>
-            <button id="main-next-level" type="button">➡️&#xfe0e;</button>
+            <button id="main-next-level" type="button">→</button>
         </nav>
     </header>
     <main id="splash">
-        <h2>Community levels</h2>
-        <ul id="level-pack-list">
-        </ul>
+        <header>
+            <h1><img src="og-preview.png" alt="">Lexy's Labyrinth</h1>
+        </header>
+        <section id="splash-intro">
+            <p><strong>Welcome</strong> to Lexy's Labyrinth, an open source puzzle game that is curiously similar to — but legally distinct from — the Atari classic <a href="https://en.wikipedia.org/wiki/Chip%27s_Challenge">Chip's Challenge</a>!</p>
+            <p>(This is a Chip's Challenge <em>emulator</em>, designed to be an accessible way to play community-made levels with free assets.  It's 99% compatible with Chip's Challenge 1, and support for Chip's Challenge 2 is underway.  But you can safely ignore all that and treat this as its own game.)</p>
+            <p>Please note that <em>levels themselves</em> may contain hints or lore referring to a guy named Chip collecting computer chips, even though you are clearly a fox named Lexy collecting hearts.  Weird, right?  Sorry for any confusion!</p>
+            <p>Pick a level pack to get started!  You can also get more technical details or report bugs on <a href="https://github.com/eevee/lexys-labyrinth">GitHub</a>, find out more about Chip's Challenge via the <a href="https://bitbusters.club/">Bit Busters Club</a> fansite, or support this endeavor (and other things I do) via <a href="https://www.patreon.com/eevee">Patreon</a>!</p>
+            <!-- TODO i want to make clear this is a chip's challenge emulator without bogging people down too much about what that means -->
+        </section>
 
-        <h2>Commercial and other levels</h2>
-        <p>You can play the original levels, or any you've downloaded from the web!</p>
-        <!-- TODO explain how to find chips.dat or steam folder -->
-        <!-- TODO drag and drop? -->
-        <p><input id="splash-upload" type="file" accept=".dat,.ccl,.c2m,.ccs"></p>
+        <section id="splash-stock-levels">
+            <h2>Just play something</h2>
+            <!-- populated by js -->
+        </section>
 
-        <h2>Make your own (WIP lol)</h2>
-        <p><button type="button" id="splash-create-level">Create a level</button></p>
+        <section id="splash-upload-levels">
+            <h2>Other levels</h2>
+            <p>You can play any levels you have lying around, or perhaps ones you found on the <a href="https://sets.bitbusters.club/">Bit Busters Club set list</a>!</p>
+            <!-- TODO explain how to find chips.dat or steam folder -->
+            <!-- TODO drag and drop? -->
+            <input id="splash-upload" type="file" accept=".dat,.ccl,.c2m,.ccs">
+            <button type="button" id="splash-upload-button" class="button-big">Open a local level<br>(or drag and drop a file into this window)</button>
+            <p>Supports both the old Microsoft <code>CHIPS.DAT</code> format and the Steam <code>C2M</code> format.</p>
+            <p>Does <em>not</em> yet support the Steam <code>C2G</code> format, so tragically, the original Steam levels can only be played one at a time!  This should be fixed soon!</p>
+            <!--
+            <p>If you own the Steam versions of <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge 1</a> (<em>free!</em>) or <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a> ($5 last I checked), you can play those too, even on Linux or Mac:</p>
+            <ol class="normal-list">
+                <li>Right-click the game in Steam and choose <em>Properties</em>.  On the <em>Local Files</em> tab, click <em>Browse local files</em>.</li>
+                <li>Open the <code>data</code> folder, then <code>games</code>.</li>
+                <li>You should see either a <code>cc1</code> or <code>cc2</code> folder.  Drag it into this window.</li>
+            </ol>
+            -->
+        </section>
+
+        <section id="splash-your-levels">
+            <h2>Make your own (WIP lol)</h2>
+            <p>Please note that the level editor is <strong>extremely</strong> unfinished, and can't even save yet.</p>
+            <p><button type="button" id="splash-create-level" class="button-big">Create a level</button></p>
+        </section>
     </main>
     <main id="player" hidden>
-        <div class="level"><!-- level canvas and any overlays go here --></div>
-        <div class="overlay-message">
-            <h1 class="-top"></h1>
-            <div class="-middle"></div>
-            <p class="-bottom"></p>
-            <p class="-keyhint"></p>
-        </div>
-        <div class="message"></div>
-        <div class="chips">
-            <h3>Chips</h3>
-            <output></output>
-        </div>
-        <div class="time">
-            <h3>Time</h3>
-            <output></output>
-        </div>
-        <div class="bonus">
-            <h3>Bonus</h3>
-            <output></output>
-        </div>
-        <div class="inventory"></div>
+        <section class="-main-area">
+            <div class="level"><!-- level canvas and any overlays go here --></div>
+            <div class="overlay-message">
+                <h1 class="-top"></h1>
+                <div class="-middle"></div>
+                <p class="-bottom"></p>
+                <p class="-keyhint"></p>
+            </div>
+            <div class="message"></div>
+            <div class="chips">
+                <h3>Chips</h3>
+                <output></output>
+            </div>
+            <div class="time">
+                <h3>Time</h3>
+                <output></output>
+            </div>
+            <div class="bonus">
+                <h3>Bonus</h3>
+                <output></output>
+            </div>
+            <div class="inventory"></div>
+        </section>
         <div id="player-music">
             <div id="player-music-left">
                 🎵 <a id="player-music-title">title</a> by <a id="player-music-author">author</a>
