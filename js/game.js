@@ -858,7 +858,8 @@ export class Level {
             if (actor.ignores(tile.type.name))
                 continue;
 
-            if (tile.type.is_item && this.give_actor(actor, tile.type.name)) {
+            // TODO some actors can pick up some items...
+            if (actor.type.is_player && tile.type.is_item && this.give_actor(actor, tile.type.name)) {
                 if (tile.type.is_key) {
                     this.sfx.play_once('get-key', cell);
                 }
