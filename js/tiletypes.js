@@ -240,7 +240,7 @@ const TILE_TYPES = {
         is_swivel: true,
         on_depart(me, level, other) {
             if (other.direction === 'north') {
-                level.transmute_tile(me, 'swivel_ne');
+                level.transmute_tile(me, 'swivel_sw');
             }
             else if (other.direction === 'west') {
                 level.transmute_tile(me, 'swivel_ne');
@@ -263,6 +263,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             if (level.take_key_from_actor(other, 'key_red')) {
+                level.sfx.play_once('door', me.cell);
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -274,6 +275,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             if (level.take_key_from_actor(other, 'key_blue')) {
+                level.sfx.play_once('door', me.cell);
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -285,6 +287,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             if (level.take_key_from_actor(other, 'key_yellow')) {
+                level.sfx.play_once('door', me.cell);
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -296,6 +299,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             if (level.take_key_from_actor(other, 'key_green')) {
+                level.sfx.play_once('door', me.cell);
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -344,6 +348,7 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
+            level.sfx.play_once('splash', me.cell);
             if (other.type.name === 'dirt_block') {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'dirt');
@@ -478,6 +483,7 @@ const TILE_TYPES = {
                 level.fail('exploded');
             }
             else {
+                level.sfx.play_once('bomb', me.cell);
                 level.transmute_tile(other, 'explosion');
             }
         },
@@ -487,6 +493,7 @@ const TILE_TYPES = {
         blocks_monsters: true,
         blocks_blocks: true,
         on_arrive(me, level, other) {
+            level.sfx.play_once('thief', me.cell);
             level.take_all_tools_from_actor(other);
             if (other.type.is_player) {
                 level.adjust_bonus(0, 0.5);
@@ -498,6 +505,7 @@ const TILE_TYPES = {
         blocks_monsters: true,
         blocks_blocks: true,
         on_arrive(me, level, other) {
+            level.sfx.play_once('thief', me.cell);
             level.take_all_keys_from_actor(other);
             if (other.type.is_player) {
                 level.adjust_bonus(0, 0.5);
@@ -576,6 +584,7 @@ const TILE_TYPES = {
                 level.fail('exploded');
             }
             else {
+                level.sfx.play_once('bomb', me.cell);
                 level.transmute_tile(other, 'explosion');
             }
         },
@@ -715,6 +724,8 @@ const TILE_TYPES = {
     button_blue: {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
             // Flip direction of all blue tanks
             for (let actor of level.actors) {
                 // TODO generify somehow??
@@ -723,10 +734,15 @@ const TILE_TYPES = {
                 }
             }
         },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+        },
     },
     button_yellow: {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
             // Move all yellow tanks one tile in the direction of the pressing actor
             for (let actor of level.actors) {
                 // TODO generify somehow??
@@ -735,10 +751,15 @@ const TILE_TYPES = {
                 }
             }
         },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+        },
     },
     button_green: {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
             // Swap green floors and walls
             // TODO could probably make this more compact for undo purposes
             for (let row of level.cells) {
@@ -760,12 +781,17 @@ const TILE_TYPES = {
                 }
             }
         },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+        },
     },
     button_brown: {
         draw_layer: LAYER_TERRAIN,
         connects_to: 'trap',
         connect_order: 'forward',
         on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
             if (me.connection && me.connection.cell) {
                 let trap = me.connection;
                 level._set_prop(trap, 'open', true);
@@ -782,6 +808,9 @@ const TILE_TYPES = {
             }
         },
         on_depart(me, level, other) {
+            // TODO this doesn't play if you walk straight across
+            level.sfx.play_once('button-release', me.cell);
+
             if (me.connection && me.connection.cell) {
                 let trap = me.connection;
                 level._set_prop(trap, 'open', false);
@@ -798,9 +827,14 @@ const TILE_TYPES = {
         connects_to: 'cloner',
         connect_order: 'forward',
         on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
             if (me.connection && me.connection.cell) {
                 me.connection.type.activate(me.connection, level);
             }
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
         },
     },
     button_orange: {
@@ -1233,6 +1267,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             if (other.type.is_player && level.chips_remaining === 0) {
+                level.sfx.play_once('socket');
                 level.transmute_tile(me, 'floor');
             }
         },

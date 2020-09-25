@@ -361,6 +361,8 @@ export class Level {
         // TODO but maybe they should be undone anyway so rewind looks better
         this.player.is_blocked = false;
 
+        this.sfx.set_player_position(this.player.cell);
+
         // First pass: tick cooldowns and animations; have actors arrive in their cells.  We do the
         // arrival as its own mini pass, for one reason: if the player dies (which will end the game
         // immediately), we still want every time's animation to finish, or it'll look like some
@@ -591,6 +593,7 @@ export class Level {
 
             // Track whether the player is blocked, for visual effect
             if (actor === this.player && p1_primary_direction && ! success) {
+                this.sfx.play_once('blocked');
                 actor.is_blocked = true;
             }
 
@@ -647,6 +650,9 @@ export class Level {
             this.time_remaining -= 1;
             if (this.time_remaining <= 0) {
                 this.fail('time');
+            }
+            else if (this.time_remaining % 20 === 0 && this.time_remaining < 30 * 20) {
+                this.sfx.play_once('tick');
             }
         }
         else {
@@ -831,6 +837,10 @@ export class Level {
             this.fail(actor.type.name);
         }
 
+        if (actor === this.player && goal_cell[0].type.name === 'floor') {
+            this.sfx.play_once('step-floor');
+        }
+
         if (this.compat.tiles_react_instantly) {
             this.step_on_cell(actor, actor.cell);
         }
@@ -846,6 +856,12 @@ export class Level {
                 continue;
 
             if (tile.type.is_item && this.give_actor(actor, tile.type.name)) {
+                if (tile.type.is_key) {
+                    this.sfx.play_once('get-key', cell);
+                }
+                else {
+                    this.sfx.play_once('get-tool', cell);
+                }
                 this.remove_tile(tile);
             }
             else if (tile.type.is_teleporter) {
@@ -873,9 +889,13 @@ export class Level {
                 // XXX not especially undo-efficient
                 this.remove_tile(actor);
                 this.add_tile(actor, goal.cell);
-                if (this.attempt_step(actor, actor.direction))
+                if (this.attempt_step(actor, actor.direction)) {
                     // Success, teleportation complete
+                    // Sound plays from the origin cell simply because that's where the sfx player
+                    // thinks the player is currently
+                    this.sfx.play_once('teleport', cell);
                     break;
+                }
                 if (goal === teleporter)
                     // We've tried every teleporter, including the one they
                     // stepped on, so leave them on it
@@ -936,6 +956,7 @@ export class Level {
     collect_chip() {
         let current = this.chips_remaining;
         if (current > 0) {
+            this.sfx.play_once('get-chip');
             this.pending_undo.push(() => this.chips_remaining = current);
             this.chips_remaining--;
         }
@@ -972,6 +993,13 @@ export class Level {
     }
 
     fail(reason) {
+        if (reason === 'time') {
+            this.sfx.play_once('timeup');
+        }
+        else {
+            this.sfx.play_once('lose');
+        }
+
         this.pending_undo.push(() => {
             this.state = 'playing';
             this.fail_reason = null;
@@ -984,6 +1012,7 @@ export class Level {
     }
 
     win() {
+        this.sfx.play_once('win');
         this.pending_undo.push(() => this.state = 'playing');
         this.state = 'success';
         throw new GameEnded;

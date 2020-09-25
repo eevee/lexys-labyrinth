@@ -219,6 +219,126 @@ const OBITUARIES = {
         "goo another way next time",
     ],
 };
+// Helper class used to let the game play sounds without knowing too much about the Player
+class SFXPlayer {
+    constructor() {
+        this.ctx = new window.AudioContext;
+        this.player_x = null;
+        this.player_y = null;
+        this.sounds = {};
+        this.sound_sources = {
+            // handcrafted
+            blocked: 'sfx/mmf.ogg',
+            // https://jummbus.bitbucket.io/#j2N04bombn110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T0v0pL0OD0Ou00q1d1f8y0z2C0w2c0h2T2v0kL0OD0Ou02q1d1f6y1z2C1w1b4gp1b0aCTFucgds0
+            bomb: 'sfx/bomb.ogg',
+            // https://jummbus.bitbucket.io/#j2N0cbutton-pressn100s0k0l00e00t3Mm1a3g00j07i0r1O_U0o3T0v0pL0OD0Ou00q1d1f3y1z1C2w0c0h0b4p1bJdn51eMUsS0
+            'button-press': 'sfx/button-press.ogg',
+            // https://jummbus.bitbucket.io/#j2N0ebutton-releasen100s0k0l00e00t3Mm1a3g00j07i0r1O_U0o3T0v0pL0OD0Ou00q1d1f3y1z1C2w0c0h0b4p1aArdkga4sG0
+            'button-release': 'sfx/button-release.ogg',
+            // https://jummbus.bitbucket.io/#j2N04doorn110s0k0l00e00t3Mmfa3g00j07i0r1O_U00o30T0v0zL0OD0Ou00q0d1f8y0z2C0w2c0h0T2v0pL0OD0Ou02q0d1f8y3ziC0w1b4gp1f0aqEQ0lCNzrYUY0
+            door: 'sfx/door.ogg',
+            // https://jummbus.bitbucket.io/#j2N08get-chipn100s0k0l00e00t3Mmca3g00j07i0r1O_U0o4T0v0zL0OD0Ou00q1d1f6y1z2C0wac0h0b4p1dFyW7czgUK7aw0
+            'get-chip': 'sfx/get-chip.ogg',
+            // https://jummbus.bitbucket.io/#j2N07get-keyn100s0k0l00e00t3Mmfa3g00j07i0r1O_U0o5T0v0pL0OD0Ou00q1d5f8y0z2C0w1c0h0b4p1dFyW85CbwwzBg0
+            'get-key': 'sfx/get-key.ogg',
+            // https://jummbus.bitbucket.io/#j2N08get-tooln100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o2T0v0pL0OD0Ou00q1d1f4y2z9C0w2c0h0b4p1bGqKNW4isVk0
+            'get-tool': 'sfx/get-tool.ogg',
+            // https://jummbus.bitbucket.io/#j2N06socketn110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T5v0pL0OD0Ou05q1d1f8y1z7C1c0h0HU7000U0006000ET2v0pL0OD0Ou02q1d6f5y3z2C0w0b4gp1xGoKHGhFBcn2FyPkxk0rE2AGcNCQyHwUY0
+            socket: 'sfx/socket.ogg',
+            // https://jummbus.bitbucket.io/#j2N06splashn110s0k0l00e00t3Mm5a3g00j07i0r1O_U00o20T0v0pL0OD0Ou00q0d0fay0z0C0w9c0h8T2v05L0OD0Ou02q2d6fay0z1C0w0b4gp1lGqKQy02gUY1qh7D1wb2Y0
+            // https://jummbus.bitbucket.io/#j2N06splashn110s0k0l00e00t3Mm5a3g00j07i0r1O_U00o20T0v0pL0OD0Ou00q0d0fay0z0C0w9c0h8T2v05L0OD0Ou02q2d6fay0z1C0w0b4gp1lGqKQxw_zzM5F4us60IbM0
+            splash: 'sfx/splash.ogg',
+            // https://jummbus.bitbucket.io/#j2N0astep-floorn100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o1T0v05L0OD0Ou00q0d2f1y1zjC2w0c0h0b4p1aGaKaxqer00
+            'step-floor': 'sfx/step-floor.ogg',
+            // https://jummbus.bitbucket.io/#j2N08teleportn110s1k0l00e00t3Mm7a3g00j07i0r1O_U00o50T0v0pL0OD0Ou00q1d1f8y4z6C2w5c4h0T2v0kL0OD0Ou02q1d7f8y4z3C1w4b4gp1wF2Uzh5wdC18yHH4hhBhHwaATXu0Asds0
+            teleport: 'sfx/teleport.ogg',
+            // https://jummbus.bitbucket.io/#j2N05thiefn100s1k0l00e00t3Mm3a3g00j07i0r1O_U0o1T0v0pL0OD0Ou00q1d1f5y1z8C2w2c0h0b4p1fFyUBBr9mGkKKds0
+            thief: 'sfx/thief.ogg',
+
+            // handcrafted
+            lose: 'sfx/bummer.ogg',
+            // https://jummbus.bitbucket.io/#j2N04tickn100s0k0l00e00t3Mmca3g00j07i0r1O_U0o2T0v0pL0OD0Ou00q1d1f7y1ziC0w4c0h4b4p1bKqE6Rtxex00
+            tick: 'sfx/tick.ogg',
+            // https://jummbus.bitbucket.io/#j2N06timeupn100s0k0l00e00t3Mm4a3g00j07i0r1O_U0o3T1v0pL0OD0Ou01q1d5f4y1z8C1c0A0F0B0V1Q38e0Pa610E0861b4p1dIyfgKPcLucqU0
+            timeup: 'sfx/timeup.ogg',
+            // https://jummbus.bitbucket.io/#j2N03winn200s0k0l00e00t2wm9a3g00j07i0r1O_U00o32T0v0EL0OD0Ou00q1d1f5y1z1C2w1c2h0T0v0pL0OD0Ou00q0d1f2y1z2C0w2c3h0b4gp1xFyW4xo31pe0MaCHCbwLbM5cFDgapBOyY0
+            win: 'sfx/win.ogg',
+        };
+
+        for (let [name, path] of Object.entries(this.sound_sources)) {
+            this.init_sound(name, path);
+        }
+
+        this.mmf_cooldown = 0;
+    }
+
+    async init_sound(name, path) {
+        let buf = await fetch(path);
+        let audiobuf = await this.ctx.decodeAudioData(buf);
+        this.sounds[name] = {
+            buf: buf,
+            audiobuf: audiobuf,
+        };
+    }
+
+    set_player_position(cell) {
+        this.player_x = cell.x;
+        this.player_y = cell.y;
+    }
+
+    play_once(name, cell = null) {
+        let data = this.sounds[name];
+        if (! data) {
+            // Hasn't loaded yet, not much we can do
+            if (! this.sound_sources[name]) {
+                console.warn("Tried to play non-existent sound", name);
+            }
+            return;
+        }
+
+        // "Mmf" can technically play every tic since bumping into something doesn't give a movement
+        // cooldown, so give it our own sound cooldown
+        if (name === 'blocked' && this.player_x !== null) {
+            if (this.mmf_cooldown > 0) {
+                return;
+            }
+            else {
+                this.mmf_cooldown = 4;
+            }
+        }
+
+        let node = this.ctx.createBufferSource();
+        node.buffer = data.audiobuf;
+
+        if (cell && this.player_x !== null) {
+            // Reduce the volume for further-away sounds
+            let dx = cell.x - this.player_x;
+            let dy = cell.y - this.player_y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let gain = this.ctx.createGain();
+            // x/(x + a) is a common and delightful way to get an easy asymptote and output between
+            // 0 and 1.  Here, the result is above 80% for almost everything on screen; drops down
+            // to 50% for things 20 tiles away (which is, roughly, the periphery when standing in
+            // the center of a CC1 map), and bottoms out at 12.5% for standing in one corner of a
+            // CC2 map of max size and hearing something on the far opposite corner.
+            gain.gain.value = 1 - dist / (dist + 20);
+            node.connect(gain);
+            gain.connect(this.ctx.destination);
+        }
+        else {
+            // Play at full volume
+            node.connect(this.ctx.destination);
+        }
+        node.start(this.ctx.currentTime);
+    }
+
+    // Reduce cooldowns
+    advance_tic() {
+        if (this.mmf_cooldown > 0) {
+            this.mmf_cooldown -= 1;
+        }
+    }
+}
 class Player extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#player'));
@@ -473,6 +593,13 @@ class Player extends PrimaryView {
         window.addEventListener('resize', ev => {
             this.adjust_scale();
         });
+
+        // TODO yet another thing that should be in setup, but can't be because load_level is called
+        // first
+        this.sfx_player = new SFXPlayer;
+    }
+
+    setup() {
     }
 
     activate() {
@@ -495,6 +622,7 @@ class Player extends PrimaryView {
 
     load_level(stored_level) {
         this.level = new Level(stored_level, this.compat);
+        this.level.sfx = this.sfx_player;
         this.renderer.set_level(this.level);
         this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
         // TODO base this on a hash of the UA + some identifier for the pack + the level index.  StoredLevel doesn't know its own index atm...
@@ -620,6 +748,7 @@ class Player extends PrimaryView {
 
             this.previous_input = input;
 
+            this.sfx_player.advance_tic();
             this.level.advance_tic(
                 this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null,
                 this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null,
