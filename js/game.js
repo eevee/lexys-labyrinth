@@ -332,14 +332,14 @@ export class Level {
     }
 
     // Move the game state forwards by one tic
-    advance_tic(p1_primary_direction, p1_secondary_direction) {
+    advance_tic(p1_primary_direction, p1_secondary_direction, force_wait) {
         if (this.state !== 'playing') {
             console.warn(`Level.advance_tic() called when state is ${this.state}`);
             return;
         }
 
         try {
-            this._advance_tic(p1_primary_direction, p1_secondary_direction);
+            this._advance_tic(p1_primary_direction, p1_secondary_direction, force_wait);
         }
         catch (e) {
             if (e instanceof GameEnded) {
@@ -356,13 +356,13 @@ export class Level {
         }
     }
 
-    _advance_tic(p1_primary_direction, p1_secondary_direction) {
+    _advance_tic(p1_primary_direction, p1_secondary_direction, force_wait) {
         var skip_to_third_pass = false;
         
         //if we're waiting for input, then we want to skip straight to phase 3 with a player decision filled out when they have one ready
         if (this.waiting_for_input) {
             this.actor_decision(this.player, p1_primary_direction);
-            if (this.player.decision != null) {
+            if (this.player.decision != null || force_wait) {
                 skip_to_third_pass = true;
             }
             else {
@@ -442,7 +442,7 @@ export class Level {
         }
         
         //in Turn-Based mode, wait for input if the player can voluntarily move on tic_counter % 4 == 0 and isn't
-        if (this.turn_based && this.player.movement_cooldown == 0 && this.player.decision == null && this.tic_counter % 4 == 0)
+        if (this.turn_based && this.player.movement_cooldown == 0 && this.player.decision == null && (this.tic_counter % 4 == 0) && !force_wait)
         {
             this.waiting_for_input = true;
             return;

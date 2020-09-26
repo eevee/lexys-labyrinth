@@ -341,6 +341,8 @@ class Player extends PrimaryView {
             ArrowRight: 'right',
             ArrowUp: 'up',
             ArrowDown: 'down',
+            Spacebar: 'wait',
+            " ": 'wait',
             w: 'up',
             a: 'left',
             s: 'down',
@@ -764,6 +766,7 @@ class Player extends PrimaryView {
             this.level.advance_tic(
                 this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null,
                 this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null,
+                input.has('wait')
             );
 
             if (this.level.state !== 'playing') {
