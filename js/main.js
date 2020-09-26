@@ -530,7 +530,9 @@ class Player extends PrimaryView {
                     }
                     else {
                         // Restart
-                        this.restart_level();
+                        if (!this.current_keys.has(ev.key)) {
+                            this.restart_level();
+                        }
                     }
                     return;
                 }
