@@ -461,6 +461,7 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
         // TODO ms: this is random, and an acting wall to monsters (!)
+        // TODO lynx/cc2 check this at decision time, which may affect ordering
         on_arrive(me, level, other) {
             level.set_actor_direction(other, level.get_force_floor_direction());
         },

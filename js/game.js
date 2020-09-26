@@ -760,10 +760,19 @@ export class Level {
             if (actor.slide_mode === 'ice') {
                 // Actors on ice turn around when they hit something
                 this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
-                // Somewhat clumsy hack: step on the ice tile again, so if it's
-                // a corner, it'll turn us in the correct direction
+            }
+            if (actor.slide_mode !== null) {
+                // Somewhat clumsy hack: if an actor is sliding and hits something, step on the
+                // relevant tile again.  This fixes two problems: if it was on an ice corner then it
+                // needs to turn a second time even though it didn't move; and if it was a player
+                // overriding a force floor into a wall, then their direction needs to be set back
+                // to the force floor direction.
+                // (For random force floors, this does still match CC2 behavior: after an override,
+                // CC2 will try to force you in the /next/ RFF direction.)
+                // FIXME now overriding into a wall doesn't show you facing that way at all!  lynx
+                // only changes your direction at decision time by examining the floor tile...
                 for (let tile of actor.cell) {
-                    if (tile.type.slide_mode === 'ice' && tile.type.on_arrive) {
+                    if (tile.type.slide_mode === actor.slide_mode && tile.type.on_arrive) {
                         tile.type.on_arrive(tile, this, actor);
                     }
                 }
