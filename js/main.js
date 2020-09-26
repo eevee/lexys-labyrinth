@@ -810,7 +810,7 @@ class Player extends PrimaryView {
         
         if (this.level.waiting_for_input)
         {
-			//freeze tic_offset in time so we don't try to interpolate to the next frame too soon
+            //freeze tic_offset in time so we don't try to interpolate to the next frame too soon
             this.tic_offset = 0;
         }
         
