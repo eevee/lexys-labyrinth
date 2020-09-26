@@ -982,7 +982,9 @@ export class Level {
     }
 
     undo() {
+        //ok, actually we're not doing an in-progress move after all.
         this.waiting_for_input = false;
+        this.pending_undo = [];
         this.aid = Math.max(1, this.aid);
 
         let entry = this.undo_stack.pop();
