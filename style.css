@@ -359,6 +359,7 @@ body[data-mode=player] #editor-play {
 #splash > section {
     padding: 1em;
     background: var(--panel-bg-color);
+    box-shadow: 0 0.25em 1em black;
 }
 #splash > #splash-intro {
     grid-area: intro;
