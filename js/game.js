@@ -832,9 +832,9 @@ export class Level {
         if (actor.cell === goal_cell)
             return;
 
-		this._set_prop(actor, 'previous_cell', actor.cell);
-		this._set_prop(actor, 'animation_speed', speed);
-		this._set_prop(actor, 'animation_progress', 0);
+        this._set_prop(actor, 'previous_cell', actor.cell);
+        this._set_prop(actor, 'animation_speed', speed);
+        this._set_prop(actor, 'animation_progress', 0);
 
         let original_cell = actor.cell;
         this.remove_tile(actor);
