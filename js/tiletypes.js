@@ -142,7 +142,8 @@ const TILE_TYPES = {
     },
     fake_floor: {
         draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
         on_bump(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'floor');
