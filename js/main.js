@@ -1193,6 +1193,7 @@ const EDITOR_TOOLS = [{
     icon: 'icons/tool-pencil.png',
     name: "Pencil",
     desc: "Draw individual tiles",
+/* TODO not implemented
 }, {
     mode: 'line',
     icon: 'icons/tool-line.png',
@@ -1208,6 +1209,7 @@ const EDITOR_TOOLS = [{
     icon: 'icons/tool-fill.png',
     name: "Fill",
     desc: "Flood-fill an area with tiles",
+*/
 }, {
     mode: 'force-floors',
     icon: 'icons/tool-force-floors.png',
@@ -1218,6 +1220,7 @@ const EDITOR_TOOLS = [{
     icon: 'icons/tool-adjust.png',
     name: "Adjust",
     desc: "Toggle blocks and rotate actors",
+/* TODO not implemented
 }, {
     mode: 'connect',
     icon: 'icons/tool-connect.png',
@@ -1232,6 +1235,7 @@ const EDITOR_TOOLS = [{
     // TODO interesting option: rotate an actor as you draw it by dragging?  or hold a key like in
     // slade when you have some selected?
     // TODO ah, railroads...
+*/
 }];
 // Tiles the "adjust" tool will turn into each other
 const EDITOR_ADJUST_TOGGLES = {

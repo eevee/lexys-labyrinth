@@ -12,6 +12,8 @@ body {
     font-family: Ubuntu, Source Sans Pro, DejaVu Sans, sans-serif;
     line-height: 1.33;
     background: #080808;
+    background-image: url(background.svg);
+    background-size: 10%;
     color: #ececec;
 
     --panel-bg-color: hsl(225, 10%, 20%);

@@ -15,10 +15,11 @@
     <header id="header-main">
         <img src="icon.png" alt="">
         <h1>Lexy's Labyrinth</h1>
+        <p>— a game by <a href="https://eev.ee/">eevee</a></p>
         <nav>
             <button id="main-about" type="button">about</button>
             <button id="main-help" type="button" disabled>help</button>
-            <button id="main-options" type="button">options</button>
+            <button id="main-options" type="button" disabled>options</button>
         </nav>
     </header>
     <header id="header-pack">
@@ -60,9 +61,9 @@
             <!-- TODO explain how to find chips.dat or steam folder -->
             <!-- TODO drag and drop? -->
             <input id="splash-upload" type="file" accept=".dat,.ccl,.c2m,.ccs">
-            <button type="button" id="splash-upload-button" class="button-big">Open a local level<br>(or drag and drop a file into this window)</button>
+            <button type="button" id="splash-upload-button" class="button-big">Open a local level<!-- TODO: <br>(or drag and drop a file into this window) --></button>
             <p>Supports both the old Microsoft <code>CHIPS.DAT</code> format and the Steam <code>C2M</code> format.</p>
-            <p>Does <em>not</em> yet support the Steam <code>C2G</code> format, so tragically, the original Steam levels can only be played one at a time!  This should be fixed soon!</p>
+            <p>Does <em>not</em> yet support the Steam <code>C2G</code> format, so tragically, the original Steam levels can only be played one at a time.  This should be fixed soon!</p>
             <!--
             <p>If you own the Steam versions of <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge 1</a> (<em>free!</em>) or <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a> ($5 last I checked), you can play those too, even on Linux or Mac:</p>
             <ol class="normal-list">
