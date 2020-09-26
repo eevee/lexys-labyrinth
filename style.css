@@ -281,7 +281,7 @@ body > header {
     align-items: center;
     gap: 0.5em;
 
-    margin: 0.25em;
+    padding: 0.5em;
     line-height: 1.125;
 }
 body > header h1 {
@@ -291,14 +291,13 @@ body > header h2 {
     font-size: 1.33em;
 }
 body > header h3 {
-    font-size: 1.25em;
+    font-size: 1.75em;
 }
 body > header > nav {
     flex: 1;
     display: flex;
     justify-content: flex-end;
     gap: 0.5em;
-    margin: 0.25rem 0.5rem;
 }
 body > header button {
     font-size: 0.75em;
@@ -317,8 +316,25 @@ body[data-mode=player] #editor-play {
     order: 3;
     color: #606060;
 }
-#header-level {
-    font-size: 1.5em;
+
+@media (max-width: 800px) {
+    body > header {
+        padding: 0.25em;
+    }
+    /* All these headings are way too big on phones */
+    body > header h1 {
+        font-size: 1.25em;
+    }
+    body > header h2 {
+        font-size: 1.125em;
+    }
+    body > header h3 {
+        font-size: 1.0625em;
+    }
+    body > header p {
+        /* "a game by eevee" takes up too much space :( */
+        display: none;
+    }
 }
 
 /**************************************************************************************************/
@@ -377,6 +393,23 @@ body[data-mode=player] #editor-play {
 }
 #splash > #splash-your-levels {
     grid-area: yours;
+}
+
+@media (max-width: 800px) {
+    #splash {
+        /* Grid layout doesn't fit, just stack everything */
+        display: flex;
+        flex-direction: column;
+        /* 10% padding is way way too much */
+        padding: 1em;
+    }
+    /* Shrink logo and title */
+    #splash > header img {
+        width: 48px;
+    }
+    #splash > header h1 {
+        font-size: 2em;
+    }
 }
 
 button.level-pack-button {
@@ -469,7 +502,7 @@ button.level-pack-button p {
     justify-content: center;
     align-items: center;
 
-    z-index: 1;
+    z-index: 2;
     font-size: calc(0.5 * var(--tile-width) * var(--scale));
     padding: 2%;
     background: #0009;
@@ -552,7 +585,6 @@ dl.score-chart .-sum {
 .bonus output {
     flex: 1;
     font-size: 2em;
-    padding: 0.125em;
     min-width: 2em;
     min-height: 1em;
     line-height: 1;
@@ -584,9 +616,11 @@ dl.score-chart .-sum {
 }
 #player .bonus {
     visibility: hidden;
+    display: none;
 }
 #player.--bonus-visible .bonus {
     visibility: initial;
+    display: initial;
 }
 
 .message {
@@ -644,11 +678,14 @@ dl.score-chart .-sum {
 #player-music {
     grid-area: music;
     display: flex;
+    gap: 1em;
+    margin: 0 1em;
     text-transform: lowercase;
     color: #909090;
 }
 #player-music #player-music-left {
-    flex: 1 0 auto;
+    /* allow me to wrap if need be */
+    flex: 1 0 0px;
 }
 #player-music #player-music-right {
     text-align: right;
@@ -706,6 +743,45 @@ main.--has-demo .demo-controls {
 .input-action.--pressed {
     color: white;
     background: hsl(225, 75%, 25%);
+}
+
+
+@media (max-width: 800px) {
+    #player {
+        /* sentinel for js */
+        --is-portrait: 1;
+        /* The play area isn't necessarily the biggest thing any more, and it's ugly when stretched */
+        align-items: center;
+    }
+    #player > .-main-area {
+        /* Rearrange the grid to be vertical */
+        grid:
+            "level  level"
+            "chips  inventory"
+            "time   inventory"
+            "bonus  inventory"
+            / min-content min-content
+        ;
+        row-gap: 0.5em;
+        column-gap: 1em;
+
+        padding: 0.5em;
+    }
+    #player .inventory {
+        /* stick me in the center right */
+        place-self: center end;
+    }
+    #player .message {
+        /* Overlay hints on the inventory area */
+        grid-row: chips / bonus;
+        grid-column: level;
+        z-index: 1;
+        font-size: calc(var(--tile-height) * var(--scale) / 2.5);
+    }
+    #player-music {
+        /* Stack the title/artist on the volume, since they don't fit well side by side */
+        font-size: 0.875em;
+    }
 }
 
 

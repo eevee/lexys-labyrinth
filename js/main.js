@@ -500,6 +500,7 @@ class Player extends PrimaryView {
         let key_target = document.body;
         this.previous_input = new Set;  // actions that were held last tic
         this.previous_action = null;  // last direction we were moving, if any
+        this.using_touch = false;  // true if using touch controls
         this.current_keys = new Set;  // keys that are currently held
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
@@ -542,6 +543,7 @@ class Player extends PrimaryView {
                 ev.stopPropagation();
                 ev.preventDefault();
 
+                // TODO for demo compat, this should happen as part of input reading?
                 if (this.state === 'waiting') {
                     this.set_state('playing');
                 }
@@ -560,13 +562,97 @@ class Player extends PrimaryView {
                 ev.preventDefault();
             }
         });
+        // Similarly, grab touch events and translate them to directions
+        this.current_touches = {};  // ident => action
+        let touch_target = this.root.querySelector('.-main-area');
+        let collect_touches = ev => {
+            ev.stopPropagation();
+            ev.preventDefault();
+
+            // If state is anything other than playing/waiting, probably switch to playing, similar
+            // to pressing spacebar
+            if (ev.type === 'touchstart') {
+                if (this.state === 'paused') {
+                    this.toggle_pause();
+                    return;
+                }
+                else if (this.state === 'stopped') {
+                    if (this.level.state === 'success') {
+                        // Advance to the next level
+                        // TODO game ending?
+                        // TODO this immediately begins it too, not sure why
+                        this.conductor.change_level(this.conductor.level_index + 1);
+                    }
+                    else {
+                        // Restart
+                        this.restart_level();
+                    }
+                    return;
+                }
+            }
+
+            // Figure out where these touches are, relative to the game area
+            // TODO allow starting a level without moving?
+            let rect = touch_target.getBoundingClientRect();
+            for (let touch of ev.changedTouches) {
+                // Normalize touch coordinates to [-1, 1]
+                let rx = (touch.clientX - rect.left) / rect.width * 2 - 1;
+                let ry = (touch.clientY - rect.top) / rect.height * 2 - 1;
+                // Divine a direction from the results
+                let action;
+                if (Math.abs(rx) > Math.abs(ry)) {
+                    if (rx < 0) {
+                        action = 'left';
+                    }
+                    else {
+                        action = 'right';
+                    }
+                }
+                else {
+                    if (ry < 0) {
+                        action = 'up';
+                    }
+                    else {
+                        action = 'down';
+                    }
+                }
+                this.current_touches[touch.identifier] = action;
+            }
+
+            // TODO for demo compat, this should happen as part of input reading?
+            if (this.state === 'waiting') {
+                this.set_state('playing');
+            }
+        };
+        touch_target.addEventListener('touchstart', collect_touches);
+        touch_target.addEventListener('touchmove', collect_touches);
+        let dismiss_touches = ev => {
+            for (let touch of ev.changedTouches) {
+                delete this.current_touches[touch.identifier];
+            }
+        };
+        touch_target.addEventListener('touchend', dismiss_touches);
+        touch_target.addEventListener('touchcancel', dismiss_touches);
 
         // When we lose focus, act as though every key was released, and pause the game
         window.addEventListener('blur', ev => {
             this.current_keys.clear();
+            this.current_touches = {};
 
             if (this.state === 'playing' || this.state === 'rewinding') {
-                this.set_state('paused');
+                this.autopause();
+            }
+        });
+        // Same when the window becomes hidden (especially important on phones, where this covers
+        // turning the screen off!)
+        document.addEventListener('visibilitychange', ev => {
+            if (document.visibilityState === 'hidden') {
+                this.current_keys.clear();
+                this.current_touches = {};
+
+                if (this.state === 'playing' || this.state === 'rewinding') {
+                    this.autopause();
+                }
             }
         });
 
@@ -687,6 +773,9 @@ class Player extends PrimaryView {
             let input = new Set;
             for (let key of this.current_keys) {
                 input.add(this.key_mapping[key]);
+            }
+            for (let action of Object.values(this.current_touches)) {
+                input.add(action);
             }
             return input;
         }
@@ -907,6 +996,10 @@ class Player extends PrimaryView {
         }
     }
 
+    autopause() {
+        this.set_state('paused');
+    }
+
     // waiting: haven't yet pressed a key so the timer isn't going
     // playing: playing normally
     // paused: um, paused
@@ -931,7 +1024,12 @@ class Player extends PrimaryView {
         else if (this.state === 'paused') {
             overlay_reason = 'paused';
             overlay_bottom = "/// paused ///";
-            overlay_keyhint = "press P to resume";
+            if (this.using_touch) {
+                overlay_keyhint = "tap to resume";
+            }
+            else {
+                overlay_keyhint = "press P to resume";
+            }
         }
         else if (this.state === 'stopped') {
             if (this.level.state === 'failure') {
@@ -939,7 +1037,13 @@ class Player extends PrimaryView {
                 overlay_top = "whoops";
                 let obits = OBITUARIES[this.level.fail_reason] ?? OBITUARIES['generic'];
                 overlay_bottom = random_choice(obits);
-                overlay_keyhint = "press space to try again, or Z to rewind";
+                if (this.using_touch) {
+                    // TODO touch gesture to rewind?
+                    overlay_keyhint = "tap to try again, or tap undo/rewind above";
+                }
+                else {
+                    overlay_keyhint = "press space to try again, or Z to rewind";
+                }
             }
             else {
                 // We just beat the level!  Hey, that's cool.
@@ -1002,7 +1106,12 @@ class Player extends PrimaryView {
                         "alphanumeric!", "nice dynamic typing!", 
                     ]);
                 }
-                overlay_keyhint = "press space to move on";
+                if (this.using_touch) {
+                    overlay_keyhint = "tap to move on";
+                }
+                else {
+                    overlay_keyhint = "press space to move on";
+                }
 
                 overlay_middle = mk('dl.score-chart',
                     mk('dt', "base score"),
@@ -1134,14 +1243,23 @@ class Player extends PrimaryView {
     // Auto-size the game canvas to fit the screen, if possible
     adjust_scale() {
         // TODO make this optional
-        // The base size is the size of the canvas, i.e. the viewport size times the tile size --
-        // but note that horizontally we have 4 extra tiles for the inventory
-        // TODO if there's ever a portrait view for phones, this will need adjusting
-        let base_x = this.conductor.tileset.size_x * (this.renderer.viewport_size_x + 4);
-        let base_y = this.conductor.tileset.size_y * this.renderer.viewport_size_y;
-        // The main UI is centered in a flex item with auto margins, so the
-        // extra space available is the size of those margins
         let style = window.getComputedStyle(this.root);
+        let is_portrait = !! style.getPropertyValue('--is-portrait');
+        // The base size is the size of the canvas, i.e. the viewport size times the tile size --
+        // but note that we have 2x4 extra tiles for the inventory depending on layout
+        // TODO if there's ever a portrait view for phones, this will need adjusting
+        let base_x, base_y;
+        if (is_portrait) {
+            base_x = this.conductor.tileset.size_x * this.renderer.viewport_size_x;
+            base_y = this.conductor.tileset.size_y * (this.renderer.viewport_size_y + 2);
+        }
+        else {
+            base_x = this.conductor.tileset.size_x * (this.renderer.viewport_size_x + 4);
+            base_y = this.conductor.tileset.size_y * this.renderer.viewport_size_y;
+        }
+        // The main UI is centered in a flex item with auto margins, so the extra space available is
+        // the size of those margins (which naturally discounts the size of the buttons and music
+        // title and whatnot, so those automatically reserve their own space)
         if (style['display'] === 'none') {
             // the computed margins can be 'auto' in this case
             return;
@@ -1153,9 +1271,10 @@ class Player extends PrimaryView {
         let total_x = extra_x + this.renderer.canvas.offsetWidth + this.inventory_el.offsetWidth;
         let total_y = extra_y + this.renderer.canvas.offsetHeight;
         let dpr = window.devicePixelRatio || 1.0;
-        // Divide to find the biggest scale that still fits.  But don't
-        // exceed 90% of the available space, or it'll feel cramped.
-        let scale = Math.floor(0.9 * dpr * Math.min(total_x / base_x, total_y / base_y));
+        // Divide to find the biggest scale that still fits.  But don't exceed 90% of the available
+        // space, or it'll feel cramped (except on small screens, where being too small HURTS).
+        let maxfrac = total_x < 800 ? 1 : 0.9;
+        let scale = Math.floor(maxfrac * dpr * Math.min(total_x / base_x, total_y / base_y));
         if (scale <= 1) {
             scale = 1;
         }
