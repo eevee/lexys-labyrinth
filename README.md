@@ -12,6 +12,7 @@ Give it a try, I guess!  [https://c.eev.ee/lexys-labyrinth/](https://c.eev.ee/le
 
 - Supports 99% of Chip's Challenge 1
 - Supports 75% of Chip's Challenge 2
+- Completely original tileset, sound effects, and music
 - Can load MS Chip's Challenge DAT/CCL files and Steam Chip's Challenge C2M files
 - Can load levels from your hard drive
 - Can play back replays (demos) from C2M files, though some may desync
@@ -20,7 +21,6 @@ Give it a try, I guess!  [https://c.eev.ee/lexys-labyrinth/](https://c.eev.ee/le
 
 ### Planned features
 
-- Completely original assets
 - Save your score, and compare it to the BBC leaderboards
 - Load levels directly from the BBC set list
 - Support for all of the nonsense in Chip's Challenge 2
@@ -34,11 +34,13 @@ Give it a try, I guess!  [https://c.eev.ee/lexys-labyrinth/](https://c.eev.ee/le
 
 ### Noble aspirations
 
-- Level editor, slash convertor
 - New exclusive puzzle elements??  Embrace extend extinguish baby
 
 ## Special thanks
 
 - The incredible nerds who put together the [Chip Wiki](https://wiki.bitbusters.club/) and also reside on the Bit Busters Discord
 - Everyone who worked on [Chip's Challenge Level Pack 1](https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1), the default set of levels
-- The [Tile World](https://wiki.bitbusters.club/Tile_World) tileset currently used by default, created by Anders Kaseorg
+- [Tile World](https://wiki.bitbusters.club/Tile_World) for being an incredible reference on Lynx mechanics
+- Everyone who contributed music — see [`js/soundtrack.js`](js/soundtrack.js) for a list!
+
+Not associated with or blessed by Chuck Somerville, Niffler, or AOP.
