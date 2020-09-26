@@ -397,6 +397,13 @@ class Player extends PrimaryView {
                 this.music_audio_el.pause();
             }
         });
+        
+        this.turn_based = false;
+        this.turn_based_checkbox = this.root.querySelector('.controls .turn-based');
+        this.turn_based_checkbox.addEventListener('change', ev => {
+            this.turn_based = !this.turn_based;
+            this.level.turn_based = this.turn_based;
+        });
 
         // Bind buttons
         this.pause_button = this.root.querySelector('.controls .control-pause');
@@ -809,9 +816,15 @@ class Player extends PrimaryView {
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
-        this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
-        if (this.state === 'rewinding') {
-            this.tic_offset = 1 - this.tic_offset;
+        if (this.level.waiting_for_input) {
+            this.last_advance = performance.now();
+        }
+        else
+        {
+            this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
+            if (this.state === 'rewinding') {
+                this.tic_offset = 1 - this.tic_offset;
+            }
         }
 
         this._redraw();

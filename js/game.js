@@ -158,6 +158,7 @@ export class Level {
         this.height = stored_level.size_y;
         this.size_x = stored_level.size_x;
         this.size_y = stored_level.size_y;
+        this.turn_based = false;
         this.restart(compat);
     }
 
@@ -185,7 +186,8 @@ export class Level {
         else {
             this.time_remaining = this.stored_level.time_limit * 20;
         }
-        this.timer_paused = false;
+        this.timer_paused = false
+        this.waiting_for_input = false
         // Note that this clock counts *up*, even on untimed levels, and is unaffected by CC2's
         // clock alteration shenanigans
         this.tic_counter = 0;
@@ -349,10 +351,25 @@ export class Level {
         }
 
         // Commit the undo state at the end of each tic
-        this.commit();
+        if (!this.waiting_for_input) {
+            this.commit();
+        }
     }
 
     _advance_tic(p1_primary_direction, p1_secondary_direction) {
+        var skip_to_third_pass = false;
+        
+        //if we're waiting for input, then we want to skip straight to phase 3 with a player decision filled out when they have one ready
+        if (this.waiting_for_input) {
+            this.actor_decision(this.player, p1_primary_direction);
+            if (this.player.decision != null) {
+                skip_to_third_pass = true;
+            }
+            else {
+                return;
+            }
+        }
+        
         // Player's secondary direction is set immediately; it applies on arrival to cells even if
         // it wasn't held the last time the player started moving
         this._set_prop(this.player, 'secondary_direction', p1_secondary_direction);
@@ -370,212 +387,69 @@ export class Level {
         // arrival as its own mini pass, for one reason: if the player dies (which will end the game
         // immediately), we still want every time's animation to finish, or it'll look like some
         // objects move backwards when the death screen appears!
-        let cell_steppers = [];
-        for (let actor of this.actors) {
-            // Actors with no cell were destroyed
-            if (! actor.cell)
-                continue;
-
-            // Clear any old decisions ASAP.  Note that this prop is only used internally within a
-            // single tic, so it doesn't need to be undoable
-            actor.decision = null;
-
-            // Decrement the cooldown here, but don't check it quite yet,
-            // because stepping on cells in the next block might reset it
-            if (actor.movement_cooldown > 0) {
-                this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
-            }
-
-            if (actor.animation_speed) {
-                // Deal with movement animation
-                this._set_prop(actor, 'animation_progress', actor.animation_progress + 1);
-                if (actor.animation_progress >= actor.animation_speed) {
-                    if (actor.type.ttl) {
-                        // This is purely an animation so it disappears once it's played
-                        this.remove_tile(actor);
-                        continue;
-                    }
-                    this._set_prop(actor, 'previous_cell', null);
-                    this._set_prop(actor, 'animation_progress', null);
-                    this._set_prop(actor, 'animation_speed', null);
-                    if (! this.compat.tiles_react_instantly) {
-                        // We need to track the actor AND the cell explicitly, because it's possible
-                        // that one actor's step will cause another actor to start another move, and
-                        // then they'd end up stepping on the new cell they're moving to instead of
-                        // the one they just landed on!
-                        cell_steppers.push([actor, actor.cell]);
-                    }
-                }
-            }
-        }
-        for (let [actor, cell] of cell_steppers) {
-            this.step_on_cell(actor, cell);
-        }
-
-        // Only reset the player's is_pushing between movement, so it lasts for the whole push
-        if (this.player.movement_cooldown <= 0) {
-            this.player.is_pushing = false;
-        }
-
-        // Second pass: actors decide their upcoming movement simultaneously
-        for (let actor of this.actors) {
-            if (! actor.cell)
-                continue;
-
-            if (actor.movement_cooldown > 0)
-                continue;
-
-            // XXX does the cooldown drop while in a trap?  is this even right?
-            if (actor.stuck && ! actor.type.is_player)
-                continue;
-
-            // Teeth can only move the first 4 of every 8 tics, though "first"
-            // can be adjusted
-            if (actor.slide_mode == null &&
-                actor.type.uses_teeth_hesitation &&
-                (this.tic_counter + this.step_parity) % 8 >= 4)
-            {
-                continue;
-            }
-
-            let direction_preference;
-            // Actors can't make voluntary moves on ice, so they're stuck with
-            // whatever they've got
-            if (actor.slide_mode === 'ice') {
-                direction_preference = [actor.direction];
-            }
-            else if (actor.slide_mode === 'force') {
-                // Only the player can make voluntary moves on a force floor,
-                // and only if their previous move was an /involuntary/ move on
-                // a force floor.  If they do, it overrides the forced move
-                // XXX this in particular has some subtleties in lynx (e.g. you
-                // can override forwards??) and DEFINITELY all kinds of stuff
-                // in ms
-                if (actor === this.player &&
-                    p1_primary_direction &&
-                    actor.last_move_was_force)
-                {
-                    direction_preference = [p1_primary_direction];
-                    this._set_prop(actor, 'last_move_was_force', false);
-                }
-                else {
-                    direction_preference = [actor.direction];
-                    if (actor === this.player) {
-                        this._set_prop(actor, 'last_move_was_force', true);
-                    }
-                }
-            }
-            else if (actor === this.player) {
-                if (p1_primary_direction) {
-                    direction_preference = [p1_primary_direction];
-                    this._set_prop(actor, 'last_move_was_force', false);
-                }
-            }
-            else if (actor.type.movement_mode === 'forward') {
-                // blue tank behavior: keep moving forward
-                direction_preference = [actor.direction];
-            }
-            else if (actor.type.movement_mode === 'follow-left') {
-                // bug behavior: always try turning as left as possible, and
-                // fall back to less-left turns when that fails
-                let d = DIRECTIONS[actor.direction];
-                direction_preference = [d.left, actor.direction, d.right, d.opposite];
-            }
-            else if (actor.type.movement_mode === 'follow-right') {
-                // paramecium behavior: always try turning as right as
-                // possible, and fall back to less-right turns when that fails
-                let d = DIRECTIONS[actor.direction];
-                direction_preference = [d.right, actor.direction, d.left, d.opposite];
-            }
-            else if (actor.type.movement_mode === 'turn-left') {
-                // glider behavior: preserve current direction; if that doesn't
-                // work, turn left, then right, then back the way we came
-                let d = DIRECTIONS[actor.direction];
-                direction_preference = [actor.direction, d.left, d.right, d.opposite];
-            }
-            else if (actor.type.movement_mode === 'turn-right') {
-                // fireball behavior: preserve current direction; if that doesn't
-                // work, turn right, then left, then back the way we came
-                let d = DIRECTIONS[actor.direction];
-                direction_preference = [actor.direction, d.right, d.left, d.opposite];
-            }
-            else if (actor.type.movement_mode === 'bounce') {
-                // bouncy ball behavior: preserve current direction; if that
-                // doesn't work, bounce back the way we came
-                let d = DIRECTIONS[actor.direction];
-                direction_preference = [actor.direction, d.opposite];
-            }
-            else if (actor.type.movement_mode === 'bounce-random') {
-                // walker behavior: preserve current direction; if that
-                // doesn't work, pick a random direction, even the one we
-                // failed to move in
-                // TODO unclear if this is right in cc2 as well.  definitely not in ms, which chooses a legal move
-                direction_preference = [actor.direction, ['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
-            }
-            else if (actor.type.movement_mode === 'pursue') {
-                // teeth behavior: always move towards the player
-                let target_cell = this.player.cell;
-                // CC2 behavior (not Lynx (TODO compat?)): pursue the cell the player is leaving, if
-                // they're still mostly in it
-                if (this.player.previous_cell && this.player.animation_speed &&
-                    this.player.animation_progress <= this.player.animation_speed / 2)
-                {
-                    target_cell = this.player.previous_cell;
-                }
-                let dx = actor.cell.x - target_cell.x;
-                let dy = actor.cell.y - target_cell.y;
-                let preferred_horizontal, preferred_vertical;
-                if (dx > 0) {
-                    preferred_horizontal = 'west';
-                }
-                else if (dx < 0) {
-                    preferred_horizontal = 'east';
-                }
-                if (dy > 0) {
-                    preferred_vertical = 'north';
-                }
-                else if (dy < 0) {
-                    preferred_vertical = 'south';
-                }
-                // Chooses the furthest direction, vertical wins ties
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    // Horizontal first
-                    direction_preference = [preferred_horizontal, preferred_vertical].filter(x => x);
-                }
-                else {
-                    // Vertical first
-                    direction_preference = [preferred_vertical, preferred_horizontal].filter(x => x);
-                }
-            }
-            else if (actor.type.movement_mode === 'random') {
-                // blob behavior: move completely at random
-                // TODO cc2 has twiddles for how this works per-level, as well as the initial seed for demo playback
-                direction_preference = [['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
-            }
-
-            // Check which of those directions we *can*, probably, move in
-            // TODO i think player on force floor will still have some issues here
-            if (direction_preference) {
-                // Players and sliding actors always move the way they want, even if blocked
-                if (actor.type.is_player || actor.slide_mode) {
-                    actor.decision = direction_preference[0];
+        if (!skip_to_third_pass) {
+            let cell_steppers = [];
+            for (let actor of this.actors) {
+                // Actors with no cell were destroyed
+                if (! actor.cell)
                     continue;
+
+                // Clear any old decisions ASAP.  Note that this prop is only used internally within a
+                // single tic, so it doesn't need to be undoable
+                actor.decision = null;
+
+                // Decrement the cooldown here, but don't check it quite yet,
+                // because stepping on cells in the next block might reset it
+                if (actor.movement_cooldown > 0) {
+                    this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
                 }
 
-                for (let direction of direction_preference) {
-                    let dest_cell = this.cell_with_offset(actor.cell, direction);
-                    if (! dest_cell)
-                        continue;
-
-                    if (! actor.cell.blocks_leaving(actor, direction) &&
-                        ! dest_cell.blocks_entering(actor, direction, this, true))
-                    {
-                        // We found a good direction!  Stop here
-                        actor.decision = direction;
-                        break;
+                if (actor.animation_speed) {
+                    // Deal with movement animation
+                    this._set_prop(actor, 'animation_progress', actor.animation_progress + 1);
+                    if (actor.animation_progress >= actor.animation_speed) {
+                        if (actor.type.ttl) {
+                            // This is purely an animation so it disappears once it's played
+                            this.remove_tile(actor);
+                            continue;
+                        }
+                        this._set_prop(actor, 'previous_cell', null);
+                        this._set_prop(actor, 'animation_progress', null);
+                        this._set_prop(actor, 'animation_speed', null);
+                        if (! this.compat.tiles_react_instantly) {
+                            // We need to track the actor AND the cell explicitly, because it's possible
+                            // that one actor's step will cause another actor to start another move, and
+                            // then they'd end up stepping on the new cell they're moving to instead of
+                            // the one they just landed on!
+                            cell_steppers.push([actor, actor.cell]);
+                        }
                     }
                 }
             }
+            for (let [actor, cell] of cell_steppers) {
+                this.step_on_cell(actor, cell);
+            }
+
+            // Only reset the player's is_pushing between movement, so it lasts for the whole push
+            if (this.player.movement_cooldown <= 0) {
+                this.player.is_pushing = false;
+            }
+
+            // Second pass: actors decide their upcoming movement simultaneously
+            for (let actor of this.actors) {
+                this.actor_decision(actor, p1_primary_direction);
+            }
+        }
+        
+        //in Turn-Based mode, wait for input if the player can voluntarily move on tic_counter % 4 == 0 and isn't
+        if (this.turn_based && this.player.movement_cooldown == 0 && this.player.decision == null && this.tic_counter % 4 == 0)
+        {
+            this.waiting_for_input = true;
+            return;
+        }
+        else
+        {
+            this.waiting_for_input = false;
         }
 
         // Third pass: everyone actually moves
@@ -662,6 +536,169 @@ export class Level {
             this.pending_undo.push(() => {
                 this.tic_counter = tic_counter;
             });
+        }
+    }
+    
+    actor_decision(actor, p1_primary_direction) {
+        if (! actor.cell)
+            return;
+
+        if (actor.movement_cooldown > 0)
+            return;
+
+        // XXX does the cooldown drop while in a trap?  is this even right?
+        if (actor.stuck && ! actor.type.is_player)
+            return;
+
+        // Teeth can only move the first 4 of every 8 tics, though "first"
+        // can be adjusted
+        if (actor.slide_mode == null &&
+            actor.type.uses_teeth_hesitation &&
+            (this.tic_counter + this.step_parity) % 8 >= 4)
+        {
+            return;
+        }
+
+        let direction_preference;
+        // Actors can't make voluntary moves on ice, so they're stuck with
+        // whatever they've got
+        if (actor.slide_mode === 'ice') {
+            direction_preference = [actor.direction];
+        }
+        else if (actor.slide_mode === 'force') {
+            // Only the player can make voluntary moves on a force floor,
+            // and only if their previous move was an /involuntary/ move on
+            // a force floor.  If they do, it overrides the forced move
+            // XXX this in particular has some subtleties in lynx (e.g. you
+            // can override forwards??) and DEFINITELY all kinds of stuff
+            // in ms
+            if (actor === this.player &&
+                (p1_primary_direction || this.turn_based) &&
+                actor.last_move_was_force)
+            {
+                if (p1_primary_direction != null)
+                {
+                    direction_preference = [p1_primary_direction];
+                    this._set_prop(actor, 'last_move_was_force', false);
+                }
+            }
+            else {
+                direction_preference = [actor.direction];
+                if (actor === this.player) {
+                    this._set_prop(actor, 'last_move_was_force', true);
+                }
+            }
+        }
+        else if (actor === this.player) {
+            if (p1_primary_direction) {
+                direction_preference = [p1_primary_direction];
+                this._set_prop(actor, 'last_move_was_force', false);
+            }
+        }
+        else if (actor.type.movement_mode === 'forward') {
+            // blue tank behavior: keep moving forward
+            direction_preference = [actor.direction];
+        }
+        else if (actor.type.movement_mode === 'follow-left') {
+            // bug behavior: always try turning as left as possible, and
+            // fall back to less-left turns when that fails
+            let d = DIRECTIONS[actor.direction];
+            direction_preference = [d.left, actor.direction, d.right, d.opposite];
+        }
+        else if (actor.type.movement_mode === 'follow-right') {
+            // paramecium behavior: always try turning as right as
+            // possible, and fall back to less-right turns when that fails
+            let d = DIRECTIONS[actor.direction];
+            direction_preference = [d.right, actor.direction, d.left, d.opposite];
+        }
+        else if (actor.type.movement_mode === 'turn-left') {
+            // glider behavior: preserve current direction; if that doesn't
+            // work, turn left, then right, then back the way we came
+            let d = DIRECTIONS[actor.direction];
+            direction_preference = [actor.direction, d.left, d.right, d.opposite];
+        }
+        else if (actor.type.movement_mode === 'turn-right') {
+            // fireball behavior: preserve current direction; if that doesn't
+            // work, turn right, then left, then back the way we came
+            let d = DIRECTIONS[actor.direction];
+            direction_preference = [actor.direction, d.right, d.left, d.opposite];
+        }
+        else if (actor.type.movement_mode === 'bounce') {
+            // bouncy ball behavior: preserve current direction; if that
+            // doesn't work, bounce back the way we came
+            let d = DIRECTIONS[actor.direction];
+            direction_preference = [actor.direction, d.opposite];
+        }
+        else if (actor.type.movement_mode === 'bounce-random') {
+            // walker behavior: preserve current direction; if that
+            // doesn't work, pick a random direction, even the one we
+            // failed to move in
+            // TODO unclear if this is right in cc2 as well.  definitely not in ms, which chooses a legal move
+            direction_preference = [actor.direction, ['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
+        }
+        else if (actor.type.movement_mode === 'pursue') {
+            // teeth behavior: always move towards the player
+            let target_cell = this.player.cell;
+            // CC2 behavior (not Lynx (TODO compat?)): pursue the cell the player is leaving, if
+            // they're still mostly in it
+            if (this.player.previous_cell && this.player.animation_speed &&
+                this.player.animation_progress <= this.player.animation_speed / 2)
+            {
+                target_cell = this.player.previous_cell;
+            }
+            let dx = actor.cell.x - target_cell.x;
+            let dy = actor.cell.y - target_cell.y;
+            let preferred_horizontal, preferred_vertical;
+            if (dx > 0) {
+                preferred_horizontal = 'west';
+            }
+            else if (dx < 0) {
+                preferred_horizontal = 'east';
+            }
+            if (dy > 0) {
+                preferred_vertical = 'north';
+            }
+            else if (dy < 0) {
+                preferred_vertical = 'south';
+            }
+            // Chooses the furthest direction, vertical wins ties
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Horizontal first
+                direction_preference = [preferred_horizontal, preferred_vertical].filter(x => x);
+            }
+            else {
+                // Vertical first
+                direction_preference = [preferred_vertical, preferred_horizontal].filter(x => x);
+            }
+        }
+        else if (actor.type.movement_mode === 'random') {
+            // blob behavior: move completely at random
+            // TODO cc2 has twiddles for how this works per-level, as well as the initial seed for demo playback
+            direction_preference = [['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
+        }
+
+        // Check which of those directions we *can*, probably, move in
+        // TODO i think player on force floor will still have some issues here
+        if (direction_preference) {
+            // Players and sliding actors always move the way they want, even if blocked
+            if (actor.type.is_player || actor.slide_mode) {
+                actor.decision = direction_preference[0];
+                return;
+            }
+
+            for (let direction of direction_preference) {
+                let dest_cell = this.cell_with_offset(actor.cell, direction);
+                if (! dest_cell)
+                    continue;
+
+                if (! actor.cell.blocks_leaving(actor, direction) &&
+                    ! dest_cell.blocks_entering(actor, direction, this, true))
+                {
+                    // We found a good direction!  Stop here
+                    actor.decision = direction;
+                    break;
+                }
+            }
         }
     }
 
@@ -945,6 +982,7 @@ export class Level {
     }
 
     undo() {
+        this.waiting_for_input = false;
         this.aid = Math.max(1, this.aid);
 
         let entry = this.undo_stack.pop();
