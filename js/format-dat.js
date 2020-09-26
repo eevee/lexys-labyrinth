@@ -180,9 +180,12 @@ function parse_level(buf, number) {
                 let cell = level.linear_cells[c];
                 c++;
 
-                // The upper layer uses 0x00 (floor) to indicate an empty
-                // space, which is probably not what we want
-                if (name === 'floor' && l === 0) {
+                // "Floor" and "empty" are interchangeable, which can lead to extra floor under
+                // other terrain and other nonsense, so ignore floor entirely and fix it below
+                // TODO one particular mscc weirdness is that you can have floor on top of
+                // something, i think?  it seems like the two layers are functionally a stack, with
+                // implied floor below everything
+                if (name === 'floor') {
                     continue;
                 }
 
@@ -193,11 +196,9 @@ function parse_level(buf, number) {
             throw new Error(`Expected 1024 cells (32x32 map); found ${c}`);
     }
 
-    // The MSCC1 format allows a lot of weird things, so check all the cells.  In particular we want
-    // to be sure there's terrain in every cell; MSCC1 allows a block on the top layer and an item
-    // on the bottom layer, and will consider the item to be the "terrain" and draw a floor under it
+    // Fix the "floor/empty" nonsense here by adding floor to any cell with no terrain on bottom
     for (let cell of level.linear_cells) {
-        if (cell[0].type.draw_layer !== 0) {
+        if (cell.length === 0 || cell[0].type.draw_layer !== 0) {
             // No terrain; insert a floor
             cell.unshift({ type: TILE_TYPES['floor'] });
         }
