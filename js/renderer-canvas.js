@@ -58,7 +58,7 @@ export class CanvasRenderer {
             return;
         }
 
-        let tic = (this.level.tic_counter ?? 0) + tic_offset;
+        let tic = (this.level.tic_counter ?? 0) + tic_offset + (this.level.waiting_for_input ? 1 : 0);
         let tw = this.tileset.size_x;
         let th = this.tileset.size_y;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);

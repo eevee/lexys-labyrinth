@@ -787,8 +787,9 @@ class Player extends PrimaryView {
             this._advance_handle = null;
             return;
         }
-
+        
         this.last_advance = performance.now();
+        
         if (this.state === 'playing') {
             this.advance_by(1);
         }
@@ -806,6 +807,13 @@ class Player extends PrimaryView {
                 this.update_ui();
             }
         }
+        
+        if (this.level.waiting_for_input)
+        {
+			//freeze tic_offset in time so we don't try to interpolate to the next frame too soon
+            this.tic_offset = 0;
+        }
+        
         let dt = 1000 / TICS_PER_SECOND;
         if (this.state === 'rewinding') {
             // Rewind faster than normal time
@@ -822,7 +830,7 @@ class Player extends PrimaryView {
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
         if (this.level.waiting_for_input) {
-            this.last_advance = performance.now();
+            //freeze tic_offset in time
         }
         else
         {
