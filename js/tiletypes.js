@@ -110,25 +110,25 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'wall');
         },
     },
-    // FIXME these should be OVERLAY by cc2 rules, but the cc1 tiles are opaque and cover everything else
+    // FIXME in a cc1 tileset, these tiles are opaque  >:S
     thinwall_n: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north']),
     },
     thinwall_s: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south']),
     },
     thinwall_e: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['east']),
     },
     thinwall_w: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['west']),
     },
     thinwall_se: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'east']),
     },
     fake_wall: {
