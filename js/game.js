@@ -1029,7 +1029,7 @@ export class Level {
             return null;
         }
 
-        let time = Math.floor((this.time_remaining ?? 0) / 20);
+        let time = Math.ceil((this.time_remaining ?? 0) / 20);
         return {
             time: time,
             abstime: this.tic_counter,
