@@ -466,6 +466,9 @@ class Player extends PrimaryView {
         this.renderer.canvas.addEventListener('auxclick', ev => {
             if (ev.button !== 1)
                 return;
+            // TODO make a real debug flag?  allow enabling this but consider it aid level 3?
+            if (! location.host.match(/localhost/))
+                return;
 
             let [x, y] = this.renderer.cell_coords_from_event(ev);
             this.level.move_to(this.level.player, this.level.cells[y][x], 1);
