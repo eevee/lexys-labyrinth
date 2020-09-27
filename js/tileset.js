@@ -365,18 +365,45 @@ export const CC2_TILESET_LAYOUT = {
     '#powered': [15, 26],
 
     player2: {
-        moving: {
-            north: [[0, 27], [1, 27], [2, 27], [3, 27], [4, 27], [5, 27], [6, 27], [7, 27]],
-            south: [[0, 28], [1, 28], [2, 28], [3, 28], [4, 28], [5, 28], [6, 28], [7, 28]],
-            west: [[8, 28], [9, 28], [10, 28], [11, 28], [12, 28], [13, 28], [14, 28], [15, 28]],
-            east: [[8, 27], [9, 27], [10, 27], [11, 27], [12, 27], [13, 27], [14, 27], [15, 27]],
-        },
         normal: {
             north: [0, 27],
             south: [0, 28],
             west: [8, 28],
             east: [8, 27],
         },
+        blocked: 'pushing',
+        moving: {
+            north: [[0, 27], [1, 27], [2, 27], [3, 27], [4, 27], [5, 27], [6, 27], [7, 27]],
+            south: [[0, 28], [1, 28], [2, 28], [3, 28], [4, 28], [5, 28], [6, 28], [7, 28]],
+            west: [[8, 28], [9, 28], [10, 28], [11, 28], [12, 28], [13, 28], [14, 28], [15, 28]],
+            east: [[8, 27], [9, 27], [10, 27], [11, 27], [12, 27], [13, 27], [14, 27], [15, 27]],
+        },
+        pushing: {
+            north: [8, 29],
+            east: [9, 29],
+            south: [10, 29],
+            west: [11, 29],
+        },
+        swimming: {
+            north: [[0, 29], [1, 29]],
+            east: [[2, 29], [3, 29]],
+            south: [[4, 29], [5, 29]],
+            west: [[6, 29], [7, 29]],
+        },
+        // The classic CC2 behavior, spinning on ice
+        skating: [[0, 27], [8, 27], [0, 28], [8, 28]],
+        // TODO i don't know what CC2 does
+        forced: {
+            north: [2, 27],
+            east: [10, 27],
+            south: [2, 28],
+            west: [10, 28],
+        },
+        // These are frames from the splash/explosion animations
+        drowned: [5, 5],
+        burned: [1, 5],
+        exploded: [1, 5],
+        failed: [1, 5],
     },
     fire: [
         [12, 29],
@@ -581,6 +608,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
             west: [7, 33],
         },
     }),
+    // TODO player2 equivalents
     bogus_player_burned_fire: {
         overlay: [6, 33],
         base: 'fire',

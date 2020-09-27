@@ -1177,6 +1177,7 @@ const TILE_TYPES = {
         infinite_items: {
             key_yellow: true,
         },
+        visual_state: player_visual_state,
     },
     chip: {
         draw_layer: LAYER_ITEM,
