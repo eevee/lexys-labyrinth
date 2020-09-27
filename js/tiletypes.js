@@ -355,7 +355,7 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'dirt');
             }
             else if (other.type.name === 'ice_block') {
-                level.remove_tile(other);
+                level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'ice');
             }
             else if (other.type.is_player) {
