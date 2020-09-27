@@ -343,7 +343,7 @@ export const CC2_TILESET_LAYOUT = {
         west: [[6, 24], [7, 24]],
     },
     bogus_player_drowned: {
-        overlay: [3, 3],  // splash
+        overlay: [5, 5],  // splash
         base: 'water',
     },
     bogus_player_burned_fire: {
