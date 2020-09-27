@@ -215,7 +215,7 @@ const OBITUARIES = {
 // Helper class used to let the game play sounds without knowing too much about the Player
 class SFXPlayer {
     constructor() {
-        this.ctx = new window.AudioContext;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext);  // come the fuck on, safari
         this.player_x = null;
         this.player_y = null;
         this.sounds = {};
