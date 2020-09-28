@@ -795,10 +795,9 @@ export class Level {
         if (actor.cell === goal_cell)
             return;
 
-        // TODO undo this stuff?
-        actor.previous_cell = actor.cell;
-        actor.animation_speed = speed;
-        actor.animation_progress = 0;
+        this._set_prop(actor, 'previous_cell', actor.cell);
+        this._set_prop(actor, 'animation_speed', speed);
+        this._set_prop(actor, 'animation_progress', 0);
 
         let original_cell = actor.cell;
         this.remove_tile(actor);
@@ -1078,8 +1077,8 @@ export class Level {
     spawn_animation(cell, name) {
         let type = TILE_TYPES[name];
         let tile = new Tile(type);
-        tile.animation_speed = type.ttl;
-        tile.animation_progress = 0;
+        this._set_prop(tile, 'animation_speed', tile.type.ttl);
+        this._set_prop(tile, 'animation_progress', 0);
         cell._add(tile);
         this.actors.push(tile);
         this.pending_undo.push(() => {
