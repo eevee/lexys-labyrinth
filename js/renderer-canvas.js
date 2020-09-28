@@ -42,6 +42,15 @@ export class CanvasRenderer {
         return [x, y];
     }
 
+    real_cell_coords_from_event(ev) {
+        let rect = this.canvas.getBoundingClientRect();
+        let scale_x = rect.width / this.canvas.width;
+        let scale_y = rect.height / this.canvas.height;
+        let x = (ev.clientX - rect.x) / scale_x / this.tileset.size_x + this.viewport_x;
+        let y = (ev.clientY - rect.y) / scale_y / this.tileset.size_y + this.viewport_y;
+        return [x, y];
+    }
+
     // Draw to a canvas using tile coordinates
     blit(ctx, sx, sy, dx, dy, w = 1, h = w) {
         let tw = this.tileset.size_x;
@@ -76,8 +85,24 @@ export class CanvasRenderer {
             [px, py] = [0, 0];
         }
         // Figure out where to start drawing
-        let x0 = Math.max(0, Math.min(this.level.size_x - this.viewport_size_x, px - xmargin));
-        let y0 = Math.max(0, Math.min(this.level.size_y - this.viewport_size_y, py - ymargin));
+        // TODO support overlapping regions better
+        let x0 = px - xmargin;
+        let y0 = py - ymargin;
+        // FIXME editor vs player again ugh, which is goofy since none of this is even relevant;
+        // maybe need to have a separate positioning method
+        if (this.level.stored_level) {
+        for (let region of this.level.stored_level.camera_regions) {
+            if (px >= region.left && px < region.right &&
+                py >= region.top && py < region.bottom)
+            {
+                x0 = Math.max(region.left, Math.min(region.right - this.viewport_size_x, x0));
+                y0 = Math.max(region.top, Math.min(region.bottom - this.viewport_size_y, y0));
+            }
+        }
+        }
+        // Always keep us within the map bounds
+        x0 = Math.max(0, Math.min(this.level.size_x - this.viewport_size_x, x0));
+        y0 = Math.max(0, Math.min(this.level.size_y - this.viewport_size_y, y0));
         // Round to the pixel grid
         x0 = Math.floor(x0 * tw + 0.5) / tw;
         y0 = Math.floor(y0 * th + 0.5) / th;

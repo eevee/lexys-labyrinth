@@ -792,9 +792,9 @@ main.--has-demo .demo-controls {
     flex: 1 1 auto;
     display: grid;
     grid:
-        "controls   level" min-content
-        "palette    level" 1fr
-        / minmax(25%, auto) auto
+        "controls   controls"   min-content
+        "palette    level"      1fr
+        / minmax(25%, auto) 1fr
     ;
     gap: 0.5em;
 
@@ -807,7 +807,12 @@ main.--has-demo .demo-controls {
     grid-area: level;
     position: relative;
     overflow: auto;
+    /* Padding and background make it easier to tell when we're at the edge of the map */
+    /* TODO padding should be half a cell, and svg should respect it too */
+    /* padding: 1em; */
+    background: #202020;
 }
+/* SVG overlays */
 #editor svg.level-editor-overlay {
     position: absolute;
     top: 0;
@@ -817,15 +822,21 @@ main.--has-demo .demo-controls {
     height: 1024px;
     /* allow clicks to go through us! */
     pointer-events: none;
-}
-#editor .level-editor-overlay rect.overlay-cxn {
+
+    /* default svg properties */
     stroke-width: 0.0625;
-    stroke: red;
     fill: none;
 }
-#editor .level-editor-overlay line.overlay-cxn {
-    stroke-width: 0.0625;
+#editor .level-editor-overlay rect.overlay-cxn {
     stroke: red;
+}
+#editor .level-editor-overlay line.overlay-cxn {
+    stroke: red;
+}
+#editor .level-editor-overlay rect.overlay-camera {
+    stroke: #808080;
+    fill: #80808040;
+    pointer-events: auto;
 }
 
 #editor .controls {

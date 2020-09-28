@@ -153,8 +153,14 @@
             -->
         </header>
         <div class="level"><!-- level canvas and any overlays go here --></div>
-        <div class="controls">
+        <nav class="controls">
+            <div id="editor-toolbar">
+                <!-- tools go here -->
+            </div>
             <button id="editor-share-url" type="button">Share?</button>
+            <div id="editor-tool-help">
+                <strong>Pencil</strong> — <span>Select a tile and draw with the left mouse button.  Erase with the right mouse button.</span>
+            </div>
             <!--
             <p style>
                 Tip: Right click to color drop.<br>
@@ -179,7 +185,7 @@
             map size
             </pre>
             -->
-        </div>
+        </nav>
         <div class="palette"></div>
         <!-- TODO:
         controls

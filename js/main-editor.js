@@ -25,57 +25,151 @@ class EditorShareOverlay extends DialogOverlay {
     }
 }
 
-const EDITOR_TOOLS = [{
-    mode: 'pencil',
-    icon: 'icons/tool-pencil.png',
-    name: "Pencil",
-    desc: "Draw individual tiles",
-/* TODO not implemented
-}, {
-    mode: 'line',
-    icon: 'icons/tool-line.png',
-    name: "Line",
-    desc: "Draw straight lines",
-}, {
-    mode: 'box',
-    icon: 'icons/tool-box.png',
-    name: "Box",
-    desc: "Fill a rectangular area with tiles",
-}, {
-    mode: 'fill',
-    icon: 'icons/tool-fill.png',
-    name: "Fill",
-    desc: "Flood-fill an area with tiles",
-*/
-}, {
-    mode: 'force-floors',
-    icon: 'icons/tool-force-floors.png',
-    name: "Force floors",
-    desc: "Draw force floors in the direction you draw",
-}, {
-    mode: 'adjust',
-    icon: 'icons/tool-adjust.png',
-    name: "Adjust",
-    desc: "Toggle blocks and rotate actors",
-/* TODO not implemented
-}, {
-    mode: 'connect',
-    icon: 'icons/tool-connect.png',
-    name: "Connect",
-    desc: "Set up CC1 clone and trap connections",
-}, {
-    mode: 'wire',
-    icon: 'icons/tool-wire.png',
-    name: "Wire",
-    desc: "Draw CC2 wiring",
-    // TODO text tool; thin walls tool; ice tool; map generator?; subtools for select tool (copy, paste, crop)
-    // TODO interesting option: rotate an actor as you draw it by dragging?  or hold a key like in
-    // slade when you have some selected?
-    // TODO ah, railroads...
-*/
-}];
+// Stores and controls what the mouse is doing during a movement, mostly by dispatching to functions
+// defined for the individual tools
+const MOUSE_BUTTON_MASKS = [1, 4, 2];  // MouseEvent.button/buttons are ordered differently
+class MouseOperation {
+    constructor(editor, ev, target = null) {
+        this.editor = editor;
+        this.target = target;
+        this.button_mask = MOUSE_BUTTON_MASKS[ev.button];
+
+        // Client coordinates of the initial click
+        this.mx0 = ev.clientX;
+        this.my0 = ev.clientY;
+
+        // Client coordinates of the previous mouse position
+        this.mx1 = ev.clientX;
+        this.my1 = ev.clientY;
+        // Cell coordinates of the previous mouse position
+        [this.gx1, this.gy1] = this.editor.renderer.cell_coords_from_event(ev);
+        // Real cell coordinates (i.e. including fractional position within a cell) of etc
+        [this.gx1f, this.gy1f] = this.editor.renderer.real_cell_coords_from_event(ev);
+
+        this.start();
+    }
+
+    cell(gx, gy) {
+        return this.editor.stored_level.cells[Math.floor(gy)][Math.floor(gx)];
+    }
+
+    do_mousemove(ev) {
+        let [gx1f, gy1f] = this.editor.renderer.real_cell_coords_from_event(ev);
+
+        this.step(ev.clientX, ev.clientY, gx1f, gy1f);
+
+        // Client coordinates of the previous mouse position
+        this.mx1 = ev.clientX;
+        this.my1 = ev.clientY;
+        // Cell coordinates of the previous mouse position
+        [this.gx1, this.gy1] = this.editor.renderer.cell_coords_from_event(ev);
+        // Real cell coordinates (i.e. including fractional position within a cell) of etc
+        this.gx1f = gx1f;
+        this.gy1f = gy1f;
+    }
+
+    do_commit() {
+        this.commit();
+    }
+
+    do_abort() {
+        this.abort();
+    }
+
+    // Implement these
+    start() {}
+    step(x, y) {}
+    commit() {}
+    abort() {}
+}
+
+class PanOperation extends MouseOperation {
+    step(mx, my) {
+        this.editor.viewport_el.scrollLeft -= mx - this.mx1;
+        this.editor.viewport_el.scrollTop -= my - this.my1;
+    }
+}
+
+class DrawOperation extends MouseOperation {
+}
+
+class PencilOperation extends DrawOperation {
+    start() {
+        this.editor.place_in_cell(this.gx1, this.gy1, this.editor.palette_selection);
+    }
+    step(mx, my, gx, gy) {
+        for (let [x, y] of walk_grid(this.gx1f, this.gy1f, gx, gy)) {
+            this.editor.place_in_cell(x, y, this.editor.palette_selection);
+        }
+    }
+}
+
+class ForceFloorOperation extends DrawOperation {
+    start() {
+        // Begin by placing an all-way force floor under the mouse
+        this.editor.place_in_cell(x, y, 'force_floor_all');
+    }
+    step(mx, my, gx, gy) {
+        // Walk the mouse movement and change each we touch to match the direction we
+        // crossed the border
+        // FIXME occasionally i draw a tetris S kinda shape and both middle parts point
+        // the same direction, but shouldn't
+        let i = 0;
+        let prevx, prevy;
+        for (let [x, y] of walk_grid(this.gx1f, this.gy1f, gx, gy)) {
+            i++;
+            // The very first cell is the one the mouse was already in, and we don't
+            // have a movement direction yet, so leave that alone
+            if (i === 1) {
+                prevx = x;
+                prevy = y;
+                continue;
+            }
+            let name;
+            if (x === prevx) {
+                if (y > prevy) {
+                    name = 'force_floor_s';
+                }
+                else {
+                    name = 'force_floor_n';
+                }
+            }
+            else {
+                if (x > prevx) {
+                    name = 'force_floor_e';
+                }
+                else {
+                    name = 'force_floor_w';
+                }
+            }
+
+            // The second cell tells us the direction to use for the first, assuming it
+            // had some kind of force floor
+            if (i === 2) {
+                let prevcell = this.editor.stored_level.cells[prevy][prevx];
+                if (prevcell[0].type.name.startsWith('force_floor_')) {
+                    prevcell[0].type = TILE_TYPES[name];
+                }
+            }
+
+            // Drawing a loop with force floors creates ice (but not in the previous
+            // cell, obviously)
+            let cell = this.editor.stored_level.cells[y][x];
+            if (cell[0].type.name.startsWith('force_floor_') &&
+                cell[0].type.name !== name)
+            {
+                name = 'ice';
+            }
+            this.editor.place_in_cell(x, y, name);
+
+            prevx = x;
+            prevy = y;
+        }
+    }
+}
+
 // Tiles the "adjust" tool will turn into each other
-const EDITOR_ADJUST_TOGGLES = {
+const ADJUST_TOGGLES = {
     floor_custom_green: 'wall_custom_green',
     floor_custom_pink: 'wall_custom_pink',
     floor_custom_yellow: 'wall_custom_yellow',
@@ -97,7 +191,137 @@ const EDITOR_ADJUST_TOGGLES = {
     thief_keys: 'thief_tools',
     thief_tools: 'thief_keys',
 };
-// TODO this MUST use a cc2 tileset!
+class AdjustOperation extends MouseOperation {
+    start() {
+        let cell = this.editor.stored_level.cells[this.gy1][this.gx1];
+        for (let tile of cell) {
+            // Toggle tiles that go in obvious pairs
+            let other = ADJUST_TOGGLES[tile.type.name];
+            if (other) {
+                tile.type = TILE_TYPES[other];
+            }
+
+            // Rotate actors
+            if (TILE_TYPES[tile.type.name].is_actor) {
+                tile.direction = DIRECTIONS[tile.direction ?? 'south'].right;
+            }
+        }
+    }
+    // Adjust tool doesn't support dragging
+    // TODO should it?
+}
+
+class CameraOperation extends MouseOperation {
+    start() {
+        this.region = this.editor.stored_level.camera_regions[0];
+
+        // TODO allow resizing it too
+        let rect = this.target.getBoundingClientRect();
+        if (this.mx0 < rect.left + 16 || this.mx0 > rect.right - 16) {
+            this.mode = 'resize';
+        }
+        else if (this.my0 < rect.top + 16 || this.my0 > rect.bottom - 16) {
+            this.mode = 'resize';
+        }
+        else {
+            this.mode = 'move';
+        }
+
+        this.offset_x = 0;
+        this.offset_y = 0;
+    }
+    step(mx, my) {
+        let dx = (mx - this.mx0) / this.editor.conductor.tileset.size_x;
+        let dy = (my - this.my0) / this.editor.conductor.tileset.size_y;
+        this.offset_x = Math.floor(dx + 0.5);
+        this.offset_y = Math.floor(dy + 0.5);
+
+        // Keep it within the map!
+        let stored_level = this.editor.stored_level;
+        this.offset_x = Math.max(- this.region.x, Math.min(stored_level.size_x - this.region.width, this.offset_x));
+        this.offset_y = Math.max(- this.region.y, Math.min(stored_level.size_y - this.region.height, this.offset_y));
+
+        this.target.setAttribute('x', this.region.x + this.offset_x);
+        this.target.setAttribute('y', this.region.y + this.offset_y);
+    }
+    commit() {
+        // Actually edit the underlying region
+        this.region.x += this.offset_x;
+        this.region.y += this.offset_y;
+    }
+    abort() {
+        // Move the element back to its original location
+        this.target.setAttribute('x', this.region.x);
+        this.target.setAttribute('y', this.region.y);
+    }
+}
+CameraOperation.TARGET_SELECTOR = '.overlay-camera';
+
+const EDITOR_TOOLS = {
+    pencil: {
+        icon: 'icons/tool-pencil.png',
+        name: "Pencil",
+        desc: "Draw individual tiles",
+        op1: PencilOperation,
+        //op2: EraseOperation,
+    },
+    line: {
+        // TODO not implemented
+        icon: 'icons/tool-line.png',
+        name: "Line",
+        desc: "Draw straight lines",
+    },
+    box: {
+        // TODO not implemented
+        icon: 'icons/tool-box.png',
+        name: "Box",
+        desc: "Fill a rectangular area with tiles",
+    },
+    fill: {
+        // TODO not implemented
+        icon: 'icons/tool-fill.png',
+        name: "Fill",
+        desc: "Flood-fill an area with tiles",
+    },
+    'force-floors': {
+        icon: 'icons/tool-force-floors.png',
+        name: "Force floors",
+        desc: "Draw force floors in the direction you draw",
+        op1: ForceFloorOperation,
+    },
+    adjust: {
+        icon: 'icons/tool-adjust.png',
+        name: "Adjust",
+        desc: "Toggle blocks and rotate actors",
+        op1: AdjustOperation,
+    },
+    connect: {
+        // TODO not implemented
+        icon: 'icons/tool-connect.png',
+        name: "Connect",
+        desc: "Set up CC1 clone and trap connections",
+    },
+    wire: {
+        // TODO not implemented
+        icon: 'icons/tool-wire.png',
+        name: "Wire",
+        desc: "Draw CC2 wiring",
+    },
+    camera: {
+        icon: 'icons/tool-camera.png',
+        name: "Camera",
+        desc: "Draw and edit custom camera bounds",
+        help: "Draw and edit camera bounds.  When the player is within a camera region, the camera will avoid showing anything outside that region.  LL only.",
+        op1: CameraOperation,
+    },
+    // TODO text tool; thin walls tool; ice tool; map generator?; subtools for select tool (copy, paste, crop)
+    // TODO interesting option: rotate an actor as you draw it by dragging?  or hold a key like in
+    // slade when you have some selected?
+    // TODO ah, railroads...
+};
+const EDITOR_TOOL_ORDER = ['pencil', 'force-floors', 'adjust', 'camera'];
+
+// TODO this MUST use a LL tileset!
 const EDITOR_PALETTE = [{
     title: "Basics",
     tiles: [
@@ -152,9 +376,12 @@ const EDITOR_PALETTE = [{
         'teleport_yellow',
     ],
 }];
+
 export class Editor extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#editor'));
+
+        this.viewport_el = this.root.querySelector('.level');
 
         // FIXME don't hardcode size here, convey this to renderer some other way
         this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
@@ -168,154 +395,58 @@ export class Editor extends PrimaryView {
         // This SVG draws vectors on top of the editor, like monster paths and button connections
         // FIXME change viewBox in load_level, can't right now because order of ops
         this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'}, this.connections_g);
-        this.root.querySelector('.level').append(
-            this.renderer.canvas,
-            this.svg_overlay);
-        this.mouse_mode = null;
-        this.mouse_button = null;
-        this.mouse_cell = null;
-        this.renderer.canvas.addEventListener('mousedown', ev => {
+        this.viewport_el.append(this.renderer.canvas, this.svg_overlay);
+        this.mouse_op = null;
+        this.viewport_el.addEventListener('mousedown', ev => {
+            this.cancel_mouse_operation();
+
             if (ev.button === 0) {
-                // Left button: draw
-                this.mouse_mode = 'draw';
-                this.mouse_button_mask = 1;
-                this.mouse_coords = [ev.clientX, ev.clientY];
+                // Left button: activate tool
+                let op_type = EDITOR_TOOLS[this.current_tool].op1;
+                if (! op_type)
+                    return;
 
-                let [x, y] = this.renderer.cell_coords_from_event(ev);
-                this.mouse_cell = [x, y];
+                let target;
+                if (op_type.TARGET_SELECTOR) {
+                    target = ev.target.closest(op_type.TARGET_SELECTOR);
+                    if (! target)
+                        return;
+                }
+                this.mouse_op = new op_type(this, ev, target);
+                ev.preventDefault();
+                ev.stopPropagation();
 
-                if (this.current_tool === 'pencil') {
-                    this.place_in_cell(x, y, this.palette_selection);
-                }
-                else if (this.current_tool === 'force-floors') {
-                    // Begin by placing an all-way force floor under the mouse
-                    this.place_in_cell(x, y, 'force_floor_all');
-                }
-                else if (this.current_tool === 'adjust') {
-                    let cell = this.stored_level.cells[y][x];
-                    for (let tile of cell) {
-                        // Toggle tiles that go in obvious pairs
-                        let other = EDITOR_ADJUST_TOGGLES[tile.type.name];
-                        if (other) {
-                            tile.type = TILE_TYPES[other];
-                        }
-
-                        // Rotate actors
-                        if (TILE_TYPES[tile.type.name].is_actor) {
-                            tile.direction = DIRECTIONS[tile.direction ?? 'south'].right;
-                        }
-                    }
-                }
                 this.renderer.draw();
             }
             else if (ev.button === 1) {
-                // Middle button: pan
-                this.mouse_mode = 'pan';
-                this.mouse_button_mask = 4;
-                this.mouse_coords = [ev.clientX, ev.clientY];
+                // Middle button: always pan
+                this.mouse_op = new PanOperation(this, ev);
+
                 ev.preventDefault();
+                ev.stopPropagation();
             }
         });
-        this.renderer.canvas.addEventListener('mousemove', ev => {
-            if (this.mouse_mode === null)
+        this.viewport_el.addEventListener('mousemove', ev => {
+            if (! this.mouse_op)
                 return;
-            // TODO check for the specific button we're holding
-            if ((ev.buttons & this.mouse_button_mask) === 0) {
-                this.mouse_mode = null;
+            if ((ev.buttons & this.mouse_op.button_mask) === 0) {
+                this.cancel_mouse_operation();
                 return;
             }
 
-            if (this.mouse_mode === 'draw') {
-                // FIXME also fill in a trail between previous cell and here, mousemove is not fired continuously
-                let [x, y] = this.renderer.cell_coords_from_event(ev);
-                if (x === this.mouse_cell[0] && y === this.mouse_cell[1])
-                    return;
+            this.mouse_op.do_mousemove(ev);
 
-                // TODO do a pixel-perfect draw too
-                if (this.current_tool === 'pencil') {
-                    for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
-                        this.place_in_cell(cx, cy, this.palette_selection);
-                    }
-                }
-                else if (this.current_tool === 'force-floors') {
-                    // Walk the mouse movement and change each we touch to match the direction we
-                    // crossed the border
-                    // FIXME occasionally i draw a tetris S kinda shape and both middle parts point
-                    // the same direction, but shouldn't
-                    let i = 0;
-                    let prevx, prevy;
-                    for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
-                        i++;
-                        // The very first cell is the one the mouse was already in, and we don't
-                        // have a movement direction yet, so leave that alone
-                        if (i === 1) {
-                            prevx = cx;
-                            prevy = cy;
-                            continue;
-                        }
-                        let name;
-                        if (cx === prevx) {
-                            if (cy > prevy) {
-                                name = 'force_floor_s';
-                            }
-                            else {
-                                name = 'force_floor_n';
-                            }
-                        }
-                        else {
-                            if (cx > prevx) {
-                                name = 'force_floor_e';
-                            }
-                            else {
-                                name = 'force_floor_w';
-                            }
-                        }
-
-                        // The second cell tells us the direction to use for the first, assuming it
-                        // had some kind of force floor
-                        if (i === 2) {
-                            let prevcell = this.stored_level.cells[prevy][prevx];
-                            if (prevcell[0].type.name.startsWith('force_floor_')) {
-                                prevcell[0].type = TILE_TYPES[name];
-                            }
-                        }
-
-                        // Drawing a loop with force floors creates ice (but not in the previous
-                        // cell, obviously)
-                        let cell = this.stored_level.cells[cy][cx];
-                        if (cell[0].type.name.startsWith('force_floor_') &&
-                            cell[0].type.name !== name)
-                        {
-                            name = 'ice';
-                        }
-                        this.place_in_cell(cx, cy, name);
-
-                        prevx = cx;
-                        prevy = cy;
-                    }
-                }
-                else if (this.current_tool === 'adjust') {
-                    // Adjust tool doesn't support dragging
-                    // TODO should it
-                }
-                this.renderer.draw();
-
-                this.mouse_cell = [x, y];
-            }
-            else if (this.mouse_mode === 'pan') {
-                let dx = ev.clientX - this.mouse_coords[0];
-                let dy = ev.clientY - this.mouse_coords[1];
-                this.renderer.canvas.parentNode.scrollLeft -= dx;
-                this.renderer.canvas.parentNode.scrollTop -= dy;
-                this.mouse_coords = [ev.clientX, ev.clientY];
-            }
+            this.renderer.draw();
         });
-        this.renderer.canvas.addEventListener('mouseup', ev => {
-            this.mouse_mode = null;
+        // TODO should this happen for a mouseup anywhere?
+        this.viewport_el.addEventListener('mouseup', ev => {
+            if (this.mouse_op) {
+                this.mouse_op.do_commit();
+                this.mouse_op = null;
+            }
         });
         window.addEventListener('blur', ev => {
-            // Unbind the mouse if the page loses focus
-            this.mouse_mode = null;
+            this.cancel_mouse_operation();
         });
 
         // Toolbar buttons
@@ -336,11 +467,12 @@ export class Editor extends PrimaryView {
         let toolbox = mk('div.icon-button-set')
         this.root.querySelector('.controls').append(toolbox);
         this.tool_button_els = {};
-        for (let tooldef of EDITOR_TOOLS) {
+        for (let toolname of EDITOR_TOOL_ORDER) {
+            let tooldef = EDITOR_TOOLS[toolname];
             let button = mk(
                 'button', {
                     type: 'button',
-                    'data-tool': tooldef.mode,
+                    'data-tool': toolname,
                 },
                 mk('img', {
                     src: tooldef.icon,
@@ -348,7 +480,7 @@ export class Editor extends PrimaryView {
                     title: `${tooldef.name}: ${tooldef.desc}`,
                 }),
             );
-            this.tool_button_els[tooldef.mode] = button;
+            this.tool_button_els[toolname] = button;
             toolbox.append(button);
         }
         this.current_tool = 'pencil';
@@ -419,6 +551,11 @@ export class Editor extends PrimaryView {
                 mk_svg('line.overlay-cxn', {x1: sx + 0.5, y1: sy + 0.5, x2: dx + 0.5, y2: dy + 0.5}),
             );
         }
+        this.stored_level.camera_regions.push(new DOMRect(0, 0, 10, 10));
+        for (let [i, region] of this.stored_level.camera_regions.entries()) {
+            let el = mk_svg('rect.overlay-camera', {x: region.x, y: region.y, width: region.width, height: region.height});
+            this.connections_g.append(el);
+        }
 
         this.renderer.set_level(stored_level);
         if (this.active) {
@@ -479,6 +616,13 @@ export class Editor extends PrimaryView {
             }
             cell.push({type});
             cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
+        }
+    }
+
+    cancel_mouse_operation() {
+        if (this.mouse_op) {
+            this.mouse_op.do_abort();
+            this.mouse_op = null;
         }
     }
 }

@@ -23,8 +23,12 @@ export class StoredLevel {
 
         // Maps of button positions to trap/cloner positions, as scalar indexes
         // in the linear cell list
+        // TODO merge these imo
         this.custom_trap_wiring = {};
         this.custom_cloner_wiring = {};
+
+        // New LL feature: custom camera regions, as lists of {x, y, width, height}
+        this.camera_regions = [];
     }
 
     scalar_to_coords(n) {
