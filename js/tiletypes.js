@@ -851,6 +851,34 @@ const TILE_TYPES = {
         // TODO not implemented
         draw_layer: LAYER_TERRAIN,
     },
+    button_gray: {
+        // TODO only partially implemented
+        draw_layer: LAYER_TERRAIN,
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
+            for (let x = Math.max(0, me.cell.x - 2); x <= Math.min(level.width - 1, me.cell.x + 2); x++) {
+                for (let y = Math.max(0, me.cell.y - 2); y <= Math.min(level.height - 1, me.cell.y + 2); y++) {
+                    let cell = level.cells[y][x];
+                    // TODO wait is this right
+                    if (cell === me.cell)
+                        continue;
+
+                    for (let tile of cell) {
+                        if (tile.type.name === 'green_floor') {
+                            tile.type = TILE_TYPES['green_wall'];
+                        }
+                        else if (tile.type.name === 'green_wall') {
+                            tile.type = TILE_TYPES['green_floor'];
+                        }
+                    }
+                }
+            }
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+        },
+    },
 
     // Time alteration
     stopwatch_bonus: {
