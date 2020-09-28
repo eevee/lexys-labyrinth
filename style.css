@@ -838,6 +838,14 @@ main.--has-demo .demo-controls {
     fill: #80808040;
     pointer-events: auto;
 }
+#editor .level-editor-overlay text {
+    /* Each cell is one "pixel", so text needs to be real small */
+    font-size: 1px;
+}
+#editor .level-editor-overlay text.overlay-edit-tip {
+    stroke: none;
+    fill: black;
+}
 
 #editor .controls {
     grid-area: controls;

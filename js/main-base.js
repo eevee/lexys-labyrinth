@@ -1,3 +1,5 @@
+import { mk, mk_svg, walk_grid } from './util.js';
+
 // Superclass for the main display modes: the player, the editor, and the splash screen
 export class PrimaryView {
     constructor(conductor, root) {

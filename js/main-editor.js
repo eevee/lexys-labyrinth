@@ -1,4 +1,5 @@
 import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
+import * as c2m from './format-c2m.js';
 import { PrimaryView, DialogOverlay } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
@@ -37,16 +38,21 @@ class MouseOperation {
         // Client coordinates of the initial click
         this.mx0 = ev.clientX;
         this.my0 = ev.clientY;
+        // Real cell coordinates (i.e. including fractional position within a cell) of the click
+        [this.gx0f, this.gy0f] = this.editor.renderer.real_cell_coords_from_event(ev);
+        // Cell coordinates
+        this.gx0 = Math.floor(this.gx0f);
+        this.gy0 = Math.floor(this.gy0f);
 
-        // Client coordinates of the previous mouse position
-        this.mx1 = ev.clientX;
-        this.my1 = ev.clientY;
-        // Cell coordinates of the previous mouse position
-        [this.gx1, this.gy1] = this.editor.renderer.cell_coords_from_event(ev);
-        // Real cell coordinates (i.e. including fractional position within a cell) of etc
-        [this.gx1f, this.gy1f] = this.editor.renderer.real_cell_coords_from_event(ev);
+        // Same as above but for the previous mouse position
+        this.mx1 = this.mx0;
+        this.my1 = this.mx1;
+        this.gx1f = this.gx0f;
+        this.gy1f = this.gy0f;
+        this.gx1 = this.gx0;
+        this.gy1 = this.gy0;
 
-        this.start();
+        this.start(ev);
     }
 
     cell(gx, gy) {
@@ -54,26 +60,28 @@ class MouseOperation {
     }
 
     do_mousemove(ev) {
-        let [gx1f, gy1f] = this.editor.renderer.real_cell_coords_from_event(ev);
+        let [gxf, gyf] = this.editor.renderer.real_cell_coords_from_event(ev);
+        let gx = Math.floor(gxf);
+        let gy = Math.floor(gyf);
 
-        this.step(ev.clientX, ev.clientY, gx1f, gy1f);
+        this.step(ev.clientX, ev.clientY, gxf, gyf, gx, gy);
 
-        // Client coordinates of the previous mouse position
         this.mx1 = ev.clientX;
         this.my1 = ev.clientY;
-        // Cell coordinates of the previous mouse position
-        [this.gx1, this.gy1] = this.editor.renderer.cell_coords_from_event(ev);
-        // Real cell coordinates (i.e. including fractional position within a cell) of etc
-        this.gx1f = gx1f;
-        this.gy1f = gy1f;
+        this.gx1f = gxf;
+        this.gy1f = gyf;
+        this.gx1 = gx;
+        this.gy1 = gy;
     }
 
     do_commit() {
         this.commit();
+        this.cleanup();
     }
 
     do_abort() {
         this.abort();
+        this.cleanup();
     }
 
     // Implement these
@@ -81,6 +89,7 @@ class MouseOperation {
     step(x, y) {}
     commit() {}
     abort() {}
+    cleanup() {}
 }
 
 class PanOperation extends MouseOperation {
@@ -97,8 +106,8 @@ class PencilOperation extends DrawOperation {
     start() {
         this.editor.place_in_cell(this.gx1, this.gy1, this.editor.palette_selection);
     }
-    step(mx, my, gx, gy) {
-        for (let [x, y] of walk_grid(this.gx1f, this.gy1f, gx, gy)) {
+    step(mx, my, gxf, gyf) {
+        for (let [x, y] of walk_grid(this.gx1f, this.gy1f, gxf, gyf)) {
             this.editor.place_in_cell(x, y, this.editor.palette_selection);
         }
     }
@@ -109,14 +118,14 @@ class ForceFloorOperation extends DrawOperation {
         // Begin by placing an all-way force floor under the mouse
         this.editor.place_in_cell(x, y, 'force_floor_all');
     }
-    step(mx, my, gx, gy) {
+    step(mx, my, gxf, gyf) {
         // Walk the mouse movement and change each we touch to match the direction we
         // crossed the border
         // FIXME occasionally i draw a tetris S kinda shape and both middle parts point
         // the same direction, but shouldn't
         let i = 0;
         let prevx, prevy;
-        for (let [x, y] of walk_grid(this.gx1f, this.gy1f, gx, gy)) {
+        for (let [x, y] of walk_grid(this.gx1f, this.gy1f, gxf, gyf)) {
             i++;
             // The very first cell is the one the mouse was already in, and we don't
             // have a movement direction yet, so leave that alone
@@ -211,51 +220,189 @@ class AdjustOperation extends MouseOperation {
     // TODO should it?
 }
 
+// FIXME currently allows creating outside the map bounds and moving beyond the right/bottom, sigh
 class CameraOperation extends MouseOperation {
-    start() {
-        this.region = this.editor.stored_level.camera_regions[0];
-
-        // TODO allow resizing it too
-        let rect = this.target.getBoundingClientRect();
-        if (this.mx0 < rect.left + 16 || this.mx0 > rect.right - 16) {
-            this.mode = 'resize';
-        }
-        else if (this.my0 < rect.top + 16 || this.my0 > rect.bottom - 16) {
-            this.mode = 'resize';
-        }
-        else {
-            this.mode = 'move';
-        }
-
+    start(ev) {
         this.offset_x = 0;
         this.offset_y = 0;
-    }
-    step(mx, my) {
-        let dx = (mx - this.mx0) / this.editor.conductor.tileset.size_x;
-        let dy = (my - this.my0) / this.editor.conductor.tileset.size_y;
-        this.offset_x = Math.floor(dx + 0.5);
-        this.offset_y = Math.floor(dy + 0.5);
+        this.resize_x = 0;
+        this.resize_y = 0;
 
-        // Keep it within the map!
+        let cursor;
+
+        this.target = ev.target.closest('.overlay-camera');
+        if (! this.target) {
+            // Clicking in empty space creates a new camera region
+            this.mode = 'create';
+            cursor = 'move';
+            this.region = new DOMRect(this.gx0, this.gy0, 1, 1);
+            this.target = mk_svg('rect.overlay-camera', {
+                x: this.gx0, y: this.gy1, width: 1, height: 1,
+                'data-region-index': this.editor.stored_level.camera_regions.length,
+            });
+            this.editor.connections_g.append(this.target);
+        }
+        else {
+            this.region = this.editor.stored_level.camera_regions[parseInt(this.target.getAttribute('data-region-index'), 10)];
+
+            // If we're grabbing an edge, resize it
+            let rect = this.target.getBoundingClientRect();
+            let grab_left = (this.mx0 < rect.left + 16);
+            let grab_right = (this.mx0 > rect.right - 16);
+            let grab_top = (this.my0 < rect.top + 16);
+            let grab_bottom = (this.my0 > rect.bottom - 16);
+            if (grab_left || grab_right || grab_top || grab_bottom) {
+                this.mode = 'resize';
+
+                if (grab_left) {
+                    this.resize_edge_x = -1;
+                }
+                else if (grab_right) {
+                    this.resize_edge_x = 1;
+                }
+                else {
+                    this.resize_edge_x = 0;
+                }
+
+                if (grab_top) {
+                    this.resize_edge_y = -1;
+                }
+                else if (grab_bottom) {
+                    this.resize_edge_y = 1;
+                }
+                else {
+                    this.resize_edge_y = 0;
+                }
+
+                if ((grab_top && grab_left) || (grab_bottom && grab_right)) {
+                    cursor = 'nwse-resize';
+                }
+                else if ((grab_top && grab_right) || (grab_bottom && grab_left)) {
+                    cursor = 'nesw-resize';
+                }
+                else if (grab_top || grab_bottom) {
+                    cursor = 'ns-resize';
+                }
+                else {
+                    cursor = 'ew-resize';
+                }
+            }
+            else {
+                this.mode = 'move';
+                cursor = 'move';
+            }
+        }
+
+        this.editor.viewport_el.style.cursor = cursor;
+
+        // Create a text element to show the size while editing
+        this.size_text = mk_svg('text.overlay-edit-tip', {
+            // Center it within the rectangle probably (x and y are set in _update_size_text)
+            'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        });
+        this._update_size_text();
+        this.editor.svg_overlay.append(this.size_text);
+    }
+    _update_size_text() {
+        this.size_text.setAttribute('x', this.region.x + this.offset_x + (this.region.width + this.resize_x) / 2);
+        this.size_text.setAttribute('y', this.region.y + this.offset_y + (this.region.height + this.resize_y) / 2);
+        this.size_text.textContent = `${this.region.width + this.resize_x} × ${this.region.height + this.resize_y}`;
+    }
+    step(mx, my, gxf, gyf, gx, gy) {
+        // FIXME not right if we zoom, should use gxf
+        let dx = Math.floor((mx - this.mx0) / this.editor.conductor.tileset.size_x + 0.5);
+        let dy = Math.floor((my - this.my0) / this.editor.conductor.tileset.size_y + 0.5);
+
         let stored_level = this.editor.stored_level;
-        this.offset_x = Math.max(- this.region.x, Math.min(stored_level.size_x - this.region.width, this.offset_x));
-        this.offset_y = Math.max(- this.region.y, Math.min(stored_level.size_y - this.region.height, this.offset_y));
+        if (this.mode === 'create') {
+            // Just make the new region span between the original click and the new position
+            this.region.x = Math.min(gx, this.gx0);
+            this.region.y = Math.min(gy, this.gy0);
+            this.region.width = Math.max(gx, this.gx0) + 1 - this.region.x;
+            this.region.height = Math.max(gy, this.gy0) + 1 - this.region.y;
+        }
+        else if (this.mode === 'move') {
+            // Keep it within the map!
+            this.offset_x = Math.max(- this.region.x, Math.min(stored_level.size_x - this.region.width, dx));
+            this.offset_y = Math.max(- this.region.y, Math.min(stored_level.size_y - this.region.height, dy));
+        }
+        else {
+            // Resize, based on the edge we originally grabbed
+            if (this.resize_edge_x < 0) {
+                // Left
+                dx = Math.max(-this.region.x, Math.min(this.region.width - 1, dx));
+                this.resize_x = -dx;
+                this.offset_x = dx;
+            }
+            else if (this.resize_edge_x > 0) {
+                // Right
+                dx = Math.max(-(this.region.width - 1), Math.min(stored_level.size_x - this.region.right, dx));
+                this.resize_x = dx;
+                this.offset_x = 0;
+            }
+
+            if (this.resize_edge_y < 0) {
+                // Top
+                dy = Math.max(-this.region.y, Math.min(this.region.height - 1, dy));
+                this.resize_y = -dy;
+                this.offset_y = dy;
+            }
+            else if (this.resize_edge_y > 0) {
+                // Bottom
+                dy = Math.max(-(this.region.height - 1), Math.min(stored_level.size_y - this.region.bottom, dy));
+                this.resize_y = dy;
+                this.offset_y = 0;
+            }
+        }
 
         this.target.setAttribute('x', this.region.x + this.offset_x);
         this.target.setAttribute('y', this.region.y + this.offset_y);
+        this.target.setAttribute('width', this.region.width + this.resize_x);
+        this.target.setAttribute('height', this.region.height + this.resize_y);
+        this._update_size_text();
     }
     commit() {
-        // Actually edit the underlying region
-        this.region.x += this.offset_x;
-        this.region.y += this.offset_y;
+        if (this.mode === 'create') {
+            // Region is already updated, just add it to the level
+            this.editor.stored_level.camera_regions.push(this.region);
+        }
+        else {
+            // Actually edit the underlying region
+            this.region.x += this.offset_x;
+            this.region.y += this.offset_y;
+            this.region.width += this.resize_x;
+            this.region.height += this.resize_y;
+        }
     }
     abort() {
-        // Move the element back to its original location
-        this.target.setAttribute('x', this.region.x);
-        this.target.setAttribute('y', this.region.y);
+        if (this.mode === 'create') {
+            // The element was fake, so delete it
+            this.target.remove();
+        }
+        else {
+            // Move the element back to its original location
+            this.target.setAttribute('x', this.region.x);
+            this.target.setAttribute('y', this.region.y);
+            this.target.setAttribute('width', this.region.width);
+            this.target.setAttribute('height', this.region.height);
+        }
+    }
+    cleanup() {
+        this.editor.viewport_el.style.cursor = '';
+        this.size_text.remove();
     }
 }
-CameraOperation.TARGET_SELECTOR = '.overlay-camera';
+
+class CameraEraseOperation extends MouseOperation {
+    start(ev) {
+        let target = ev.target.closest('.overlay-camera');
+        if (target) {
+            let index = parseInt(target.getAttribute('data-region-index'), 10);
+            target.remove();
+            this.editor.stored_level.camera_regions.splice(index, 1);
+        }
+    }
+}
 
 const EDITOR_TOOLS = {
     pencil: {
@@ -310,9 +457,10 @@ const EDITOR_TOOLS = {
     camera: {
         icon: 'icons/tool-camera.png',
         name: "Camera",
-        desc: "Draw and edit custom camera bounds",
-        help: "Draw and edit camera bounds.  When the player is within a camera region, the camera will avoid showing anything outside that region.  LL only.",
+        desc: "Draw and edit custom camera regions",
+        help: "Draw and edit camera regions.  Right-click to erase a region.  When the player is within a camera region, the camera will avoid showing anything outside that region.  LL only.",
         op1: CameraOperation,
+        op2: CameraEraseOperation,
     },
     // TODO text tool; thin walls tool; ice tool; map generator?; subtools for select tool (copy, paste, crop)
     // TODO interesting option: rotate an actor as you draw it by dragging?  or hold a key like in
@@ -406,13 +554,7 @@ export class Editor extends PrimaryView {
                 if (! op_type)
                     return;
 
-                let target;
-                if (op_type.TARGET_SELECTOR) {
-                    target = ev.target.closest(op_type.TARGET_SELECTOR);
-                    if (! target)
-                        return;
-                }
-                this.mouse_op = new op_type(this, ev, target);
+                this.mouse_op = new op_type(this, ev);
                 ev.preventDefault();
                 ev.stopPropagation();
 
@@ -424,6 +566,18 @@ export class Editor extends PrimaryView {
 
                 ev.preventDefault();
                 ev.stopPropagation();
+            }
+            else if (ev.button === 2) {
+                // Right button: activate tool's alt mode
+                let op_type = EDITOR_TOOLS[this.current_tool].op2;
+                if (! op_type)
+                    return;
+
+                this.mouse_op = new op_type(this, ev);
+                ev.preventDefault();
+                ev.stopPropagation();
+
+                this.renderer.draw();
             }
         });
         this.viewport_el.addEventListener('mousemove', ev => {
@@ -443,7 +597,13 @@ export class Editor extends PrimaryView {
             if (this.mouse_op) {
                 this.mouse_op.do_commit();
                 this.mouse_op = null;
+                ev.stopPropagation();
+                ev.preventDefault();
             }
+        });
+        // Disable context menu, which interferes with right-click tools
+        this.viewport_el.addEventListener('contextmenu', ev => {
+            ev.preventDefault();
         });
         window.addEventListener('blur', ev => {
             this.cancel_mouse_operation();
@@ -551,7 +711,7 @@ export class Editor extends PrimaryView {
                 mk_svg('line.overlay-cxn', {x1: sx + 0.5, y1: sy + 0.5, x2: dx + 0.5, y2: dy + 0.5}),
             );
         }
-        this.stored_level.camera_regions.push(new DOMRect(0, 0, 10, 10));
+        // TODO why are these in connections_g lol
         for (let [i, region] of this.stored_level.camera_regions.entries()) {
             let el = mk_svg('rect.overlay-camera', {x: region.x, y: region.y, width: region.width, height: region.height});
             this.connections_g.append(el);
