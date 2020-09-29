@@ -340,7 +340,9 @@ const TILE_ENCODING = {
     0x46: {
         name: 'force_floor_all',
     },
-    // 0x47: 'button_gray',
+    0x47: {
+        name: 'button_gray',
+    },
     // FIXME swivel floors...  argh...
     0x48: {
         name: 'swivel_sw',
