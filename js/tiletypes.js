@@ -866,10 +866,10 @@ const TILE_TYPES = {
 
                     for (let tile of cell) {
                         if (tile.type.name === 'green_floor') {
-                            tile.type = TILE_TYPES['green_wall'];
+                            level.transmute_tile(tile, 'green_wall');
                         }
                         else if (tile.type.name === 'green_wall') {
-                            tile.type = TILE_TYPES['green_floor'];
+                            level.transmute_tile(tile, 'green_floor');
                         }
                     }
                 }
