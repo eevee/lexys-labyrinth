@@ -949,7 +949,9 @@ class Player extends PrimaryView {
                 let savefile = this.conductor.current_pack_savefile;
                 let old_scorecard;
                 if (! savefile.scorecards[level_index] ||
-                    savefile.scorecards[level_index].score < scorecard.score)
+                    savefile.scorecards[level_index].score < scorecard.score ||
+                    (savefile.scorecards[level_index].score === scorecard.score &&
+                        savefile.scorecards[level_index].aid > scorecard.aid))
                 {
                     old_scorecard = savefile.scorecards[level_index];
 
@@ -1509,7 +1511,9 @@ class LevelBrowserOverlay extends DialogOverlay {
 
                 // Express absolute time as mm:ss, with two decimals on the seconds (which should be
                 // able to exactly count a number of tics)
-                abstime = `${Math.floor(scorecard.abstime / TICS_PER_SECOND / 60)}:${(scorecard.abstime / TICS_PER_SECOND % 60).toFixed(2)}`;
+                let absmin = Math.floor(scorecard.abstime / TICS_PER_SECOND / 60);
+                let abssec = scorecard.abstime / TICS_PER_SECOND % 60;
+                abstime = `${absmin}:${abssec < 10 ? '0' : ''}${abssec.toFixed(2)}`;
             }
 
             tbody.append(mk(i >= savefile.highest_level ? 'tr.--unvisited' : 'tr',
