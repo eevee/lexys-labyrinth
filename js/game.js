@@ -246,13 +246,11 @@ export class Level {
                     }
                     else if (tile.type.is_actor) {
                         if (has_cloner) {
+                            // TODO is there any reason not to add clone templates to the actor
+                            // list?
                             tile.stuck = true;
                         }
                         else {
-                            if (has_trap) {
-                                // FIXME wait, not if the trap is open!  crap
-                                tile.stuck = true;
-                            }
                             this.actors.push(tile);
                         }
                     }
@@ -302,6 +300,17 @@ export class Level {
                 connectable.connection = tile;
                 // Just grab the first
                 break;
+            }
+        }
+
+        // Finally, let all tiles do any custom init behavior
+        for (let row of this.cells) {
+            for (let cell of row) {
+                for (let tile of cell) {
+                    if (tile.type.on_ready) {
+                        tile.type.on_ready(tile, this);
+                    }
+                }
             }
         }
     }

@@ -633,6 +633,28 @@ const TILE_TYPES = {
     },
     trap: {
         draw_layer: LAYER_TERRAIN,
+        on_ready(me, level) {
+            // Trap any actor standing on us, unless we already know we're pressed
+            if (me.presses)
+                return;
+
+            for (let tile of me.cell) {
+                if (tile.type.is_actor) {
+                    tile.stuck = true;
+                }
+            }
+        },
+        add_press_ready(me, level, other) {
+            // Same as below, but without using the undo stack or ejection
+            me.presses = (me.presses ?? 0) + 1;
+            if (me.presses === 1) {
+                for (let tile of me.cell) {
+                    if (tile.type.is_actor) {
+                        tile.stuck = false;
+                    }
+                }
+            }
+        },
         on_arrive(me, level, other) {
             if (me.presses) {
                 // Lynx: Traps immediately eject their contents, if possible
@@ -643,7 +665,7 @@ const TILE_TYPES = {
                 level.set_actor_stuck(other, true);
             }
         },
-        increment_presses(me, level, is_begin) {
+        add_press(me, level, is_begin) {
             level._set_prop(me, 'presses', (me.presses ?? 0) + 1);
             if (me.presses === 1) {
                 // Free everything on us, if we went from 0 to 1 presses (i.e. closed to open)
@@ -657,7 +679,7 @@ const TILE_TYPES = {
                 }
             }
         },
-        decrement_presses(me, level) {
+        remove_press(me, level) {
             level._set_prop(me, 'presses', me.presses - 1);
             if (me.presses === 0) {
                 // Trap everything on us, if we went from 1 to 0 presses (i.e. open to closed)
@@ -820,15 +842,15 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         connects_to: 'trap',
         connect_order: 'forward',
-        on_begin(me, level) {
+        on_ready(me, level) {
             // Inform the trap of any actors that start out holding us down
-            let traps = Array.from(level.find_connections(me, 'trap'));
+            let trap = me.connection;
+            if (! (trap && trap.cell))
+                return;
+
             for (let tile of me.cell) {
                 if (tile.type.is_actor) {
-                    for (let trap of traps) {
-                        // FIXME this will try to move stuff and also populate undo buffer  ~_~
-                        trap.type.increment_presses(trap, level);
-                    }
+                    trap.type.add_press_ready(trap, level);
                 }
             }
         },
@@ -837,7 +859,7 @@ const TILE_TYPES = {
 
             let trap = me.connection;
             if (trap && trap.cell) {
-                trap.type.increment_presses(trap, level);
+                trap.type.add_press(trap, level);
             }
         },
         on_depart(me, level, other) {
@@ -845,7 +867,7 @@ const TILE_TYPES = {
 
             let trap = me.connection;
             if (trap && trap.cell) {
-                trap.type.decrement_presses(trap, level);
+                trap.type.remove_press(trap, level);
             }
         },
     },
