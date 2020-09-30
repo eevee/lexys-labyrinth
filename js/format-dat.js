@@ -121,6 +121,7 @@ const TILE_ENCODING = {
     
 function parse_level(buf, number) {
     let level = new util.StoredLevel(number);
+    level.has_custom_connections = true;
     // Map size is always fixed as 32x32 in CC1
     level.size_x = 32;
     level.size_y = 32;

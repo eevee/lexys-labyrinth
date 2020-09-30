@@ -272,60 +272,37 @@ export class Level {
             let x = cell.x;
             let y = cell.y;
             let goal = connectable.type.connects_to;
-            let found = false;
 
             // Check for custom wiring, for MSCC .DAT levels
-            let n = x + y * this.width;
-            let target_cell_n = null;
-            if (goal === 'trap') {
-                target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
-            }
-            else if (goal === 'cloner') {
-                target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
-            }
-            if (target_cell_n) {
-                // TODO this N could be outside the map bounds
-                let target_cell_x = target_cell_n % this.width;
-                let target_cell_y = Math.floor(target_cell_n / this.width);
-                for (let tile of this.cells[target_cell_y][target_cell_x]) {
-                    if (tile.type.name === goal) {
-                        connectable.connection = tile;
-                        found = true;
-                        break;
+            if (this.stored_level.has_custom_connections) {
+                let n = this.stored_level.coords_to_scalar(x, y);
+                let target_cell_n = null;
+                if (goal === 'trap') {
+                    target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
+                }
+                else if (goal === 'cloner') {
+                    target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
+                }
+                if (target_cell_n && target_cell_n < this.width * this.height) {
+                    let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
+                    for (let tile of this.cells[ty][tx]) {
+                        if (tile.type.name === goal) {
+                            connectable.connection = tile;
+                            break;
+                        }
                     }
                 }
-                if (found)
-                    continue;
+                continue;
             }
 
             // Otherwise, look in reading order
-            let direction = 1;
-            if (connectable.type.connect_order === 'backward') {
-                direction = -1;
+            for (let tile of this.iter_tiles_in_reading_order(cell, goal)) {
+                // TODO ideally this should be a weak connection somehow, since dynamite can destroy
+                // empty cloners and probably traps too
+                connectable.connection = tile;
+                // Just grab the first
+                break;
             }
-            for (let i = 0; i < num_cells - 1; i++) {
-                x += direction;
-                if (x >= this.width) {
-                    x -= this.width;
-                    y = (y + 1) % this.height;
-                }
-                else if (x < 0) {
-                    x += this.width;
-                    y = (y - 1 + this.height) % this.height;
-                }
-
-                for (let tile of this.cells[y][x]) {
-                    if (tile.type.name === goal) {
-                        // TODO should be weak, but you can't destroy cloners so in practice not a concern
-                        connectable.connection = tile;
-                        found = true;
-                        break;
-                    }
-                }
-                if (found)
-                    break;
-            }
-            // TODO soft warn for e.g. a button with no cloner?  (or a cloner with no button?)
         }
     }
 
@@ -876,7 +853,7 @@ export class Level {
                 }
                 this.remove_tile(tile);
             }
-            else if (tile.type.is_teleporter) {
+            else if (tile.type.teleport_dest_order) {
                 teleporter = tile;
             }
             else if (tile.type.on_arrive) {
@@ -887,33 +864,23 @@ export class Level {
         // Handle teleporting, now that the dust has cleared
         // FIXME something funny happening here, your input isn't ignore while walking out of it?
         if (teleporter) {
-            let goal = teleporter;
-            // TODO in pathological cases this might infinite loop
-            while (true) {
-                goal = goal.connection;
-
+            for (let dest of teleporter.type.teleport_dest_order(teleporter, this)) {
                 // Teleporters already containing an actor are blocked and unusable
-                if (goal.cell.some(tile => tile.type.is_actor && tile !== actor))
+                if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
                     continue;
 
                 // Physically move the actor to the new teleporter
                 // XXX is this right, compare with tile world?  i overhear it's actually implemented as a slide?
                 // XXX not especially undo-efficient
                 this.remove_tile(actor);
-                this.add_tile(actor, goal.cell);
+                this.add_tile(actor, dest.cell);
                 if (this.attempt_step(actor, actor.direction)) {
                     // Success, teleportation complete
                     // Sound plays from the origin cell simply because that's where the sfx player
-                    // thinks the player is currently
-                    this.sfx.play_once('teleport', cell);
+                    // thinks the player is currently; position isn't updated til next turn
+                    this.sfx.play_once('teleport', dest.cell);
                     break;
                 }
-                if (goal === teleporter)
-                    // We've tried every teleporter, including the one they
-                    // stepped on, so leave them on it
-                    break;
-
-                // Otherwise, try the next one
             }
         }
     }
@@ -927,6 +894,39 @@ export class Level {
         }
         else {
             return null;
+        }
+    }
+
+    // Iterates over the grid in (reverse?) reading order and yields all tiles with the given name.
+    // The starting cell is iterated last.
+    *iter_tiles_in_reading_order(start_cell, name, reverse = false) {
+        let x = start_cell.x;
+        let y = start_cell.y;
+        while (true) {
+            if (reverse) {
+                x -= 1;
+                if (x < 0) {
+                    x = this.width - 1;
+                    y = (y - 1 + this.height) % this.height;
+                }
+            }
+            else {
+                x += 1;
+                if (x >= this.width) {
+                    x = 0;
+                    y = (y + 1) % this.height;
+                }
+            }
+
+            let cell = this.cells[y][x];
+            for (let tile of cell) {
+                if (tile.type.name === name) {
+                    yield tile;
+                }
+            }
+
+            if (cell === start_cell)
+                return;
         }
     }
 

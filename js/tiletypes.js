@@ -1,4 +1,5 @@
 import { DIRECTIONS } from './defs.js';
+import { random_choice } from './util.js';
 
 // Draw layers
 const LAYER_TERRAIN = 0;
@@ -633,7 +634,7 @@ const TILE_TYPES = {
     trap: {
         draw_layer: LAYER_TERRAIN,
         on_arrive(me, level, other) {
-            if (me.open) {
+            if (me.presses) {
                 // Lynx: Traps immediately eject their contents, if possible
                 // TODO compat this, cc2 doens't do it!
                 //level.attempt_step(other, other.direction);
@@ -642,8 +643,33 @@ const TILE_TYPES = {
                 level.set_actor_stuck(other, true);
             }
         },
+        increment_presses(me, level, is_begin) {
+            level._set_prop(me, 'presses', (me.presses ?? 0) + 1);
+            if (me.presses === 1) {
+                // Free everything on us, if we went from 0 to 1 presses (i.e. closed to open)
+                for (let tile of Array.from(me.cell)) {
+                    if (tile.type.is_actor) {
+                        level.set_actor_stuck(tile, false);
+                        // Forcibly move anything released from a trap, to keep it in sync with
+                        // whatever pushed the button
+                        level.attempt_step(tile, tile.direction);
+                    }
+                }
+            }
+        },
+        decrement_presses(me, level) {
+            level._set_prop(me, 'presses', me.presses - 1);
+            if (me.presses === 0) {
+                // Trap everything on us, if we went from 1 to 0 presses (i.e. open to closed)
+                for (let tile of me.cell) {
+                    if (tile.type.is_actor) {
+                        level.set_actor_stuck(tile, true);
+                    }
+                }
+            }
+        },
         visual_state(me) {
-            if (me && me.open) {
+            if (me && me.presses) {
                 return 'open';
             }
             else {
@@ -690,29 +716,32 @@ const TILE_TYPES = {
     },
     teleport_blue: {
         draw_layer: LAYER_TERRAIN,
-        connects_to: 'teleport_blue',
-        connect_order: 'backward',
-        is_teleporter: true,
+        teleport_dest_order(me, level) {
+            return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
+        },
     },
     teleport_red: {
         draw_layer: LAYER_TERRAIN,
-        connects_to: 'teleport_red',
-        connect_order: 'forward',
-        is_teleporter: true,
+        teleport_dest_order(me, level) {
+            // FIXME you can control your exit direction from red teleporters
+            return level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
+        },
     },
     teleport_green: {
         draw_layer: LAYER_TERRAIN,
-        // connects_to: 'teleport_red',
-        // connect_order: 'forward',
-        // is_teleporter: true,
-        // FIXME completely different behavior from other teleporters
+        teleport_dest_order(me, level) {
+            // FIXME exit direction is random; unclear if it's any direction or only unblocked ones
+            let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
+            // FIXME this should use the lynxish rng
+            return [random_choice(all), me];
+        },
     },
     teleport_yellow: {
         draw_layer: LAYER_TERRAIN,
-        connects_to: 'teleport_yellow',
-        connect_order: 'backward',
-        is_teleporter: true,
-        // FIXME special pickup behavior
+        teleport_dest_order(me, level) {
+            // FIXME special pickup behavior
+            return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
+        },
     },
     // FIXME do i want these as separate objects?  what would they do, turn into each other?  or should it be one with state?
     flame_jet_off: {
@@ -791,36 +820,32 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         connects_to: 'trap',
         connect_order: 'forward',
-        on_arrive(me, level, other) {
-            level.sfx.play_once('button-press', me.cell);
-
-            if (me.connection && me.connection.cell) {
-                let trap = me.connection;
-                level._set_prop(trap, 'open', true);
-                for (let tile of trap.cell) {
-                    if (tile.type.is_actor) {
-                        if (tile.stuck) {
-                            level.set_actor_stuck(tile, false);
-                        }
-                        // Forcibly move anything released from a trap, to keep
-                        // it in sync with whatever pushed the button
-                        level.attempt_step(tile, tile.direction);
+        on_begin(me, level) {
+            // Inform the trap of any actors that start out holding us down
+            let traps = Array.from(level.find_connections(me, 'trap'));
+            for (let tile of me.cell) {
+                if (tile.type.is_actor) {
+                    for (let trap of traps) {
+                        // FIXME this will try to move stuff and also populate undo buffer  ~_~
+                        trap.type.increment_presses(trap, level);
                     }
                 }
             }
         },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
+            let trap = me.connection;
+            if (trap && trap.cell) {
+                trap.type.increment_presses(trap, level);
+            }
+        },
         on_depart(me, level, other) {
-            // TODO this doesn't play if you walk straight across
             level.sfx.play_once('button-release', me.cell);
 
-            if (me.connection && me.connection.cell) {
-                let trap = me.connection;
-                level._set_prop(trap, 'open', false);
-                for (let tile of trap.cell) {
-                    if (tile.type.is_actor) {
-                        level.set_actor_stuck(tile, true);
-                    }
-                }
+            let trap = me.connection;
+            if (trap && trap.cell) {
+                trap.type.decrement_presses(trap, level);
             }
         },
     },
@@ -831,8 +856,9 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
 
-            if (me.connection && me.connection.cell) {
-                me.connection.type.activate(me.connection, level);
+            let cloner = me.connection;
+            if (cloner && cloner.cell) {
+                cloner.type.activate(cloner, level);
             }
         },
         on_depart(me, level, other) {
