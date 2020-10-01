@@ -111,6 +111,12 @@ const OBITUARIES = {
 class SFXPlayer {
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext);  // come the fuck on, safari
+        // This automatically reduces volume when a lot of sound effects are playing at once
+        this.compressor_node = this.ctx.createDynamicsCompressor();
+        this.compressor_node.threshold.value = -40;
+        this.compressor_node.ratio.value = 16;
+        this.compressor_node.connect(this.ctx.destination);
+
         this.player_x = null;
         this.player_y = null;
         this.sounds = {};
@@ -205,17 +211,17 @@ class SFXPlayer {
             let dist = Math.sqrt(dx*dx + dy*dy);
             let gain = this.ctx.createGain();
             // x/(x + a) is a common and delightful way to get an easy asymptote and output between
-            // 0 and 1.  Here, the result is above 80% for almost everything on screen; drops down
-            // to 50% for things 20 tiles away (which is, roughly, the periphery when standing in
-            // the center of a CC1 map), and bottoms out at 12.5% for standing in one corner of a
+            // 0 and 1.  Here, the result is above 2/3 for almost everything on screen; drops down
+            // to 1/3 for things 20 tiles away (which is, roughly, the periphery when standing in
+            // the center of a CC1 map), and bottoms out at 1/15 for standing in one corner of a
             // CC2 map of max size and hearing something on the far opposite corner.
-            gain.gain.value = 1 - dist / (dist + 20);
+            gain.gain.value = 1 - dist / (dist + 10);
             node.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(this.compressor_node);
         }
         else {
             // Play at full volume
-            node.connect(this.ctx.destination);
+            node.connect(this.compressor_node);
         }
         node.start(this.ctx.currentTime);
     }
