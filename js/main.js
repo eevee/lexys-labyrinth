@@ -256,7 +256,7 @@ class Player extends PrimaryView {
         this.compat = {
             popwalls_react_on_arrive: false,
             auto_convert_ccl_popwalls: true,
-            blue_walls_walkable: true,
+            auto_convert_ccl_blue_walls: true,
             sliding_tanks_ignore_button: true,
             tiles_react_instantly: false,
             allow_flick: false,
@@ -1405,10 +1405,10 @@ const COMPAT_OPTIONS = [{
     impls: ['lynx', 'ms'],
     note: "This is a more conservative solution to the problem with recessed walls.  It replaces recessed walls with a new tile, \"doubly recessed walls\", only if they begin the level with something on top of them.  This should resolve compatibility issues without changing the behavior of recessed walls.",
 }, {
-    key: 'blue_walls_walkable',
-    label: "Blocks can be pushed off of blue walls",
+    key: 'auto_convert_ccl_blue_walls',
+    label: "Fix loaded blue walls",
     impls: ['lynx'],
-    note: "Generally, you can only push a block if it's in a space you could otherwise move into, but Tile World Lynx allows pushing blocks off of blue walls.  (Unclear whether this is a Tile World bug, or a Lynx bug that Tile World is replicating.)  The same effect can be achieved in Steam by using a recessed wall instead, assuming you're using the Steam recessed wall behavior.",
+    note: "Generally, you can only push a block if it's in a space you could otherwise move into, but Tile World Lynx allows pushing blocks off of blue walls.  (Unclear whether this is a Tile World bug, or a Lynx bug that Tile World is replicating.)  The same effect can be achieved in Steam by using a recessed wall instead, so this replaces such walls with recessed walls.  Note that this fix may have unintended side effects in conjunction with the recessed wall compat option.",
 }, {
     key: 'sliding_tanks_ignore_button',
     label: "Blue tanks ignore blue buttons while sliding",

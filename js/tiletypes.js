@@ -153,14 +153,14 @@ const TILE_TYPES = {
     },
     fake_wall: {
         draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
-        blocks(me, level, other) {
-            if (other.type.is_player && level.compat.blue_walls_walkable) {
-                return false;
-            }
-            else {
-                return true;
+        blocks_all: true,
+        on_ready(me, level) {
+            if (level.compat.auto_convert_ccl_blue_walls &&
+                me.cell.some(tile => tile.type.is_actor))
+            {
+                // Blocks can be pushed off of blue walls in TW Lynx, which only works due to a tiny
+                // quirk of the engine that I don't want to replicate, so replace them with popwalls
+                me.type = TILE_TYPES['popwall'];
             }
         },
         on_bump(me, level, other) {
