@@ -197,6 +197,7 @@ export const CC2_TILESET_LAYOUT = {
         wired: [[4, 10], [5, 10], [6, 10], [7, 10]],
     },
     popwall: [8, 10],
+    popwall2: [8, 10],
     gravel: [9, 10],
     ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
     steel: [15, 10],
@@ -478,6 +479,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     wall_appearing: [2, 12],
     gravel: [2, 13],
     popwall: [2, 14],
+    popwall2: [2, 14],
     hint: [2, 15],
 
     thinwall_se: [3, 0],
@@ -591,6 +593,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     teeth: Object.assign({}, CC2_TILESET_LAYOUT.teeth, {
         north: [[0, 32], [1, 32], [2, 32], [1, 32]],
     }),
+    popwall2: [9, 32],
 
     // Extra player sprites
     player: Object.assign({}, CC2_TILESET_LAYOUT.player, {

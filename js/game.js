@@ -162,7 +162,7 @@ export class Level {
     }
 
     restart(compat) {
-        this.compat = {};
+        this.compat = compat;
 
         // playing: normal play
         // success: has been won
@@ -425,9 +425,13 @@ export class Level {
             }
 
             let direction_preference;
-            // Actors can't make voluntary moves on ice, so they're stuck with
-            // whatever they've got
+            if (this.compat.sliding_tanks_ignore_button &&
+                actor.slide_mode && actor.pending_reverse)
+            {
+                this._set_prop(actor, 'pending_reverse', false);
+            }
             if (actor.slide_mode === 'ice') {
+                // Actors can't make voluntary moves on ice; they just slide
                 direction_preference = [actor.direction];
             }
             else if (actor.slide_mode === 'force') {
@@ -458,8 +462,13 @@ export class Level {
                 }
             }
             else if (actor.type.movement_mode === 'forward') {
-                // blue tank behavior: keep moving forward
-                direction_preference = [actor.direction];
+                // blue tank behavior: keep moving forward, reverse if the flag is set
+                let direction = actor.direction;
+                if (actor.pending_reverse) {
+                    direction = DIRECTIONS[actor.direction].opposite;
+                    this._set_prop(actor, 'pending_reverse', false);
+                }
+                direction_preference = [direction];
             }
             else if (actor.type.movement_mode === 'follow-left') {
                 // bug behavior: always try turning as left as possible, and

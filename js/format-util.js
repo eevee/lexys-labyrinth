@@ -7,6 +7,7 @@ export class StoredCell extends Array {
 
 export class StoredLevel {
     constructor(number) {
+        // TODO still not sure this belongs here
         this.number = number;  // one-based
         this.title = '';
         this.password = null;
@@ -16,6 +17,7 @@ export class StoredLevel {
         this.viewport_size = 9;
         this.extra_chunks = [];
         this.use_cc1_boots = false;
+        this.use_ccl_compat = false;
 
         this.size_x = 0;
         this.size_y = 0;

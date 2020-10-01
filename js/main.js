@@ -248,7 +248,12 @@ class Player extends PrimaryView {
         this.scale = 1;
 
         this.compat = {
+            popwalls_react_on_arrive: false,
+            auto_convert_ccl_popwalls: true,
+            blue_walls_walkable: true,
+            sliding_tanks_ignore_button: true,
             tiles_react_instantly: false,
+            allow_flick: false,
         };
 
         this.root.style.setProperty('--tile-width', `${this.conductor.tileset.size_x}px`);
@@ -607,7 +612,7 @@ class Player extends PrimaryView {
         }
         this.conductor.save_savefile();
 
-        this.level = new Level(stored_level, this.compat);
+        this.level = new Level(stored_level, this.gather_compat_options(stored_level));
         this.level.sfx = this.sfx_player;
         this.renderer.set_level(this.level);
         this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
@@ -617,8 +622,18 @@ class Player extends PrimaryView {
     }
 
     restart_level() {
-        this.level.restart(this.compat);
+        this.level.restart(this.gather_compat_options(this.level.stored_level));
         this._clear_state();
+    }
+
+    gather_compat_options(stored_level) {
+        let ret = {};
+        if (stored_level.use_ccl_compat) {
+            for (let [key, value] of Object.entries(this.compat)) {
+                ret[key] = value;
+            }
+        }
+        return ret;
     }
 
     // Call after loading or restarting a level
@@ -1374,15 +1389,40 @@ const AESTHETIC_OPTIONS = [{
     note: "Chip's Challenge typically draws everything in a grid, which looks a bit funny for tall skinny objects like...  the player.  And teeth.  This option draws both of them raised up slightly, so they'll break the grid and add a slight 3D effect.  May not work for all tilesets.",
 }];
 const COMPAT_OPTIONS = [{
+    key: 'popwalls_react_on_arrive',
+    label: "Recessed walls trigger when stepped on",
+    impls: ['lynx', 'ms'],
+    note: "This was the behavior in both versions of CC1, but CC2 changed them to trigger when stepped off of (probably to match the behavior of turtles).  Some CCLP levels depend on the old behavior.  See the next option for a more conservative solution.",
+}, {
+    key: 'auto_convert_ccl_popwalls',
+    label: "Fix loaded recessed walls",
+    impls: ['lynx', 'ms'],
+    note: "This is a more conservative solution to the problem with recessed walls.  It replaces recessed walls with a new tile, \"doubly recessed walls\", only if they begin the level with something on top of them.  This should resolve compatibility issues without changing the behavior of recessed walls.",
+}, {
+    key: 'blue_walls_walkable',
+    label: "Blocks can be pushed off of blue walls",
+    impls: ['lynx'],
+    note: "Generally, you can only push a block if it's in a space you could otherwise move into, but Tile World Lynx allows pushing blocks off of blue walls.  (Unclear whether this is a Tile World bug, or a Lynx bug that Tile World is replicating.)  The same effect can be achieved in Steam by using a recessed wall instead, assuming you're using the Steam recessed wall behavior.",
+}, {
+    key: 'sliding_tanks_ignore_button',
+    label: "Blue tanks ignore blue buttons while sliding",
+    impls: ['lynx'],
+    note: "In Lynx, due to what is almost certainly a bug, blue tanks would simply not react at all if a blue button were pressed while they were in mid-movement.  Steam fixed this, but it also made blue tanks \"remember\" a button press if they were in the middle of a slide and then turn around once they were finished, and this subtle change broke at least one CCLP level.  (There is no compat option for ignoring a button press while moving normally, as that makes the game worse for no known benefit.)",
+}, {
     key: 'tiles_react_instantly',
     label: "Tiles react instantly",
-    impls: ['lynx', 'ms'],
-    note: "In classic CC, actors moved instantly from one tile to another, so tiles would react (e.g., buttons would become pressed) instantly as well.  CC2 made actors slide smoothly between tiles, and it made more sense visually for the reactions to only happen once the sliding animation had finished.  That's technically a gameplay change, since it delays a lot of tile behavior for 4 tics (the time it takes most actors to move), so here's a compat option.  Works best in conjunction with disabling smooth scrolling; otherwise you'll see strange behavior like completing a level before actually stepping onto the exit.",
+    impls: ['ms'],
+    note: "CC originally had objects slide smoothly from one tile to another, so most tiles only responded when the movement completed.  In the Microsoft port, though, everything moves instantly (and then waits before moving again), so tiles respond right away.",
+}, {
+    key: 'allow_flick',
+    label: "Allow flicking",
+    impls: ['ms'],
+    note: "Generally, you can only push a block if it's in a space you could otherwise move into.  Due to a bug, the Microsoft port allows pushing blocks that are on top of walls, thin walls, ice corners, etc., and this maneuver is called a \"flick\".",
 }];
 const COMPAT_IMPLS = {
     lynx: "Lynx, the original version",
     ms: "Microsoft's Windows port",
-    cc2bug: "Bug present in CC2",
+    steam: "The canonical Steam version, but off by default because it's considered a bug",
 };
 const OPTIONS_TABS = [{
     name: 'aesthetic',
@@ -1430,8 +1470,10 @@ class OptionsOverlay extends DialogOverlay {
 
         // Compat tab
         this.tab_blocks['compat'].append(
-            mk('p', "If you don't know what any of these are for, you can pretty safely ignore them."),
-            mk('p', "Changes won't take effect until you restart the level."),
+            mk('p', "Revert to:", mk('button', "Default"), mk('button', "Lynx"), mk('button', "Microsoft"), mk('button', "Steam")),
+            mk('p', "These settings are for compatibility with player-created levels, which sometimes relied on subtle details of the Microsoft or Lynx games and no longer work with the now-canonical Steam rules.  The default is to follow the Steam rules as closely as possible (except for bugs), but make a few small tweaks to keep CCL-format levels working."),
+            mk('p', "Changes won't take effect until you restart the level or change levels."),
+            mk('p', "Please note that Microsoft had a number of subtle but complex bugs that Lexy's Labyrinth cannot ever reasonably emulate.  The Microsoft settings here are best-effort and not intended to be 100% compatible."),
         );
         this._add_options(this.tab_blocks['compat'], COMPAT_OPTIONS);
     }

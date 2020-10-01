@@ -107,8 +107,27 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         blocks_monsters: true,
         blocks_blocks: true,
+        on_ready(me, level) {
+            if (level.compat.auto_convert_ccl_popwalls &&
+                me.cell.some(tile => tile.type.is_actor))
+            {
+                // Fix blocks and other actors on top of popwalls by turning them into double
+                // popwalls, which preserves CC2 popwall behavior
+                me.type = TILE_TYPES['popwall2'];
+            }
+        },
         on_depart(me, level, other) {
             level.transmute_tile(me, 'wall');
+        },
+    },
+    // LL specific tile that can only be stepped on /twice/, originally used to repair differences
+    // with popwall behavior between Lynx and Steam
+    popwall2: {
+        draw_layer: LAYER_TERRAIN,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_depart(me, level, other) {
+            level.transmute_tile(me, 'popwall');
         },
     },
     // FIXME in a cc1 tileset, these tiles are opaque  >:S
@@ -134,7 +153,16 @@ const TILE_TYPES = {
     },
     fake_wall: {
         draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        blocks(me, level, other) {
+            if (other.type.is_player && level.compat.blue_walls_walkable) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        },
         on_bump(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'wall');
@@ -783,7 +811,7 @@ const TILE_TYPES = {
             for (let actor of level.actors) {
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_blue') {
-                    level.set_actor_direction(actor, DIRECTIONS[actor.direction].opposite);
+                    level._set_prop(actor, 'pending_reverse', ! actor.pending_reverse);
                 }
             }
         },
