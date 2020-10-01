@@ -200,7 +200,12 @@ export const CC2_TILESET_LAYOUT = {
     popwall2: [8, 10],
     gravel: [9, 10],
     ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
-    steel: [15, 10],
+    steel: {
+        // Wiring!
+        base: [15, 10],
+        wired: [9, 26],
+        is_wired_optional: true,
+    },
 
     // TODO only animates while moving
     teeth: {
@@ -216,7 +221,7 @@ export const CC2_TILESET_LAYOUT = {
     swivel_ne: [11, 11],
     swivel_se: [12, 11],
     swivel_floor: [13, 11],
-    // TODO some kinda four-edges thing again
+    '#wire-tunnel': [14, 11],
     stopwatch_penalty: [15, 11],
     paramecium: {
         north: [[0, 12], [1, 12], [2, 12]],
@@ -666,10 +671,10 @@ export class Tileset {
             coords = drawspec.tile;
         }
         else if (drawspec.wired) {
-            if (tile && tile.wire_directions !== undefined && tile.wire_directions !== 0) {
-                // TODO all four is a different thing entirely
+            if (tile && tile.wire_directions) {
+                // TODO all four is a different thing entirely with two separate parts, ugh
                 // Draw the appropriate wire underlay
-                this.draw_type('#unpowered', tile, tic, blit);
+                this.draw_type(tile.cell.is_powered ? '#powered' : '#unpowered', tile, tic, blit);
 
                 // Draw a masked part of the base tile
                 let wiredir = tile.wire_directions;
@@ -726,7 +731,7 @@ export class Tileset {
         }
 
         // Apply custom per-type visual states
-        if (TILE_TYPES[name].visual_state) {
+        if (TILE_TYPES[name] && TILE_TYPES[name].visual_state) {
             // Note that these accept null, too, and return a default
             let state = TILE_TYPES[name].visual_state(tile);
             // If it's a string, that's an alias for another state
@@ -795,6 +800,30 @@ export class Tileset {
         else {
             if (!coords) console.error(name, tile);
             blit(coords[0], coords[1]);
+        }
+
+        // Wired tiles may also have tunnels, drawn on top of everything else
+        if (drawspec.wired && tile && tile.wire_tunnel_directions) {
+            let tunnel_coords = this.layout['#wire-tunnel'];
+            let tunnel_width = 6/32;
+            let tunnel_length = 12/32;
+            let tunnel_offset = (1 - tunnel_width) / 2;
+            if (tile.wire_tunnel_directions & DIRECTIONS['north'].bit) {
+                blit(tunnel_coords[0] + tunnel_offset, tunnel_coords[1],
+                    tunnel_offset, 0, tunnel_width, tunnel_length);
+            }
+            if (tile.wire_tunnel_directions & DIRECTIONS['south'].bit) {
+                blit(tunnel_coords[0] + tunnel_offset, tunnel_coords[1] + 1 - tunnel_length,
+                    tunnel_offset, 1 - tunnel_length, tunnel_width, tunnel_length);
+            }
+            if (tile.wire_tunnel_directions & DIRECTIONS['west'].bit) {
+                blit(tunnel_coords[0], tunnel_coords[1] + tunnel_offset,
+                    0, tunnel_offset, tunnel_length, tunnel_width);
+            }
+            if (tile.wire_tunnel_directions & DIRECTIONS['east'].bit) {
+                blit(tunnel_coords[0] + 1 - tunnel_length, tunnel_coords[1] + tunnel_offset,
+                    1 - tunnel_length, tunnel_offset, tunnel_length, tunnel_width);
+            }
         }
 
         // Special behavior for special objects

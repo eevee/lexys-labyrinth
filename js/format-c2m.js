@@ -69,6 +69,7 @@ class CC2Demo {
 let modifier_wire = {
     decode(tile, modifier) {
         tile.wire_directions = modifier & 0x0f;
+        // TODO wait, what happens if you use wire tunnels on steel or something other than floor?
         tile.wire_tunnel_directions = (modifier & 0xf0) >> 4;
     },
     encode(tile) {

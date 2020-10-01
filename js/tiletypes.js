@@ -588,10 +588,16 @@ const TILE_TYPES = {
     },
     green_floor: {
         draw_layer: LAYER_TERRAIN,
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'green_wall');
+        },
     },
     green_wall: {
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'green_floor');
+        },
     },
     green_chip: {
         draw_layer: LAYER_ITEM,
@@ -605,6 +611,7 @@ const TILE_TYPES = {
                 level.remove_tile(me);
             }
         },
+        // Not affected by gray buttons
     },
     green_bomb: {
         draw_layer: LAYER_ITEM,
@@ -619,15 +626,32 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'explosion');
             }
         },
+        // Not affected by gray buttons
     },
     purple_floor: {
-        // TODO wired
         draw_layer: LAYER_TERRAIN,
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'purple_wall');
+        },
+        on_power(me, level) {
+            me.type.on_gray_button(me, level);
+        },
+        on_depower(me, level) {
+            me.type.on_gray_button(me, level);
+        },
     },
     purple_wall: {
-        // TODO wired
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'purple_floor');
+        },
+        on_power(me, level) {
+            me.type.on_gray_button(me, level);
+        },
+        on_depower(me, level) {
+            me.type.on_gray_button(me, level);
+        },
     },
     cloner: {
         draw_layer: LAYER_TERRAIN,
@@ -657,6 +681,13 @@ const TILE_TYPES = {
                     }
                 }
             }
+        },
+        // Also clones on rising pulse or gray button
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
         },
     },
     trap: {
@@ -693,7 +724,7 @@ const TILE_TYPES = {
                 level.set_actor_stuck(other, true);
             }
         },
-        add_press(me, level, is_begin) {
+        add_press(me, level) {
             level._set_prop(me, 'presses', (me.presses ?? 0) + 1);
             if (me.presses === 1) {
                 // Free everything on us, if we went from 0 to 1 presses (i.e. closed to open)
@@ -717,6 +748,15 @@ const TILE_TYPES = {
                     }
                 }
             }
+        },
+        on_power(me, level) {
+            // Treat being powered or not as an extra kind of brown button press
+            me.type.add_press(me, level);
+            console.log("powering UP", me.presses);
+        },
+        on_depower(me, level) {
+            me.type.remove_press(me, level);
+            console.log("powering down...", me.presses);
         },
         visual_state(me) {
             if (me && me.presses) {
@@ -793,13 +833,30 @@ const TILE_TYPES = {
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
         },
     },
-    // FIXME do i want these as separate objects?  what would they do, turn into each other?  or should it be one with state?
     flame_jet_off: {
         draw_layer: LAYER_TERRAIN,
+        activate(me, level) {
+            level.transmute_tile(me, 'flame_jet_on');
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
+        },
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
     },
     flame_jet_on: {
         draw_layer: LAYER_TERRAIN,
         // FIXME every tic, kills every actor in the cell
+        activate(me, level) {
+            level.transmute_tile(me, 'flame_jet_off');
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
+        },
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
     },
     // Buttons
     button_blue: {
@@ -920,8 +977,17 @@ const TILE_TYPES = {
         // FIXME toggles flame jets, connected somehow, ???
     },
     button_pink: {
-        // TODO not implemented
         draw_layer: LAYER_TERRAIN,
+        is_emitting(me, level) {
+            // We emit current as long as there's an actor on us
+            return me.cell.some(tile => tile.type.is_actor);
+        },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+        },
     },
     button_black: {
         // TODO not implemented
@@ -941,11 +1007,8 @@ const TILE_TYPES = {
                         continue;
 
                     for (let tile of cell) {
-                        if (tile.type.name === 'green_floor') {
-                            level.transmute_tile(tile, 'green_wall');
-                        }
-                        else if (tile.type.name === 'green_wall') {
-                            level.transmute_tile(tile, 'green_floor');
+                        if (tile.type.on_gray_button) {
+                            tile.type.on_gray_button(tile, level);
                         }
                     }
                 }
