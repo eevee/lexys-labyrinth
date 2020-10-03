@@ -444,6 +444,13 @@ class Player extends PrimaryView {
                 }
             }
 
+            if (ev.key === 'r') {
+                if (this.state === 'playing') {
+                    this.restart_level();
+                    return;
+                }
+            }
+
             if (this.key_mapping[ev.key]) {
                 this.current_keys.add(ev.key);
                 ev.stopPropagation();
