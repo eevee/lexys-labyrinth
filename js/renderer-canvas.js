@@ -111,12 +111,12 @@ export class CanvasRenderer {
         // The viewport might not be aligned to the grid, so split off any fractional part.
         let xf0 = Math.floor(x0);
         let yf0 = Math.floor(y0);
-        // Note that when the viewport is exactly aligned to the grid, we need to draw the cells
-        // just outside of it, or we'll miss objects partway through crossing the border
-        if (xf0 === x0 && xf0 > 0) {
+        // We need to draw one cell beyond the viewport, or we'll miss objects partway through
+        // crossing the border moving away from us
+        if (xf0 > 0) {
             xf0 -= 1;
         }
-        if (yf0 === y0 && yf0 > 0) {
+        if (yf0 > 0) {
             yf0 -= 1;
         }
         // Find where to stop drawing.  As with above, if we're aligned to the grid, we need to
