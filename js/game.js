@@ -451,7 +451,8 @@ export class Level {
             }
             if (actor.slide_mode === 'ice') {
                 // Actors can't make voluntary moves on ice; they just slide
-                direction_preference = [actor.direction];
+                actor.decision = actor.direction;
+                continue;
             }
             else if (actor.slide_mode === 'force') {
                 // Only the player can make voluntary moves on a force floor,
@@ -464,21 +465,23 @@ export class Level {
                     p1_primary_direction &&
                     actor.last_move_was_force)
                 {
-                    direction_preference = [p1_primary_direction];
+                    actor.decision = p1_primary_direction;
                     this._set_prop(actor, 'last_move_was_force', false);
                 }
                 else {
-                    direction_preference = [actor.direction];
+                    actor.decision = actor.direction;
                     if (actor === this.player) {
                         this._set_prop(actor, 'last_move_was_force', true);
                     }
                 }
+                continue;
             }
             else if (actor === this.player) {
                 if (p1_primary_direction) {
-                    direction_preference = [p1_primary_direction];
+                    actor.decision = p1_primary_direction;
                     this._set_prop(actor, 'last_move_was_force', false);
                 }
+                continue;
             }
             else if (actor.type.movement_mode === 'forward') {
                 // blue tank behavior: keep moving forward, reverse if the flag is set
@@ -487,7 +490,9 @@ export class Level {
                     direction = DIRECTIONS[actor.direction].opposite;
                     this._set_prop(actor, 'pending_reverse', false);
                 }
-                direction_preference = [direction];
+                // Tanks are controlled explicitly so they don't check if they're blocked
+                actor.decision = direction;
+                continue;
             }
             else if (actor.type.movement_mode === 'follow-left') {
                 // bug behavior: always try turning as left as possible, and
@@ -570,12 +575,6 @@ export class Level {
             // Check which of those directions we *can*, probably, move in
             // TODO i think player on force floor will still have some issues here
             if (direction_preference) {
-                // Players and sliding actors always move the way they want, even if blocked
-                if (actor.type.is_player || actor.slide_mode) {
-                    actor.decision = direction_preference[0];
-                    continue;
-                }
-
                 for (let direction of direction_preference) {
                     let dest_cell = this.get_neighboring_cell(actor.cell, direction);
                     if (! dest_cell)
