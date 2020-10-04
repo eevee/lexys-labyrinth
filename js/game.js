@@ -430,10 +430,6 @@ export class Level {
             if (actor.movement_cooldown > 0)
                 continue;
 
-            // XXX does the cooldown drop while in a trap?  is this even right?
-            if (actor.stuck && ! actor.type.is_player)
-                continue;
-
             // Teeth can only move the first 4 of every 8 tics, though "first"
             // can be adjusted
             if (actor.slide_mode == null &&
@@ -491,7 +487,11 @@ export class Level {
                     this._set_prop(actor, 'pending_reverse', false);
                 }
                 // Tanks are controlled explicitly so they don't check if they're blocked
-                actor.decision = direction;
+                // TODO tanks in traps turn around, but tanks on cloners do not, and i use the same
+                // prop for both
+                if (! actor.cell.some(tile => tile.type.name === 'cloner')) {
+                    actor.decision = direction;
+                }
                 continue;
             }
             else if (actor.type.movement_mode === 'follow-left') {
@@ -574,7 +574,7 @@ export class Level {
 
             // Check which of those directions we *can*, probably, move in
             // TODO i think player on force floor will still have some issues here
-            if (direction_preference) {
+            if (direction_preference && ! actor.stuck) {
                 for (let direction of direction_preference) {
                     let dest_cell = this.get_neighboring_cell(actor.cell, direction);
                     if (! dest_cell)
