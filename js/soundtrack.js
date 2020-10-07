@@ -51,4 +51,14 @@ export default [{
     twitter: "glitchedpuppet",
     beepbox: 'https://jummbus.bitbucket.io/#j2N07Unnamedn310s0k0l00e0jt2mm0a7g0jj07i0r1O_U0000o3210T1v0wL0OD0Ou01q1d5f6y0z6C1c0A1F2B5V6Q20a0Pe64bE0171T1v0pL0OD0Ou92q1d4f7y2z1C0c2AbF6B6V9Q0490Pb976E0001T1v0pL0OD0Ou94q1d2f7y2z1C0c2A9F5B5V6Q290dPa883E0011T4v0pL0OD0Ouf0q1z6666ji8k8k3jSBKSJJAArriiiiii07JCABrzrrrrrrr00YrkqHrsrrrrjr005zrAqzrjzrrqr1jRjrqGGrrzsrsA099ijrABJJJIAzrrtirqrqjqixzsrAjrqjiqaqqysttAJqjikikrizrHtBJJAzArzrIsRCITKSS099ijrAJS____Qg99habbCAYrDzh00b4x8Qd000lBu7014x4i4Qd3gQlmoh4ia2cz8OcChA4h4y8w01cPhjl0p27hFCLwATnMkCKChW2ZcngbUxcnikQ7sQO_inQ5WCkXyW9jbZ9vlO_lODhdcDjQNtgJ0Gp7IpAukFczR2FyX2frIzQ4zOGOOfpauP9vainRihQPK4tClqoKMnaAzQQnQQnRknXx7pBnK2OFjSO_oELFAzFIOWa8WF8WpHW3nEdv26LgqZcLQQap7Iu6P9j5R2Q2Q2Q2VeRfbEbWGq2-DinQBZttkHUMRWPn9HFAuwzEe3E8W2ehFyUsNncLQThuCnW2_aGydcngbkO_rZdkPjdcSpvx9jbZ3cRZtcO_lipvFSFkO_lN4YlAjBpdp6hahFyWz5OXbWFbWF8YEmChy3wWiehcK0bWaoEIlChw3JHp5K5E5E5w1sPb5P2f9as0LVds0bkbukQni0JFyQ5c0bokRyXrbxqxr2CyWSOSAzw1qxqxrNrxqxrhtwJgJMJJhvmbibikO8J5JwJEJEJtE',
     path: 'music/kinda-song.ogg',
+}, {
+    title: "learning has occurred",
+    author: "jneen",
+    twitter: "jneen_",
+    path: 'music/learning-has-occurred.ogg',
+}, {
+    title: "escape on star road",
+    author: "jneen",
+    twitter: "jneen_",
+    path: 'music/escape-on-star-road.ogg',
 }];
