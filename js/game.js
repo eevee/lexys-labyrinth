@@ -1253,6 +1253,7 @@ export class Level {
         }
     }
 
+    // Give an item to an actor, even if it's not supposed to have an inventory
     give_actor(actor, name) {
         if (! actor.type.is_actor)
             return false;

@@ -1185,17 +1185,32 @@ const TILE_TYPES = {
         movement_speed: 4,
     },
 
-    // Keys
-    // Note that red and blue keys do NOT block monsters, but yellow and green DO
+    // Keys, whose behavior varies
     key_red: {
+        // TODO Red key can ONLY be picked up by players (and doppelgangers), no other actor that
+        // has an inventory
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_key: true,
     },
     key_blue: {
+        // Blue key is picked up by dirt blocks and all monsters, including those that don't have an
+        // inventory normally
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_key: true,
+        on_arrive(me, level, other) {
+            // Call it...  everything except ice and directional blocks?  These rules are weird.
+            // Note that the game itself normally handles picking items up, so we only get here for
+            // actors who aren't supposed to have an inventory
+            // TODO make this a...  flag?  i don't know?
+            // TODO major difference from lynx...
+            if (other.type.name !== 'ice_block' && other.type.name !== 'directional_block') {
+                if (level.give_actor(other, me.type.name)) {
+                    level.remove_tile(me);
+                }
+            }
+        },
     },
     key_yellow: {
         draw_layer: LAYER_ITEM,
