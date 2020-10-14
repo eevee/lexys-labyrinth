@@ -655,6 +655,7 @@ class Player extends PrimaryView {
     _clear_state() {
         this.set_state('waiting');
 
+		this.waiting_for_input = false;
         this.tic_offset = 0;
         this.last_advance = 0;
         this.demo_faucet = null;
@@ -777,10 +778,12 @@ class Player extends PrimaryView {
 			{
 				if (!this.turn_based || primary_dir != null || input.has('wait'))
 				{
+					this.waiting_for_input = false;
 					this.level.advance_tic(
 					primary_dir,
 					secondary_dir,
 					2);
+					
 				}
 			}
 			else //TODO: or `if (!this.waiting_for_input)` to be snappier
@@ -840,7 +843,7 @@ class Player extends PrimaryView {
             }
         }
         
-        if (this.level.waiting_for_input)
+        if (this.waiting_for_input)
         {
             //freeze tic_offset in time so we don't try to interpolate to the next frame too soon
             this.tic_offset = 0;
@@ -861,7 +864,7 @@ class Player extends PrimaryView {
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
-        if (this.level.waiting_for_input) {
+        if (this.waiting_for_input) {
             //freeze tic_offset in time
         }
         else
@@ -887,6 +890,7 @@ class Player extends PrimaryView {
 
     // Actually redraw.  Used to force drawing outside of normal play
     _redraw() {
+		this.renderer.waiting_for_input = this.waiting_for_input;
         this.renderer.draw(this.tic_offset);
     }
 
