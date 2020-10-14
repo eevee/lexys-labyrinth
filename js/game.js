@@ -979,13 +979,13 @@ export class Level {
     }
 
     undo() {
-		//reverse the pending_undo too
+        //reverse the pending_undo too
         this.pending_undo.reverse();
         for (let undo of this.pending_undo) {
             undo();
         }
         this.pending_undo = [];
-		
+        
         this.aid = Math.max(1, this.aid);
 
         let entry = this.undo_stack.pop();
