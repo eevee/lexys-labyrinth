@@ -332,7 +332,7 @@ export class Level {
 
 	player_awaiting_input() {
 		//todo: the tic_counter part feels kludgey. maybe there's some other way a wait/wall nudge can wait a certain amount of time per tap?
-		return this.player.movement_cooldown === 0 && this.player.slide_mode === null && this.tic_counter % 2 == 0
+		return this.player.movement_cooldown === 0 && (this.player.slide_mode === null || (this.player.slide_mode === 'force' && this.player.last_move_was_force)) && this.tic_counter % 2 == 0
 	}
 
     // Move the game state forwards by one tic
@@ -438,8 +438,12 @@ export class Level {
 		}
 
 		// Second pass: actors decide their upcoming movement simultaneously
+		// (we'll do the player's decision in part 2!)
 		for (let actor of this.actors) {
-			this.actor_decision(actor, p1_primary_direction);
+			if (actor != this.player)
+			{
+				this.actor_decision(actor, p1_primary_direction);
+			}
 		}
 	}
 	
