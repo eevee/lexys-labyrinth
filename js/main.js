@@ -404,7 +404,6 @@ class Player extends PrimaryView {
         this.turn_based_checkbox = this.root.querySelector('.controls .turn-based');
         this.turn_based_checkbox.addEventListener('change', ev => {
             this.turn_based = !this.turn_based;
-            this.level.turn_based = this.turn_based;
         });
 
         // Bind buttons

@@ -158,7 +158,6 @@ export class Level {
         this.height = stored_level.size_y;
         this.size_x = stored_level.size_x;
         this.size_y = stored_level.size_y;
-        this.turn_based = false;
         this.restart(compat);
     }
 
@@ -331,8 +330,7 @@ export class Level {
     }
 
 	player_awaiting_input() {
-		//todo: the tic_counter part feels kludgey. maybe there's some other way a wait/wall nudge can wait a certain amount of time per tap?
-		return this.player.movement_cooldown === 0 && (this.player.slide_mode === null || (this.player.slide_mode === 'force' && this.player.last_move_was_force)) && this.tic_counter % 2 == 0
+		return this.player.movement_cooldown === 0 && (this.player.slide_mode === null || (this.player.slide_mode === 'force' && this.player.last_move_was_force))
 	}
 
     // Move the game state forwards by one tic
@@ -573,7 +571,7 @@ export class Level {
             // can override forwards??) and DEFINITELY all kinds of stuff
             // in ms
             if (actor === this.player &&
-                (p1_primary_direction || this.turn_based) &&
+                p1_primary_direction &&
                 actor.last_move_was_force)
             {
                 if (p1_primary_direction != null)
