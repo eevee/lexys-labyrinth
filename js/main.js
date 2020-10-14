@@ -428,7 +428,7 @@ class Player extends PrimaryView {
             while (this.level.undo_stack.length > 0 &&
                 ! (moved && this.level.player.slide_mode === null))
             {
-                this.level.undo();
+				this.undo();
                 if (player_cell !== this.level.player.cell) {
                     moved = true;
                 }
@@ -843,7 +843,7 @@ class Player extends PrimaryView {
             }
             else {
                 // Rewind by undoing one tic every tic
-                this.level.undo();
+				this.undo();
                 this.update_ui();
             }
         }
@@ -861,6 +861,12 @@ class Player extends PrimaryView {
         }
         this._advance_handle = window.setTimeout(this._advance_bound, dt);
     }
+
+	undo() {
+		//if we were waiting for input and undo, well, now we're not
+		this.waiting_for_input = false;
+		this.level.undo();
+	}
 
     // Redraws every frame, unless the game isn't running
     redraw() {
