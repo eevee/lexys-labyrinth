@@ -51,8 +51,8 @@ export class CanvasRenderer {
             sx * tw, sy * th, w * tw, h * th,
             dx * tw, dy * th, w * tw, h * th);
     }
-	
-	waiting_for_input = false;
+    
+    waiting_for_input = false;
 
     draw(tic_offset = 0) {
         if (! this.level) {

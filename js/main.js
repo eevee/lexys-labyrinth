@@ -428,7 +428,7 @@ class Player extends PrimaryView {
             while (this.level.undo_stack.length > 0 &&
                 ! (moved && this.level.player.slide_mode === null))
             {
-				this.undo();
+                this.undo();
                 if (player_cell !== this.level.player.cell) {
                     moved = true;
                 }
@@ -509,7 +509,7 @@ class Player extends PrimaryView {
         this.previous_input = new Set;  // actions that were held last tic
         this.previous_action = null;  // last direction we were moving, if any
         this.current_keys = new Set;  // keys that are currently held
-		this.current_keys_new = new Set; //for keys that have only been held a frame
+        this.current_keys_new = new Set; //for keys that have only been held a frame
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
             if (ev.key === 'p' || ev.key === 'Pause') {
@@ -550,7 +550,7 @@ class Player extends PrimaryView {
 
             if (this.key_mapping[ev.key]) {
                 this.current_keys.add(ev.key);
-				this.current_keys_new.add(ev.key);
+                this.current_keys_new.add(ev.key);
                 ev.stopPropagation();
                 ev.preventDefault();
 
@@ -656,7 +656,7 @@ class Player extends PrimaryView {
     _clear_state() {
         this.set_state('waiting');
 
-		this.waiting_for_input = false;
+        this.waiting_for_input = false;
         this.tic_offset = 0;
         this.last_advance = 0;
         this.demo_faucet = null;
@@ -701,15 +701,15 @@ class Player extends PrimaryView {
             for (let key of this.current_keys) {
                 input.add(this.key_mapping[key]);
             }
-			for (let key of this.current_keys_new) {
+            for (let key of this.current_keys_new) {
                 input.add(this.key_mapping[key]);
             }
-			this.current_keys_new = new Set;
+            this.current_keys_new = new Set;
             return input;
         }
     }
-	
-	waiting_for_input = false;
+    
+    waiting_for_input = false;
 
     advance_by(tics) {
         for (let i = 0; i < tics; i++) {
@@ -773,43 +773,43 @@ class Player extends PrimaryView {
             this.previous_input = input;
 
             this.sfx_player.advance_tic();
-			
-			var primary_dir = this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null;
-			var secondary_dir =  this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null;
-			
-			//turn based logic
-			//first, handle a part 2 we just got input for
-			if (this.waiting_for_input)
-			{
-				if (!this.turn_based || primary_dir != null || input.has('wait'))
-				{
-					this.waiting_for_input = false;
-					this.level.advance_tic(
-					primary_dir,
-					secondary_dir,
-					2);
-					
-				}
-			}
-			else //TODO: or `if (!this.waiting_for_input)` to be snappier
-			{
-				this.level.advance_tic(
-				primary_dir,
-				secondary_dir,
-				1);
-				//then if we should wait for input, the player needs input and we don't have input, we set waiting_for_input, else we run part 2
-				if (this.turn_based && this.level.player_awaiting_input() && !(primary_dir != null || input.has('wait')))
-				{
-					this.waiting_for_input = true;
-				}
-				else
-				{
-					this.level.advance_tic(
-					primary_dir,
-					secondary_dir,
-					2);
-				}
-			}
+            
+            var primary_dir = this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null;
+            var secondary_dir =  this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null;
+            
+            //turn based logic
+            //first, handle a part 2 we just got input for
+            if (this.waiting_for_input)
+            {
+                if (!this.turn_based || primary_dir != null || input.has('wait'))
+                {
+                    this.waiting_for_input = false;
+                    this.level.advance_tic(
+                    primary_dir,
+                    secondary_dir,
+                    2);
+                    
+                }
+            }
+            else //TODO: or `if (!this.waiting_for_input)` to be snappier
+            {
+                this.level.advance_tic(
+                primary_dir,
+                secondary_dir,
+                1);
+                //then if we should wait for input, the player needs input and we don't have input, we set waiting_for_input, else we run part 2
+                if (this.turn_based && this.level.player_awaiting_input() && !(primary_dir != null || input.has('wait')))
+                {
+                    this.waiting_for_input = true;
+                }
+                else
+                {
+                    this.level.advance_tic(
+                    primary_dir,
+                    secondary_dir,
+                    2);
+                }
+            }
 
             if (this.level.state !== 'playing') {
                 // We either won or lost!
@@ -843,7 +843,7 @@ class Player extends PrimaryView {
             }
             else {
                 // Rewind by undoing one tic every tic
-				this.undo();
+                this.undo();
                 this.update_ui();
             }
         }
@@ -862,11 +862,11 @@ class Player extends PrimaryView {
         this._advance_handle = window.setTimeout(this._advance_bound, dt);
     }
 
-	undo() {
-		//if we were waiting for input and undo, well, now we're not
-		this.waiting_for_input = false;
-		this.level.undo();
-	}
+    undo() {
+        //if we were waiting for input and undo, well, now we're not
+        this.waiting_for_input = false;
+        this.level.undo();
+    }
 
     // Redraws every frame, unless the game isn't running
     redraw() {
@@ -901,7 +901,7 @@ class Player extends PrimaryView {
 
     // Actually redraw.  Used to force drawing outside of normal play
     _redraw() {
-		this.renderer.waiting_for_input = this.waiting_for_input;
+        this.renderer.waiting_for_input = this.waiting_for_input;
         this.renderer.draw(this.tic_offset);
     }
 

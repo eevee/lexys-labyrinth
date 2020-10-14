@@ -329,12 +329,12 @@ export class Level {
         }
     }
 
-	player_awaiting_input() {
-		return this.player.movement_cooldown === 0 && (this.player.slide_mode === null || (this.player.slide_mode === 'force' && this.player.last_move_was_force))
-	}
+    player_awaiting_input() {
+        return this.player.movement_cooldown === 0 && (this.player.slide_mode === null || (this.player.slide_mode === 'force' && this.player.last_move_was_force))
+    }
 
     // Move the game state forwards by one tic
-	// split into two parts for turn-based mode: first part is the consequences of the previous tick, second part depends on the player's input
+    // split into two parts for turn-based mode: first part is the consequences of the previous tick, second part depends on the player's input
     advance_tic(p1_primary_direction, p1_secondary_direction, pass) {
         if (this.state !== 'playing') {
             console.warn(`Level.advance_tic() called when state is ${this.state}`);
@@ -342,18 +342,18 @@ export class Level {
         }
 
         try {
-			if (pass == 1)
-			{
-				this._advance_tic_part1(p1_primary_direction, p1_secondary_direction);
-			}
-			else if (pass == 2)
-			{
-				this._advance_tic_part2(p1_primary_direction, p1_secondary_direction);
-			}
-			else
-			{
-				console.warn(`What pass is this?`);
-			}
+            if (pass == 1)
+            {
+                this._advance_tic_part1(p1_primary_direction, p1_secondary_direction);
+            }
+            else if (pass == 2)
+            {
+                this._advance_tic_part2(p1_primary_direction, p1_secondary_direction);
+            }
+            else
+            {
+                console.warn(`What pass is this?`);
+            }
         }
         catch (e) {
             if (e instanceof GameEnded) {
@@ -388,68 +388,68 @@ export class Level {
         // arrival as its own mini pass, for one reason: if the player dies (which will end the game
         // immediately), we still want every time's animation to finish, or it'll look like some
         // objects move backwards when the death screen appears!
-		let cell_steppers = [];
-		for (let actor of this.actors) {
-			// Actors with no cell were destroyed
-			if (! actor.cell)
-				continue;
+        let cell_steppers = [];
+        for (let actor of this.actors) {
+            // Actors with no cell were destroyed
+            if (! actor.cell)
+                continue;
 
-			// Clear any old decisions ASAP.  Note that this prop is only used internally within a
-			// single tic, so it doesn't need to be undoable
-			actor.decision = null;
+            // Clear any old decisions ASAP.  Note that this prop is only used internally within a
+            // single tic, so it doesn't need to be undoable
+            actor.decision = null;
 
-			// Decrement the cooldown here, but don't check it quite yet,
-			// because stepping on cells in the next block might reset it
-			if (actor.movement_cooldown > 0) {
-				this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
-			}
+            // Decrement the cooldown here, but don't check it quite yet,
+            // because stepping on cells in the next block might reset it
+            if (actor.movement_cooldown > 0) {
+                this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
+            }
 
-			if (actor.animation_speed) {
-				// Deal with movement animation
-				this._set_prop(actor, 'animation_progress', actor.animation_progress + 1);
-				if (actor.animation_progress >= actor.animation_speed) {
-					if (actor.type.ttl) {
-						// This is purely an animation so it disappears once it's played
-						this.remove_tile(actor);
-						continue;
-					}
-					this._set_prop(actor, 'previous_cell', null);
-					this._set_prop(actor, 'animation_progress', null);
-					this._set_prop(actor, 'animation_speed', null);
-					if (! this.compat.tiles_react_instantly) {
-						// We need to track the actor AND the cell explicitly, because it's possible
-						// that one actor's step will cause another actor to start another move, and
-						// then they'd end up stepping on the new cell they're moving to instead of
-						// the one they just landed on!
-						cell_steppers.push([actor, actor.cell]);
-					}
-				}
-			}
-		}
-		for (let [actor, cell] of cell_steppers) {
-			this.step_on_cell(actor, cell);
-		}
+            if (actor.animation_speed) {
+                // Deal with movement animation
+                this._set_prop(actor, 'animation_progress', actor.animation_progress + 1);
+                if (actor.animation_progress >= actor.animation_speed) {
+                    if (actor.type.ttl) {
+                        // This is purely an animation so it disappears once it's played
+                        this.remove_tile(actor);
+                        continue;
+                    }
+                    this._set_prop(actor, 'previous_cell', null);
+                    this._set_prop(actor, 'animation_progress', null);
+                    this._set_prop(actor, 'animation_speed', null);
+                    if (! this.compat.tiles_react_instantly) {
+                        // We need to track the actor AND the cell explicitly, because it's possible
+                        // that one actor's step will cause another actor to start another move, and
+                        // then they'd end up stepping on the new cell they're moving to instead of
+                        // the one they just landed on!
+                        cell_steppers.push([actor, actor.cell]);
+                    }
+                }
+            }
+        }
+        for (let [actor, cell] of cell_steppers) {
+            this.step_on_cell(actor, cell);
+        }
 
-		// Only reset the player's is_pushing between movement, so it lasts for the whole push
-		if (this.player.movement_cooldown <= 0) {
-			this.player.is_pushing = false;
-		}
+        // Only reset the player's is_pushing between movement, so it lasts for the whole push
+        if (this.player.movement_cooldown <= 0) {
+            this.player.is_pushing = false;
+        }
 
-		// Second pass: actors decide their upcoming movement simultaneously
-		// (we'll do the player's decision in part 2!)
-		for (let actor of this.actors) {
-			if (actor != this.player)
-			{
-				this.actor_decision(actor, p1_primary_direction);
-			}
-		}
-	}
-	
-	
-	_advance_tic_part2(p1_primary_direction, p1_secondary_direction) {
-		//player now makes a decision based on input
-		this.actor_decision(this.player, p1_primary_direction);
-		
+        // Second pass: actors decide their upcoming movement simultaneously
+        // (we'll do the player's decision in part 2!)
+        for (let actor of this.actors) {
+            if (actor != this.player)
+            {
+                this.actor_decision(actor, p1_primary_direction);
+            }
+        }
+    }
+    
+    
+    _advance_tic_part2(p1_primary_direction, p1_secondary_direction) {
+        //player now makes a decision based on input
+        this.actor_decision(this.player, p1_primary_direction);
+        
         // Third pass: everyone actually moves
         for (let actor of this.actors) {
             if (! actor.cell)
