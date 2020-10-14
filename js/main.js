@@ -509,6 +509,7 @@ class Player extends PrimaryView {
         this.previous_input = new Set;  // actions that were held last tic
         this.previous_action = null;  // last direction we were moving, if any
         this.current_keys = new Set;  // keys that are currently held
+		this.current_keys_new = new Set; //for keys that have only been held a frame
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
             if (ev.key === 'p' || ev.key === 'Pause') {
@@ -549,6 +550,7 @@ class Player extends PrimaryView {
 
             if (this.key_mapping[ev.key]) {
                 this.current_keys.add(ev.key);
+				this.current_keys_new.add(ev.key);
                 ev.stopPropagation();
                 ev.preventDefault();
 
@@ -699,6 +701,10 @@ class Player extends PrimaryView {
             for (let key of this.current_keys) {
                 input.add(this.key_mapping[key]);
             }
+			for (let key of this.current_keys_new) {
+                input.add(this.key_mapping[key]);
+            }
+			this.current_keys_new = new Set;
             return input;
         }
     }
