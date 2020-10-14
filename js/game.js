@@ -187,7 +187,6 @@ export class Level {
             this.time_remaining = this.stored_level.time_limit * 20;
         }
         this.timer_paused = false
-        this.waiting_for_input = false
         // Note that this clock counts *up*, even on untimed levels, and is unaffected by CC2's
         // clock alteration shenanigans
         this.tic_counter = 0;
@@ -331,15 +330,32 @@ export class Level {
         }
     }
 
+	player_awaiting_input() {
+		//todo: the tic_counter part feels kludgey. maybe there's some other way a wait/wall nudge can wait a certain amount of time per tap?
+		return this.player.movement_cooldown === 0 && this.player.slide_mode === null && this.tic_counter % 2 == 0
+	}
+
     // Move the game state forwards by one tic
-    advance_tic(p1_primary_direction, p1_secondary_direction, force_wait) {
+	// split into two parts for turn-based mode: first part is the consequences of the previous tick, second part depends on the player's input
+    advance_tic(p1_primary_direction, p1_secondary_direction, pass) {
         if (this.state !== 'playing') {
             console.warn(`Level.advance_tic() called when state is ${this.state}`);
             return;
         }
 
         try {
-            this._advance_tic(p1_primary_direction, p1_secondary_direction, force_wait);
+			if (pass == 1)
+			{
+				this._advance_tic_part1(p1_primary_direction, p1_secondary_direction);
+			}
+			else if (pass == 2)
+			{
+				this._advance_tic_part2(p1_primary_direction, p1_secondary_direction);
+			}
+			else
+			{
+				console.warn(`What pass is this?`);
+			}
         }
         catch (e) {
             if (e instanceof GameEnded) {
@@ -350,26 +366,13 @@ export class Level {
             }
         }
 
-        // Commit the undo state at the end of each tic
-        if (!this.waiting_for_input) {
+        // Commit the undo state at the end of each tic (pass 2)
+        if (pass == 2) {
             this.commit();
         }
     }
 
-    _advance_tic(p1_primary_direction, p1_secondary_direction, force_wait) {
-        var skip_to_third_pass = false;
-        
-        //if we're waiting for input, then we want to skip straight to phase 3 with a player decision filled out when they have one ready
-        if (this.waiting_for_input) {
-            this.actor_decision(this.player, p1_primary_direction);
-            if (this.player.decision != null || force_wait) {
-                skip_to_third_pass = true;
-            }
-            else {
-                return;
-            }
-        }
-        
+    _advance_tic_part1(p1_primary_direction, p1_secondary_direction) {
         // Player's secondary direction is set immediately; it applies on arrival to cells even if
         // it wasn't held the last time the player started moving
         this._set_prop(this.player, 'secondary_direction', p1_secondary_direction);
@@ -387,71 +390,64 @@ export class Level {
         // arrival as its own mini pass, for one reason: if the player dies (which will end the game
         // immediately), we still want every time's animation to finish, or it'll look like some
         // objects move backwards when the death screen appears!
-        if (!skip_to_third_pass) {
-            let cell_steppers = [];
-            for (let actor of this.actors) {
-                // Actors with no cell were destroyed
-                if (! actor.cell)
-                    continue;
+		let cell_steppers = [];
+		for (let actor of this.actors) {
+			// Actors with no cell were destroyed
+			if (! actor.cell)
+				continue;
 
-                // Clear any old decisions ASAP.  Note that this prop is only used internally within a
-                // single tic, so it doesn't need to be undoable
-                actor.decision = null;
+			// Clear any old decisions ASAP.  Note that this prop is only used internally within a
+			// single tic, so it doesn't need to be undoable
+			actor.decision = null;
 
-                // Decrement the cooldown here, but don't check it quite yet,
-                // because stepping on cells in the next block might reset it
-                if (actor.movement_cooldown > 0) {
-                    this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
-                }
+			// Decrement the cooldown here, but don't check it quite yet,
+			// because stepping on cells in the next block might reset it
+			if (actor.movement_cooldown > 0) {
+				this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
+			}
 
-                if (actor.animation_speed) {
-                    // Deal with movement animation
-                    this._set_prop(actor, 'animation_progress', actor.animation_progress + 1);
-                    if (actor.animation_progress >= actor.animation_speed) {
-                        if (actor.type.ttl) {
-                            // This is purely an animation so it disappears once it's played
-                            this.remove_tile(actor);
-                            continue;
-                        }
-                        this._set_prop(actor, 'previous_cell', null);
-                        this._set_prop(actor, 'animation_progress', null);
-                        this._set_prop(actor, 'animation_speed', null);
-                        if (! this.compat.tiles_react_instantly) {
-                            // We need to track the actor AND the cell explicitly, because it's possible
-                            // that one actor's step will cause another actor to start another move, and
-                            // then they'd end up stepping on the new cell they're moving to instead of
-                            // the one they just landed on!
-                            cell_steppers.push([actor, actor.cell]);
-                        }
-                    }
-                }
-            }
-            for (let [actor, cell] of cell_steppers) {
-                this.step_on_cell(actor, cell);
-            }
+			if (actor.animation_speed) {
+				// Deal with movement animation
+				this._set_prop(actor, 'animation_progress', actor.animation_progress + 1);
+				if (actor.animation_progress >= actor.animation_speed) {
+					if (actor.type.ttl) {
+						// This is purely an animation so it disappears once it's played
+						this.remove_tile(actor);
+						continue;
+					}
+					this._set_prop(actor, 'previous_cell', null);
+					this._set_prop(actor, 'animation_progress', null);
+					this._set_prop(actor, 'animation_speed', null);
+					if (! this.compat.tiles_react_instantly) {
+						// We need to track the actor AND the cell explicitly, because it's possible
+						// that one actor's step will cause another actor to start another move, and
+						// then they'd end up stepping on the new cell they're moving to instead of
+						// the one they just landed on!
+						cell_steppers.push([actor, actor.cell]);
+					}
+				}
+			}
+		}
+		for (let [actor, cell] of cell_steppers) {
+			this.step_on_cell(actor, cell);
+		}
 
-            // Only reset the player's is_pushing between movement, so it lasts for the whole push
-            if (this.player.movement_cooldown <= 0) {
-                this.player.is_pushing = false;
-            }
+		// Only reset the player's is_pushing between movement, so it lasts for the whole push
+		if (this.player.movement_cooldown <= 0) {
+			this.player.is_pushing = false;
+		}
 
-            // Second pass: actors decide their upcoming movement simultaneously
-            for (let actor of this.actors) {
-                this.actor_decision(actor, p1_primary_direction);
-            }
-        }
-        
-        //in Turn-Based mode, wait for input if the player can voluntarily move on tic_counter % 4 == 0 and isn't
-        if (this.turn_based && this.player.movement_cooldown == 0 && this.player.decision == null && (this.tic_counter % 4 == 0) && !force_wait)
-        {
-            this.waiting_for_input = true;
-            return;
-        }
-        else
-        {
-            this.waiting_for_input = false;
-        }
-
+		// Second pass: actors decide their upcoming movement simultaneously
+		for (let actor of this.actors) {
+			this.actor_decision(actor, p1_primary_direction);
+		}
+	}
+	
+	
+	_advance_tic_part2(p1_primary_direction, p1_secondary_direction) {
+		//player now makes a decision based on input
+		this.actor_decision(this.player, p1_primary_direction);
+		
         // Third pass: everyone actually moves
         for (let actor of this.actors) {
             if (! actor.cell)
@@ -981,8 +977,6 @@ export class Level {
     }
 
     undo() {
-        //ok, actually we're not doing an in-progress move after all.
-        this.waiting_for_input = false;
         this.pending_undo = [];
         this.aid = Math.max(1, this.aid);
 

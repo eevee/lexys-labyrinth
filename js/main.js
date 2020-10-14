@@ -702,6 +702,8 @@ class Player extends PrimaryView {
             return input;
         }
     }
+	
+	waiting_for_input = false;
 
     advance_by(tics) {
         for (let i = 0; i < tics; i++) {
@@ -765,11 +767,41 @@ class Player extends PrimaryView {
             this.previous_input = input;
 
             this.sfx_player.advance_tic();
-            this.level.advance_tic(
-                this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null,
-                this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null,
-                input.has('wait')
-            );
+			
+			var primary_dir = this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null;
+			var secondary_dir =  this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null;
+			
+			//turn based logic
+			//first, handle a part 2 we just got input for
+			if (this.waiting_for_input)
+			{
+				if (!this.turn_based || primary_dir != null || input.has('wait'))
+				{
+					this.level.advance_tic(
+					primary_dir,
+					secondary_dir,
+					2);
+				}
+			}
+			else //TODO: or `if (!this.waiting_for_input)` to be snappier
+			{
+				this.level.advance_tic(
+				primary_dir,
+				secondary_dir,
+				1);
+				//then if we should wait for input, the player needs input and we don't have input, we set waiting_for_input, else we run part 2
+				if (this.turn_based && this.level.player_awaiting_input() && !(primary_dir != null || input.has('wait')))
+				{
+					this.waiting_for_input = true;
+				}
+				else
+				{
+					this.level.advance_tic(
+					primary_dir,
+					secondary_dir,
+					2);
+				}
+			}
 
             if (this.level.state !== 'playing') {
                 // We either won or lost!
