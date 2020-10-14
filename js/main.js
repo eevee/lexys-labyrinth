@@ -796,7 +796,7 @@ class Player extends PrimaryView {
                     
                 }
             }
-            else //TODO: or `if (!this.waiting_for_input)` to be snappier
+            else
             {
                 this.level.advance_tic(
                 primary_dir,
