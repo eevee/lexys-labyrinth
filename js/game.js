@@ -125,6 +125,17 @@ export class Cell extends Array {
         return index;
     }
 
+    get_wired_tile() {
+        let ret = null;
+        for (let tile of this) {
+            if (tile.wire_directions || tile.wire_tunnel_directions) {
+                ret = tile;
+                // Don't break; we want the topmost tile!
+            }
+        }
+        return ret;
+    }
+
     blocks_leaving(actor, direction) {
         for (let tile of this) {
             if (tile !== actor &&
@@ -148,6 +159,8 @@ export class Cell extends Array {
         return false;
     }
 }
+Cell.prototype.was_powered = false;
+Cell.prototype.is_powered = false;
 
 class GameEnded extends Error {}
 
@@ -162,7 +175,7 @@ export class Level {
     }
 
     restart(compat) {
-        this.compat = {};
+        this.compat = compat;
 
         // playing: normal play
         // success: has been won
@@ -205,6 +218,9 @@ export class Level {
 
         let n = 0;
         let connectables = [];
+        // Handle CC2 wiring; a contiguous region of wire is all updated as a single unit, so detect
+        // those units ahead of time for simplicity and call them "clusters"
+        this.wire_clusters = [];
         // FIXME handle traps correctly:
         // - if an actor is in the cell, set the trap to open and unstick everything in it
         for (let y = 0; y < this.height; y++) {
@@ -246,13 +262,11 @@ export class Level {
                     }
                     else if (tile.type.is_actor) {
                         if (has_cloner) {
+                            // TODO is there any reason not to add clone templates to the actor
+                            // list?
                             tile.stuck = true;
                         }
                         else {
-                            if (has_trap) {
-                                // FIXME wait, not if the trap is open!  crap
-                                tile.stuck = true;
-                            }
                             this.actors.push(tile);
                         }
                     }
@@ -272,60 +286,48 @@ export class Level {
             let x = cell.x;
             let y = cell.y;
             let goal = connectable.type.connects_to;
-            let found = false;
 
             // Check for custom wiring, for MSCC .DAT levels
-            let n = x + y * this.width;
-            let target_cell_n = null;
-            if (goal === 'trap') {
-                target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
-            }
-            else if (goal === 'cloner') {
-                target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
-            }
-            if (target_cell_n) {
-                // TODO this N could be outside the map bounds
-                let target_cell_x = target_cell_n % this.width;
-                let target_cell_y = Math.floor(target_cell_n / this.width);
-                for (let tile of this.cells[target_cell_y][target_cell_x]) {
-                    if (tile.type.name === goal) {
-                        connectable.connection = tile;
-                        found = true;
-                        break;
+            if (this.stored_level.has_custom_connections) {
+                let n = this.stored_level.coords_to_scalar(x, y);
+                let target_cell_n = null;
+                if (goal === 'trap') {
+                    target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
+                }
+                else if (goal === 'cloner') {
+                    target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
+                }
+                if (target_cell_n && target_cell_n < this.width * this.height) {
+                    let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
+                    for (let tile of this.cells[ty][tx]) {
+                        if (tile.type.name === goal) {
+                            connectable.connection = tile;
+                            break;
+                        }
                     }
                 }
-                if (found)
-                    continue;
+                continue;
             }
 
             // Otherwise, look in reading order
-            let direction = 1;
-            if (connectable.type.connect_order === 'backward') {
-                direction = -1;
+            for (let tile of this.iter_tiles_in_reading_order(cell, goal)) {
+                // TODO ideally this should be a weak connection somehow, since dynamite can destroy
+                // empty cloners and probably traps too
+                connectable.connection = tile;
+                // Just grab the first
+                break;
             }
-            for (let i = 0; i < num_cells - 1; i++) {
-                x += direction;
-                if (x >= this.width) {
-                    x -= this.width;
-                    y = (y + 1) % this.height;
-                }
-                else if (x < 0) {
-                    x += this.width;
-                    y = (y - 1 + this.height) % this.height;
-                }
+        }
 
-                for (let tile of this.cells[y][x]) {
-                    if (tile.type.name === goal) {
-                        // TODO should be weak, but you can't destroy cloners so in practice not a concern
-                        connectable.connection = tile;
-                        found = true;
-                        break;
+        // Finally, let all tiles do any custom init behavior
+        for (let row of this.cells) {
+            for (let cell of row) {
+                for (let tile of cell) {
+                    if (tile.type.on_ready) {
+                        tile.type.on_ready(tile, this);
                     }
                 }
-                if (found)
-                    break;
             }
-            // TODO soft warn for e.g. a button with no cloner?  (or a cloner with no button?)
         }
     }
 
@@ -430,6 +432,9 @@ export class Level {
             this.step_on_cell(actor, cell);
         }
 
+        // Now we handle wiring
+        this.update_wiring();
+
         // Only reset the player's is_pushing between movement, so it lasts for the whole push
         if (this.player.movement_cooldown <= 0) {
             this.player.is_pushing = false;
@@ -477,7 +482,7 @@ export class Level {
             if (actor.type.is_player && dir2 &&
                 ! old_cell.blocks_leaving(actor, dir2))
             {
-                let neighbor = this.cell_with_offset(old_cell, dir2);
+                let neighbor = this.get_neighboring_cell(old_cell, dir2);
                 if (neighbor) {
                     let could_push = ! neighbor.blocks_entering(actor, dir2, this, true);
                     for (let tile of Array.from(neighbor)) {
@@ -544,10 +549,6 @@ export class Level {
         if (actor.movement_cooldown > 0)
             return;
 
-        // XXX does the cooldown drop while in a trap?  is this even right?
-        if (actor.stuck && ! actor.type.is_player)
-            return;
-
         // Teeth can only move the first 4 of every 8 tics, though "first"
         // can be adjusted
         if (actor.slide_mode == null &&
@@ -558,10 +559,15 @@ export class Level {
         }
 
         let direction_preference;
-        // Actors can't make voluntary moves on ice, so they're stuck with
-        // whatever they've got
+        if (this.compat.sliding_tanks_ignore_button &&
+            actor.slide_mode && actor.pending_reverse)
+        {
+            this._set_prop(actor, 'pending_reverse', false);
+        }
         if (actor.slide_mode === 'ice') {
-            direction_preference = [actor.direction];
+            // Actors can't make voluntary moves on ice; they just slide
+            actor.decision = actor.direction;
+            return;
         }
         else if (actor.slide_mode === 'force') {
             // Only the player can make voluntary moves on a force floor,
@@ -574,28 +580,38 @@ export class Level {
                 p1_primary_direction &&
                 actor.last_move_was_force)
             {
-                if (p1_primary_direction != null)
-                {
-                    direction_preference = [p1_primary_direction];
-                    this._set_prop(actor, 'last_move_was_force', false);
-                }
+                actor.decision = p1_primary_direction;
+                this._set_prop(actor, 'last_move_was_force', false);
             }
             else {
-                direction_preference = [actor.direction];
+                actor.decision = actor.direction;
                 if (actor === this.player) {
                     this._set_prop(actor, 'last_move_was_force', true);
                 }
             }
+            return;
         }
         else if (actor === this.player) {
             if (p1_primary_direction) {
-                direction_preference = [p1_primary_direction];
+                actor.decision = p1_primary_direction;
                 this._set_prop(actor, 'last_move_was_force', false);
             }
+            return;
         }
         else if (actor.type.movement_mode === 'forward') {
-            // blue tank behavior: keep moving forward
-            direction_preference = [actor.direction];
+            // blue tank behavior: keep moving forward, reverse if the flag is set
+            let direction = actor.direction;
+            if (actor.pending_reverse) {
+                direction = DIRECTIONS[actor.direction].opposite;
+                this._set_prop(actor, 'pending_reverse', false);
+            }
+            // Tanks are controlled explicitly so they don't check if they're blocked
+            // TODO tanks in traps turn around, but tanks on cloners do not, and i use the same
+            // prop for both
+            if (! actor.cell.some(tile => tile.type.name === 'cloner')) {
+                actor.decision = direction;
+            }
+            return;
         }
         else if (actor.type.movement_mode === 'follow-left') {
             // bug behavior: always try turning as left as possible, and
@@ -677,15 +693,9 @@ export class Level {
 
         // Check which of those directions we *can*, probably, move in
         // TODO i think player on force floor will still have some issues here
-        if (direction_preference) {
-            // Players and sliding actors always move the way they want, even if blocked
-            if (actor.type.is_player || actor.slide_mode) {
-                actor.decision = direction_preference[0];
-                return;
-            }
-
+        if (direction_preference && ! actor.stuck) {
             for (let direction of direction_preference) {
-                let dest_cell = this.cell_with_offset(actor.cell, direction);
+                let dest_cell = this.get_neighboring_cell(actor.cell, direction);
                 if (! dest_cell)
                     continue;
 
@@ -717,7 +727,7 @@ export class Level {
 
         let move = DIRECTIONS[direction].movement;
         if (!actor.cell) console.error(actor);
-        let goal_cell = this.cell_with_offset(actor.cell, direction);
+        let goal_cell = this.get_neighboring_cell(actor.cell, direction);
 
         // TODO this could be a lot simpler if i could early-return!  should ice bumping be
         // somewhere else?
@@ -911,7 +921,7 @@ export class Level {
                 }
                 this.remove_tile(tile);
             }
-            else if (tile.type.is_teleporter) {
+            else if (tile.type.teleport_dest_order) {
                 teleporter = tile;
             }
             else if (tile.type.on_arrive) {
@@ -922,46 +932,184 @@ export class Level {
         // Handle teleporting, now that the dust has cleared
         // FIXME something funny happening here, your input isn't ignore while walking out of it?
         if (teleporter) {
-            let goal = teleporter;
-            // TODO in pathological cases this might infinite loop
-            while (true) {
-                goal = goal.connection;
-
+            for (let dest of teleporter.type.teleport_dest_order(teleporter, this)) {
                 // Teleporters already containing an actor are blocked and unusable
-                if (goal.cell.some(tile => tile.type.is_actor && tile !== actor))
+                if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
                     continue;
 
                 // Physically move the actor to the new teleporter
                 // XXX is this right, compare with tile world?  i overhear it's actually implemented as a slide?
                 // XXX not especially undo-efficient
                 this.remove_tile(actor);
-                this.add_tile(actor, goal.cell);
+                this.add_tile(actor, dest.cell);
                 if (this.attempt_step(actor, actor.direction)) {
                     // Success, teleportation complete
                     // Sound plays from the origin cell simply because that's where the sfx player
-                    // thinks the player is currently
-                    this.sfx.play_once('teleport', cell);
+                    // thinks the player is currently; position isn't updated til next turn
+                    this.sfx.play_once('teleport', dest.cell);
                     break;
                 }
-                if (goal === teleporter)
-                    // We've tried every teleporter, including the one they
-                    // stepped on, so leave them on it
-                    break;
-
-                // Otherwise, try the next one
             }
         }
     }
 
-    cell_with_offset(cell, direction) {
+    // Update the state of all wired tiles in the game.
+    // XXX need to be clear on the order of events here.  say everything starts out unpowered.
+    // then:
+    // 1. you step on a pink button, which flags itself as going to be powered next frame
+    // 2. this pass happens.  every unpowered-but-wired cell is inspected.  if a powered one is
+    // found, floodfill from there
+    // FIXME can probably skip this if we know there are no wires at all, like in a CCL, or just an
+    // unwired map
+    // FIXME this feels inefficient.  most of the time none of the inputs have changed so none of
+    // this needs to happen at all
+    // FIXME none of this is currently undoable
+    update_wiring() {
+        // Turn off power to every cell
+        // TODO wonder if i need a linear cell list, or even a flat list of all tiles (that sounds
+        // like hell to keep updated though)
+        for (let row of this.cells) {
+            for (let cell of row) {
+                cell.was_powered = cell.is_powered;
+                cell.is_powered = false;
+            }
+        }
+
+        // Iterate through the grid looking for emitters — tiles that are generating current — and
+        // propagated it via flood-fill through neighboring wires
+        for (let row of this.cells) {
+            for (let cell of row) {
+                // TODO probably this should set a prop on the tile
+                if (! cell.some(tile => tile.type.is_emitting && tile.type.is_emitting(tile, this)))
+                    continue;
+
+                // We have an emitter!  Flood-fill outwards
+                let neighbors = [cell];
+                for (let neighbor of neighbors) {
+                    // Power it even if it's not wired itself, so that e.g. purple tiles work
+                    neighbor.is_powered = true;
+
+                    let wire = neighbor.get_wired_tile();
+                    if (! wire)
+                        continue;
+
+                    // Emit along every wire direction, and add any unpowered neighbors to the
+                    // pending list to continue the floodfill
+                    // TODO but only if wires connect
+                    // TODO handle wire tunnels
+                    for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
+                        if (! (wire.wire_directions & dirinfo.bit))
+                            continue;
+
+                        let neighbor2, wire2;
+                        let opposite_bit = DIRECTIONS[dirinfo.opposite].bit;
+                        if (wire.wire_tunnel_directions & dirinfo.bit) {
+                            // Search in the given direction until we find a matching tunnel
+                            // FIXME these act like nested parens!
+                            let x = neighbor.x;
+                            let y = neighbor.y;
+                            let nesting = 0;
+                            while (true) {
+                                x += dirinfo.movement[0];
+                                y += dirinfo.movement[1];
+                                if (! this.is_point_within_bounds(x, y))
+                                    break;
+
+                                let candidate = this.cells[y][x];
+                                wire2 = candidate.get_wired_tile();
+                                if (wire2 && (wire2.wire_tunnel_directions ?? 0) & opposite_bit) {
+                                    neighbor2 = candidate;
+                                    break;
+                                }
+                            }
+                        }
+                        else {
+                            // Otherwise this is easy
+                            neighbor2 = this.get_neighboring_cell(neighbor, direction);
+                            wire2 = neighbor2.get_wired_tile();
+                        }
+
+                        if (neighbor2 && ! neighbor2.is_powered &&
+                            // Unwired tiles are OK; they might be something activated by power.
+                            // Wired tiles that do NOT connect to us are ignored.
+                            (! wire2 || wire2.wire_directions & opposite_bit))
+                        {
+                            neighbors.push(neighbor2);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Inform any affected cells of power changes
+        for (let row of this.cells) {
+            for (let cell of row) {
+                if (cell.was_powered !== cell.is_powered) {
+                    let method = cell.is_powered ? 'on_power' : 'on_depower';
+                    for (let tile of cell) {
+                        if (tile.type[method]) {
+                            tile.type[method](tile, this);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Performs a depth-first search for connected wires and wire objects, extending out from the
+    // given starting cell
+    *follow_circuit(cell) {
+    }
+
+    // -------------------------------------------------------------------------
+    // Board inspection
+
+    is_point_within_bounds(x, y) {
+        return (x >= 0 && x < this.width && y >= 0 && y < this.height);
+    }
+
+    get_neighboring_cell(cell, direction) {
         let move = DIRECTIONS[direction].movement;
         let goal_x = cell.x + move[0];
         let goal_y = cell.y + move[1];
-        if (goal_x >= 0 && goal_x < this.width && goal_y >= 0 && goal_y < this.height) {
+        if (this.is_point_within_bounds(goal_x, goal_y)) {
             return this.cells[goal_y][goal_x];
         }
         else {
             return null;
+        }
+    }
+
+    // Iterates over the grid in (reverse?) reading order and yields all tiles with the given name.
+    // The starting cell is iterated last.
+    *iter_tiles_in_reading_order(start_cell, name, reverse = false) {
+        let x = start_cell.x;
+        let y = start_cell.y;
+        while (true) {
+            if (reverse) {
+                x -= 1;
+                if (x < 0) {
+                    x = this.width - 1;
+                    y = (y - 1 + this.height) % this.height;
+                }
+            }
+            else {
+                x += 1;
+                if (x >= this.width) {
+                    x = 0;
+                    y = (y + 1) % this.height;
+                }
+            }
+
+            let cell = this.cells[y][x];
+            for (let tile of cell) {
+                if (tile.type.name === name) {
+                    yield tile;
+                }
+            }
+
+            if (cell === start_cell)
+                return;
         }
     }
 
@@ -1119,8 +1267,8 @@ export class Level {
     spawn_animation(cell, name) {
         let type = TILE_TYPES[name];
         let tile = new Tile(type);
-        tile.animation_speed = type.ttl;
-        tile.animation_progress = 0;
+        this._set_prop(tile, 'animation_speed', tile.type.ttl);
+        this._set_prop(tile, 'animation_progress', 0);
         cell._add(tile);
         this.actors.push(tile);
         this.pending_undo.push(() => {
@@ -1144,6 +1292,7 @@ export class Level {
         }
     }
 
+    // Give an item to an actor, even if it's not supposed to have an inventory
     give_actor(actor, name) {
         if (! actor.type.is_actor)
             return false;

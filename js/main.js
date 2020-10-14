@@ -5,120 +5,15 @@ import * as c2m from './format-c2m.js';
 import * as dat from './format-dat.js';
 import * as format_util from './format-util.js';
 import { Level } from './game.js';
+import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay } from './main-base.js';
+import { Editor } from './main-editor.js';
 import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
 import { Tileset, CC2_TILESET_LAYOUT, LL_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
-import { random_choice, mk, mk_svg, promise_event, fetch, walk_grid } from './util.js';
+import { random_choice, mk, mk_svg, promise_event, fetch } from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
-// Stackable modal overlay of some kind, usually a dialog
-class Overlay {
-    constructor(conductor, root) {
-        this.conductor = conductor;
-        this.root = root;
-
-        // Don't propagate clicks on the root element, so they won't trigger a
-        // parent overlay's automatic dismissal
-        this.root.addEventListener('click', ev => {
-            ev.stopPropagation();
-        });
-    }
-
-    open() {
-        // FIXME ah, but keystrokes can still go to the game, including
-        // spacebar to begin it if it was waiting.  how do i completely disable
-        // an entire chunk of the page?
-        if (this.conductor.player.state === 'playing') {
-            this.conductor.player.set_state('paused');
-        }
-
-        let overlay = mk('div.overlay', this.root);
-        document.body.append(overlay);
-
-        // Remove the overlay when clicking outside the element
-        overlay.addEventListener('click', ev => {
-            this.close();
-        });
-    }
-
-    close() {
-        this.root.closest('.overlay').remove();
-    }
-}
-
-// Overlay styled like a dialog box
-class DialogOverlay extends Overlay {
-    constructor(conductor) {
-        super(conductor, mk('div.dialog'));
-
-        this.root.append(
-            this.header = mk('header'),
-            this.main = mk('section'),
-            this.footer = mk('footer'),
-        );
-    }
-
-    set_title(title) {
-        this.header.textContent = '';
-        this.header.append(mk('h1', {}, title));
-    }
-
-    add_button(label, onclick) {
-        let button = mk('button', {type: 'button'}, label);
-        button.addEventListener('click', onclick);
-        this.footer.append(button);
-    }
-}
-
-// Yes/no popup dialog
-class ConfirmOverlay extends DialogOverlay {
-    constructor(conductor, message, what) {
-        super(conductor);
-        this.set_title("just checking");
-        this.main.append(mk('p', {}, message));
-        let yes = mk('button', {type: 'button'}, "yep");
-        let no = mk('button', {type: 'button'}, "nope");
-        yes.addEventListener('click', ev => {
-            this.close();
-            what();
-        });
-        no.addEventListener('click', ev => {
-            this.close();
-        });
-        this.footer.append(yes, no);
-    }
-}
-
-
-// -------------------------------------------------------------------------------------------------
-// Main display...  modes
-
-class PrimaryView {
-    constructor(conductor, root) {
-        this.conductor = conductor;
-        this.root = root;
-        this.active = false;
-        this._done_setup = false;
-    }
-
-    setup() {}
-
-    activate() {
-        this.root.removeAttribute('hidden');
-        this.active = true;
-        if (! this._done_setup) {
-            this.setup();
-            this._done_setup = true;
-        }
-    }
-
-    deactivate() {
-        this.root.setAttribute('hidden', '');
-        this.active = false;
-    }
-}
-
 
 // TODO:
 // - level password, if any
@@ -215,7 +110,13 @@ const OBITUARIES = {
 // Helper class used to let the game play sounds without knowing too much about the Player
 class SFXPlayer {
     constructor() {
-        this.ctx = new window.AudioContext;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext);  // come the fuck on, safari
+        // This automatically reduces volume when a lot of sound effects are playing at once
+        this.compressor_node = this.ctx.createDynamicsCompressor();
+        this.compressor_node.threshold.value = -40;
+        this.compressor_node.ratio.value = 16;
+        this.compressor_node.connect(this.ctx.destination);
+
         this.player_x = null;
         this.player_y = null;
         this.sounds = {};
@@ -310,17 +211,17 @@ class SFXPlayer {
             let dist = Math.sqrt(dx*dx + dy*dy);
             let gain = this.ctx.createGain();
             // x/(x + a) is a common and delightful way to get an easy asymptote and output between
-            // 0 and 1.  Here, the result is above 80% for almost everything on screen; drops down
-            // to 50% for things 20 tiles away (which is, roughly, the periphery when standing in
-            // the center of a CC1 map), and bottoms out at 12.5% for standing in one corner of a
+            // 0 and 1.  Here, the result is above 2/3 for almost everything on screen; drops down
+            // to 1/3 for things 20 tiles away (which is, roughly, the periphery when standing in
+            // the center of a CC1 map), and bottoms out at 1/15 for standing in one corner of a
             // CC2 map of max size and hearing something on the far opposite corner.
-            gain.gain.value = 1 - dist / (dist + 20);
+            gain.gain.value = 1 - dist / (dist + 10);
             node.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(this.compressor_node);
         }
         else {
             // Play at full volume
-            node.connect(this.ctx.destination);
+            node.connect(this.compressor_node);
         }
         node.start(this.ctx.currentTime);
     }
@@ -355,7 +256,12 @@ class Player extends PrimaryView {
         this.scale = 1;
 
         this.compat = {
+            popwalls_react_on_arrive: false,
+            auto_convert_ccl_popwalls: true,
+            auto_convert_ccl_blue_walls: true,
+            sliding_tanks_ignore_button: true,
             tiles_react_instantly: false,
+            allow_flick: false,
         };
 
         this.root.style.setProperty('--tile-width', `${this.conductor.tileset.size_x}px`);
@@ -508,6 +414,7 @@ class Player extends PrimaryView {
         let key_target = document.body;
         this.previous_input = new Set;  // actions that were held last tic
         this.previous_action = null;  // last direction we were moving, if any
+        this.using_touch = false;  // true if using touch controls
         this.current_keys = new Set;  // keys that are currently held
         this.current_keys_new = new Set; //for keys that have only been held a frame
         // TODO this could all probably be more rigorous but it's fine for now
@@ -554,6 +461,7 @@ class Player extends PrimaryView {
                 ev.stopPropagation();
                 ev.preventDefault();
 
+                // TODO for demo compat, this should happen as part of input reading?
                 if (this.state === 'waiting') {
                     this.set_state('playing');
                 }
@@ -572,13 +480,97 @@ class Player extends PrimaryView {
                 ev.preventDefault();
             }
         });
+        // Similarly, grab touch events and translate them to directions
+        this.current_touches = {};  // ident => action
+        let touch_target = this.root.querySelector('.-main-area');
+        let collect_touches = ev => {
+            ev.stopPropagation();
+            ev.preventDefault();
+
+            // If state is anything other than playing/waiting, probably switch to playing, similar
+            // to pressing spacebar
+            if (ev.type === 'touchstart') {
+                if (this.state === 'paused') {
+                    this.toggle_pause();
+                    return;
+                }
+                else if (this.state === 'stopped') {
+                    if (this.level.state === 'success') {
+                        // Advance to the next level
+                        // TODO game ending?
+                        // TODO this immediately begins it too, not sure why
+                        this.conductor.change_level(this.conductor.level_index + 1);
+                    }
+                    else {
+                        // Restart
+                        this.restart_level();
+                    }
+                    return;
+                }
+            }
+
+            // Figure out where these touches are, relative to the game area
+            // TODO allow starting a level without moving?
+            let rect = touch_target.getBoundingClientRect();
+            for (let touch of ev.changedTouches) {
+                // Normalize touch coordinates to [-1, 1]
+                let rx = (touch.clientX - rect.left) / rect.width * 2 - 1;
+                let ry = (touch.clientY - rect.top) / rect.height * 2 - 1;
+                // Divine a direction from the results
+                let action;
+                if (Math.abs(rx) > Math.abs(ry)) {
+                    if (rx < 0) {
+                        action = 'left';
+                    }
+                    else {
+                        action = 'right';
+                    }
+                }
+                else {
+                    if (ry < 0) {
+                        action = 'up';
+                    }
+                    else {
+                        action = 'down';
+                    }
+                }
+                this.current_touches[touch.identifier] = action;
+            }
+
+            // TODO for demo compat, this should happen as part of input reading?
+            if (this.state === 'waiting') {
+                this.set_state('playing');
+            }
+        };
+        touch_target.addEventListener('touchstart', collect_touches);
+        touch_target.addEventListener('touchmove', collect_touches);
+        let dismiss_touches = ev => {
+            for (let touch of ev.changedTouches) {
+                delete this.current_touches[touch.identifier];
+            }
+        };
+        touch_target.addEventListener('touchend', dismiss_touches);
+        touch_target.addEventListener('touchcancel', dismiss_touches);
 
         // When we lose focus, act as though every key was released, and pause the game
         window.addEventListener('blur', ev => {
             this.current_keys.clear();
+            this.current_touches = {};
 
             if (this.state === 'playing' || this.state === 'rewinding') {
-                this.set_state('paused');
+                this.autopause();
+            }
+        });
+        // Same when the window becomes hidden (especially important on phones, where this covers
+        // turning the screen off!)
+        document.addEventListener('visibilitychange', ev => {
+            if (document.visibilityState === 'hidden') {
+                this.current_keys.clear();
+                this.current_touches = {};
+
+                if (this.state === 'playing' || this.state === 'rewinding') {
+                    this.autopause();
+                }
             }
         });
 
@@ -638,7 +630,7 @@ class Player extends PrimaryView {
         }
         this.conductor.save_savefile();
 
-        this.level = new Level(stored_level, this.compat);
+        this.level = new Level(stored_level, this.gather_compat_options(stored_level));
         this.level.sfx = this.sfx_player;
         this.renderer.set_level(this.level);
         this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
@@ -648,8 +640,18 @@ class Player extends PrimaryView {
     }
 
     restart_level() {
-        this.level.restart(this.compat);
+        this.level.restart(this.gather_compat_options(this.level.stored_level));
         this._clear_state();
+    }
+
+    gather_compat_options(stored_level) {
+        let ret = {};
+        if (stored_level.use_ccl_compat) {
+            for (let [key, value] of Object.entries(this.compat)) {
+                ret[key] = value;
+            }
+        }
+        return ret;
     }
 
     // Call after loading or restarting a level
@@ -705,6 +707,9 @@ class Player extends PrimaryView {
                 input.add(this.key_mapping[key]);
             }
             this.current_keys_new = new Set;
+            for (let action of Object.values(this.current_touches)) {
+                input.add(action);
+            }
             return input;
         }
     }
@@ -929,9 +934,9 @@ class Player extends PrimaryView {
             this.time_el.textContent = '---';
         }
         else {
-            this.time_el.textContent = Math.ceil(this.level.time_remaining / 20);
-            this.time_el.classList.toggle('--warning', this.level.time_remaining < 30 * 20);
-            this.time_el.classList.toggle('--danger', this.level.time_remaining < 10 * 20);
+            this.time_el.textContent = Math.ceil(this.level.time_remaining / TICS_PER_SECOND);
+            this.time_el.classList.toggle('--warning', this.level.time_remaining < 30 * TICS_PER_SECOND);
+            this.time_el.classList.toggle('--danger', this.level.time_remaining < 10 * TICS_PER_SECOND);
         }
 
         this.bonus_el.textContent = this.level.bonus_points;
@@ -980,6 +985,10 @@ class Player extends PrimaryView {
         }
     }
 
+    autopause() {
+        this.set_state('paused');
+    }
+
     // waiting: haven't yet pressed a key so the timer isn't going
     // playing: playing normally
     // paused: um, paused
@@ -1004,7 +1013,12 @@ class Player extends PrimaryView {
         else if (this.state === 'paused') {
             overlay_reason = 'paused';
             overlay_bottom = "/// paused ///";
-            overlay_keyhint = "press P to resume";
+            if (this.using_touch) {
+                overlay_keyhint = "tap to resume";
+            }
+            else {
+                overlay_keyhint = "press P to resume";
+            }
         }
         else if (this.state === 'stopped') {
             if (this.level.state === 'failure') {
@@ -1012,7 +1026,13 @@ class Player extends PrimaryView {
                 overlay_top = "whoops";
                 let obits = OBITUARIES[this.level.fail_reason] ?? OBITUARIES['generic'];
                 overlay_bottom = random_choice(obits);
-                overlay_keyhint = "press space to try again, or Z to rewind";
+                if (this.using_touch) {
+                    // TODO touch gesture to rewind?
+                    overlay_keyhint = "tap to try again, or tap undo/rewind above";
+                }
+                else {
+                    overlay_keyhint = "press space to try again, or Z to rewind";
+                }
             }
             else {
                 // We just beat the level!  Hey, that's cool.
@@ -1023,7 +1043,9 @@ class Player extends PrimaryView {
                 let savefile = this.conductor.current_pack_savefile;
                 let old_scorecard;
                 if (! savefile.scorecards[level_index] ||
-                    savefile.scorecards[level_index].score < scorecard.score)
+                    savefile.scorecards[level_index].score < scorecard.score ||
+                    (savefile.scorecards[level_index].score === scorecard.score &&
+                        savefile.scorecards[level_index].aid > scorecard.aid))
                 {
                     old_scorecard = savefile.scorecards[level_index];
 
@@ -1045,7 +1067,7 @@ class Player extends PrimaryView {
                 // TODO done on first try; took many tries
                 let time_left_fraction = null;
                 if (this.level.time_remaining !== null && this.level.stored_level.time_limit !== null) {
-                    time_left_fraction = this.level.time_remaining / 20 / this.level.stored_level.time_limit;
+                    time_left_fraction = this.level.time_remaining / TICS_PER_SECOND / this.level.stored_level.time_limit;
                 }
 
                 if (this.level.chips_remaining > 0) {
@@ -1075,7 +1097,12 @@ class Player extends PrimaryView {
                         "alphanumeric!", "nice dynamic typing!", 
                     ]);
                 }
-                overlay_keyhint = "press space to move on";
+                if (this.using_touch) {
+                    overlay_keyhint = "tap to move on";
+                }
+                else {
+                    overlay_keyhint = "press space to move on";
+                }
 
                 overlay_middle = mk('dl.score-chart',
                     mk('dt', "base score"),
@@ -1207,14 +1234,23 @@ class Player extends PrimaryView {
     // Auto-size the game canvas to fit the screen, if possible
     adjust_scale() {
         // TODO make this optional
-        // The base size is the size of the canvas, i.e. the viewport size times the tile size --
-        // but note that horizontally we have 4 extra tiles for the inventory
-        // TODO if there's ever a portrait view for phones, this will need adjusting
-        let base_x = this.conductor.tileset.size_x * (this.renderer.viewport_size_x + 4);
-        let base_y = this.conductor.tileset.size_y * this.renderer.viewport_size_y;
-        // The main UI is centered in a flex item with auto margins, so the
-        // extra space available is the size of those margins
         let style = window.getComputedStyle(this.root);
+        let is_portrait = !! style.getPropertyValue('--is-portrait');
+        // The base size is the size of the canvas, i.e. the viewport size times the tile size --
+        // but note that we have 2x4 extra tiles for the inventory depending on layout
+        // TODO if there's ever a portrait view for phones, this will need adjusting
+        let base_x, base_y;
+        if (is_portrait) {
+            base_x = this.conductor.tileset.size_x * this.renderer.viewport_size_x;
+            base_y = this.conductor.tileset.size_y * (this.renderer.viewport_size_y + 2);
+        }
+        else {
+            base_x = this.conductor.tileset.size_x * (this.renderer.viewport_size_x + 4);
+            base_y = this.conductor.tileset.size_y * this.renderer.viewport_size_y;
+        }
+        // The main UI is centered in a flex item with auto margins, so the extra space available is
+        // the size of those margins (which naturally discounts the size of the buttons and music
+        // title and whatnot, so those automatically reserve their own space)
         if (style['display'] === 'none') {
             // the computed margins can be 'auto' in this case
             return;
@@ -1226,9 +1262,10 @@ class Player extends PrimaryView {
         let total_x = extra_x + this.renderer.canvas.offsetWidth + this.inventory_el.offsetWidth;
         let total_y = extra_y + this.renderer.canvas.offsetHeight;
         let dpr = window.devicePixelRatio || 1.0;
-        // Divide to find the biggest scale that still fits.  But don't
-        // exceed 90% of the available space, or it'll feel cramped.
-        let scale = Math.floor(0.9 * dpr * Math.min(total_x / base_x, total_y / base_y));
+        // Divide to find the biggest scale that still fits.  But don't exceed 90% of the available
+        // space, or it'll feel cramped (except on small screens, where being too small HURTS).
+        let maxfrac = total_x < 800 ? 1 : 0.9;
+        let scale = Math.floor(maxfrac * dpr * Math.min(total_x / base_x, total_y / base_y));
         if (scale <= 1) {
             scale = 1;
         }
@@ -1239,486 +1276,6 @@ class Player extends PrimaryView {
 
         this.scale = scale;
         this.root.style.setProperty('--scale', scale);
-    }
-}
-
-
-class EditorShareOverlay extends DialogOverlay {
-    constructor(conductor, url) {
-        super(conductor);
-        this.set_title("give this to friends");
-        this.main.append(mk('p', "Give this URL out to let others try your level:"));
-        this.main.append(mk('p.editor-share-url', {}, url));
-        let copy_button = mk('button', {type: 'button'}, "Copy to clipboard");
-        copy_button.addEventListener('click', ev => {
-            navigator.clipboard.writeText(url);
-            // TODO feedback?
-        });
-        this.main.append(copy_button);
-
-        let ok = mk('button', {type: 'button'}, "neato");
-        ok.addEventListener('click', ev => {
-            this.close();
-        });
-        this.footer.append(ok);
-    }
-}
-
-const EDITOR_TOOLS = [{
-    mode: 'pencil',
-    icon: 'icons/tool-pencil.png',
-    name: "Pencil",
-    desc: "Draw individual tiles",
-/* TODO not implemented
-}, {
-    mode: 'line',
-    icon: 'icons/tool-line.png',
-    name: "Line",
-    desc: "Draw straight lines",
-}, {
-    mode: 'box',
-    icon: 'icons/tool-box.png',
-    name: "Box",
-    desc: "Fill a rectangular area with tiles",
-}, {
-    mode: 'fill',
-    icon: 'icons/tool-fill.png',
-    name: "Fill",
-    desc: "Flood-fill an area with tiles",
-*/
-}, {
-    mode: 'force-floors',
-    icon: 'icons/tool-force-floors.png',
-    name: "Force floors",
-    desc: "Draw force floors in the direction you draw",
-}, {
-    mode: 'adjust',
-    icon: 'icons/tool-adjust.png',
-    name: "Adjust",
-    desc: "Toggle blocks and rotate actors",
-/* TODO not implemented
-}, {
-    mode: 'connect',
-    icon: 'icons/tool-connect.png',
-    name: "Connect",
-    desc: "Set up CC1 clone and trap connections",
-}, {
-    mode: 'wire',
-    icon: 'icons/tool-wire.png',
-    name: "Wire",
-    desc: "Draw CC2 wiring",
-    // TODO text tool; thin walls tool; ice tool; map generator?; subtools for select tool (copy, paste, crop)
-    // TODO interesting option: rotate an actor as you draw it by dragging?  or hold a key like in
-    // slade when you have some selected?
-    // TODO ah, railroads...
-*/
-}];
-// Tiles the "adjust" tool will turn into each other
-const EDITOR_ADJUST_TOGGLES = {
-    floor_custom_green: 'wall_custom_green',
-    floor_custom_pink: 'wall_custom_pink',
-    floor_custom_yellow: 'wall_custom_yellow',
-    floor_custom_blue: 'wall_custom_blue',
-    wall_custom_green: 'floor_custom_green',
-    wall_custom_pink: 'floor_custom_pink',
-    wall_custom_yellow: 'floor_custom_yellow',
-    wall_custom_blue: 'floor_custom_blue',
-    fake_floor: 'fake_wall',
-    fake_wall: 'fake_floor',
-    wall_invisible: 'wall_appearing',
-    wall_appearing: 'wall_invisible',
-    green_floor: 'green_wall',
-    green_wall: 'green_floor',
-    green_bomb: 'green_chip',
-    green_chip: 'green_bomb',
-    purple_floor: 'purple_wall',
-    purple_wall: 'purple_floor',
-    thief_keys: 'thief_tools',
-    thief_tools: 'thief_keys',
-};
-// TODO this MUST use a cc2 tileset!
-const EDITOR_PALETTE = [{
-    title: "Basics",
-    tiles: [
-        'player',
-        'chip', 'chip_extra',
-        'floor', 'wall', 'hint', 'socket', 'exit',
-    ],
-}, {
-    title: "Terrain",
-    tiles: [
-        'popwall',
-        'fake_floor', 'fake_wall',
-        'wall_invisible', 'wall_appearing',
-        'gravel',
-        'dirt',
-        'door_blue', 'door_red', 'door_yellow', 'door_green',
-        'water', 'turtle', 'fire',
-        'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
-        'force_floor_n', 'force_floor_s', 'force_floor_w', 'force_floor_e', 'force_floor_all',
-    ],
-}, {
-    title: "Items",
-    tiles: [
-        'key_blue', 'key_red', 'key_yellow', 'key_green',
-        'flippers', 'fire_boots', 'cleats', 'suction_boots',
-    ],
-}, {
-    title: "Creatures",
-    tiles: [
-        'tank_blue',
-        'ball',
-        'fireball',
-        'glider',
-        'bug',
-        'paramecium',
-        'walker',
-        'teeth',
-        'blob',
-    ],
-}, {
-    title: "Mechanisms",
-    tiles: [
-        'bomb',
-        'dirt_block',
-        'ice_block',
-        'button_blue',
-        'button_red', 'cloner',
-        'button_brown', 'trap',
-        'teleport_blue',
-        'teleport_red',
-        'teleport_green',
-        'teleport_yellow',
-    ],
-}];
-class Editor extends PrimaryView {
-    constructor(conductor) {
-        super(conductor, document.body.querySelector('main#editor'));
-
-        // FIXME don't hardcode size here, convey this to renderer some other way
-        this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
-
-        // FIXME need this in load_level which is called even if we haven't been setup yet
-        this.connections_g = mk_svg('g');
-    }
-
-    setup() {
-        // Level canvas and mouse handling
-        // This SVG draws vectors on top of the editor, like monster paths and button connections
-        // FIXME change viewBox in load_level, can't right now because order of ops
-        this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'}, this.connections_g);
-        this.root.querySelector('.level').append(
-            this.renderer.canvas,
-            this.svg_overlay);
-        this.mouse_mode = null;
-        this.mouse_button = null;
-        this.mouse_cell = null;
-        this.renderer.canvas.addEventListener('mousedown', ev => {
-            if (ev.button === 0) {
-                // Left button: draw
-                this.mouse_mode = 'draw';
-                this.mouse_button_mask = 1;
-                this.mouse_coords = [ev.clientX, ev.clientY];
-
-                let [x, y] = this.renderer.cell_coords_from_event(ev);
-                this.mouse_cell = [x, y];
-
-                if (this.current_tool === 'pencil') {
-                    this.place_in_cell(x, y, this.palette_selection);
-                }
-                else if (this.current_tool === 'force-floors') {
-                    // Begin by placing an all-way force floor under the mouse
-                    this.place_in_cell(x, y, 'force_floor_all');
-                }
-                else if (this.current_tool === 'adjust') {
-                    let cell = this.stored_level.cells[y][x];
-                    for (let tile of cell) {
-                        // Toggle tiles that go in obvious pairs
-                        let other = EDITOR_ADJUST_TOGGLES[tile.type.name];
-                        if (other) {
-                            tile.type = TILE_TYPES[other];
-                        }
-
-                        // Rotate actors
-                        if (TILE_TYPES[tile.type.name].is_actor) {
-                            tile.direction = DIRECTIONS[tile.direction ?? 'south'].right;
-                        }
-                    }
-                }
-                this.renderer.draw();
-            }
-            else if (ev.button === 1) {
-                // Middle button: pan
-                this.mouse_mode = 'pan';
-                this.mouse_button_mask = 4;
-                this.mouse_coords = [ev.clientX, ev.clientY];
-                ev.preventDefault();
-            }
-        });
-        this.renderer.canvas.addEventListener('mousemove', ev => {
-            if (this.mouse_mode === null)
-                return;
-            // TODO check for the specific button we're holding
-            if ((ev.buttons & this.mouse_button_mask) === 0) {
-                this.mouse_mode = null;
-                return;
-            }
-
-            if (this.mouse_mode === 'draw') {
-                // FIXME also fill in a trail between previous cell and here, mousemove is not fired continuously
-                let [x, y] = this.renderer.cell_coords_from_event(ev);
-                if (x === this.mouse_cell[0] && y === this.mouse_cell[1])
-                    return;
-
-                // TODO do a pixel-perfect draw too
-                if (this.current_tool === 'pencil') {
-                    for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
-                        this.place_in_cell(cx, cy, this.palette_selection);
-                    }
-                }
-                else if (this.current_tool === 'force-floors') {
-                    // Walk the mouse movement and change each we touch to match the direction we
-                    // crossed the border
-                    // FIXME occasionally i draw a tetris S kinda shape and both middle parts point
-                    // the same direction, but shouldn't
-                    let i = 0;
-                    let prevx, prevy;
-                    for (let [cx, cy] of walk_grid(this.mouse_cell[0], this.mouse_cell[1], x, y)) {
-                        i++;
-                        // The very first cell is the one the mouse was already in, and we don't
-                        // have a movement direction yet, so leave that alone
-                        if (i === 1) {
-                            prevx = cx;
-                            prevy = cy;
-                            continue;
-                        }
-                        let name;
-                        if (cx === prevx) {
-                            if (cy > prevy) {
-                                name = 'force_floor_s';
-                            }
-                            else {
-                                name = 'force_floor_n';
-                            }
-                        }
-                        else {
-                            if (cx > prevx) {
-                                name = 'force_floor_e';
-                            }
-                            else {
-                                name = 'force_floor_w';
-                            }
-                        }
-
-                        // The second cell tells us the direction to use for the first, assuming it
-                        // had some kind of force floor
-                        if (i === 2) {
-                            let prevcell = this.stored_level.cells[prevy][prevx];
-                            if (prevcell[0].type.name.startsWith('force_floor_')) {
-                                prevcell[0].type = TILE_TYPES[name];
-                            }
-                        }
-
-                        // Drawing a loop with force floors creates ice (but not in the previous
-                        // cell, obviously)
-                        let cell = this.stored_level.cells[cy][cx];
-                        if (cell[0].type.name.startsWith('force_floor_') &&
-                            cell[0].type.name !== name)
-                        {
-                            name = 'ice';
-                        }
-                        this.place_in_cell(cx, cy, name);
-
-                        prevx = cx;
-                        prevy = cy;
-                    }
-                }
-                else if (this.current_tool === 'adjust') {
-                    // Adjust tool doesn't support dragging
-                    // TODO should it
-                }
-                this.renderer.draw();
-
-                this.mouse_cell = [x, y];
-            }
-            else if (this.mouse_mode === 'pan') {
-                let dx = ev.clientX - this.mouse_coords[0];
-                let dy = ev.clientY - this.mouse_coords[1];
-                this.renderer.canvas.parentNode.scrollLeft -= dx;
-                this.renderer.canvas.parentNode.scrollTop -= dy;
-                this.mouse_coords = [ev.clientX, ev.clientY];
-            }
-        });
-        this.renderer.canvas.addEventListener('mouseup', ev => {
-            this.mouse_mode = null;
-        });
-        window.addEventListener('blur', ev => {
-            // Unbind the mouse if the page loses focus
-            this.mouse_mode = null;
-        });
-
-        // Toolbar buttons
-        this.root.querySelector('#editor-share-url').addEventListener('click', ev => {
-            let buf = c2m.synthesize_level(this.stored_level);
-            // FIXME Not ideal, but btoa() wants a string rather than any of the myriad binary types
-            let stringy_buf = Array.from(new Uint8Array(buf)).map(n => String.fromCharCode(n)).join('');
-            // Make URL-safe and strip trailing padding
-            let data = btoa(stringy_buf).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
-            let url = new URL(location);
-            url.searchParams.delete('level');
-            url.searchParams.delete('setpath');
-            url.searchParams.append('level', data);
-            new EditorShareOverlay(this.conductor, url.toString()).open();
-        });
-
-        // Toolbox
-        let toolbox = mk('div.icon-button-set')
-        this.root.querySelector('.controls').append(toolbox);
-        this.tool_button_els = {};
-        for (let tooldef of EDITOR_TOOLS) {
-            let button = mk(
-                'button', {
-                    type: 'button',
-                    'data-tool': tooldef.mode,
-                },
-                mk('img', {
-                    src: tooldef.icon,
-                    alt: tooldef.name,
-                    title: `${tooldef.name}: ${tooldef.desc}`,
-                }),
-            );
-            this.tool_button_els[tooldef.mode] = button;
-            toolbox.append(button);
-        }
-        this.current_tool = 'pencil';
-        this.tool_button_els['pencil'].classList.add('-selected');
-        toolbox.addEventListener('click', ev => {
-            let button = ev.target.closest('.icon-button-set button');
-            if (! button)
-                return;
-
-            this.select_tool(button.getAttribute('data-tool'));
-        });
-
-        // Tile palette
-        let palette_el = this.root.querySelector('.palette');
-        this.palette = {};  // name => element
-        for (let sectiondef of EDITOR_PALETTE) {
-            let section_el = mk('section');
-            palette_el.append(mk('h2', sectiondef.title), section_el);
-            for (let name of sectiondef.tiles) {
-                let entry = this.renderer.create_tile_type_canvas(name);
-                entry.setAttribute('data-tile-name', name);
-                entry.classList = 'palette-entry';
-                this.palette[name] = entry;
-                section_el.append(entry);
-            }
-        }
-        palette_el.addEventListener('click', ev => {
-            let entry = ev.target.closest('canvas.palette-entry');
-            if (! entry)
-                return;
-
-            this.select_palette(entry.getAttribute('data-tile-name'));
-        });
-        this.palette_selection = null;
-        this.select_palette('floor');
-    }
-
-    activate() {
-        super.activate();
-        this.renderer.draw();
-    }
-
-    load_game(stored_game) {
-    }
-
-    load_level(stored_level) {
-        // TODO support a game too i guess
-        this.stored_level = stored_level;
-
-        // XXX need this for renderer compat.  but i guess it's nice in general idk
-        this.stored_level.cells = [];
-        let row;
-        for (let [i, cell] of this.stored_level.linear_cells.entries()) {
-            if (i % this.stored_level.size_x === 0) {
-                row = [];
-                this.stored_level.cells.push(row);
-            }
-            row.push(cell);
-        }
-
-        // Load connections
-        this.connections_g.textContent = '';
-        for (let [src, dest] of Object.entries(this.stored_level.custom_trap_wiring)) {
-            let [sx, sy] = this.stored_level.scalar_to_coords(src);
-            let [dx, dy] = this.stored_level.scalar_to_coords(dest);
-            this.connections_g.append(
-                mk_svg('rect.overlay-cxn', {x: sx, y: sy, width: 1, height: 1}),
-                mk_svg('line.overlay-cxn', {x1: sx + 0.5, y1: sy + 0.5, x2: dx + 0.5, y2: dy + 0.5}),
-            );
-        }
-
-        this.renderer.set_level(stored_level);
-        if (this.active) {
-            this.renderer.draw();
-        }
-    }
-
-    select_tool(tool) {
-        if (tool === this.current_tool)
-            return;
-        if (! this.tool_button_els[tool])
-            return;
-
-        this.tool_button_els[this.current_tool].classList.remove('-selected');
-        this.current_tool = tool;
-        this.tool_button_els[this.current_tool].classList.add('-selected');
-    }
-
-    select_palette(name) {
-        if (name === this.palette_selection)
-            return;
-
-        if (this.palette_selection) {
-            this.palette[this.palette_selection].classList.remove('--selected');
-        }
-        this.palette_selection = name;
-        if (this.palette_selection) {
-            this.palette[this.palette_selection].classList.add('--selected');
-        }
-
-        // Some tools obviously don't work with a palette selection, in which case changing tiles
-        // should default you back to the pencil
-        if (this.current_tool === 'adjust') {
-            this.select_tool('pencil');
-        }
-    }
-
-    place_in_cell(x, y, name) {
-        // TODO weird api?
-        if (! name)
-            return;
-
-        let type = TILE_TYPES[name];
-        let cell = this.stored_level.cells[y][x];
-        // For terrain tiles, erase the whole cell.  For other tiles, only
-        // replace whatever's on the same layer
-        // TODO probably not the best heuristic yet, since i imagine you can
-        // combine e.g. the tent with thin walls
-        if (type.draw_layer === 0) {
-            cell.length = 0;
-            cell.push({type});
-        }
-        else {
-            for (let i = cell.length - 1; i >= 0; i--) {
-                if (cell[i].type.draw_layer === type.draw_layer) {
-                    cell.splice(i, 1);
-                }
-            }
-            cell.push({type});
-            cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
-        }
     }
 }
 
@@ -1911,15 +1468,40 @@ const AESTHETIC_OPTIONS = [{
     note: "Chip's Challenge typically draws everything in a grid, which looks a bit funny for tall skinny objects like...  the player.  And teeth.  This option draws both of them raised up slightly, so they'll break the grid and add a slight 3D effect.  May not work for all tilesets.",
 }];
 const COMPAT_OPTIONS = [{
+    key: 'popwalls_react_on_arrive',
+    label: "Recessed walls trigger when stepped on",
+    impls: ['lynx', 'ms'],
+    note: "This was the behavior in both versions of CC1, but CC2 changed them to trigger when stepped off of (probably to match the behavior of turtles).  Some CCLP levels depend on the old behavior.  See the next option for a more conservative solution.",
+}, {
+    key: 'auto_convert_ccl_popwalls',
+    label: "Fix loaded recessed walls",
+    impls: ['lynx', 'ms'],
+    note: "This is a more conservative solution to the problem with recessed walls.  It replaces recessed walls with a new tile, \"doubly recessed walls\", only if they begin the level with something on top of them.  This should resolve compatibility issues without changing the behavior of recessed walls.",
+}, {
+    key: 'auto_convert_ccl_blue_walls',
+    label: "Fix loaded blue walls",
+    impls: ['lynx'],
+    note: "Generally, you can only push a block if it's in a space you could otherwise move into, but Tile World Lynx allows pushing blocks off of blue walls.  (Unclear whether this is a Tile World bug, or a Lynx bug that Tile World is replicating.)  The same effect can be achieved in Steam by using a recessed wall instead, so this replaces such walls with recessed walls.  Note that this fix may have unintended side effects in conjunction with the recessed wall compat option.",
+}, {
+    key: 'sliding_tanks_ignore_button',
+    label: "Blue tanks ignore blue buttons while sliding",
+    impls: ['lynx'],
+    note: "In Lynx, due to what is almost certainly a bug, blue tanks would simply not react at all if a blue button were pressed while they were in mid-movement.  Steam fixed this, but it also made blue tanks \"remember\" a button press if they were in the middle of a slide and then turn around once they were finished, and this subtle change broke at least one CCLP level.  (There is no compat option for ignoring a button press while moving normally, as that makes the game worse for no known benefit.)",
+}, {
     key: 'tiles_react_instantly',
     label: "Tiles react instantly",
-    impls: ['lynx', 'ms'],
-    note: "In classic CC, actors moved instantly from one tile to another, so tiles would react (e.g., buttons would become pressed) instantly as well.  CC2 made actors slide smoothly between tiles, and it made more sense visually for the reactions to only happen once the sliding animation had finished.  That's technically a gameplay change, since it delays a lot of tile behavior for 4 tics (the time it takes most actors to move), so here's a compat option.  Works best in conjunction with disabling smooth scrolling; otherwise you'll see strange behavior like completing a level before actually stepping onto the exit.",
+    impls: ['ms'],
+    note: "CC originally had objects slide smoothly from one tile to another, so most tiles only responded when the movement completed.  In the Microsoft port, though, everything moves instantly (and then waits before moving again), so tiles respond right away.",
+}, {
+    key: 'allow_flick',
+    label: "Allow flicking",
+    impls: ['ms'],
+    note: "Generally, you can only push a block if it's in a space you could otherwise move into.  Due to a bug, the Microsoft port allows pushing blocks that are on top of walls, thin walls, ice corners, etc., and this maneuver is called a \"flick\".",
 }];
 const COMPAT_IMPLS = {
     lynx: "Lynx, the original version",
     ms: "Microsoft's Windows port",
-    cc2bug: "Bug present in CC2",
+    steam: "The canonical Steam version, but off by default because it's considered a bug",
 };
 const OPTIONS_TABS = [{
     name: 'aesthetic',
@@ -1967,8 +1549,10 @@ class OptionsOverlay extends DialogOverlay {
 
         // Compat tab
         this.tab_blocks['compat'].append(
-            mk('p', "If you don't know what any of these are for, you can pretty safely ignore them."),
-            mk('p', "Changes won't take effect until you restart the level."),
+            mk('p', "Revert to:", mk('button', "Default"), mk('button', "Lynx"), mk('button', "Microsoft"), mk('button', "Steam")),
+            mk('p', "These settings are for compatibility with player-created levels, which sometimes relied on subtle details of the Microsoft or Lynx games and no longer work with the now-canonical Steam rules.  The default is to follow the Steam rules as closely as possible (except for bugs), but make a few small tweaks to keep CCL-format levels working."),
+            mk('p', "Changes won't take effect until you restart the level or change levels."),
+            mk('p', "Please note that Microsoft had a number of subtle but complex bugs that Lexy's Labyrinth cannot ever reasonably emulate.  The Microsoft settings here are best-effort and not intended to be 100% compatible."),
         );
         this._add_options(this.tab_blocks['compat'], COMPAT_OPTIONS);
     }
@@ -2048,7 +1632,9 @@ class LevelBrowserOverlay extends DialogOverlay {
 
                 // Express absolute time as mm:ss, with two decimals on the seconds (which should be
                 // able to exactly count a number of tics)
-                abstime = `${Math.floor(scorecard.abstime / 20 / 60)}:${(scorecard.abstime / 20 % 60).toFixed(2)}`;
+                let absmin = Math.floor(scorecard.abstime / TICS_PER_SECOND / 60);
+                let abssec = scorecard.abstime / TICS_PER_SECOND % 60;
+                abstime = `${absmin}:${abssec < 10 ? '0' : ''}${abssec.toFixed(2)}`;
             }
 
             tbody.append(mk(i >= savefile.highest_level ? 'tr.--unvisited' : 'tr',

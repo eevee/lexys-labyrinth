@@ -10,6 +10,7 @@
     <meta name="og:image" content="https://c.eev.ee/lexys-labyrinth/og-preview.png">
     <meta name="og:title" content="Lexy's Labyrinth">
     <meta name="og:description" content="A (work in progress) reimplementation of Chip's Challenge 1 and 2, using entirely free assets.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body data-mode="splash">
     <header id="header-main">
@@ -116,10 +117,10 @@
         </div>
         <div class="controls">
             <div class="play-controls">
-                <button class="control-pause" type="button">Pause (p)</button>
+                <button class="control-pause" type="button">Pause <span class="keyhint">(p)</span></button>
                 <button class="control-restart" type="button">Restart</button>
                 <button class="control-undo" type="button">Undo</button>
-                <button class="control-rewind" type="button">Rewind (z)</button>
+                <button class="control-rewind" type="button">Rewind <span class="keyhint">(z)</span></button>
                 <input class="turn-based" type="checkbox">Turn-Based</input>
             </div>
             <div class="demo-controls">
@@ -153,8 +154,14 @@
             -->
         </header>
         <div class="level"><!-- level canvas and any overlays go here --></div>
-        <div class="controls">
+        <nav class="controls">
+            <div id="editor-toolbar">
+                <!-- tools go here -->
+            </div>
             <button id="editor-share-url" type="button">Share?</button>
+            <div id="editor-tool-help">
+                <strong>Pencil</strong> — <span>Select a tile and draw with the left mouse button.  Erase with the right mouse button.</span>
+            </div>
             <!--
             <p style>
                 Tip: Right click to color drop.<br>
@@ -179,7 +186,7 @@
             map size
             </pre>
             -->
-        </div>
+        </nav>
         <div class="palette"></div>
         <!-- TODO:
         controls

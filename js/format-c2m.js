@@ -69,6 +69,7 @@ class CC2Demo {
 let modifier_wire = {
     decode(tile, modifier) {
         tile.wire_directions = modifier & 0x0f;
+        // TODO wait, what happens if you use wire tunnels on steel or something other than floor?
         tile.wire_tunnel_directions = (modifier & 0xf0) >> 4;
     },
     encode(tile) {
@@ -340,7 +341,9 @@ const TILE_ENCODING = {
     0x46: {
         name: 'force_floor_all',
     },
-    // 0x47: 'button_gray',
+    0x47: {
+        name: 'button_gray',
+    },
     // FIXME swivel floors...  argh...
     0x48: {
         name: 'swivel_sw',
@@ -902,7 +905,23 @@ export function parse_level(buf, number = 1) {
         }
         else if (section_type === 'RDNY') {
         }
-        else if (section_type === 'END ') {
+        // TODO LL custom chunks, should distinguish somehow
+        else if (section_type === 'LXCM') {
+            // Camera regions
+            if (section_length % 4 !== 0)
+                throw new Error(`Expected LXCM chunk to be a multiple of 4 bytes; got ${section_length}`);
+
+            let bytes = new Uint8Array(section_buf);
+            let p = 0;
+            while (p < section_length) {
+                let x = bytes[p + 0];
+                let y = bytes[p + 1];
+                let w = bytes[p + 2];
+                let h = bytes[p + 3];
+                // TODO validate?  must be smaller than map?
+                level.camera_regions.push(new DOMRect(x, y, w, h));
+                p += 4;
+            }
         }
         else {
             console.warn(`Unrecognized section type '${section_type}' at offset ${section_start}`);
@@ -1070,6 +1089,21 @@ class C2M {
 export function synthesize_level(stored_level) {
     let c2m = new C2M;
     c2m.add_section('CC2M', '133');
+
+    // Store camera regions
+    // TODO LL feature, should be distinguished somehow
+    if (stored_level.camera_regions.length > 0) {
+        let bytes = new Uint8Array(4 * stored_level.camera_regions.length);
+        let p = 0;
+        for (let region of stored_level.camera_regions) {
+            bytes[p + 0] = region.x;
+            bytes[p + 1] = region.y;
+            bytes[p + 2] = region.width;
+            bytes[p + 3] = region.height;
+            p += 4;
+        }
+        c2m.add_section('LXCM', bytes.buffer);
+    }
 
     // FIXME well this will not do
     let map_bytes = new Uint8Array(4096);

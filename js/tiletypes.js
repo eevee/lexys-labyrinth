@@ -1,4 +1,5 @@
 import { DIRECTIONS } from './defs.js';
+import { random_choice } from './util.js';
 
 // Draw layers
 const LAYER_TERRAIN = 0;
@@ -106,34 +107,62 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         blocks_monsters: true,
         blocks_blocks: true,
+        on_ready(me, level) {
+            if (level.compat.auto_convert_ccl_popwalls &&
+                me.cell.some(tile => tile.type.is_actor))
+            {
+                // Fix blocks and other actors on top of popwalls by turning them into double
+                // popwalls, which preserves CC2 popwall behavior
+                me.type = TILE_TYPES['popwall2'];
+            }
+        },
         on_depart(me, level, other) {
             level.transmute_tile(me, 'wall');
         },
     },
-    // FIXME these should be OVERLAY by cc2 rules, but the cc1 tiles are opaque and cover everything else
-    thinwall_n: {
+    // LL specific tile that can only be stepped on /twice/, originally used to repair differences
+    // with popwall behavior between Lynx and Steam
+    popwall2: {
         draw_layer: LAYER_TERRAIN,
+        blocks_monsters: true,
+        blocks_blocks: true,
+        on_depart(me, level, other) {
+            level.transmute_tile(me, 'popwall');
+        },
+    },
+    // FIXME in a cc1 tileset, these tiles are opaque  >:S
+    thinwall_n: {
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north']),
     },
     thinwall_s: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south']),
     },
     thinwall_e: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['east']),
     },
     thinwall_w: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['west']),
     },
     thinwall_se: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'east']),
     },
     fake_wall: {
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
+        on_ready(me, level) {
+            if (level.compat.auto_convert_ccl_blue_walls &&
+                me.cell.some(tile => tile.type.is_actor))
+            {
+                // Blocks can be pushed off of blue walls in TW Lynx, which only works due to a tiny
+                // quirk of the engine that I don't want to replicate, so replace them with popwalls
+                me.type = TILE_TYPES['popwall'];
+            }
+        },
         on_bump(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'wall');
@@ -142,7 +171,8 @@ const TILE_TYPES = {
     },
     fake_floor: {
         draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
         on_bump(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'floor');
@@ -354,7 +384,7 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'dirt');
             }
             else if (other.type.name === 'ice_block') {
-                level.remove_tile(other);
+                level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'ice');
             }
             else if (other.type.is_player) {
@@ -558,10 +588,16 @@ const TILE_TYPES = {
     },
     green_floor: {
         draw_layer: LAYER_TERRAIN,
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'green_wall');
+        },
     },
     green_wall: {
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'green_floor');
+        },
     },
     green_chip: {
         draw_layer: LAYER_ITEM,
@@ -575,6 +611,7 @@ const TILE_TYPES = {
                 level.remove_tile(me);
             }
         },
+        // Not affected by gray buttons
     },
     green_bomb: {
         draw_layer: LAYER_ITEM,
@@ -589,15 +626,32 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'explosion');
             }
         },
+        // Not affected by gray buttons
     },
     purple_floor: {
-        // TODO wired
         draw_layer: LAYER_TERRAIN,
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'purple_wall');
+        },
+        on_power(me, level) {
+            me.type.on_gray_button(me, level);
+        },
+        on_depower(me, level) {
+            me.type.on_gray_button(me, level);
+        },
     },
     purple_wall: {
-        // TODO wired
         draw_layer: LAYER_TERRAIN,
         blocks_all: true,
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'purple_floor');
+        },
+        on_power(me, level) {
+            me.type.on_gray_button(me, level);
+        },
+        on_depower(me, level) {
+            me.type.on_gray_button(me, level);
+        },
     },
     cloner: {
         draw_layer: LAYER_TERRAIN,
@@ -628,11 +682,40 @@ const TILE_TYPES = {
                 }
             }
         },
+        // Also clones on rising pulse or gray button
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
+        },
     },
     trap: {
         draw_layer: LAYER_TERRAIN,
+        on_ready(me, level) {
+            // Trap any actor standing on us, unless we already know we're pressed
+            if (me.presses)
+                return;
+
+            for (let tile of me.cell) {
+                if (tile.type.is_actor) {
+                    tile.stuck = true;
+                }
+            }
+        },
+        add_press_ready(me, level, other) {
+            // Same as below, but without using the undo stack or ejection
+            me.presses = (me.presses ?? 0) + 1;
+            if (me.presses === 1) {
+                for (let tile of me.cell) {
+                    if (tile.type.is_actor) {
+                        tile.stuck = false;
+                    }
+                }
+            }
+        },
         on_arrive(me, level, other) {
-            if (me.open) {
+            if (me.presses) {
                 // Lynx: Traps immediately eject their contents, if possible
                 // TODO compat this, cc2 doens't do it!
                 //level.attempt_step(other, other.direction);
@@ -641,8 +724,42 @@ const TILE_TYPES = {
                 level.set_actor_stuck(other, true);
             }
         },
+        add_press(me, level) {
+            level._set_prop(me, 'presses', (me.presses ?? 0) + 1);
+            if (me.presses === 1) {
+                // Free everything on us, if we went from 0 to 1 presses (i.e. closed to open)
+                for (let tile of Array.from(me.cell)) {
+                    if (tile.type.is_actor) {
+                        level.set_actor_stuck(tile, false);
+                        // Forcibly move anything released from a trap, to keep it in sync with
+                        // whatever pushed the button
+                        level.attempt_step(tile, tile.direction);
+                    }
+                }
+            }
+        },
+        remove_press(me, level) {
+            level._set_prop(me, 'presses', me.presses - 1);
+            if (me.presses === 0) {
+                // Trap everything on us, if we went from 1 to 0 presses (i.e. open to closed)
+                for (let tile of me.cell) {
+                    if (tile.type.is_actor) {
+                        level.set_actor_stuck(tile, true);
+                    }
+                }
+            }
+        },
+        on_power(me, level) {
+            // Treat being powered or not as an extra kind of brown button press
+            me.type.add_press(me, level);
+            console.log("powering UP", me.presses);
+        },
+        on_depower(me, level) {
+            me.type.remove_press(me, level);
+            console.log("powering down...", me.presses);
+        },
         visual_state(me) {
-            if (me && me.open) {
+            if (me && me.presses) {
                 return 'open';
             }
             else {
@@ -689,37 +806,57 @@ const TILE_TYPES = {
     },
     teleport_blue: {
         draw_layer: LAYER_TERRAIN,
-        connects_to: 'teleport_blue',
-        connect_order: 'backward',
-        is_teleporter: true,
+        teleport_dest_order(me, level) {
+            return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
+        },
     },
     teleport_red: {
         draw_layer: LAYER_TERRAIN,
-        connects_to: 'teleport_red',
-        connect_order: 'forward',
-        is_teleporter: true,
+        teleport_dest_order(me, level) {
+            // FIXME you can control your exit direction from red teleporters
+            return level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
+        },
     },
     teleport_green: {
         draw_layer: LAYER_TERRAIN,
-        // connects_to: 'teleport_red',
-        // connect_order: 'forward',
-        // is_teleporter: true,
-        // FIXME completely different behavior from other teleporters
+        teleport_dest_order(me, level) {
+            // FIXME exit direction is random; unclear if it's any direction or only unblocked ones
+            let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
+            // FIXME this should use the lynxish rng
+            return [random_choice(all), me];
+        },
     },
     teleport_yellow: {
         draw_layer: LAYER_TERRAIN,
-        connects_to: 'teleport_yellow',
-        connect_order: 'backward',
-        is_teleporter: true,
-        // FIXME special pickup behavior
+        teleport_dest_order(me, level) {
+            // FIXME special pickup behavior
+            return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
+        },
     },
-    // FIXME do i want these as separate objects?  what would they do, turn into each other?  or should it be one with state?
     flame_jet_off: {
         draw_layer: LAYER_TERRAIN,
+        activate(me, level) {
+            level.transmute_tile(me, 'flame_jet_on');
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
+        },
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
     },
     flame_jet_on: {
         draw_layer: LAYER_TERRAIN,
         // FIXME every tic, kills every actor in the cell
+        activate(me, level) {
+            level.transmute_tile(me, 'flame_jet_off');
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
+        },
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
     },
     // Buttons
     button_blue: {
@@ -731,7 +868,7 @@ const TILE_TYPES = {
             for (let actor of level.actors) {
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_blue') {
-                    level.set_actor_direction(actor, DIRECTIONS[actor.direction].opposite);
+                    level._set_prop(actor, 'pending_reverse', ! actor.pending_reverse);
                 }
             }
         },
@@ -790,36 +927,32 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         connects_to: 'trap',
         connect_order: 'forward',
-        on_arrive(me, level, other) {
-            level.sfx.play_once('button-press', me.cell);
+        on_ready(me, level) {
+            // Inform the trap of any actors that start out holding us down
+            let trap = me.connection;
+            if (! (trap && trap.cell))
+                return;
 
-            if (me.connection && me.connection.cell) {
-                let trap = me.connection;
-                level._set_prop(trap, 'open', true);
-                for (let tile of trap.cell) {
-                    if (tile.type.is_actor) {
-                        if (tile.stuck) {
-                            level.set_actor_stuck(tile, false);
-                        }
-                        // Forcibly move anything released from a trap, to keep
-                        // it in sync with whatever pushed the button
-                        level.attempt_step(tile, tile.direction);
-                    }
+            for (let tile of me.cell) {
+                if (tile.type.is_actor) {
+                    trap.type.add_press_ready(trap, level);
                 }
             }
         },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
+            let trap = me.connection;
+            if (trap && trap.cell) {
+                trap.type.add_press(trap, level);
+            }
+        },
         on_depart(me, level, other) {
-            // TODO this doesn't play if you walk straight across
             level.sfx.play_once('button-release', me.cell);
 
-            if (me.connection && me.connection.cell) {
-                let trap = me.connection;
-                level._set_prop(trap, 'open', false);
-                for (let tile of trap.cell) {
-                    if (tile.type.is_actor) {
-                        level.set_actor_stuck(tile, true);
-                    }
-                }
+            let trap = me.connection;
+            if (trap && trap.cell) {
+                trap.type.remove_press(trap, level);
             }
         },
     },
@@ -830,8 +963,9 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
 
-            if (me.connection && me.connection.cell) {
-                me.connection.type.activate(me.connection, level);
+            let cloner = me.connection;
+            if (cloner && cloner.cell) {
+                cloner.type.activate(cloner, level);
             }
         },
         on_depart(me, level, other) {
@@ -843,12 +977,46 @@ const TILE_TYPES = {
         // FIXME toggles flame jets, connected somehow, ???
     },
     button_pink: {
-        // TODO not implemented
         draw_layer: LAYER_TERRAIN,
+        is_emitting(me, level) {
+            // We emit current as long as there's an actor on us
+            return me.cell.some(tile => tile.type.is_actor);
+        },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+        },
     },
     button_black: {
         // TODO not implemented
         draw_layer: LAYER_TERRAIN,
+    },
+    button_gray: {
+        // TODO only partially implemented
+        draw_layer: LAYER_TERRAIN,
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
+            for (let x = Math.max(0, me.cell.x - 2); x <= Math.min(level.width - 1, me.cell.x + 2); x++) {
+                for (let y = Math.max(0, me.cell.y - 2); y <= Math.min(level.height - 1, me.cell.y + 2); y++) {
+                    let cell = level.cells[y][x];
+                    // TODO wait is this right
+                    if (cell === me.cell)
+                        continue;
+
+                    for (let tile of cell) {
+                        if (tile.type.on_gray_button) {
+                            tile.type.on_gray_button(tile, level);
+                        }
+                    }
+                }
+            }
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+        },
     },
 
     // Time alteration
@@ -1017,17 +1185,32 @@ const TILE_TYPES = {
         movement_speed: 4,
     },
 
-    // Keys
-    // Note that red and blue keys do NOT block monsters, but yellow and green DO
+    // Keys, whose behavior varies
     key_red: {
+        // TODO Red key can ONLY be picked up by players (and doppelgangers), no other actor that
+        // has an inventory
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_key: true,
     },
     key_blue: {
+        // Blue key is picked up by dirt blocks and all monsters, including those that don't have an
+        // inventory normally
         draw_layer: LAYER_ITEM,
         is_item: true,
         is_key: true,
+        on_arrive(me, level, other) {
+            // Call it...  everything except ice and directional blocks?  These rules are weird.
+            // Note that the game itself normally handles picking items up, so we only get here for
+            // actors who aren't supposed to have an inventory
+            // TODO make this a...  flag?  i don't know?
+            // TODO major difference from lynx...
+            if (other.type.name !== 'ice_block' && other.type.name !== 'directional_block') {
+                if (level.give_actor(other, me.type.name)) {
+                    level.remove_tile(me);
+                }
+            }
+        },
     },
     key_yellow: {
         draw_layer: LAYER_ITEM,
@@ -1176,6 +1359,7 @@ const TILE_TYPES = {
         infinite_items: {
             key_yellow: true,
         },
+        visual_state: player_visual_state,
     },
     chip: {
         draw_layer: LAYER_ITEM,

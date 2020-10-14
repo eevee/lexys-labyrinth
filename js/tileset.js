@@ -197,9 +197,15 @@ export const CC2_TILESET_LAYOUT = {
         wired: [[4, 10], [5, 10], [6, 10], [7, 10]],
     },
     popwall: [8, 10],
+    popwall2: [8, 10],
     gravel: [9, 10],
     ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
-    steel: [15, 10],
+    steel: {
+        // Wiring!
+        base: [15, 10],
+        wired: [9, 26],
+        is_wired_optional: true,
+    },
 
     // TODO only animates while moving
     teeth: {
@@ -215,7 +221,7 @@ export const CC2_TILESET_LAYOUT = {
     swivel_ne: [11, 11],
     swivel_se: [12, 11],
     swivel_floor: [13, 11],
-    // TODO some kinda four-edges thing again
+    '#wire-tunnel': [14, 11],
     stopwatch_penalty: [15, 11],
     paramecium: {
         north: [[0, 12], [1, 12], [2, 12]],
@@ -343,7 +349,7 @@ export const CC2_TILESET_LAYOUT = {
         west: [[6, 24], [7, 24]],
     },
     bogus_player_drowned: {
-        overlay: [3, 3],  // splash
+        overlay: [5, 5],  // splash
         base: 'water',
     },
     bogus_player_burned_fire: {
@@ -365,18 +371,45 @@ export const CC2_TILESET_LAYOUT = {
     '#powered': [15, 26],
 
     player2: {
-        moving: {
-            north: [[0, 27], [1, 27], [2, 27], [3, 27], [4, 27], [5, 27], [6, 27], [7, 27]],
-            south: [[0, 28], [1, 28], [2, 28], [3, 28], [4, 28], [5, 28], [6, 28], [7, 28]],
-            west: [[8, 28], [9, 28], [10, 28], [11, 28], [12, 28], [13, 28], [14, 28], [15, 28]],
-            east: [[8, 27], [9, 27], [10, 27], [11, 27], [12, 27], [13, 27], [14, 27], [15, 27]],
-        },
         normal: {
             north: [0, 27],
             south: [0, 28],
             west: [8, 28],
             east: [8, 27],
         },
+        blocked: 'pushing',
+        moving: {
+            north: [[0, 27], [1, 27], [2, 27], [3, 27], [4, 27], [5, 27], [6, 27], [7, 27]],
+            south: [[0, 28], [1, 28], [2, 28], [3, 28], [4, 28], [5, 28], [6, 28], [7, 28]],
+            west: [[8, 28], [9, 28], [10, 28], [11, 28], [12, 28], [13, 28], [14, 28], [15, 28]],
+            east: [[8, 27], [9, 27], [10, 27], [11, 27], [12, 27], [13, 27], [14, 27], [15, 27]],
+        },
+        pushing: {
+            north: [8, 29],
+            east: [9, 29],
+            south: [10, 29],
+            west: [11, 29],
+        },
+        swimming: {
+            north: [[0, 29], [1, 29]],
+            east: [[2, 29], [3, 29]],
+            south: [[4, 29], [5, 29]],
+            west: [[6, 29], [7, 29]],
+        },
+        // The classic CC2 behavior, spinning on ice
+        skating: [[0, 27], [8, 27], [0, 28], [8, 28]],
+        // TODO i don't know what CC2 does
+        forced: {
+            north: [2, 27],
+            east: [10, 27],
+            south: [2, 28],
+            west: [10, 28],
+        },
+        // These are frames from the splash/explosion animations
+        drowned: [5, 5],
+        burned: [1, 5],
+        exploded: [1, 5],
+        failed: [1, 5],
     },
     fire: [
         [12, 29],
@@ -451,6 +484,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     wall_appearing: [2, 12],
     gravel: [2, 13],
     popwall: [2, 14],
+    popwall2: [2, 14],
     hint: [2, 15],
 
     thinwall_se: [3, 0],
@@ -564,6 +598,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     teeth: Object.assign({}, CC2_TILESET_LAYOUT.teeth, {
         north: [[0, 32], [1, 32], [2, 32], [1, 32]],
     }),
+    popwall2: [9, 32],
 
     // Extra player sprites
     player: Object.assign({}, CC2_TILESET_LAYOUT.player, {
@@ -581,6 +616,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
             west: [7, 33],
         },
     }),
+    // TODO player2 equivalents
     bogus_player_burned_fire: {
         overlay: [6, 33],
         base: 'fire',
@@ -635,10 +671,10 @@ export class Tileset {
             coords = drawspec.tile;
         }
         else if (drawspec.wired) {
-            if (tile && tile.wire_directions !== undefined && tile.wire_directions !== 0) {
-                // TODO all four is a different thing entirely
+            if (tile && tile.wire_directions) {
+                // TODO all four is a different thing entirely with two separate parts, ugh
                 // Draw the appropriate wire underlay
-                this.draw_type('#unpowered', tile, tic, blit);
+                this.draw_type(tile.cell.is_powered ? '#powered' : '#unpowered', tile, tic, blit);
 
                 // Draw a masked part of the base tile
                 let wiredir = tile.wire_directions;
@@ -695,7 +731,7 @@ export class Tileset {
         }
 
         // Apply custom per-type visual states
-        if (TILE_TYPES[name].visual_state) {
+        if (TILE_TYPES[name] && TILE_TYPES[name].visual_state) {
             // Note that these accept null, too, and return a default
             let state = TILE_TYPES[name].visual_state(tile);
             // If it's a string, that's an alias for another state
@@ -764,6 +800,30 @@ export class Tileset {
         else {
             if (!coords) console.error(name, tile);
             blit(coords[0], coords[1]);
+        }
+
+        // Wired tiles may also have tunnels, drawn on top of everything else
+        if (drawspec.wired && tile && tile.wire_tunnel_directions) {
+            let tunnel_coords = this.layout['#wire-tunnel'];
+            let tunnel_width = 6/32;
+            let tunnel_length = 12/32;
+            let tunnel_offset = (1 - tunnel_width) / 2;
+            if (tile.wire_tunnel_directions & DIRECTIONS['north'].bit) {
+                blit(tunnel_coords[0] + tunnel_offset, tunnel_coords[1],
+                    tunnel_offset, 0, tunnel_width, tunnel_length);
+            }
+            if (tile.wire_tunnel_directions & DIRECTIONS['south'].bit) {
+                blit(tunnel_coords[0] + tunnel_offset, tunnel_coords[1] + 1 - tunnel_length,
+                    tunnel_offset, 1 - tunnel_length, tunnel_width, tunnel_length);
+            }
+            if (tile.wire_tunnel_directions & DIRECTIONS['west'].bit) {
+                blit(tunnel_coords[0], tunnel_coords[1] + tunnel_offset,
+                    0, tunnel_offset, tunnel_length, tunnel_width);
+            }
+            if (tile.wire_tunnel_directions & DIRECTIONS['east'].bit) {
+                blit(tunnel_coords[0] + 1 - tunnel_length, tunnel_coords[1] + tunnel_offset,
+                    1 - tunnel_length, tunnel_offset, tunnel_length, tunnel_width);
+            }
         }
 
         // Special behavior for special objects
