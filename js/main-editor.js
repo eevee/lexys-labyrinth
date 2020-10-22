@@ -1,5 +1,5 @@
 import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
-import * as c2m from './format-c2m.js';
+import * as c2g from './format-c2g.js';
 import { PrimaryView, DialogOverlay } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
@@ -617,7 +617,7 @@ export class Editor extends PrimaryView {
 
         // Toolbar buttons
         this.root.querySelector('#editor-share-url').addEventListener('click', ev => {
-            let buf = c2m.synthesize_level(this.stored_level);
+            let buf = c2g.synthesize_level(this.stored_level);
             // FIXME Not ideal, but btoa() wants a string rather than any of the myriad binary types
             let stringy_buf = Array.from(new Uint8Array(buf)).map(n => String.fromCharCode(n)).join('');
             // Make URL-safe and strip trailing padding

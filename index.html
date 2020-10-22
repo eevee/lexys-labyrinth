@@ -40,6 +40,7 @@
         </nav>
     </header>
     <main id="splash">
+        <div class="drag-overlay"></div>
         <header>
             <h1><img src="og-preview.png" alt="">Lexy's Labyrinth</h1>
         </header>
@@ -58,21 +59,20 @@
 
         <section id="splash-upload-levels">
             <h2>Other levels</h2>
-            <p>You can play <code>CHIPS.DAT</code> from the original Microsoft version, any custom levels you have lying around, or perhaps ones you found on the <a href="https://sets.bitbusters.club/">Bit Busters Club set list</a>!</p>
-            <!-- TODO explain how to find chips.dat or steam folder -->
-            <!-- TODO drag and drop? -->
-            <input id="splash-upload" type="file" accept=".dat,.ccl,.c2m,.ccs">
-            <button type="button" id="splash-upload-button" class="button-big">Open a local level<!-- TODO: <br>(or drag and drop a file into this window) --></button>
-            <p>Supports both the old Microsoft <code>CHIPS.DAT</code> format and the Steam <code>C2M</code> format.</p>
-            <p>Does <em>not</em> yet support the Steam <code>C2G</code> format, so tragically, the original Steam levels can only be played one at a time.  This should be fixed soon!</p>
-            <!--
+            <p>Load and play any levels you have on hand — both the original levels and any custom ones, perhaps ones you found on the <a href="https://sets.bitbusters.club/">Bit Busters Club set list</a>.  Supports CCL/DAT, C2G, and individual C2Ms (though scores aren't saved for those).</p>
+            <!-- TODO zip files! -->
+            <p>You can also drag and drop files or directories into this window.</p>
+            <input id="splash-upload-file" type="file" accept=".dat,.ccl,.c2m,.ccs" multiple>
+            <input id="splash-upload-dir" type="file" webkitdirectory>
+            <button type="button" id="splash-upload-file-button" class="button-big">Load files</button>
+            <button type="button" id="splash-upload-dir-button" class="button-big">Load directory</button>
+            <p>If you still have the original Microsoft "BOWEP" game lying around, you can play the Chip's Challenge 1 levels by loading <code>CHIPS.DAT</code>.</p>
             <p>If you own the Steam versions of <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge 1</a> (<em>free!</em>) or <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a> ($5 last I checked), you can play those too, even on Linux or Mac:</p>
             <ol class="normal-list">
                 <li>Right-click the game in Steam and choose <em>Properties</em>.  On the <em>Local Files</em> tab, click <em>Browse local files</em>.</li>
                 <li>Open the <code>data</code> folder, then <code>games</code>.</li>
-                <li>You should see either a <code>cc1</code> or <code>cc2</code> folder.  Drag it into this window.</li>
+                <li>You should see either a <code>cc1</code> or <code>cc2</code> folder.  Drag it into this window, or load it with the button above.</li>
             </ol>
-            -->
         </section>
 
         <section id="splash-your-levels">

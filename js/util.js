@@ -1,7 +1,13 @@
+// Base class for custom errors
+export class LLError extends Error {}
+
+// Random choice
 export function random_choice(list) {
     return list[Math.floor(Math.random() * list.length)];
 }
 
+
+// DOM stuff
 function _mk(el, children) {
     if (children.length > 0) {
         if (!(children[0] instanceof Node) && children[0] !== undefined && typeof(children[0]) !== "string" && typeof(children[0]) !== "number") {
@@ -29,6 +35,70 @@ export function mk_svg(tag_selector, ...children) {
     return _mk(el, children);
 }
 
+export function handle_drop(element, options) {
+    let dropzone_class = options.dropzone_class ?? null;
+    let on_drop = options.on_drop;
+
+    let require_file = options.require_file ?? false;
+    let is_valid = ev => {
+        // TODO this requires files, should make some args for this
+        if (options.require_file) {
+            let dt = ev.dataTransfer;
+            if (! dt || dt.items.length === 0)
+                return false;
+
+            // Only test the first item I guess?  If it's a file then they should all be files
+            if (dt.items[0].kind !== 'file')
+                return false;
+        }
+
+        return true;
+    };
+
+    let end_drop = () => {
+        if (dropzone_class !== null) {
+            element.classList.remove(dropzone_class);
+        }
+    };
+
+    // TODO should have a filter function for when a drag is valid but i forget which of these
+    // should have that
+    element.addEventListener('dragenter', ev => {
+        if (! is_valid(ev))
+            return;
+
+        ev.stopPropagation();
+        ev.preventDefault();
+
+        if (dropzone_class !== null) {
+            element.classList.add(dropzone_class);
+        }
+    });
+    element.addEventListener('dragover', ev => {
+        if (! is_valid(ev))
+            return;
+
+        ev.stopPropagation();
+        ev.preventDefault();
+    });
+    element.addEventListener('dragleave', ev => {
+        if (ev.relatedTarget && element.contains(ev.relatedTarget))
+            return;
+
+        end_drop();
+    });
+    element.addEventListener('drop', ev => {
+        if (! is_valid(ev))
+            return;
+
+        ev.stopPropagation();
+        ev.preventDefault();
+
+        end_drop();
+        on_drop(ev);
+    });
+}
+
 export function promise_event(element, success_event, failure_event) {
     let resolve, reject;
     let promise = new Promise((res, rej) => {
@@ -36,21 +106,21 @@ export function promise_event(element, success_event, failure_event) {
         reject = rej;
     });
 
-    let success_handler = e => {
+    let success_handler = ev => {
         element.removeEventListener(success_event, success_handler);
         if (failure_event) {
             element.removeEventListener(failure_event, failure_handler);
         }
 
-        resolve(e);
+        resolve(ev);
     };
-    let failure_handler = e => {
+    let failure_handler = ev => {
         element.removeEventListener(success_event, success_handler);
         if (failure_event) {
             element.removeEventListener(failure_event, failure_handler);
         }
 
-        reject(e);
+        reject(ev);
     };
 
     element.addEventListener(success_event, success_handler);
@@ -61,6 +131,7 @@ export function promise_event(element, success_event, failure_event) {
     return promise;
 }
 
+
 export async function fetch(url) {
     let xhr = new XMLHttpRequest;
     let promise = promise_event(xhr, 'load', 'error');
@@ -68,7 +139,17 @@ export async function fetch(url) {
     xhr.responseType = 'arraybuffer';
     xhr.send();
     await promise;
+    if (xhr.status !== 200)
+        throw new Error(`Failed to load ${url} -- ${xhr.status} ${xhr.statusText}`);
     return xhr.response;
+}
+
+export function string_from_buffer_ascii(buf, start = 0, len) {
+    if (ArrayBuffer.isView(buf)) {
+        start += buf.byteOffset;
+        buf = buf.buffer;
+    }
+    return String.fromCharCode.apply(null, new Uint8Array(buf, start, len));
 }
 
 // Cast a line through a grid and yield every cell it touches
@@ -169,5 +250,103 @@ export function* walk_grid(x0, y0, x1, y1) {
             err += dx;
             b += step_b;
         }
+    }
+}
+
+// Root class to indirect over where we might get files from
+// - a pool of uploaded in-memory files
+// - a single uploaded zip file
+// - a local directory provided via the webkit Entry api
+// - HTTP (but only for files we choose ourselves, not arbitrary ones, due to CORS)
+// Note that where possible, these classes lowercase all filenames, in keeping with C2G's implicit
+// requirement that filenames are case-insensitive  :/
+class FileSource {
+    constructor() {}
+
+    // Get a file's contents as an ArrayBuffer
+    async get(path) {}
+}
+// Files we have had uploaded one at a time (note that each upload becomes its own source)
+export class FileFileSource extends FileSource {
+    constructor(files) {
+        super();
+        this.files = {};
+        for (let file of files) {
+            this.files[(file.webkitRelativePath ?? file.name).toLowerCase()] = file;
+        }
+    }
+
+    get(path) {
+        let file = this.files[path.toLowerCase()];
+        if (file) {
+            return file.arrayBuffer();
+        }
+        else {
+            return Promise.reject(new Error(`No such file was provided: ${path}`));
+        }
+    }
+}
+// Regular HTTP fetch
+export class HTTPFileSource extends FileSource {
+    // Should be given a URL object as a root
+    constructor(root) {
+        super();
+        this.root = root;
+    }
+
+    get(path) {
+        let url = new URL(path, this.root);
+        return fetch(url);
+    }
+}
+// WebKit Entry interface
+// XXX this does not appear to work if you drag in a link to a directory but that is probably beyond
+// my powers to fix
+export class EntryFileSource extends FileSource {
+    constructor(entries) {
+        super();
+        this.files = {};
+        let file_count = 0;
+
+        let read_directory = async (directory_entry, dir_prefix) => {
+            let reader = directory_entry.createReader();
+            let all_entries = [];
+            while (true) {
+                let entries = await new Promise((res, rej) => reader.readEntries(res, rej));
+                all_entries.push.apply(all_entries, entries);
+                if (entries.length === 0)
+                    break;
+            }
+
+            await handle_entries(all_entries, dir_prefix);
+        };
+        let handle_entries = (entries, dir_prefix) => {
+            file_count += entries.length;
+            if (file_count > 4096)
+                throw new LLError("Found way too many files; did you drag in the wrong directory?");
+
+            let dir_promises = [];
+            for (let entry of entries) {
+                if (entry.isDirectory) {
+                    dir_promises.push(read_directory(entry, dir_prefix + entry.name + '/'));
+                }
+                else {
+                    this.files[(dir_prefix + entry.name).toLowerCase()] = entry;
+                }
+            }
+
+            return Promise.all(dir_promises);
+        };
+
+        this._loaded_promise = handle_entries(entries, '');
+    }
+
+    async get(path) {
+        let entry = this.files[path.toLowerCase()];
+        if (! entry)
+            throw new LLError(`No such file in local directory: ${path}`);
+
+        let file = await new Promise((res, rej) => entry.file(res, rej));
+        return await file.arrayBuffer();
     }
 }

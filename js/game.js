@@ -253,22 +253,18 @@ export class Level {
 
                     if (tile.type.is_player) {
                         // TODO handle multiple players, also chip and melinda both
-                        // TODO complain if no chip
+                        // TODO complain if no player
                         this.player = tile;
-                        // Always put the player at the start of the actor list
-                        // (accomplished traditionally with a swap)
-                        this.actors.push(this.actors[0]);
-                        this.actors[0] = tile;
                     }
-                    else if (tile.type.is_actor) {
+                    if (tile.type.is_actor) {
                         if (has_cloner) {
                             // TODO is there any reason not to add clone templates to the actor
                             // list?
                             tile.stuck = true;
                         }
-                        else {
-                            this.actors.push(tile);
-                        }
+                    }
+                    if (! tile.stuck) {
+                        this.actors.push(tile);
                     }
                     cell._add(tile);
 
@@ -391,7 +387,13 @@ export class Level {
         // immediately), we still want every time's animation to finish, or it'll look like some
         // objects move backwards when the death screen appears!
         let cell_steppers = [];
-        for (let actor of this.actors) {
+        // Note that we iterate in reverse order, DESPITE keeping dead actors around with null
+        // cells, to match the Lynx and CC2 behavior.  This is actually important in some cases;
+        // check out the start of CCLP3 #54, where the gliders will eat the blue key immediately if
+        // they act in forward order!  (More subtly, even the earlier passes do things like advance
+        // the RNG, so for replay compatibility they need to be in reverse order too.)
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
             // Actors with no cell were destroyed
             if (! actor.cell)
                 continue;
@@ -442,8 +444,10 @@ export class Level {
 
         // Second pass: actors decide their upcoming movement simultaneously
         // (we'll do the player's decision in part 2!)
-        for (let actor of this.actors) {
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
             if (actor != this.player)
+                continue;
             {
                 this.actor_decision(actor, p1_primary_direction);
             }
@@ -456,7 +460,8 @@ export class Level {
         this.actor_decision(this.player, p1_primary_direction);
         
         // Third pass: everyone actually moves
-        for (let actor of this.actors) {
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
             if (! actor.cell)
                 continue;
 

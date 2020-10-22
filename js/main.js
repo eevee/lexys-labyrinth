@@ -1,9 +1,9 @@
 // TODO bugs and quirks i'm aware of:
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
 import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
-import * as c2m from './format-c2m.js';
+import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
-import * as format_util from './format-util.js';
+import * as format_base from './format-base.js';
 import { Level } from './game.js';
 import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay } from './main-base.js';
 import { Editor } from './main-editor.js';
@@ -11,7 +11,8 @@ import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
 import { Tileset, CC2_TILESET_LAYOUT, LL_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
-import { random_choice, mk, mk_svg, promise_event, fetch } from './util.js';
+import { random_choice, mk, mk_svg, promise_event } from './util.js';
+import * as util from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
 
@@ -167,7 +168,7 @@ class SFXPlayer {
     }
 
     async init_sound(name, path) {
-        let buf = await fetch(path);
+        let buf = await util.fetch(path);
         let audiobuf = await this.ctx.decodeAudioData(buf);
         this.sounds[name] = {
             buf: buf,
@@ -1312,9 +1313,15 @@ class Splash extends PrimaryView {
             let score;
             let packinfo = conductor.stash.packs[packdef.ident];
             if (packinfo && packinfo.total_score !== undefined) {
-                // TODO tack on a star if the game is "beaten"?  what's that mean?  every level
-                // beaten i guess?
-                score = packinfo.total_score.toLocaleString();
+                if (packinfo.total_score === null) {
+                    // Whoops, some NaNs got in here  :(
+                    score = "computing...";
+                }
+                else {
+                    // TODO tack on a star if the game is "beaten"?  what's that mean?  every level
+                    // beaten i guess?
+                    score = packinfo.total_score.toLocaleString();
+                }
             }
             else {
                 score = "unplayed";
@@ -1326,93 +1333,139 @@ class Splash extends PrimaryView {
                 mk('span.-score', score),
             );
             button.addEventListener('click', ev => {
-                this.fetch_pack(packdef.path, packdef.title);
+                this.conductor.fetch_pack(packdef.path, packdef.title);
             });
             pack_list.append(button);
         }
 
-        // Bind to file upload control
-        let upload_el = this.root.querySelector('#splash-upload');
-        // Clear it out in case of refresh
-        upload_el.value = '';
-        this.root.querySelector('#splash-upload-button').addEventListener('click', ev => {
-            upload_el.click();
+        // File loading: allow providing either a single file, multiple files, OR an entire
+        // directory (via the hokey WebKit Entry interface)
+        let upload_file_el = this.root.querySelector('#splash-upload-file');
+        let upload_dir_el = this.root.querySelector('#splash-upload-dir');
+        // Clear out the file controls in case of refresh
+        upload_file_el.value = '';
+        upload_dir_el.value = '';
+        this.root.querySelector('#splash-upload-file-button').addEventListener('click', ev => {
+            upload_file_el.click();
         });
-        upload_el.addEventListener('change', async ev => {
+        this.root.querySelector('#splash-upload-dir-button').addEventListener('click', ev => {
+            upload_dir_el.click();
+        });
+        upload_file_el.addEventListener('change', async ev => {
+            if (upload_file_el.files.length === 0)
+                return;
+
+            // TODO throw up a 'loading' overlay
+            // FIXME handle multiple files!  but if there's only one, explicitly load /that/ one
             let file = ev.target.files[0];
             let buf = await file.arrayBuffer();
-            this.load_file(buf, this.extract_identifier_from_path(file.name));
-            // TODO get title out of C2G when it's supported
-            this.conductor.level_pack_name_el.textContent = file.name;
+            await this.conductor.parse_and_load_game(buf, new util.FileFileSource(ev.target.files), file.name);
+        });
+        upload_dir_el.addEventListener('change', async ev => {
+            // TODO throw up a 'loading' overlay
+            // The directory selector populates 'files' with every single file, recursively, which
+            // is kind of wild but also /much/ easier to deal with
+            let files = upload_dir_el.files;
+            if (files.length > 4096)
+                throw new util.LLError("Got way too many files; did you upload the right directory?");
+
+            await this.search_multi_source(new util.FileFileSource(files));
+        });
+        // Allow loading a local directory onto us, via the WebKit
+        // file entry interface
+        // TODO? this always takes a moment to register, not sure why...
+        // FIXME as written this won't correctly handle CCLs
+        util.handle_drop(this.root, {
+            require_file: true,
+            dropzone_class: '--drag-hover',
+            on_drop: async ev => {
+                // TODO for now, always use the entry interface, but if these are all files then
+                // they can just be loaded normally
+                let entries = [];
+                for (let item of ev.dataTransfer.items) {
+                    entries.push(item.webkitGetAsEntry());
+                }
+                await this.search_multi_source(new util.EntryFileSource(entries));
+            },
         });
 
         // Bind to "create level" button
         this.root.querySelector('#splash-create-level').addEventListener('click', ev => {
-            let stored_level = new format_util.StoredLevel;
+            let stored_level = new format_base.StoredLevel(1);
             stored_level.size_x = 32;
             stored_level.size_y = 32;
             for (let i = 0; i < 1024; i++) {
-                let cell = new format_util.StoredCell;
+                let cell = new format_base.StoredCell;
                 cell.push({type: TILE_TYPES['floor']});
                 stored_level.linear_cells.push(cell);
             }
             stored_level.linear_cells[0].push({type: TILE_TYPES['player']});
 
             // FIXME definitely gonna need a name here chief
-            let stored_game = new format_util.StoredGame(null);
-            stored_game.levels.push(stored_level);
+            let stored_game = new format_base.StoredGame(null);
+            stored_game.level_metadata.push({
+                stored_level: stored_level,
+            });
             this.conductor.load_game(stored_game);
 
             this.conductor.switch_to_editor();
         });
     }
 
-    extract_identifier_from_path(path) {
-        let ident = path.match(/^(?:.*\/)?[.]*([^.]+)(?:[.]|$)/)[1];
-        if (ident) {
-            return ident.toLowerCase();
+    // Look for something we can load, and load it
+    async search_multi_source(source) {
+        // TODO not entiiirely kosher, but not sure if we should have an api for this or what
+        if (source._loaded_promise) {
+            await source._loaded_promise;
         }
-        else {
-            return null;
-        }
-    }
 
-    // TODO wait why aren't these just on conductor
-    async fetch_pack(path, title) {
-        // TODO indicate we're downloading something
-        // TODO handle errors
-        // TODO cancel a download if we start another one?
-        let buf = await fetch(path);
-        this.load_file(buf, this.extract_identifier_from_path(path));
-        // TODO get title out of C2G when it's supported
-        this.conductor.level_pack_name_el.textContent = title || path;
-    }
+        let paths = Object.keys(source.files);
+        // TODO should handle having multiple candidates, but this is good enough for now
+        paths.sort((a, b) => a.length - b.length);
+        for (let path of paths) {
+            let m = path.match(/[.]([^./]+)$/);
+            if (! m)
+                continue;
 
-    load_file(buf, identifier = null) {
-        // TODO also support tile world's DAC when reading from local??
-        // TODO ah, there's more metadata in CCX, crapola
-        let magic = String.fromCharCode.apply(null, new Uint8Array(buf.slice(0, 4)));
-        let stored_game;
-        if (magic === 'CC2M' || magic === 'CCS ') {
-            stored_game = new format_util.StoredGame;
-            stored_game.levels.push(c2m.parse_level(buf));
-            // Don't make a savefile for individual levels
-            identifier = null;
+            let ext = m[1];
+            // TODO this can't load an individual c2m, hmmm
+            if (ext === 'c2g' || ext === 'dat' || ext === 'ccl') {
+                let buf = await source.get(path);
+                await this.conductor.parse_and_load_game(buf, source, path);
+                break;
+            }
         }
-        else if (magic === '\xac\xaa\x02\x00' || magic == '\xac\xaa\x02\x01') {
-            stored_game = dat.parse_game(buf);
-        }
-        else {
-            throw new Error("Unrecognized file format");
-        }
-        this.conductor.load_game(stored_game, identifier);
-        this.conductor.switch_to_player();
+        // TODO else...?  complain we couldn't find anything?  list what we did find??  idk
     }
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Central controller, thingy
+
+// Report an error when a level fails to load
+class LevelErrorOverlay extends DialogOverlay {
+    constructor(conductor, error) {
+        super(conductor);
+        this.set_title("bummer");
+        this.main.append(
+            mk('p', "Whoopsadoodle!  I seem to be having some trouble loading this level.  I got this error, which may or may not be useful:"),
+            mk('pre.error', error.toString()),
+            mk('p',
+                "It's probably entirely my fault, and I'm very sorry.  ",
+                "Unless you're doing something weird and it's actually your fault, I guess.  ",
+                "This is just a prerecorded message, so it's hard for me to tell!  ",
+                "But if it's my fault and you're feeling up to it, you can let me know by ",
+                mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/issues'}, "filing an issue on GitHub"),
+                " or finding me on Discord or Twitter or whatever.",
+            ),
+            mk('p', "In the more immediate future, you can see if any other levels work by jumping around manually with the 'level select' button.  Unless this was the first level of a set, in which case you're completely out of luck."),
+        );
+        this.add_button("welp, you get what you pay for", ev => {
+            this.close();
+        });
+    }
+}
 
 // About dialog
 const ABOUT_HTML = `
@@ -1613,7 +1666,7 @@ class LevelBrowserOverlay extends DialogOverlay {
         this.main.append(table);
         let savefile = conductor.current_pack_savefile;
         // TODO if i stop eagerloading everything in a .DAT then this will not make sense any more
-        for (let [i, stored_level] of conductor.stored_game.levels.entries()) {
+        for (let [i, meta] of conductor.stored_game.level_metadata.entries()) {
             let scorecard = savefile.scorecards[i];
             let score = "—", time = "—", abstime = "—";
             if (scorecard) {
@@ -1637,10 +1690,18 @@ class LevelBrowserOverlay extends DialogOverlay {
                 abstime = `${absmin}:${abssec < 10 ? '0' : ''}${abssec.toFixed(2)}`;
             }
 
-            tbody.append(mk(i >= savefile.highest_level ? 'tr.--unvisited' : 'tr',
+            let title = meta.title;
+            if (meta.error) {
+                title = '[failed to load]';
+            }
+            else if (! title) {
+                title = '(untitled)';
+            }
+
+            let tr = mk('tr',
                 {'data-index': i},
-                mk('td.-number', i + 1),
-                mk('td.-title', stored_level.title),
+                mk('td.-number', meta.number),
+                mk('td.-title', title),
                 mk('td.-time', time),
                 mk('td.-time', abstime),
                 mk('td.-score', score),
@@ -1649,7 +1710,17 @@ class LevelBrowserOverlay extends DialogOverlay {
                 // your wallclock time also?
                 // TODO other stats??  num chips, time limit?  don't know that without loading all
                 // the levels upfront though, which i currently do but want to stop doing
-            ));
+            );
+
+            // TODO sigh, does not actually indicate visited in C2G world
+            if (i >= savefile.highest_level) {
+                tr.classList.add('--unvisited');
+            }
+            if (meta.error) {
+                tr.classList.add('--error');
+            }
+
+            tbody.append(tr);
         }
 
         tbody.addEventListener('click', ev => {
@@ -1658,8 +1729,9 @@ class LevelBrowserOverlay extends DialogOverlay {
                 return;
 
             let index = parseInt(tr.getAttribute('data-index'), 10);
-            this.conductor.change_level(index);
-            this.close();
+            if (this.conductor.change_level(index)) {
+                this.close();
+            }
         });
 
         this.add_button("nevermind", ev => {
@@ -1718,7 +1790,7 @@ class Conductor {
         });
         this.nav_next_button.addEventListener('click', ev => {
             // TODO confirm
-            if (this.stored_game && this.level_index < this.stored_game.levels.length - 1) {
+            if (this.stored_game && this.level_index < this.stored_game.level_metadata.length - 1) {
                 this.change_level(this.level_index + 1);
             }
             ev.target.blur();
@@ -1786,6 +1858,13 @@ class Conductor {
         if (identifier !== null) {
             // TODO again, enforce something about the shape here
             this.current_pack_savefile = JSON.parse(window.localStorage.getItem(STORAGE_PACK_PREFIX + identifier));
+            if (this.current_pack_savefile.total_score === null) {
+                // Fix some NaNs that slipped in
+                this.current_pack_savefile.total_score = this.current_pack_savefile.scorecards
+                    .map(scorecard => scorecard ? scorecard.score : 0)
+                    .reduce((a, b) => a + b, 0);
+                this.save_savefile();
+            }
         }
         if (! this.current_pack_savefile) {
             this.current_pack_savefile = {
@@ -1800,12 +1879,20 @@ class Conductor {
         this.player.load_game(stored_game);
         this.editor.load_game(stored_game);
 
-        this.change_level(0);
+        return this.change_level(0);
     }
 
     change_level(level_index) {
+        // FIXME handle errors here
+        try {
+            this.stored_level = this.stored_game.load_level(level_index);
+        }
+        catch (e) {
+            new LevelErrorOverlay(this, e).open();
+            return false;
+        }
+
         this.level_index = level_index;
-        this.stored_level = this.stored_game.levels[level_index];
 
         // FIXME do better
         this.level_name_el.textContent = `Level ${level_index + 1} — ${this.stored_level.title}`;
@@ -1815,12 +1902,13 @@ class Conductor {
 
         this.player.load_level(this.stored_level);
         this.editor.load_level(this.stored_level);
+        return true;
     }
 
     update_nav_buttons() {
         this.nav_choose_level_button.disabled = !this.stored_game;
         this.nav_prev_button.disabled = !this.stored_game || this.level_index <= 0;
-        this.nav_next_button.disabled = !this.stored_game || this.level_index >= this.stored_game.levels.length;
+        this.nav_next_button.disabled = !this.stored_game || this.level_index >= this.stored_game.level_metadata.length;
     }
 
     save_stash() {
@@ -1843,6 +1931,68 @@ class Conductor {
             }
             packinfo.total_score = this.current_pack_savefile.total_score;
             this.save_stash();
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------------
+    // File loading
+
+    extract_identifier_from_path(path) {
+        let ident = path.match(/^(?:.*\/)?[.]*([^.]+)(?:[.]|$)/)[1];
+        if (ident) {
+            return ident.toLowerCase();
+        }
+        else {
+            return null;
+        }
+    }
+
+    async fetch_pack(path, title) {
+        // TODO indicate we're downloading something
+        // TODO handle errors
+        // TODO cancel a download if we start another one?
+        let buf = await util.fetch(path);
+        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path);
+    }
+
+    async parse_and_load_game(buf, source, path, identifier, title) {
+        if (identifier === undefined) {
+            identifier = this.extract_identifier_from_path(path);
+        }
+
+        // TODO get title out of C2G when it's supported
+        this.level_pack_name_el.textContent = title ?? identifier ?? '(untitled)';
+
+        // TODO also support tile world's DAC when reading from local??
+        // TODO ah, there's more metadata in CCX, crapola
+        let magic = String.fromCharCode.apply(null, new Uint8Array(buf.slice(0, 4)));
+        let stored_game;
+        if (magic === 'CC2M' || magic === 'CCS ') {
+            // This is an individual level, so concoct a fake game for it, and don't save anything
+            stored_game = c2g.wrap_individual_level(buf);
+            identifier = null;
+        }
+        else if (magic === '\xac\xaa\x02\x00' || magic == '\xac\xaa\x02\x01') {
+            stored_game = dat.parse_game(buf);
+        }
+        else if (magic.toLowerCase() === 'game') {
+            // TODO this isn't really a magic number and isn't required to be first, so, maybe
+            // this one should just go by filename
+            console.log(path);
+            let dir;
+            if (! path.match(/[/]/)) {
+                dir = '';
+            }
+            else {
+                dir = path.replace(/[/][^/]+$/, '');
+            }
+            stored_game = await c2g.parse_game(buf, source, dir);
+        }
+        else {
+            throw new Error("Unrecognized file format");
+        }
+        if (this.load_game(stored_game, identifier)) {
+            this.switch_to_player();
         }
     }
 }
@@ -1891,14 +2041,14 @@ async function main() {
     let path = query.get('setpath');
     let b64level = query.get('level');
     if (path && path.match(/^levels[/]/)) {
-        conductor.splash.fetch_pack(path);
+        conductor.fetch_pack(path);
     }
     else if (b64level) {
         // TODO all the more important to show errors!!
         // FIXME Not ideal, but atob() returns a string rather than any of the myriad binary types
         let stringy_buf = atob(b64level.replace(/-/g, '+').replace(/_/g, '/'));
         let buf = Uint8Array.from(stringy_buf, c => c.charCodeAt(0)).buffer;
-        conductor.splash.load_file(buf);
+        await conductor.parse_and_load_game(buf, null, 'shared.c2m', null, "Shared level");
     }
 }
 
