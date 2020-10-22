@@ -66,11 +66,13 @@ export class StoredGame {
         if (meta.error)
             throw meta.error;
 
-        // The editor stores inflated levels at times, so respect that
-        if (meta.stored_level)
+        if (meta.stored_level) {
+            // The editor stores inflated levels at times, so respect that
             return meta.stored_level;
-
-        // Otherwise, attempt to load the level
-        return this._level_loader(meta.bytes);
+        }
+        else {
+            // Otherwise, attempt to load the level
+            return this._level_loader(meta.bytes, meta.number);
+        }
     }
 }

@@ -1240,9 +1240,15 @@ class Splash extends PrimaryView {
             let score;
             let packinfo = conductor.stash.packs[packdef.ident];
             if (packinfo && packinfo.total_score !== undefined) {
-                // TODO tack on a star if the game is "beaten"?  what's that mean?  every level
-                // beaten i guess?
-                score = packinfo.total_score.toLocaleString();
+                if (packinfo.total_score === null) {
+                    // Whoops, some NaNs got in here  :(
+                    score = "computing...";
+                }
+                else {
+                    // TODO tack on a star if the game is "beaten"?  what's that mean?  every level
+                    // beaten i guess?
+                    score = packinfo.total_score.toLocaleString();
+                }
             }
             else {
                 score = "unplayed";
@@ -1312,7 +1318,7 @@ class Splash extends PrimaryView {
 
         // Bind to "create level" button
         this.root.querySelector('#splash-create-level').addEventListener('click', ev => {
-            let stored_level = new format_base.StoredLevel;
+            let stored_level = new format_base.StoredLevel(1);
             stored_level.size_x = 32;
             stored_level.size_y = 32;
             for (let i = 0; i < 1024; i++) {
@@ -1779,6 +1785,13 @@ class Conductor {
         if (identifier !== null) {
             // TODO again, enforce something about the shape here
             this.current_pack_savefile = JSON.parse(window.localStorage.getItem(STORAGE_PACK_PREFIX + identifier));
+            if (this.current_pack_savefile.total_score === null) {
+                // Fix some NaNs that slipped in
+                this.current_pack_savefile.total_score = this.current_pack_savefile.scorecards
+                    .map(scorecard => scorecard ? scorecard.score : 0)
+                    .reduce((a, b) => a + b, 0);
+                this.save_savefile();
+            }
         }
         if (! this.current_pack_savefile) {
             this.current_pack_savefile = {
