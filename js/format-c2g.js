@@ -860,7 +860,7 @@ export function parse_level(buf, number = 1) {
                 if (! spec)
                     throw new util.LLError(`Invalid tile type 0x${tile_byte.toString(16)}`);
                 if (spec.error)
-                    throw spec.error;
+                    throw new util.LLError(spec.error);
 
                 return spec;
             }

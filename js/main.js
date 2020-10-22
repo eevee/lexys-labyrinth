@@ -3,7 +3,7 @@
 import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
-import * as format_util from './format-base.js';
+import * as format_base from './format-base.js';
 import { Level } from './game.js';
 import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay } from './main-base.js';
 import { Editor } from './main-editor.js';
@@ -1312,18 +1312,18 @@ class Splash extends PrimaryView {
 
         // Bind to "create level" button
         this.root.querySelector('#splash-create-level').addEventListener('click', ev => {
-            let stored_level = new format_util.StoredLevel;
+            let stored_level = new format_base.StoredLevel;
             stored_level.size_x = 32;
             stored_level.size_y = 32;
             for (let i = 0; i < 1024; i++) {
-                let cell = new format_util.StoredCell;
+                let cell = new format_base.StoredCell;
                 cell.push({type: TILE_TYPES['floor']});
                 stored_level.linear_cells.push(cell);
             }
             stored_level.linear_cells[0].push({type: TILE_TYPES['player']});
 
             // FIXME definitely gonna need a name here chief
-            let stored_game = new format_util.StoredGame(null);
+            let stored_game = new format_base.StoredGame(null);
             stored_game.level_metadata.push({
                 stored_level: stored_level,
             });
@@ -1362,6 +1362,30 @@ class Splash extends PrimaryView {
 
 // -------------------------------------------------------------------------------------------------
 // Central controller, thingy
+
+// Report an error when a level fails to load
+class LevelErrorOverlay extends DialogOverlay {
+    constructor(conductor, error) {
+        super(conductor);
+        this.set_title("bummer");
+        this.main.append(
+            mk('p', "Whoopsadoodle!  I seem to be having some trouble loading this level.  I got this error, which may or may not be useful:"),
+            mk('pre.error', error.toString()),
+            mk('p',
+                "It's probably entirely my fault, and I'm very sorry.  ",
+                "Unless you're doing something weird and it's actually your fault, I guess.  ",
+                "This is just a prerecorded message, so it's hard for me to tell!  ",
+                "But if it's my fault and you're feeling up to it, you can let me know by ",
+                mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/issues'}, "filing an issue on GitHub"),
+                " or finding me on Discord or Twitter or whatever.",
+            ),
+            mk('p', "In the more immediate future, you can see if any other levels work by jumping around manually with the 'level select' button.  Unless this was the first level of a set, in which case you're completely out of luck."),
+        );
+        this.add_button("welp, you get what you pay for", ev => {
+            this.close();
+        });
+    }
+}
 
 // About dialog
 const ABOUT_HTML = `
@@ -1625,8 +1649,9 @@ class LevelBrowserOverlay extends DialogOverlay {
                 return;
 
             let index = parseInt(tr.getAttribute('data-index'), 10);
-            this.conductor.change_level(index);
-            this.close();
+            if (this.conductor.change_level(index)) {
+                this.close();
+            }
         });
 
         this.add_button("nevermind", ev => {
@@ -1767,13 +1792,20 @@ class Conductor {
         this.player.load_game(stored_game);
         this.editor.load_game(stored_game);
 
-        this.change_level(0);
+        return this.change_level(0);
     }
 
     change_level(level_index) {
-        this.level_index = level_index;
         // FIXME handle errors here
-        this.stored_level = this.stored_game.load_level(level_index);
+        try {
+            this.stored_level = this.stored_game.load_level(level_index);
+        }
+        catch (e) {
+            new LevelErrorOverlay(this, e).open();
+            return false;
+        }
+
+        this.level_index = level_index;
 
         // FIXME do better
         this.level_name_el.textContent = `Level ${level_index + 1} — ${this.stored_level.title}`;
@@ -1783,6 +1815,7 @@ class Conductor {
 
         this.player.load_level(this.stored_level);
         this.editor.load_level(this.stored_level);
+        return true;
     }
 
     update_nav_buttons() {
@@ -1871,8 +1904,9 @@ class Conductor {
         else {
             throw new Error("Unrecognized file format");
         }
-        this.load_game(stored_game, identifier);
-        this.switch_to_player();
+        if (this.load_game(stored_game, identifier)) {
+            this.switch_to_player();
+        }
     }
 }
 

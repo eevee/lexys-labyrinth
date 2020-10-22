@@ -82,6 +82,9 @@ p:first-child {
 p:last-child {
     margin-bottom: 0;
 }
+pre {
+    white-space: pre-wrap;
+}
 code {
     color: #c0c0e0;
 }
@@ -156,6 +159,11 @@ a:active {
 .dialog > section {
     overflow: auto;
     padding: 1em;
+}
+.dialog pre.error {
+    color: #400000;
+    background: #f0d0d0;
+    padding: 0.5em 1em;
 }
 
 /* Individual overlays */
