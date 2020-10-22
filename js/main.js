@@ -1785,7 +1785,7 @@ class Conductor {
         if (identifier !== null) {
             // TODO again, enforce something about the shape here
             this.current_pack_savefile = JSON.parse(window.localStorage.getItem(STORAGE_PACK_PREFIX + identifier));
-            if (this.current_pack_savefile.total_score === null) {
+            if (this.current_pack_savefile && this.current_pack_savefile.total_score === null) {
                 // Fix some NaNs that slipped in
                 this.current_pack_savefile.total_score = this.current_pack_savefile.scorecards
                     .map(scorecard => scorecard ? scorecard.score : 0)
