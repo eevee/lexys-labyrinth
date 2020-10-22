@@ -1,5 +1,6 @@
-import * as util from './format-util.js';
+import * as format_base from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
+import * as util from './util.js';
 
 const TILE_ENCODING = {
     0x00: 'floor',
@@ -118,21 +119,71 @@ const TILE_ENCODING = {
     0x6e: ['player', 'south'],
     0x6f: ['player', 'east'],
 };
-    
-function parse_level(buf, number) {
-    let level = new util.StoredLevel(number);
+
+function decode_password(bytes, start, len) {
+    let password = [];
+    for (let i = 0; i < len; i++) {
+        password.push(bytes[start + i] ^ 0x99);
+    }
+    return String.fromCharCode.apply(null, password);
+}
+
+export function parse_level_metadata(bytes) {
+    let meta = {};
+
+    let view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+    // Level number; rest of level header is unused
+    meta.number = view.getUint16(0, true);
+
+    // Map layout
+    // Same structure twice, for the two layers
+    let p = 8;
+    for (let l = 0; l < 2; l++) {
+        let layer_length = view.getUint16(p, true);
+        p += 2 + layer_length;
+    }
+
+    // Optional metadata fields
+    let meta_length = view.getUint16(p, true);
+    p += 2;
+    let end = p + meta_length;
+    while (p < end) {
+        // Common header
+        let field_type = view.getUint8(p, true);
+        let field_length = view.getUint8(p + 1, true);
+        p += 2;
+        if (field_type === 0x03) {
+            // Title, including trailing NUL
+            meta.title = util.string_from_buffer_ascii(bytes, p, field_length - 1);
+        }
+        else if (field_type === 0x06) {
+            // Password, with trailing NUL, and XORed with 0x99 (???)
+            meta.password = decode_password(bytes, p, field_length - 1);
+        }
+        else if (field_type === 0x07) {
+            // Hint, including trailing NUL, of course
+            meta.hint = util.string_from_buffer_ascii(bytes, p, field_length - 1);
+        }
+        p += field_length;
+    }
+
+    return meta;
+}
+
+function parse_level(bytes, number) {
+    let level = new format_base.StoredLevel(number);
     level.has_custom_connections = true;
     level.use_ccl_compat = true;
     // Map size is always fixed as 32x32 in CC1
     level.size_x = 32;
     level.size_y = 32;
     for (let i = 0; i < 1024; i++) {
-        level.linear_cells.push(new util.StoredCell);
+        level.linear_cells.push(new format_base.StoredCell);
     }
     level.use_cc1_boots = true;
 
-    let view = new DataView(buf);
-    let bytes = new Uint8Array(buf);
+    let view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
     // Header
     let level_number = view.getUint16(0, true);
@@ -163,7 +214,7 @@ function parse_level(buf, number) {
             // TODO could be more forgiving for goofy levels doing goofy things
             if (! spec) {
                 let [x, y] = level.scalar_to_coords(c);
-                throw new Error(`Invalid tile byte 0x${tile_byte.toString(16)} at (${x}, ${y}) in level ${number}`);
+                throw new Error(`Invalid tile byte 0x${tile_byte.toString(16)} at (${x}, ${y})`);
             }
 
             let name, direction;
@@ -227,11 +278,11 @@ function parse_level(buf, number) {
         }
         else if (field_type === 0x03) {
             // Title, including trailing NUL
-            level.title = util.string_from_buffer_ascii(buf.slice(p, p + field_length - 1));
+            level.title = util.string_from_buffer_ascii(bytes, p, field_length - 1);
         }
         else if (field_type === 0x04) {
             // Trap linkages (MSCC only, not in Lynx or CC2)
-            let field_view = new DataView(buf.slice(p, p + field_length));
+            let field_view = new DataView(bytes.buffer, bytes.byteOffset + p, field_length);
             let q = 0;
             while (q < field_length) {
                 let button_x = field_view.getUint16(q + 0, true);
@@ -245,7 +296,7 @@ function parse_level(buf, number) {
         }
         else if (field_type === 0x05) {
             // Cloner linkages (MSCC only, not in Lynx or CC2)
-            let field_view = new DataView(buf.slice(p, p + field_length));
+            let field_view = new DataView(bytes.buffer, bytes.byteOffset + p, field_length);
             let q = 0;
             while (q < field_length) {
                 let button_x = field_view.getUint16(q + 0, true);
@@ -257,16 +308,12 @@ function parse_level(buf, number) {
             }
         }
         else if (field_type === 0x06) {
-            // Password, with trailing NUL, and otherwise XORed with 0x99 (?!)
-            let password = [];
-            for (let i = 0; i < field_length - 1; i++) {
-                password.push(view.getUint8(p + i, true) ^ 0x99);
-            }
-            level.password = String.fromCharCode.apply(null, password);
+            // Password, with trailing NUL, and otherwise XORed with 0x99 (???)
+            level.password = decode_password(bytes, p, field_length - 1);
         }
         else if (field_type === 0x07) {
             // Hint, including trailing NUL, of course
-            level.hint = util.string_from_buffer_ascii(buf.slice(p, p + field_length - 1));
+            level.hint = util.string_from_buffer_ascii(bytes, p, field_length - 1);
         }
         else if (field_type === 0x08) {
             // Password, but not encoded
@@ -283,7 +330,7 @@ function parse_level(buf, number) {
 }
 
 export function parse_game(buf) {
-    let game = new util.StoredGame;
+    let game = new format_base.StoredGame(null, parse_level);
 
     let full_view = new DataView(buf);
     let magic = full_view.getUint32(0, true);
@@ -305,11 +352,19 @@ export function parse_game(buf) {
     let p = 6;
     for (let l = 1; l <= level_count; l++) {
         let length = full_view.getUint16(p, true);
-        let level_buf = buf.slice(p + 2, p + 2 + length);
+        let bytes = new Uint8Array(buf, p + 2, length);
         p += 2 + length;
 
-        let level = parse_level(level_buf, l);
-        game.levels.push(level);
+        let meta;
+        try {
+            meta = parse_level_metadata(bytes);
+        }
+        catch (e) {
+            meta = {error: e};
+        }
+        meta.index = l - 1;
+        meta.bytes = bytes;
+        game.level_metadata.push(meta);
     }
 
     return game;

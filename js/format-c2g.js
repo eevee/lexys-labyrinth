@@ -1,6 +1,7 @@
 import { DIRECTIONS } from './defs.js';
-import * as util from './format-util.js';
+import * as format_base from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
+import * as util from './util.js';
 
 const CC2_DEMO_INPUT_MASK = {
     drop:   0x01,
@@ -13,9 +14,8 @@ const CC2_DEMO_INPUT_MASK = {
 };
 
 class CC2Demo {
-    constructor(buf) {
-        this.buf = buf;
-        this.bytes = new Uint8Array(buf);
+    constructor(bytes) {
+        this.bytes = bytes;
 
         // byte 0 is unknown, always 0?
         // Force floor seed can apparently be anything; my best guess, based on the Desert Oasis
@@ -398,8 +398,18 @@ const TILE_ENCODING = {
         has_next: true,
         extra_args: [arg_direction],
     },
-    // 0x57: Timid teeth : '#direction', '#next'
-    // 0x58: Explosion animation (unused in main levels) : '#direction', '#next'
+    0x57: {
+        name: 'teeth_timid',
+        has_next: true,
+        extra_args: [arg_direction],
+        error: "Timid chomper is not yet implemented, sorry!",
+    },
+    0x58: {
+        // TODO??? unused in main levels -- name: 'doppelganger2',
+        has_next: true,
+        extra_args: [arg_direction],
+        error: "Explosion animation is not implemented, sorry!",
+    },
     0x59: {
         name: 'hiking_boots',
         has_next: true,
@@ -410,7 +420,11 @@ const TILE_ENCODING = {
     0x5b: {
         name: 'no_player1_sign',
     },
-    // 0x5c: Inverter gate (N) : Modifier allows other gates, see below
+    0x5c: {
+        // TODO (modifier chooses logic gate) name: 'doppelganger2',
+        // TODO modifier: ...
+        error: "Logic gates are not yet implemented, sorry!",
+    },
     0x5e: {
         name: 'button_pink',
         modifier: modifier_wire,
@@ -424,7 +438,11 @@ const TILE_ENCODING = {
     0x61: {
         name: 'button_orange',
     },
-    // 0x62: Lightning bolt : '#next'
+    0x62: {
+        name: 'lightning_bolt',
+        has_next: true,
+        error: "The lightning bolt is not yet implemented, sorry!",
+    },
     0x63: {
         name: 'tank_yellow',
         has_next: true,
@@ -433,8 +451,18 @@ const TILE_ENCODING = {
     0x64: {
         name: 'button_yellow',
     },
-    // 0x65: Mirror Chip : '#direction', '#next'
-    // 0x66: Mirror Melinda : '#direction', '#next'
+    0x65: {
+        name: 'doppelganger1',
+        has_next: true,
+        extra_args: [arg_direction],
+        error: "Doppelganger Lexy is not yet implemented, sorry!",
+    },
+    0x66: {
+        name: 'doppelganger2',
+        has_next: true,
+        extra_args: [arg_direction],
+        error: "Doppelganger Cerise is not yet implemented, sorry!",
+    },
     0x68: {
         name: 'bowling_ball',
         has_next: true,
@@ -555,8 +583,14 @@ const TILE_ENCODING = {
         name: 'button_black',
         modifier: modifier_wire,
     },
-    // 0x88: ON/OFF switch (OFF) : 
-    // 0x89: ON/OFF switch (ON) : 
+    0x88: {
+        name: 'light_switch_off',
+        error: "The light switch is not yet implemented, sorry!",
+    },
+    0x89: {
+        name: 'light_switch_on',
+        error: "The light switch is not yet implemented, sorry!",
+    },
     0x8a: {
         name: 'thief_keys',
     },
@@ -576,9 +610,21 @@ const TILE_ENCODING = {
         name: 'xray_eye',
         has_next: true,
     },
-    // 0x8f: Thief bribe : '#next'
-    // 0x90: Speed boots : '#next'
-    // 0x92: Hook : '#next' 
+    0x8f: {
+        name: 'bribe',
+        has_next: true,
+        error: "The bribe is not yet implemented, sorry!",
+    },
+    0x90: {
+        name: 'speed_boots',
+        has_next: true,
+        error: "The speed boots are not yet implemented, sorry!",
+    },
+    0x91: {
+        name: 'hook',
+        has_next: true,
+        error: "The hook is not yet implemented, sorry!",
+    },
 };
 const REVERSE_TILE_ENCODING = {};
 for (let [tile_byte, spec] of Object.entries(TILE_ENCODING)) {
@@ -619,21 +665,18 @@ function read_n_bytes(view, start, n) {
     }
 }
 
-// Decompress the little ad-hoc compression scheme used for both map data and
-// solution playback
-function decompress(buf) {
-    let decompressed_length = new DataView(buf).getUint16(0, true);
-    let out = new ArrayBuffer(decompressed_length);
-    let outbytes = new Uint8Array(out);
-    let bytes = new Uint8Array(buf);
+// Decompress the little ad-hoc compression scheme used for both map data and solution playback
+function decompress(bytes) {
+    let decompressed_length = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint16(0, true);
+    let outbytes = new Uint8Array(decompressed_length);
     let p = 2;
     let q = 0;
-    while (p < buf.byteLength) {
+    while (p < bytes.length) {
         let len = bytes[p];
         p++;
         if (len < 0x80) {
             // Data block
-            outbytes.set(new Uint8Array(buf.slice(p, p + len)), q);
+            outbytes.set(new Uint8Array(bytes.buffer, bytes.byteOffset + p, len), q);
             p += len;
             q += len;
         }
@@ -654,59 +697,85 @@ function decompress(buf) {
     }
     if (q !== decompressed_length)
         throw new Error(`Expected to decode ${decompressed_length} bytes but got ${q} instead`);
-    return out;
+    return outbytes;
 }
 
-export function parse_level(buf, number = 1) {
-    let level = new util.StoredLevel(number);
+// Iterates over a C2M file and yields: [section type, uint8 array view of the section]
+function* read_c2m_sections(buf) {
     let full_view = new DataView(buf);
     let next_section_start = 0;
-    let extra_hints = [];
-    let hint_tiles = [];
     while (next_section_start < buf.byteLength) {
         // Read section header and length
         let section_start = next_section_start;
-        let section_type = util.string_from_buffer_ascii(buf.slice(section_start, section_start + 4));
+        let section_type = util.string_from_buffer_ascii(buf, section_start, 4);
         let section_length = full_view.getUint32(section_start + 4, true);
         next_section_start = section_start + 8 + section_length;
         if (next_section_start > buf.byteLength)
-            throw new Error(`Section at byte ${section_start} of type '${section_type}' extends ${buf.length - next_section_start} bytes past the end of the file`);
+            throw new util.LLError(`Section at byte ${section_start} of type '${section_type}' extends ${buf.length - next_section_start} bytes past the end of the file`);
 
-        // This chunk marks the end of the file regardless
+        // This chunk marks the end of the file, full stop; a lot of canonical files have garbage
+        // newlines afterwards and will fail to continue to parse beyond this point
         if (section_type === 'END ')
-            break;
+            return;
 
-        if (section_type === 'CC2M' || section_type === 'LOCK' || section_type === 'VERS' ||
-            section_type === 'TITL' || section_type === 'AUTH' ||
-            section_type === 'CLUE' || section_type === 'NOTE')
+        yield [section_type, new Uint8Array(buf, section_start + 8, section_length)];
+    }
+}
+
+export function parse_level_metadata(buf) {
+    let meta = {
+        title: null,
+    };
+    for (let [type, bytes] of read_c2m_sections(buf)) {
+        if (type === 'TITL') {
+            meta.title = util.string_from_buffer_ascii(bytes, 0, bytes.length - 1).replace(/\r\n/g, "\n");
+            // TODO anything else we want for now?
+            break;
+        }
+    }
+    return meta;
+}
+
+export function parse_level(buf, number = 1) {
+    if (ArrayBuffer.isView(buf)) {
+        buf = buf.buffer;
+    }
+
+    let level = new format_base.StoredLevel(number);
+    let extra_hints = [];
+    let hint_tiles = [];
+    for (let [type, bytes] of read_c2m_sections(buf)) {
+        if (type === 'CC2M' || type === 'LOCK' || type === 'VERS' ||
+            type === 'TITL' || type === 'AUTH' ||
+            type === 'CLUE' || type === 'NOTE')
         {
             // These are all singular strings (with a terminating NUL, for some reason)
             // XXX character encoding??
-            let str = util.string_from_buffer_ascii(buf.slice(section_start + 8, next_section_start - 1)).replace(/\r\n/g, "\n");
+            let str = util.string_from_buffer_ascii(bytes, 0, bytes.length - 1).replace(/\r\n/g, "\n");
 
             // TODO store more of this, at least for idempotence, maybe
-            if (section_type === 'CC2M') {
+            if (type === 'CC2M') {
                 // File version, doesn't seem interesting
             }
-            else if (section_type === 'LOCK') {
+            else if (type === 'LOCK') {
                 // Unclear, seems to be a comment about the editor...?
             }
-            else if (section_type === 'VERS') {
+            else if (type === 'VERS') {
                 // Editor version which created this level
             }
-            else if (section_type === 'TITL') {
+            else if (type === 'TITL') {
                 // Level title
                 level.title = str;
             }
-            else if (section_type === 'AUTH') {
+            else if (type === 'AUTH') {
                 // Author's name
                 level.author = str;
             }
-            else if (section_type === 'CLUE') {
+            else if (type === 'CLUE') {
                 // Level hint
                 level.hint = str;
             }
-            else if (section_type === 'NOTE') {
+            else if (type === 'NOTE') {
                 // Author's comments...  but might also include multiple hints
                 // for levels with multiple hint tiles, delineated by [CLUE].
                 // For my purposes, extra hints are associated with the
@@ -716,16 +785,15 @@ export function parse_level(buf, number = 1) {
             continue;
         }
 
-        let section_buf = buf.slice(section_start + 8, next_section_start);
-        let section_view = new DataView(buf, section_start + 8, section_length);
+        let view = new DataView(buf, bytes.byteOffset, bytes.byteLength);
 
-        if (section_type === 'OPTN') {
+        if (type === 'OPTN') {
             // Level options, which may be truncated at any point
             // TODO implement most of these
-            level.time_limit = section_view.getUint16(0, true);
+            level.time_limit = view.getUint16(0, true);
 
             // TODO 0 - 10x10, 1 - 9x9, 2 - split, otherwise unknown which needs handling
-            let viewport = section_view.getUint8(2, true);
+            let viewport = view.getUint8(2, true);
             if (viewport === 0) {
                 level.viewport_size = 10;
             }
@@ -740,42 +808,40 @@ export function parse_level(buf, number = 1) {
                 throw new Error(`Unrecognized viewport size option ${viewport}`);
             }
 
-            if (section_view.byteLength <= 3)
+            if (view.byteLength <= 3)
                 continue;
-            //options.has_solution = section_view.getUint8(3, true);
+            //options.has_solution = view.getUint8(3, true);
 
-            if (section_view.byteLength <= 4)
+            if (view.byteLength <= 4)
                 continue;
-            //options.show_map_in_editor = section_view.getUint8(4, true);
+            //options.show_map_in_editor = view.getUint8(4, true);
 
-            if (section_view.byteLength <= 5)
+            if (view.byteLength <= 5)
                 continue;
-            //options.is_editable = section_view.getUint8(5, true);
+            //options.is_editable = view.getUint8(5, true);
 
-            if (section_view.byteLength <= 6)
+            if (view.byteLength <= 6)
                 continue;
-            //options.solution_hash = util.string_from_buffer_ascii(buf.slice(
+            //options.solution_hash = format_base.string_from_buffer_ascii(buf.slice(
                 //section_start + 6, section_start + 22));
 
-            if (section_view.byteLength <= 22)
+            if (view.byteLength <= 22)
                 continue;
-            //options.hide_logic = section_view.getUint8(22, true);
+            //options.hide_logic = view.getUint8(22, true);
 
-            if (section_view.byteLength <= 23)
+            if (view.byteLength <= 23)
                 continue;
-            level.use_cc1_boots = section_view.getUint8(23, true);
+            level.use_cc1_boots = view.getUint8(23, true);
 
-            if (section_view.byteLength <= 24)
+            if (view.byteLength <= 24)
                 continue;
-            //level.blob_behavior = section_view.getUint8(24, true);
+            //level.blob_behavior = view.getUint8(24, true);
         }
-        else if (section_type === 'MAP ' || section_type === 'PACK') {
-            let data = section_buf;
-            if (section_type === 'PACK') {
-                data = decompress(data);
+        else if (type === 'MAP ' || type === 'PACK') {
+            if (type === 'PACK') {
+                bytes = decompress(bytes);
             }
-            let bytes = new Uint8Array(data);
-            let map_view = new DataView(data);
+            let map_view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
             let width = bytes[0];
             let height = bytes[1];
             level.size_x = width;
@@ -788,17 +854,19 @@ export function parse_level(buf, number = 1) {
                 let tile_byte = bytes[p];
                 p++;
                 if (tile_byte === undefined)
-                    throw new Error(`Read past end of file in cell ${n}`);
+                    throw new util.LLError(`Read past end of file in cell ${n}`);
 
                 let spec = TILE_ENCODING[tile_byte];
                 if (! spec)
-                    throw new Error(`Unrecognized tile type 0x${tile_byte.toString(16)}`);
+                    throw new util.LLError(`Invalid tile type 0x${tile_byte.toString(16)}`);
+                if (spec.error)
+                    throw spec.error;
 
                 return spec;
             }
 
             for (n = 0; n < width * height; n++) {
-                let cell = new util.StoredCell;
+                let cell = new format_base.StoredCell;
                 while (true) {
                     let spec = read_spec();
 
@@ -818,7 +886,7 @@ export function parse_level(buf, number = 1) {
                             p += 4;
                         }
                         spec = read_spec();
-                        if (! spec.modifier) {
+                        if (! spec.modifier && ! (spec.name instanceof Array)) {
                             console.warn("Got unexpected modifier for tile:", spec.name);
                         }
                     }
@@ -893,27 +961,25 @@ export function parse_level(buf, number = 1) {
                 level.linear_cells.push(cell);
             }
         }
-        else if (section_type === 'KEY ') {
+        else if (type === 'KEY ') {
         }
-        else if (section_type === 'REPL' || section_type === 'PRPL') {
+        else if (type === 'REPL' || type === 'PRPL') {
             // "Replay", i.e. demo solution
-            let data = section_buf;
-            if (section_type === 'PRPL') {
-                data = decompress(data);
+            if (type === 'PRPL') {
+                bytes = decompress(bytes);
             }
-            level.demo = new CC2Demo(data);
+            level.demo = new CC2Demo(bytes);
         }
-        else if (section_type === 'RDNY') {
+        else if (type === 'RDNY') {
         }
         // TODO LL custom chunks, should distinguish somehow
-        else if (section_type === 'LXCM') {
+        else if (type === 'LXCM') {
             // Camera regions
-            if (section_length % 4 !== 0)
-                throw new Error(`Expected LXCM chunk to be a multiple of 4 bytes; got ${section_length}`);
+            if (bytes.length % 4 !== 0)
+                throw new Error(`Expected LXCM chunk to be a multiple of 4 bytes; got ${bytes.length}`);
 
-            let bytes = new Uint8Array(section_buf);
             let p = 0;
-            while (p < section_length) {
+            while (p < bytes.length) {
                 let x = bytes[p + 0];
                 let y = bytes[p + 1];
                 let w = bytes[p + 2];
@@ -924,7 +990,7 @@ export function parse_level(buf, number = 1) {
             }
         }
         else {
-            console.warn(`Unrecognized section type '${section_type}' at offset ${section_start}`);
+            console.warn(`Unrecognized section type '${type}' at offset ${bytes.byteOffset}`);
             // TODO save it, persist when editing level
         }
     }
@@ -1170,4 +1236,480 @@ export function synthesize_level(stored_level) {
     c2m.add_section('END ', '');
 
     return c2m.serialize();
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// C2G, the text format that stitches levels together into a game
+
+// NOTE: C2G is surprisingly complicated for a game layout format, and most of its features are not
+// currently supported.  Most of them have also never been used in practice, so that's fine.
+
+// TODO this is not quite right yet; the architect has more specific lexing documentation
+
+// Split a statement into a number of tokens.  This is, thankfully, relatively easy, due to the
+// minimal syntax and the lack of string escapes (so we don't have to check for " vs \" vs \\").
+// The tokens seem to be one of:
+// - a bareword (could be a variable or keyword)
+// - an operator
+// - a literal number
+// - a quoted string
+// - a label
+// - a comment
+// And that's it!  So here's a regex to find all of them, and then we just use matchAll.
+const TOKENIZE_RX = RegExp(
+    // Eat any leading horizontal whitespace
+    '[ \\t]*(?:' +
+        // 1: Catch newlines as their own thing, since they are (sigh) important, sometimes
+        '(\\n)' +
+        // 2: Comments are preceded by ; or // for some reason and run to the end of the line
+        '|(?:;|//)(.*)' +
+        // 3: Strings are double-quoted (only!) and contain no escapes
+        '|"([^"]+?)"' +
+        // 4: Labels are indicated by a #, including when used with 'goto'
+        // (the exact set of allowed characters is unclear and i'm fudging it here)
+        '|#(\\w+)' +
+        // 5: Only decimal integers are allowed
+        '|(\\d+)' +
+        // 6: Operators are part of a fixed set
+        '|(==|<=|>=|!=|&&|\\|\\||[-+*/<>=&|&^])' +
+        // 7: Barewords appear to allow literally fucking anything as long as they start with a
+        // letter -- the official playcc2 contains `really?'"` as an accidental unquoted string and
+        // it's accepted but ignored, so I can only assume it's treated as a variable
+        // TODO i really don't like this, it's beyond error-prone
+        '|([a-zA-Z]\\S*)' +
+        // 8: Anything else is an error
+        '|(\\S+)' +
+    ')', 'g');
+const DIRECTIVES = {
+    // Important stuff
+    'chdir': ['string'],
+    'do': 'statement',  // special
+    'game': ['string'],
+    'goto': ['label'],
+    'map': ['string'],
+    'music': ['string'],
+    'script': 'script',  // special
+    // Weird stuff
+    'edit': [],
+    // Seemingly unused, or at least not understood
+    'art': ['string'],
+    'chain': ['string'],
+    'dlc': ['string'],
+    'end': [],
+    'main': [],  // allegedly jumps to playcc2.c2g??
+    'wav': ['string'],
+};
+const OPERATORS = {
+    '==': {
+        argc: 2,
+    },
+    '<=': {
+    },
+    '>=': {
+    },
+    '!=': {
+    },
+    '<': {
+    },
+    '>': {
+    },
+    '=': {
+    },
+    '*': {
+    },
+    '/': {
+    },
+    '+': {
+    },
+    '-': {
+    },
+    '&&': {
+    },
+    '||': {
+    },
+    '&': {
+    },
+    '|': {
+    },
+    '%': {
+    },
+    '^': {
+    },
+};
+
+function* tokenize(statement) {
+    for (let match of statement.matchAll(TOKENIZE_RX)) {
+        if (match[1] !== undefined) {
+            // Newline(s)
+            yield {type: 'newline'};
+        }
+        else if (match[2] !== undefined) {
+            // Comment, do nothing
+        }
+        else if (match[3] !== undefined) {
+            // String
+            yield {type: 'string', value: match[3]};
+        }
+        else if (match[4] !== undefined) {
+            // Label
+            yield {type: 'label', value: match[4].toLowerCase()};
+        }
+        else if (match[5] !== undefined) {
+            // Number
+            yield {type: 'number', value: parseInt(match[5], 10)};
+        }
+        else if (match[6] !== undefined) {
+            // Operator
+            yield {type: 'op', value: match[6]};
+        }
+        else if (match[7] !== undefined) {
+            // Bareword; either a directive or a variable name
+            let word = match[7].toLowerCase();
+            if (DIRECTIVES[word] !== undefined) {
+                yield {type: 'directive', value: word};
+            }
+            else {
+                yield {type: 'variable', value: word};
+            }
+        }
+        else {
+            yield {type: 'error', value: match[8]};
+        }
+    }
+}
+
+class ParseError extends Error {
+    constructor(message, parser) {
+        super(`${message} at line ${parser.lineno}`);
+    }
+}
+
+class Parser {
+    constructor(string) {
+        this.string = string;
+        this.lexer = tokenize(string);
+        this.lineno = 1;
+        this.done = false;
+        this._peek = null;
+    }
+
+    peek() {
+        if (this._peek === null) {
+            let next = this.lexer.next();
+            if (! next.done) {
+                this._peek = next.value;
+                if (this._peek.type === 'error')
+                    throw new ParseError(`Bad syntax: ${this._peek.value}`, this);
+            }
+        }
+
+        return this._peek;
+    }
+
+    advance() {
+        if (this.done)
+            return null;
+
+        let token;
+        if (this._peek !== null) {
+            token = this._peek;
+            this._peek = null;
+        }
+        else {
+            let next = this.lexer.next();
+            if (next.done) {
+                this.done = true;
+                return null;
+            }
+
+            token = next.value;
+            if (token.type === 'error')
+                throw new ParseError(`Bad syntax: ${token.value}`, this);
+        }
+
+        if (token && token.type === 'newline') {
+            this.lineno++;
+        }
+        return token;
+    }
+
+    advance_ignore_newlines() {
+        if (this.done)
+            return null;
+
+        let token = this.advance();
+        while (token && token.type === 'newline') {
+            token = this.advance();
+        }
+
+        return token;
+    }
+
+    parse_statement() {
+        let token = this.advance_ignore_newlines();
+        if (! token)
+            return null;
+
+        // Check for a directive and handle it separately
+        if (token.type === 'directive') {
+            return this.parse_directive(token.value);
+        }
+
+        // A string (outside of a script block) doesn't seem to do anything?
+        if (token.type === 'string') {
+            return {
+                kind: 'noop',
+                tokens: [token],
+            };
+        }
+
+        // A lone label is a label declaration
+        if (token.type === 'label') {
+            return {
+                kind: 'label',
+                name: token.value,
+            };
+        }
+
+        // An operator is not a valid start; this uses RPN so values must come first
+        if (token.type === 'op')
+            throw new ParseError(`Unexpected operator: ${token.value}`, this);
+
+        // Otherwise (number, bareword presumed to be a variable), we have an RPN expression; keep
+        // consuming tokens until we finish the expression
+        let branches = [token];
+        while (true) {
+            let next = this.peek();
+            if (! next) {
+                break;
+            }
+            else if (next.type === 'number' || next.type === 'variable') {
+                let token = this.advance();
+                branches.push(token);
+            }
+            else if (next.type === 'op') {
+                let token = this.advance();
+                if (! token || token.type === 'newline')
+                    break;
+
+                // All operators are binary, so pop the last two expressions
+                if (branches.length < 2)
+                    throw new ParseError(`Not enough arguments for operator: ${token.value}`, this);
+                let a = branches.pop();
+                let b = branches.pop();
+                branches.push({
+                    op: token.value,
+                    left: a,
+                    right: b,
+                });
+
+                // TODO return now if we just did an =?
+            }
+            else {
+                break;
+            }
+        }
+
+        return {
+            kind: 'expression',
+            trees: branches,
+        };
+    }
+
+    parse_directive(name) {
+        let argspec = DIRECTIVES[name];
+        if (argspec === 'statement') {
+            // TODO implement this for real
+            // eat the rest of the line for now
+            while (true) {
+                let token = this.advance();
+                if (! token || token.type === 'newline') {
+                    break;
+                }
+            }
+        }
+        else if (argspec === 'script') {
+            // Script mode; expect a newline, then sequences of [string, values..., newline]
+            let lines = [];
+            let newline = this.advance();
+            if (newline && newline.type !== 'newline')
+                throw new ParseError(`Expected a newline after 'script' directive`, this);
+            while (true) {
+                let next = this.peek();
+                while (next && next.type === 'newline') {
+                    this.advance();
+                    next = this.peek();
+                }
+                if (! next)
+                    break;
+
+                // If this is a string, we're still in script mode; eat the whole line
+                if (next.type === 'string') {
+                    let string = this.advance();
+                    let args = [];
+                    // TODO can args be expressions??
+                    while (true) {
+                        let arg = this.advance();
+                        if (! arg || arg.type === 'newline') {
+                            break;
+                        }
+                        else if (arg.type === 'number' || arg.type === 'variable') {
+                            args.push(arg);
+                        }
+                        else {
+                            throw new ParseError(`Unexpected ${arg.type} token found in script mode: ${arg.value}`, this);
+                        }
+                    }
+                    lines.push({
+                        string: string,
+                        args: args,
+                    });
+                }
+                // If not a string, script mode is over
+                else {
+                    break;
+                }
+            }
+
+            return {
+                kind: 'script',
+                lines: lines,
+            };
+        }
+        else {
+            // Normal arguments
+            let args = [];
+            for (let argtype of argspec) {
+                let token = this.advance();
+                if (! token || token.type === 'newline') {
+                    // If we're cut off early, the whole directive is ignored
+                    return {
+                        kind: 'noop',
+                        directive: name,
+                        tokens: args,
+                    };
+                }
+                else if (token.type === argtype) {
+                    args.push(token);
+                }
+                else {
+                    throw new ParseError(`Directive ${name} expected a ${argtype} token but got ${token.type}`, this);
+                }
+            }
+            return {
+                kind: 'directive',
+                name: name,
+                args: args,
+            };
+        }
+    }
+}
+
+// C2G is a Chip's Challenge 2 format that describes the structure of a level set, which is helpful
+// since CC2 levels are all stored in separate files
+// XXX observations i have made about this hell format:
+// - newlines are optional, except after: do, map, script, goto
+// - `1 level = music "+Intro"` crashes the game
+// - `map\n"path"` is completely ignored, and in fact newlines between a directive and its arguments
+//   in general seem to separate them
+const MAX_SIMULTANEOUS_REQUESTS = 5;
+/*async*/ export function parse_game(buf, source, base_path) {
+    // TODO maybe do something with this later
+    let warn = () => {};
+
+    let resolve;
+    let promise = new Promise((res, rej) => { resolve = res });
+
+    let game = new format_base.StoredGame(undefined, parse_level);
+    let parser;
+    let active_map_fetches = new Set;
+    let pending_map_fetches = [];
+    let _fetch_map = (path, n) => {
+        let promise = source.get(base_path + '/' + path);
+        active_map_fetches.add(promise);
+
+        let meta = {
+            // TODO this will not always fly, the slot is not the same as the number
+            index: n - 1,
+            number: n,
+        };
+        game.level_metadata[meta.index] = meta;
+
+        promise.then(buf => {
+            meta.bytes = new Uint8Array(buf);
+            Object.assign(meta, parse_level_metadata(buf));
+        })
+        .then(null, err => {
+            // TODO should have: what level, what file, position, etc attached to errors
+            console.error(err);
+            meta.error = err;
+        })
+        .then(() => {
+            // Always remove our promise and start a new map load if any are waiting
+            active_map_fetches.delete(promise);
+            if (active_map_fetches.size < MAX_SIMULTANEOUS_REQUESTS && pending_map_fetches.length > 0) {
+                _fetch_map(...pending_map_fetches.shift());
+            }
+            else if (active_map_fetches.size === 0 && pending_map_fetches.length === 0 && parser.done) {
+                // FIXME this is a bit of a mess
+                resolve(game);
+            }
+        });
+    };
+    let fetch_map = (path, n) => {
+        if (active_map_fetches.size >= MAX_SIMULTANEOUS_REQUESTS) {
+            pending_map_fetches.push([path, n]);
+            return;
+        }
+
+        _fetch_map(path, n);
+    };
+    
+    // FIXME and right off the bat we have an Issue: this is a text format so i want a string, not
+    // an arraybuffer!
+    let contents = util.string_from_buffer_ascii(buf);
+    parser = new Parser(contents);
+    let statements = [];
+    let level_number = 1;
+    while (! parser.done) {
+        let stmt = parser.parse_statement();
+        if (stmt === null)
+            break;
+
+        // TODO search 'do' as well
+        if (stmt.kind === 'directive' && stmt.name === 'map') {
+            let path = stmt.args[0].value;
+            path = path.replace(/\\/, '/');
+            fetch_map(path, level_number);
+            level_number++;
+        }
+        statements.push(stmt);
+    }
+
+    // FIXME grody
+    if (active_map_fetches.size === 0 && pending_map_fetches.length === 0) {
+        resolve(game);
+    }
+
+    console.log(game);
+    return promise;
+}
+
+// Individual levels don't make sense on their own, but we can wrap them in a dummy one-level game
+export function wrap_individual_level(buf) {
+    let game = new format_base.StoredGame(undefined, parse_level);
+    let meta = {
+        index: 0,
+        number: 1,
+        bytes: new Uint8Array(buf),
+    };
+    try {
+        Object.assign(meta, parse_level_metadata(buf));
+    }
+    catch (e) {
+        meta.error = e;
+    }
+    game.level_metadata.push(meta);
+    return game;
 }

@@ -82,6 +82,9 @@ p:first-child {
 p:last-child {
     margin-bottom: 0;
 }
+code {
+    color: #c0c0e0;
+}
 
 a {
     color: #c0c0c0;
@@ -186,6 +189,10 @@ table.level-browser td.-score {
 }
 table.level-browser tr.--unvisited {
     color: #606060;
+    font-style: italic;
+}
+table.level-browser tr.--error {
+    color: #600000;
     font-style: italic;
 }
 table.level-browser tbody tr {
@@ -350,9 +357,30 @@ body[data-mode=player] #editor-play {
     ;
     gap: 1em;
 
+    position: relative;
     padding: 1em 10%;
     margin: auto;
     overflow: auto;
+}
+#splash > .drag-overlay {
+    display: none;
+    justify-content: center;
+    align-items: center;
+
+    font-size: 10vmin;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 1rem;
+    right: 1rem;
+    background: #fff2;
+    border: 0.25rem dashed white;
+    border-radius: 1rem;
+    text-shadow: 0 1px 5px black;
+    text-align: center;
+}
+#splash.--drag-hover > .drag-overlay {
+    display: flex;
 }
 
 #splash > header {
@@ -387,7 +415,8 @@ body[data-mode=player] #editor-play {
 #splash > #splash-upload-levels {
     grid-area: upload;
 }
-#splash-upload {
+#splash-upload-file,
+#splash-upload-dir {
     /* Hide the file upload control, which is ugly */
     display: none;
 }
