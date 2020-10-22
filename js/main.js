@@ -1349,6 +1349,7 @@ class Splash extends PrimaryView {
                 continue;
 
             let ext = m[1];
+            // TODO this can't load an individual c2m, hmmm
             if (ext === 'c2g' || ext === 'dat' || ext === 'ccl') {
                 let buf = await source.get(path);
                 await this.conductor.parse_and_load_game(buf, source, path);

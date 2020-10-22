@@ -882,7 +882,8 @@ const TILE_TYPES = {
             level.sfx.play_once('button-press', me.cell);
 
             // Move all yellow tanks one tile in the direction of the pressing actor
-            for (let actor of level.actors) {
+            for (let i = level.actors.length - 1; i >= 0; i--) {
+                let actor = level.actors[i];
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_yellow') {
                     level.attempt_step(actor, other.direction);
