@@ -4,8 +4,9 @@ import { random_choice } from './util.js';
 // Draw layers
 const LAYER_TERRAIN = 0;
 const LAYER_ITEM = 1;
-const LAYER_ACTOR = 2;
-const LAYER_OVERLAY = 3;
+const LAYER_NO_SIGN = 2;
+const LAYER_ACTOR = 3;
+const LAYER_OVERLAY = 4;
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
 function player_visual_state(me) {
@@ -543,8 +544,19 @@ const TILE_TYPES = {
             }
         },
     },
-    forbidden: {
-        draw_layer: LAYER_TERRAIN,
+    no_sign: {
+        draw_layer: LAYER_NO_SIGN,
+        disables_pickup: true,
+        blocks(me, level, other) {
+            let item;
+            for (let tile of me.cell) {
+                if (tile.type.is_item) {
+                    item = tile.type.name;
+                    break;
+                }
+            }
+            return item && other.has_item(item);
+        },
     },
 
     // Mechanisms
@@ -829,7 +841,7 @@ const TILE_TYPES = {
     teleport_yellow: {
         draw_layer: LAYER_TERRAIN,
         teleport_dest_order(me, level) {
-            // FIXME special pickup behavior
+            // FIXME special pickup behavior; NOT an item though, does not combine with no sign
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
         },
     },
@@ -1207,9 +1219,7 @@ const TILE_TYPES = {
             // TODO make this a...  flag?  i don't know?
             // TODO major difference from lynx...
             if (other.type.name !== 'ice_block' && other.type.name !== 'directional_block') {
-                if (level.give_actor(other, me.type.name)) {
-                    level.remove_tile(me);
-                }
+                level.attempt_take(other, me);
             }
         },
     },

@@ -884,14 +884,15 @@ export class Level {
                 continue;
 
             // TODO some actors can pick up some items...
-            if (actor.type.is_player && tile.type.is_item && this.give_actor(actor, tile.type.name)) {
+            if (actor.type.is_player && tile.type.is_item &&
+                this.attempt_take(actor, tile))
+            {
                 if (tile.type.is_key) {
                     this.sfx.play_once('get-key', cell);
                 }
                 else {
                     this.sfx.play_once('get-tool', cell);
                 }
-                this.remove_tile(tile);
             }
             else if (tile.type.teleport_dest_order) {
                 teleporter = tile;
@@ -1255,6 +1256,18 @@ export class Level {
             this._set_prop(tile, 'animation_speed', tile.type.ttl);
             this._set_prop(tile, 'animation_progress', 0);
         }
+    }
+
+    // Have an actor try to pick up a particular tile; it's prevented if there's a no sign, and the
+    // tile is removed if successful
+    attempt_take(actor, tile) {
+        if (! tile.cell.some(t => t.type.disables_pickup) &&
+            this.give_actor(actor, tile.type.name))
+        {
+            this.remove_tile(tile);
+            return true;
+        }
+        return false;
     }
 
     // Give an item to an actor, even if it's not supposed to have an inventory

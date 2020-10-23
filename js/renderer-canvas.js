@@ -126,7 +126,9 @@ export class CanvasRenderer {
         // Draw one layer at a time, so animated objects aren't overdrawn by
         // neighboring terrain
         // XXX layer count hardcoded here
-        for (let layer = 0; layer < 4; layer++) {
+        // FIXME this is a bit inefficient when there are a lot of rarely-used layers; consider
+        // instead drawing everything under actors, then actors, then everything above actors?
+        for (let layer = 0; layer < 5; layer++) {
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
                     for (let tile of this.level.cells[y][x]) {

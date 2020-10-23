@@ -536,7 +536,7 @@ const TILE_ENCODING = {
         name: 'popdown_floor',
     },
     0x7f: {
-        name: 'forbidden',
+        name: 'no_sign',
         has_next: true,
     },
     0x80: {
