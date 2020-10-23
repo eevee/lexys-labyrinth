@@ -322,6 +322,9 @@ export class Level {
                     if (tile.type.on_ready) {
                         tile.type.on_ready(tile, this);
                     }
+                    if (cell === this.player.cell && tile.type.is_hint) {
+                        this.hint_shown = tile.specific_hint ?? this.stored_level.hint;
+                    }
                 }
             }
         }
