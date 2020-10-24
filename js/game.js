@@ -212,6 +212,9 @@ export class Level {
         this.hint_shown = null;
         // TODO in lynx/steam, this carries over between levels; in tile world, you can set it manually
         this.force_floor_direction = 'north';
+        // PRNG is initialized to zero
+        this._rng1 = 0;
+        this._rng2 = 0;
 
         this.undo_stack = [];
         this.pending_undo = [];
@@ -328,6 +331,26 @@ export class Level {
                 }
             }
         }
+    }
+
+    // Lynx PRNG, used unchanged in CC2
+    prng() {
+        // TODO what if we just saved this stuff, as well as the RFF direction, at the beginning of
+        // each tic?
+        let rng1 = this._rng1;
+        let rng2 = this._rng2;
+        this.pending_undo.push(() => {
+            this._rng1 = rng1;
+            this._rng2 = rng2;
+        });
+
+        let n = (this._rng1 >> 2) - this._rng1;
+        if (!(this._rng1 & 0x02)) --n;
+        this._rng1 = (this._rng1 >> 1) | (this._rng2 & 0x80);
+        this._rng2 = (this._rng2 << 1) | (n & 0x01);
+        let ret = (this._rng1 ^ this._rng2) & 0xFF;
+        console.log(ret);
+        return ret;
     }
 
     // Move the game state forwards by one tic
@@ -906,24 +929,54 @@ export class Level {
         }
 
         // Handle teleporting, now that the dust has cleared
-        // FIXME something funny happening here, your input isn't ignore while walking out of it?
+        // FIXME something funny happening here, your input isn't ignored while walking out of it?
         if (teleporter) {
-            for (let dest of teleporter.type.teleport_dest_order(teleporter, this)) {
+            let original_direction = actor.direction;
+            let success = false;
+            for (let dest of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
                 // Teleporters already containing an actor are blocked and unusable
                 if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
                     continue;
 
                 // Physically move the actor to the new teleporter
-                // XXX is this right, compare with tile world?  i overhear it's actually implemented as a slide?
+                // XXX lynx treats this as a slide and does it in a pass in the main loop
                 // XXX not especially undo-efficient
                 this.remove_tile(actor);
                 this.add_tile(actor, dest.cell);
-                if (this.attempt_step(actor, actor.direction)) {
-                    // Success, teleportation complete
-                    // Sound plays from the origin cell simply because that's where the sfx player
-                    // thinks the player is currently; position isn't updated til next turn
-                    this.sfx.play_once('teleport', dest.cell);
+
+                // Red and green teleporters attempt to spit you out in every direction before
+                // giving up on a destination (but not if you return to the original).
+                // Note that we use actor.direction here (rather than original_direction) because
+                // green teleporters modify it in teleport_dest_order, to randomize the exit
+                // direction
+                let direction = actor.direction;
+                let num_directions = 1;
+                if (teleporter.type.teleport_try_all_directions && dest !== teleporter) {
+                    num_directions = 4;
+                }
+                for (let i = 0; i < num_directions; i++) {
+                    if (this.attempt_step(actor, direction)) {
+                        success = true;
+                        // Sound plays from the origin cell simply because that's where the sfx player
+                        // thinks the player is currently; position isn't updated til next turn
+                        this.sfx.play_once('teleport', teleporter.cell);
+                        break;
+                    }
+                    else {
+                        direction = DIRECTIONS[direction].right;
+                    }
+                }
+
+                if (success) {
                     break;
+                }
+                else if (num_directions === 4) {
+                    // Restore our original facing before continuing
+                    // (For red teleports, we try every possible destination in our original
+                    // movement direction, so this is correct.  For green teleports, we only try one
+                    // destination and then fall back to walking through the source in our original
+                    // movement direction, so this is still correct.)
+                    this.set_actor_direction(actor, original_direction);
                 }
             }
         }

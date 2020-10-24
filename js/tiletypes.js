@@ -818,29 +818,41 @@ const TILE_TYPES = {
     },
     teleport_blue: {
         draw_layer: LAYER_TERRAIN,
-        teleport_dest_order(me, level) {
+        teleport_dest_order(me, level, other) {
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
         },
     },
     teleport_red: {
         draw_layer: LAYER_TERRAIN,
-        teleport_dest_order(me, level) {
-            // FIXME you can control your exit direction from red teleporters
+        teleport_try_all_directions: true,
+        teleport_allow_override: true,
+        teleport_dest_order(me, level, other) {
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
         },
     },
     teleport_green: {
         draw_layer: LAYER_TERRAIN,
-        teleport_dest_order(me, level) {
-            // FIXME exit direction is random; unclear if it's any direction or only unblocked ones
+        teleport_try_all_directions: true,
+        teleport_dest_order(me, level, other) {
             let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
-            // FIXME this should use the lynxish rng
-            return [random_choice(all), me];
+            if (all.length <= 1) {
+                // If this is the only teleporter, just walk out the other side — and, crucially, do
+                // NOT advance the PRNG
+                return [me];
+            }
+            // Note the iterator starts on the /next/ teleporter, so there's an implicit +1 here.
+            // The -1 is to avoid spitting us back out of the same teleporter, which will be last in
+            // the list
+            let target = all[level.prng() % (all.length - 1)];
+            // Also set the actor's (initial) exit direction
+            level.set_actor_direction(other, ['north', 'east', 'south', 'west'][level.prng() % 4]);
+            return [target, me];
         },
     },
     teleport_yellow: {
         draw_layer: LAYER_TERRAIN,
-        teleport_dest_order(me, level) {
+        teleport_allow_override: true,
+        teleport_dest_order(me, level, other) {
             // FIXME special pickup behavior; NOT an item though, does not combine with no sign
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
         },
@@ -1517,7 +1529,7 @@ for (let [name, type] of Object.entries(TILE_TYPES)) {
 
     if (type.draw_layer === undefined ||
         type.draw_layer !== Math.floor(type.draw_layer) ||
-        type.draw_layer >= 4)
+        type.draw_layer >= 5)
     {
         console.error(`Tile type ${name} has a bad draw layer`);
     }

@@ -38,7 +38,9 @@ Give it a try, I guess!  [https://c.eev.ee/lexys-labyrinth/](https://c.eev.ee/le
 
 ## Special thanks
 
-- The incredible nerds who put together the [Chip Wiki](https://wiki.bitbusters.club/) and also reside on the Bit Busters Discord
+- The incredible nerds who put together the [Chip Wiki](https://wiki.bitbusters.club/) and also reside on the Bit Busters Discord, including:
+  - ruben for documenting the CC2 PRNG
+  - The Architect for documenting the CC2 C2G parser
 - Everyone who worked on [Chip's Challenge Level Pack 1](https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1), the default set of levels
 - [Tile World](https://wiki.bitbusters.club/Tile_World) for being an incredible reference on Lynx mechanics
 - Everyone who contributed music — see [`js/soundtrack.js`](js/soundtrack.js) for a list!
