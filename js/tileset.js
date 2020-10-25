@@ -98,7 +98,7 @@ export const CC2_TILESET_LAYOUT = {
     popdown_wall: [12, 5],
     popdown_floor: [12, 5],
     popdown_floor_visible: [13, 5],
-    forbidden: [14, 5],
+    no_sign: [14, 5],
     // TODO arrows overlay at [3, 10]
     directional_block: [15, 5],
 

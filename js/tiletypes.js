@@ -4,8 +4,9 @@ import { random_choice } from './util.js';
 // Draw layers
 const LAYER_TERRAIN = 0;
 const LAYER_ITEM = 1;
-const LAYER_ACTOR = 2;
-const LAYER_OVERLAY = 3;
+const LAYER_NO_SIGN = 2;
+const LAYER_ACTOR = 3;
+const LAYER_OVERLAY = 4;
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
 function player_visual_state(me) {
@@ -543,8 +544,19 @@ const TILE_TYPES = {
             }
         },
     },
-    forbidden: {
-        draw_layer: LAYER_TERRAIN,
+    no_sign: {
+        draw_layer: LAYER_NO_SIGN,
+        disables_pickup: true,
+        blocks(me, level, other) {
+            let item;
+            for (let tile of me.cell) {
+                if (tile.type.is_item) {
+                    item = tile.type.name;
+                    break;
+                }
+            }
+            return item && other.has_item(item);
+        },
     },
 
     // Mechanisms
@@ -806,30 +818,42 @@ const TILE_TYPES = {
     },
     teleport_blue: {
         draw_layer: LAYER_TERRAIN,
-        teleport_dest_order(me, level) {
+        teleport_dest_order(me, level, other) {
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
         },
     },
     teleport_red: {
         draw_layer: LAYER_TERRAIN,
-        teleport_dest_order(me, level) {
-            // FIXME you can control your exit direction from red teleporters
+        teleport_try_all_directions: true,
+        teleport_allow_override: true,
+        teleport_dest_order(me, level, other) {
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
         },
     },
     teleport_green: {
         draw_layer: LAYER_TERRAIN,
-        teleport_dest_order(me, level) {
-            // FIXME exit direction is random; unclear if it's any direction or only unblocked ones
+        teleport_try_all_directions: true,
+        teleport_dest_order(me, level, other) {
             let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
-            // FIXME this should use the lynxish rng
-            return [random_choice(all), me];
+            if (all.length <= 1) {
+                // If this is the only teleporter, just walk out the other side — and, crucially, do
+                // NOT advance the PRNG
+                return [me];
+            }
+            // Note the iterator starts on the /next/ teleporter, so there's an implicit +1 here.
+            // The -1 is to avoid spitting us back out of the same teleporter, which will be last in
+            // the list
+            let target = all[level.prng() % (all.length - 1)];
+            // Also set the actor's (initial) exit direction
+            level.set_actor_direction(other, ['north', 'east', 'south', 'west'][level.prng() % 4]);
+            return [target, me];
         },
     },
     teleport_yellow: {
         draw_layer: LAYER_TERRAIN,
-        teleport_dest_order(me, level) {
-            // FIXME special pickup behavior
+        teleport_allow_override: true,
+        teleport_dest_order(me, level, other) {
+            // FIXME special pickup behavior; NOT an item though, does not combine with no sign
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
         },
     },
@@ -1207,9 +1231,7 @@ const TILE_TYPES = {
             // TODO make this a...  flag?  i don't know?
             // TODO major difference from lynx...
             if (other.type.name !== 'ice_block' && other.type.name !== 'directional_block') {
-                if (level.give_actor(other, me.type.name)) {
-                    level.remove_tile(me);
-                }
+                level.attempt_take(other, me);
             }
         },
     },
@@ -1507,7 +1529,7 @@ for (let [name, type] of Object.entries(TILE_TYPES)) {
 
     if (type.draw_layer === undefined ||
         type.draw_layer !== Math.floor(type.draw_layer) ||
-        type.draw_layer >= 4)
+        type.draw_layer >= 5)
     {
         console.error(`Tile type ${name} has a bad draw layer`);
     }

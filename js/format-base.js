@@ -16,6 +16,10 @@ export class StoredLevel {
         this.extra_chunks = [];
         this.use_cc1_boots = false;
         this.use_ccl_compat = false;
+        // 0 - deterministic (PRNG + simple convolution)
+        // 1 - 4 patterns (default; PRNG + rotating through 0-3)
+        // 2 - extra random (like deterministic, but initial seed is "actually" random)
+        this.blob_behavior = 1;
 
         this.size_x = 0;
         this.size_y = 0;

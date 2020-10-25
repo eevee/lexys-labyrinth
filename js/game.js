@@ -212,6 +212,16 @@ export class Level {
         this.hint_shown = null;
         // TODO in lynx/steam, this carries over between levels; in tile world, you can set it manually
         this.force_floor_direction = 'north';
+        // PRNG is initialized to zero
+        this._rng1 = 0;
+        this._rng2 = 0;
+        if (this.stored_level.blob_behavior === 0) {
+            this._blob_modifier = 0x55;
+        }
+        else {
+            // The other two modes are initialized to a random seed
+            this._blob_modifier = Math.floor(Math.random() * 256);
+        }
 
         this.undo_stack = [];
         this.pending_undo = [];
@@ -322,13 +332,60 @@ export class Level {
                     if (tile.type.on_ready) {
                         tile.type.on_ready(tile, this);
                     }
+                    if (cell === this.player.cell && tile.type.is_hint) {
+                        this.hint_shown = tile.specific_hint ?? this.stored_level.hint;
+                    }
                 }
             }
         }
     }
 
+
     player_awaiting_input() {
         return this.player.movement_cooldown === 0 && (this.player.slide_mode === null || (this.player.slide_mode === 'force' && this.player.last_move_was_force))
+    }
+
+    // Lynx PRNG, used unchanged in CC2
+    prng() {
+        // TODO what if we just saved this stuff, as well as the RFF direction, at the beginning of
+        // each tic?
+        let rng1 = this._rng1;
+        let rng2 = this._rng2;
+        this.pending_undo.push(() => {
+            this._rng1 = rng1;
+            this._rng2 = rng2;
+        });
+
+        let n = (this._rng1 >> 2) - this._rng1;
+        if (!(this._rng1 & 0x02)) --n;
+        this._rng1 = (this._rng1 >> 1) | (this._rng2 & 0x80);
+        this._rng2 = (this._rng2 << 1) | (n & 0x01);
+        let ret = (this._rng1 ^ this._rng2) & 0xff;
+        return ret;
+    }
+
+    // Weird thing done by CC2 to make blobs...  more...  random
+    get_blob_modifier() {
+        let mod = this._blob_modifier;
+        this.pending_undo.push(() => this._blob_modifier = mod);
+
+        if (this.stored_level.blob_behavior === 1) {
+            // "4 patterns" just increments by 1 every time (but /after/ returning)
+            //this._blob_modifier = (this._blob_modifier + 1) % 4;
+            mod = (mod + 1) % 4;
+            this._blob_modifier = mod;
+        }
+        else {
+            // Other modes do this curious operation
+            mod *= 2;
+            if (mod < 255) {
+                mod ^= 0x1d;
+            }
+            mod &= 0xff;
+            this._blob_modifier = mod;
+        }
+
+        return mod;
     }
 
     // Move the game state forwards by one tic
@@ -649,11 +706,9 @@ export class Level {
             direction_preference = [actor.direction, d.opposite];
         }
         else if (actor.type.movement_mode === 'bounce-random') {
-            // walker behavior: preserve current direction; if that
-            // doesn't work, pick a random direction, even the one we
-            // failed to move in
-            // TODO unclear if this is right in cc2 as well.  definitely not in ms, which chooses a legal move
-            direction_preference = [actor.direction, ['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
+            // walker behavior: preserve current direction; if that doesn't work, pick a random
+            // direction, even the one we failed to move in (but ONLY then)
+            direction_preference = [actor.direction, 'WALKER'];
         }
         else if (actor.type.movement_mode === 'pursue') {
             // teeth behavior: always move towards the player
@@ -692,14 +747,27 @@ export class Level {
         }
         else if (actor.type.movement_mode === 'random') {
             // blob behavior: move completely at random
-            // TODO cc2 has twiddles for how this works per-level, as well as the initial seed for demo playback
-            direction_preference = [['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
+            let modifier = this.get_blob_modifier();
+            direction_preference = [['north', 'east', 'south', 'west'][(this.prng() + modifier) % 4]];
         }
 
         // Check which of those directions we *can*, probably, move in
         // TODO i think player on force floor will still have some issues here
+        // FIXME probably bail earlier for stuck actors so the prng isn't advanced?  what is the
+        // lynx behavior?  also i hear something about blobs on cloners??
         if (direction_preference && ! actor.stuck) {
+            let fallback_direction;
             for (let direction of direction_preference) {
+                if (direction === 'WALKER') {
+                    // Walkers roll a random direction ONLY if their first attempt was blocked
+                    direction = actor.direction;
+                    let num_turns = this.prng() % 4;
+                    for (let i = 0; i < num_turns; i++) {
+                        direction = DIRECTIONS[direction].right;
+                    }
+                }
+                fallback_direction = direction;
+
                 let dest_cell = this.get_neighboring_cell(actor.cell, direction);
                 if (! dest_cell)
                     continue;
@@ -711,6 +779,12 @@ export class Level {
                     actor.decision = direction;
                     break;
                 }
+            }
+
+            // If all the decisions are blocked, actors still try the last one (and might even
+            // be able to move that way by the time their turn comes around!)
+            if (actor.decision === null) {
+                actor.decision = fallback_direction;
             }
         }
     }
@@ -917,14 +991,15 @@ export class Level {
                 continue;
 
             // TODO some actors can pick up some items...
-            if (actor.type.is_player && tile.type.is_item && this.give_actor(actor, tile.type.name)) {
+            if (actor.type.is_player && tile.type.is_item &&
+                this.attempt_take(actor, tile))
+            {
                 if (tile.type.is_key) {
                     this.sfx.play_once('get-key', cell);
                 }
                 else {
                     this.sfx.play_once('get-tool', cell);
                 }
-                this.remove_tile(tile);
             }
             else if (tile.type.teleport_dest_order) {
                 teleporter = tile;
@@ -935,24 +1010,54 @@ export class Level {
         }
 
         // Handle teleporting, now that the dust has cleared
-        // FIXME something funny happening here, your input isn't ignore while walking out of it?
+        // FIXME something funny happening here, your input isn't ignored while walking out of it?
         if (teleporter) {
-            for (let dest of teleporter.type.teleport_dest_order(teleporter, this)) {
+            let original_direction = actor.direction;
+            let success = false;
+            for (let dest of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
                 // Teleporters already containing an actor are blocked and unusable
                 if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
                     continue;
 
                 // Physically move the actor to the new teleporter
-                // XXX is this right, compare with tile world?  i overhear it's actually implemented as a slide?
+                // XXX lynx treats this as a slide and does it in a pass in the main loop
                 // XXX not especially undo-efficient
                 this.remove_tile(actor);
                 this.add_tile(actor, dest.cell);
-                if (this.attempt_step(actor, actor.direction)) {
-                    // Success, teleportation complete
-                    // Sound plays from the origin cell simply because that's where the sfx player
-                    // thinks the player is currently; position isn't updated til next turn
-                    this.sfx.play_once('teleport', dest.cell);
+
+                // Red and green teleporters attempt to spit you out in every direction before
+                // giving up on a destination (but not if you return to the original).
+                // Note that we use actor.direction here (rather than original_direction) because
+                // green teleporters modify it in teleport_dest_order, to randomize the exit
+                // direction
+                let direction = actor.direction;
+                let num_directions = 1;
+                if (teleporter.type.teleport_try_all_directions && dest !== teleporter) {
+                    num_directions = 4;
+                }
+                for (let i = 0; i < num_directions; i++) {
+                    if (this.attempt_step(actor, direction)) {
+                        success = true;
+                        // Sound plays from the origin cell simply because that's where the sfx player
+                        // thinks the player is currently; position isn't updated til next turn
+                        this.sfx.play_once('teleport', teleporter.cell);
+                        break;
+                    }
+                    else {
+                        direction = DIRECTIONS[direction].right;
+                    }
+                }
+
+                if (success) {
                     break;
+                }
+                else if (num_directions === 4) {
+                    // Restore our original facing before continuing
+                    // (For red teleports, we try every possible destination in our original
+                    // movement direction, so this is correct.  For green teleports, we only try one
+                    // destination and then fall back to walking through the source in our original
+                    // movement direction, so this is still correct.)
+                    this.set_actor_direction(actor, original_direction);
                 }
             }
         }
@@ -1295,6 +1400,18 @@ export class Level {
             this._set_prop(tile, 'animation_speed', tile.type.ttl);
             this._set_prop(tile, 'animation_progress', 0);
         }
+    }
+
+    // Have an actor try to pick up a particular tile; it's prevented if there's a no sign, and the
+    // tile is removed if successful
+    attempt_take(actor, tile) {
+        if (! tile.cell.some(t => t.type.disables_pickup) &&
+            this.give_actor(actor, tile.type.name))
+        {
+            this.remove_tile(tile);
+            return true;
+        }
+        return false;
     }
 
     // Give an item to an actor, even if it's not supposed to have an inventory
