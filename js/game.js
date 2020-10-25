@@ -81,7 +81,6 @@ export class Tile {
     can_push(tile) {
         return (
             this.type.pushes && this.type.pushes[tile.type.name] &&
-            tile.movement_cooldown === 0 &&
             ! tile.stuck);
     }
 
@@ -512,7 +511,7 @@ export class Level {
 
             // Teeth can only move the first 4 of every 8 tics, though "first"
             // can be adjusted
-            if (actor.slide_mode == null &&
+            if (actor.slide_mode === null &&
                 actor.type.uses_teeth_hesitation &&
                 (this.tic_counter + this.step_parity) % 8 >= 4)
             {
@@ -525,7 +524,14 @@ export class Level {
             {
                 this._set_prop(actor, 'pending_reverse', false);
             }
-            if (actor.slide_mode === 'ice') {
+            // Blocks that were pushed while sliding will move in the push direction as soon as they
+            // stop sliding, regardless of what they landed on
+            if (actor.pending_push) {
+                actor.decision = actor.pending_push;
+                this._set_prop(actor, 'pending_push', null);
+                continue;
+            }
+            else if (actor.slide_mode === 'ice') {
                 // Actors can't make voluntary moves on ice; they just slide
                 actor.decision = actor.direction;
                 continue;
@@ -850,7 +856,13 @@ export class Level {
                     // This time make a copy, since we're modifying the contents of the cell
                     for (let tile of Array.from(goal_cell)) {
                         if (actor.can_push(tile)) {
-                            this.attempt_step(tile, direction);
+                            if (! this.attempt_step(tile, direction) &&
+                                tile.slide_mode !== null && tile.movement_cooldown !== 0)
+                            {
+                                // If the push failed and the obstacle is in the middle of a slide,
+                                // remember this as the next move it'll make
+                                this._set_prop(tile, 'pending_push', direction);
+                            }
                             if (actor === this.player) {
                                 actor.is_pushing = true;
                             }
