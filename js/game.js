@@ -215,6 +215,13 @@ export class Level {
         // PRNG is initialized to zero
         this._rng1 = 0;
         this._rng2 = 0;
+        if (this.stored_level.blob_behavior === 0) {
+            this._blob_modifier = 0x55;
+        }
+        else {
+            // The other two modes are initialized to a random seed
+            this._blob_modifier = Math.floor(Math.random() * 256);
+        }
 
         this.undo_stack = [];
         this.pending_undo = [];
@@ -348,9 +355,32 @@ export class Level {
         if (!(this._rng1 & 0x02)) --n;
         this._rng1 = (this._rng1 >> 1) | (this._rng2 & 0x80);
         this._rng2 = (this._rng2 << 1) | (n & 0x01);
-        let ret = (this._rng1 ^ this._rng2) & 0xFF;
-        console.log(ret);
+        let ret = (this._rng1 ^ this._rng2) & 0xff;
         return ret;
+    }
+
+    // Weird thing done by CC2 to make blobs...  more...  random
+    get_blob_modifier() {
+        let mod = this._blob_modifier;
+        this.pending_undo.push(() => this._blob_modifier = mod);
+
+        if (this.stored_level.blob_behavior === 1) {
+            // "4 patterns" just increments by 1 every time (but /after/ returning)
+            //this._blob_modifier = (this._blob_modifier + 1) % 4;
+            mod = (mod + 1) % 4;
+            this._blob_modifier = mod;
+        }
+        else {
+            // Other modes do this curious operation
+            mod *= 2;
+            if (mod < 255) {
+                mod ^= 0x1d;
+            }
+            mod &= 0xff;
+            this._blob_modifier = mod;
+        }
+
+        return mod;
     }
 
     // Move the game state forwards by one tic
@@ -554,11 +584,9 @@ export class Level {
                 direction_preference = [actor.direction, d.opposite];
             }
             else if (actor.type.movement_mode === 'bounce-random') {
-                // walker behavior: preserve current direction; if that
-                // doesn't work, pick a random direction, even the one we
-                // failed to move in
-                // TODO unclear if this is right in cc2 as well.  definitely not in ms, which chooses a legal move
-                direction_preference = [actor.direction, ['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
+                // walker behavior: preserve current direction; if that doesn't work, pick a random
+                // direction, even the one we failed to move in (but ONLY then)
+                direction_preference = [actor.direction, 'WALKER'];
             }
             else if (actor.type.movement_mode === 'pursue') {
                 // teeth behavior: always move towards the player
@@ -597,14 +625,27 @@ export class Level {
             }
             else if (actor.type.movement_mode === 'random') {
                 // blob behavior: move completely at random
-                // TODO cc2 has twiddles for how this works per-level, as well as the initial seed for demo playback
-                direction_preference = [['north', 'south', 'east', 'west'][Math.floor(Math.random() * 4)]];
+                let modifier = this.get_blob_modifier();
+                direction_preference = [['north', 'east', 'south', 'west'][(this.prng() + modifier) % 4]];
             }
 
             // Check which of those directions we *can*, probably, move in
             // TODO i think player on force floor will still have some issues here
+            // FIXME probably bail earlier for stuck actors so the prng isn't advanced?  what is the
+            // lynx behavior?  also i hear something about blobs on cloners??
             if (direction_preference && ! actor.stuck) {
+                let fallback_direction;
                 for (let direction of direction_preference) {
+                    if (direction === 'WALKER') {
+                        // Walkers roll a random direction ONLY if their first attempt was blocked
+                        direction = actor.direction;
+                        let num_turns = this.prng() % 4;
+                        for (let i = 0; i < num_turns; i++) {
+                            direction = DIRECTIONS[direction].right;
+                        }
+                    }
+                    fallback_direction = direction;
+
                     let dest_cell = this.get_neighboring_cell(actor.cell, direction);
                     if (! dest_cell)
                         continue;
@@ -621,7 +662,7 @@ export class Level {
                 // If all the decisions are blocked, actors still try the last one (and might even
                 // be able to move that way by the time their turn comes around!)
                 if (actor.decision === null) {
-                    actor.decision = direction_preference[direction_preference.length - 1];
+                    actor.decision = fallback_direction;
                 }
             }
         }

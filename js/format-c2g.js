@@ -835,7 +835,7 @@ export function parse_level(buf, number = 1) {
 
             if (view.byteLength <= 24)
                 continue;
-            //level.blob_behavior = view.getUint8(24, true);
+            level.blob_behavior = view.getUint8(24, true);
         }
         else if (type === 'MAP ' || type === 'PACK') {
             if (type === 'PACK') {
