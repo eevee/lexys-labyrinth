@@ -617,6 +617,12 @@ export class Level {
                         break;
                     }
                 }
+
+                // If all the decisions are blocked, actors still try the last one (and might even
+                // be able to move that way by the time their turn comes around!)
+                if (actor.decision === null) {
+                    actor.decision = direction_preference[direction_preference.length - 1];
+                }
             }
         }
 
