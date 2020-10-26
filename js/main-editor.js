@@ -524,6 +524,7 @@ const EDITOR_PALETTE = [{
         'button_blue',
         'button_red', 'cloner',
         'button_brown', 'trap',
+        'button_orange', 'flame_jet_off', 'flame_jet_on',
         'teleport_blue',
         'teleport_red',
         'teleport_green',

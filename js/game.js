@@ -81,7 +81,6 @@ export class Tile {
     can_push(tile) {
         return (
             this.type.pushes && this.type.pushes[tile.type.name] &&
-            tile.movement_cooldown === 0 &&
             ! tile.stuck);
     }
 
@@ -291,22 +290,25 @@ export class Level {
             let cell = connectable.cell;
             let x = cell.x;
             let y = cell.y;
-            let goal = connectable.type.connects_to;
+            // FIXME this is a single string for red/brown buttons (to match iter_tiles_in_RO) but a
+            // set for orange buttons (because flame jet states are separate tiles), which sucks ass
+            let goals = connectable.type.connects_to;
 
             // Check for custom wiring, for MSCC .DAT levels
+            // TODO would be neat if this applied to orange buttons too
             if (this.stored_level.has_custom_connections) {
                 let n = this.stored_level.coords_to_scalar(x, y);
                 let target_cell_n = null;
-                if (goal === 'trap') {
+                if (connectable.type.name === 'button_brown') {
                     target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
                 }
-                else if (goal === 'cloner') {
+                else if (connectable.type.name === 'button_red') {
                     target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
                 }
                 if (target_cell_n && target_cell_n < this.width * this.height) {
                     let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
                     for (let tile of this.cells[ty][tx]) {
-                        if (tile.type.name === goal) {
+                        if (goals === tile.type.name) {
                             connectable.connection = tile;
                             break;
                         }
@@ -315,8 +317,26 @@ export class Level {
                 continue;
             }
 
+            // Orange buttons do a really weird diamond search
+            if (connectable.type.connect_order === 'diamond') {
+                for (let cell of this.iter_cells_in_diamond(connectable.cell)) {
+                    let target = null;
+                    for (let tile of cell) {
+                        if (goals.has(tile.type.name)) {
+                            target = tile;
+                            break;
+                        }
+                    }
+                    if (target !== null) {
+                        connectable.connection = target;
+                        break;
+                    }
+                }
+                continue;
+            }
+
             // Otherwise, look in reading order
-            for (let tile of this.iter_tiles_in_reading_order(cell, goal)) {
+            for (let tile of this.iter_tiles_in_reading_order(cell, goals)) {
                 // TODO ideally this should be a weak connection somehow, since dynamite can destroy
                 // empty cloners and probably traps too
                 connectable.connection = tile;
@@ -504,7 +524,6 @@ export class Level {
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
             if (actor != this.player)
-                continue;
             {
                 this.actor_decision(actor, p1_primary_direction);
             }
@@ -613,7 +632,7 @@ export class Level {
 
         // Teeth can only move the first 4 of every 8 tics, though "first"
         // can be adjusted
-        if (actor.slide_mode == null &&
+        if (actor.slide_mode === null &&
             actor.type.uses_teeth_hesitation &&
             (this.tic_counter + this.step_parity) % 8 >= 4)
         {
@@ -625,6 +644,13 @@ export class Level {
             actor.slide_mode && actor.pending_reverse)
         {
             this._set_prop(actor, 'pending_reverse', false);
+        }
+        // Blocks that were pushed while sliding will move in the push direction as soon as they
+        // stop sliding, regardless of what they landed on
+        if (actor.pending_push) {
+            actor.decision = actor.pending_push;
+            this._set_prop(actor, 'pending_push', null);
+            continue;
         }
         if (actor.slide_mode === 'ice') {
             // Actors can't make voluntary moves on ice; they just slide
@@ -863,7 +889,13 @@ export class Level {
                     // This time make a copy, since we're modifying the contents of the cell
                     for (let tile of Array.from(goal_cell)) {
                         if (actor.can_push(tile)) {
-                            this.attempt_step(tile, direction);
+                            if (! this.attempt_step(tile, direction) &&
+                                tile.slide_mode !== null && tile.movement_cooldown !== 0)
+                            {
+                                // If the push failed and the obstacle is in the middle of a slide,
+                                // remember this as the next move it'll make
+                                this._set_prop(tile, 'pending_push', direction);
+                            }
                             if (actor === this.player) {
                                 actor.is_pushing = true;
                             }
@@ -1220,6 +1252,26 @@ export class Level {
 
             if (cell === start_cell)
                 return;
+        }
+    }
+
+    // Iterates over the grid in a diamond pattern, spreading out from the given start cell (but not
+    // including it).  Only used for connecting orange buttons.
+    *iter_cells_in_diamond(start_cell) {
+        let max_search_radius = Math.max(this.size_x, this.size_y);
+        for (let dist = 1; dist <= max_search_radius; dist++) {
+            // Start east and move counterclockwise
+            let sx = start_cell.x + dist;
+            let sy = start_cell.y;
+            for (let direction of [[-1, -1], [-1, 1], [1, 1], [1, -1]]) {
+                for (let i = 0; i < dist; i++) {
+                    if (this.is_point_within_bounds(sx, sy)) {
+                        yield this.cells[sy][sx];
+                    }
+                    sx += direction[0];
+                    sy += direction[1];
+                }
+            }
         }
     }
 

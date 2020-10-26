@@ -565,7 +565,7 @@ const TILE_TYPES = {
         blocks_all: true,
         is_actor: true,
         is_block: true,
-        ignores: new Set(['fire']),
+        ignores: new Set(['fire', 'flame_jet_on']),
         movement_speed: 4,
     },
     ice_block: {
@@ -583,14 +583,13 @@ const TILE_TYPES = {
     directional_block: {
         // TODO directional, obviously
         // TODO floor in water
-        // TODO destroyed in fire, flame jet, slime
+        // TODO destroyed in slime
         // TODO rotate on train tracks
         draw_layer: LAYER_ACTOR,
         blocks_all: true,
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
-        ignores: new Set(['fire']),
         movement_speed: 4,
         pushes: {
             dirt_block: true,
@@ -857,6 +856,10 @@ const TILE_TYPES = {
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
         },
     },
+    // Flame jet rules:
+    // - State toggles /while/ an orange button is held or wire current is received
+    // - Multiple such inputs cancel each other out
+    // - Gray button toggles it permanently
     flame_jet_off: {
         draw_layer: LAYER_TERRAIN,
         activate(me, level) {
@@ -871,7 +874,6 @@ const TILE_TYPES = {
     },
     flame_jet_on: {
         draw_layer: LAYER_TERRAIN,
-        // FIXME every tic, kills every actor in the cell
         activate(me, level) {
             level.transmute_tile(me, 'flame_jet_off');
         },
@@ -880,6 +882,21 @@ const TILE_TYPES = {
         },
         on_power(me, level) {
             me.type.activate(me, level);
+        },
+        // Kill anything that shows up
+        // FIXME every tic, also kills every actor in the cell (mostly matters if you step on with
+        // fire boots and then drop them)
+        on_arrive(me, level, other) {
+            // Note that blocks, fireballs, and anything with fire boots are immune
+            // TODO would be neat if this understood "ignores anything with fire immunity" but that
+            // might be a bit too high-level for this game
+            if (other.type.is_player) {
+                level.fail('burned');
+            }
+            else {
+                // TODO should this play a sound?
+                level.transmute_tile(other, 'explosion');
+            }
         },
     },
     // Buttons
@@ -999,7 +1016,26 @@ const TILE_TYPES = {
     },
     button_orange: {
         draw_layer: LAYER_TERRAIN,
-        // FIXME toggles flame jets, connected somehow, ???
+        connects_to: new Set(['flame_jet_off', 'flame_jet_on']),
+        connect_order: 'diamond',
+        // Both stepping on and leaving the button have the same effect: toggle the state of the
+        // connected flame jet
+        _toggle_flame_jet(me, level, other) {
+            let jet = me.connection;
+            if (jet && jet.cell) {
+                jet.type.activate(jet, level);
+            }
+        },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
+            me.type._toggle_flame_jet(me, level, other);
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+
+            me.type._toggle_flame_jet(me, level, other);
+        },
     },
     button_pink: {
         draw_layer: LAYER_TERRAIN,
@@ -1164,7 +1200,7 @@ const TILE_TYPES = {
         blocks_blocks: true,
         movement_mode: 'turn-right',
         movement_speed: 4,
-        ignores: new Set(['fire']),
+        ignores: new Set(['fire', 'flame_jet_on']),
     },
     glider: {
         draw_layer: LAYER_ACTOR,
@@ -1279,7 +1315,7 @@ const TILE_TYPES = {
         is_tool: true,
         blocks_monsters: true,
         blocks_blocks: true,
-        item_ignores: new Set(['fire']),
+        item_ignores: new Set(['fire', 'flame_jet_on']),
     },
     flippers: {
         draw_layer: LAYER_ITEM,
