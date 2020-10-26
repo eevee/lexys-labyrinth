@@ -650,7 +650,7 @@ export class Level {
         if (actor.pending_push) {
             actor.decision = actor.pending_push;
             this._set_prop(actor, 'pending_push', null);
-            continue;
+            return;
         }
         if (actor.slide_mode === 'ice') {
             // Actors can't make voluntary moves on ice; they just slide
