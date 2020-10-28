@@ -384,6 +384,10 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'dirt');
             }
+            else if (other.type.name === 'directional_block') {
+                level.transmute_tile(other, 'splash');
+                level.transmute_tile(me, 'floor');
+            }
             else if (other.type.name === 'ice_block') {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'ice');
@@ -591,6 +595,9 @@ const TILE_TYPES = {
         is_block: true,
         can_reveal_walls: true,
         movement_speed: 4,
+        allows_push(me, direction) {
+            return me.arrows && me.arrows.has(direction);
+        },
         pushes: {
             dirt_block: true,
             ice_block: true,

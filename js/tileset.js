@@ -99,8 +99,10 @@ export const CC2_TILESET_LAYOUT = {
     popdown_floor: [12, 5],
     popdown_floor_visible: [13, 5],
     no_sign: [14, 5],
-    // TODO arrows overlay at [3, 10]
-    directional_block: [15, 5],
+    directional_block: {
+        base: [15, 5],
+        arrows: [3, 10],
+    },
 
     flippers: [0, 6],
     fire_boots: [1, 6],
@@ -711,6 +713,10 @@ export class Tileset {
                 }
             }
         }
+        else if (drawspec.arrows) {
+            // Directional blocks have a specific overlay, but draw the base first
+            coords = drawspec.base;
+        }
         else if (drawspec.animate_width) {
             // Force floors animate their...  cutout, I guess?
             let [x, y] = drawspec.base;
@@ -823,6 +829,23 @@ export class Tileset {
             if (tile.wire_tunnel_directions & DIRECTIONS['east'].bit) {
                 blit(tunnel_coords[0] + 1 - tunnel_length, tunnel_coords[1] + tunnel_offset,
                     1 - tunnel_length, tunnel_offset, tunnel_length, tunnel_width);
+            }
+        }
+
+        // Directional blocks have arrows drawn on top
+        if (drawspec.arrows && tile && tile.arrows) {
+            let [x, y] = drawspec.arrows;
+            if (tile.arrows.has('north')) {
+                blit(x, y, 0, 0, 1, 0.25);
+            }
+            if (tile.arrows.has('east')) {
+                blit(x + 0.75, y, 0.75, 0, 0.25, 1);
+            }
+            if (tile.arrows.has('south')) {
+                blit(x, y + 0.75, 0, 0.75, 1, 0.25);
+            }
+            if (tile.arrows.has('west')) {
+                blit(x, y, 0, 0, 0.25, 1);
             }
         }
 

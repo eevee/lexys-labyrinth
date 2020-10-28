@@ -78,9 +78,10 @@ export class Tile {
         return false;
     }
 
-    can_push(tile) {
+    can_push(tile, direction) {
         return (
             this.type.pushes && this.type.pushes[tile.type.name] &&
+            (! tile.type.allows_push || tile.type.allows_push(tile, direction)) &&
             ! tile.stuck);
     }
 
@@ -150,7 +151,7 @@ export class Cell extends Array {
     blocks_entering(actor, direction, level, ignore_pushables = false) {
         for (let tile of this) {
             if (tile.blocks(actor, direction, level) &&
-                ! (ignore_pushables && actor.can_push(tile)))
+                ! (ignore_pushables && actor.can_push(tile, direction)))
             {
                 return true;
             }
@@ -729,7 +730,7 @@ export class Level {
                         if (tile.type.on_bump) {
                             tile.type.on_bump(tile, this, actor);
                         }
-                        if (could_push && actor.can_push(tile)) {
+                        if (could_push && actor.can_push(tile, dir2)) {
                             // Block slapping: you can shove a block by walking past it sideways
                             // TODO i think cc2 uses the push pose and possibly even turns you here?
                             this.attempt_step(tile, dir2);
@@ -824,7 +825,7 @@ export class Level {
                 let blocked_by_pushable = false;
                 for (let tile of goal_cell) {
                     if (tile.blocks(actor, direction, this)) {
-                        if (actor.can_push(tile)) {
+                        if (actor.can_push(tile, direction)) {
                             blocked_by_pushable = true;
                         }
                         else {
@@ -855,7 +856,7 @@ export class Level {
                 if (! blocked && blocked_by_pushable) {
                     // This time make a copy, since we're modifying the contents of the cell
                     for (let tile of Array.from(goal_cell)) {
-                        if (actor.can_push(tile)) {
+                        if (actor.can_push(tile, direction)) {
                             if (! this.attempt_step(tile, direction) &&
                                 tile.slide_mode !== null && tile.movement_cooldown !== 0)
                             {
