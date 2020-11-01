@@ -753,6 +753,14 @@ main.--has-demo .demo-controls {
 }
 
 /* Debug stuff */
+#player-debug {
+    display: none;
+    background-image: repeating-linear-gradient(135deg,
+        hsl(0, 0%, 12.5%) 0em,
+        hsl(0, 0%, 12.5%) 1em,
+        hsl(45, 25%, 12.5%) 1em,
+        hsl(45, 25%, 12.5%) 2em);
+}
 .input {
     display: grid;
     display: none;
@@ -831,13 +839,12 @@ main.--has-demo .demo-controls {
     grid:
         "controls   controls"   min-content
         "palette    level"      1fr
-        / minmax(25%, auto) 1fr
+        / calc((32px + 4px) * 8) 1fr
     ;
     gap: 0.5em;
 
     min-height: 0;
-    margin: auto;
-    padding: 1em;
+    margin: auto 1em;
 }
 
 #editor .level {
@@ -886,9 +893,20 @@ main.--has-demo .demo-controls {
 
 #editor .controls {
     grid-area: controls;
+    display: grid;
+    grid:
+        "toolbar    layer   direction   menu" auto
+        "hint       hint    hint        hint" 1.5em
+    ;
 }
-#editor .controls p img {
-    background: url(icons/tool-bg-unselected.png);
+#editor .controls #editor-toolbar {
+    grid-area: toolbar;
+}
+#editor .controls .-buttons {
+    grid-area: menu;
+}
+#editor .controls #editor-tool-help {
+    grid-area: hint;
 }
 .icon-button-set {
     display: flex;
@@ -910,6 +928,7 @@ main.--has-demo .demo-controls {
 .icon-button-set button img {
     display: block;
 }
+
 #editor .palette {
     grid-area: palette;
     min-width: 20vw;
@@ -928,7 +947,7 @@ main.--has-demo .demo-controls {
 #editor .palette section {
     display: grid;
     grid: auto-flow 32px / repeat(auto-fit, 32px);
-    gap: 3px;
+    gap: 4px;
 }
 .palette-entry {
     margin: 0.25em;

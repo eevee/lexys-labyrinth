@@ -129,16 +129,42 @@
                 <div class="input"></div>
             </div>
         </div>
-        <!-- TODO debug panel?
-        - current tic
-        - list of actors, or currently pointed-to actor?
-        <div class="debug">
-            <button>« 4 tics</button>
-            <button>« 1 tic</button>
-            <button>1 tic »</button>
-            <button>4 tics »</button>
+        <div id="player-debug">
+            <p>Play time: A tics, B moves, C seconds</p>
+            <p>
+                <button>« 4 tics</button>
+                <button>« 1 tic</button>
+                <button>1 tic »</button>
+                <button>4 tics »</button>
+            </p>
+            <p>Speed: 6× (0.5 frame), 3× (1 frame), 2× (???), 1.5× (2 frames), 1× (3 frames), ½× (6 frames), ⅓× (9 frames), ¼× (12 frames)</p>
+            <p>Viewport: 9/10, 12, 16, 24, 32, map size</p>
+
+            <p><input type="checkbox"> Show actor info</p>
+            <p><input type="checkbox"> Show actor bounding boxes</p>
+
+            <p><input type="checkbox"> Freeze time for everything else</p>
+            <p><input type="checkbox"> Immortal / intangible?</p>
+            <p><input type="checkbox"> Ignore collisions</p>
+            <p><input type="checkbox"> Levitate</p>
+            <p><input type="checkbox"> Stop clock</p>  <!-- TODO toggle clock like the ingame tile? -->
+            <p>Give item: <img src="icons/tool-bg-selected.png"> (Click inventory to destroy items)</p>
+
+            <p>
+                <button>Green button</button>
+                <button>Blue button</button>
+            </p>
+
+            <!-- TODO?
+                - inspect with mouse
+                    - list of actors, or currently pointed-to actor?
+                - activate something manually?
+                - click a button ingame?
+                - pan viewport (like editor)
+                - show connections, directions, other editor features
+                - look under anything
+            -->
         </div>
-        -->
     </main>
     <main id="editor" hidden>
         <header>
@@ -157,7 +183,10 @@
             <div id="editor-toolbar">
                 <!-- tools go here -->
             </div>
-            <button id="editor-share-url" type="button">Share?</button>
+            <div class="-buttons">
+                <button id="editor-share-url" type="button">Share?</button>
+                <button id="editor-toggle-green" type="button">Toggle green objects</button>
+            </div>
             <div id="editor-tool-help">
                 <strong>Pencil</strong> — <span>Select a tile and draw with the left mouse button.  Erase with the right mouse button.</span>
             </div>
