@@ -485,6 +485,11 @@ const EDITOR_PALETTE = [{
         'wall_invisible', 'wall_appearing',
         'gravel',
         'dirt',
+        'dirt',
+
+        'floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue',
+        'wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue',
+
         'door_blue', 'door_red', 'door_yellow', 'door_green',
         'water', 'turtle', 'fire',
         'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
@@ -495,6 +500,7 @@ const EDITOR_PALETTE = [{
     tiles: [
         'key_blue', 'key_red', 'key_yellow', 'key_green',
         'flippers', 'fire_boots', 'cleats', 'suction_boots',
+        'no_sign', // 'bestowal_bow',
     ],
 }, {
     title: "Creatures",

@@ -4,7 +4,7 @@ import { random_choice } from './util.js';
 // Draw layers
 const LAYER_TERRAIN = 0;
 const LAYER_ITEM = 1;
-const LAYER_NO_SIGN = 2;
+const LAYER_ITEM_MOD = 2;
 const LAYER_ACTOR = 3;
 const LAYER_OVERLAY = 4;
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
@@ -549,7 +549,7 @@ const TILE_TYPES = {
         },
     },
     no_sign: {
-        draw_layer: LAYER_NO_SIGN,
+        draw_layer: LAYER_ITEM_MOD,
         disables_pickup: true,
         blocks(me, level, other) {
             let item;
@@ -561,6 +561,10 @@ const TILE_TYPES = {
             }
             return item && other.has_item(item);
         },
+    },
+    bestowal_bow: {
+        draw_layer: LAYER_ITEM_MOD,
+        allows_all_pickup: true,
     },
 
     // Mechanisms
@@ -1046,9 +1050,15 @@ const TILE_TYPES = {
     },
     button_pink: {
         draw_layer: LAYER_TERRAIN,
-        is_emitting(me, level) {
-            // We emit current as long as there's an actor on us
-            return me.cell.some(tile => tile.type.is_actor);
+        is_power_source: true,
+        get_emitting_edges(me, level) {
+            // We emit current as long as there's an actor fully on us
+            if (me.cell.some(tile => tile.type.is_actor && tile.movement_cooldown === 0)) {
+                return me.wire_directions;
+            }
+            else {
+                return 0;
+            }
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
@@ -1060,6 +1070,16 @@ const TILE_TYPES = {
     button_black: {
         // TODO not implemented
         draw_layer: LAYER_TERRAIN,
+        is_power_source: true,
+        get_emitting_edges(me, level) {
+            // We emit current as long as there's NOT an actor fully on us
+            if (! me.cell.some(tile => tile.type.is_actor && tile.movement_cooldown === 0)) {
+                return me.wire_directions;
+            }
+            else {
+                return 0;
+            }
+        },
     },
     button_gray: {
         // TODO only partially implemented
@@ -1084,6 +1104,51 @@ const TILE_TYPES = {
         },
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
+        },
+    },
+    // Logic gates, all consolidated into a single tile type
+    logic_gate: {
+        // gate_type: not, and, or, xor, nand, latch-cw, latch-ccw, counter, bogus
+        _gate_types: {
+            not: ['out', null, 'in1', null],
+            and: ['out', 'in2', null, 'in1'],
+            or: [],
+            xor: [],
+            nand: [],
+            'latch-cw': [],
+            'latch-ccw': [],
+        },
+        draw_layer: LAYER_TERRAIN,
+        is_power_source: true,
+        get_emitting_edges(me, level) {
+            if (me.gate_type === 'and') {
+                let vars = {};
+                let out_bit = 0;
+                let dir = me.direction;
+                for (let name of me.type._gate_types[me.gate_type]) {
+                    let dirinfo = DIRECTIONS[dir];
+                    if (name === 'out') {
+                        out_bit |= dirinfo.bit;
+                    }
+                    else if (name) {
+                        vars[name] = (me.cell.powered_edges & dirinfo.bit) !== 0;
+                    }
+                    dir = dirinfo.right;
+                }
+
+                if (vars.in1 && vars.in2) {
+                    return out_bit;
+                }
+                else {
+                    return 0;
+                }
+            }
+            else {
+                return 0;
+            }
+        },
+        visual_state(me) {
+            return me.gate_type;
         },
     },
 
@@ -1383,6 +1448,14 @@ const TILE_TYPES = {
         item_ignores: new Set(['railroad']),
     },
     foil: {
+        // TODO not implemented
+        draw_layer: LAYER_ITEM,
+        is_item: true,
+        is_tool: true,
+        blocks_monsters: true,
+        blocks_blocks: true,
+    },
+    lightning_bolt: {
         // TODO not implemented
         draw_layer: LAYER_ITEM,
         is_item: true,

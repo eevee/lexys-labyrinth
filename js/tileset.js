@@ -35,6 +35,7 @@ export const CC2_TILESET_LAYOUT = {
         // Wiring!
         base: [0, 2],
         wired: [8, 26],
+        wired_cross: [10, 26],
         is_wired_optional: true,
     },
     wall_invisible: [0, 2],
@@ -206,6 +207,7 @@ export const CC2_TILESET_LAYOUT = {
         // Wiring!
         base: [15, 10],
         wired: [9, 26],
+        wired_cross: [11, 26],
         is_wired_optional: true,
     },
 
@@ -368,6 +370,55 @@ export const CC2_TILESET_LAYOUT = {
         [14, 24],
         [15, 24],
     ],
+
+    logic_gate: {
+        // TODO currently, 'wired' can't coexist with visual state etc...
+        // TODO *long sigh*  of course, logic gates have parts with independent current too
+        'latch-ccw': {
+            north: [8, 21],
+            east: [9, 21],
+            south: [10, 21],
+            west: [11, 21],
+        },
+        not: {
+            north: [0, 25],
+            east: [1, 25],
+            south: [2, 25],
+            west: [3, 25],
+        },
+        and: {
+            north: [4, 25],
+            east: [5, 25],
+            south: [6, 25],
+            west: [7, 25],
+        },
+        or: {
+            north: [8, 25],
+            east: [9, 25],
+            south: [10, 25],
+            west: [11, 25],
+        },
+        xor: {
+            north: [12, 25],
+            east: [13, 25],
+            south: [14, 25],
+            west: [15, 25],
+        },
+        'latch-cw': {
+            north: [0, 26],
+            east: [1, 26],
+            south: [2, 26],
+            west: [3, 26],
+        },
+        nand: {
+            north: [4, 26],
+            east: [5, 26],
+            south: [6, 26],
+            west: [7, 26],
+        },
+        // FIXME need to draw the number as well
+        counter: [14, 26],
+    },
 
     '#unpowered': [13, 26],
     '#powered': [15, 26],
@@ -600,7 +651,6 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     teeth: Object.assign({}, CC2_TILESET_LAYOUT.teeth, {
         north: [[0, 32], [1, 32], [2, 32], [1, 32]],
     }),
-    popwall2: [9, 32],
 
     // Extra player sprites
     player: Object.assign({}, CC2_TILESET_LAYOUT.player, {
@@ -627,6 +677,10 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
         overlay: [6, 33],
         base: 'floor',
     },
+
+    // Custom tiles
+    popwall2: [9, 32],
+    bestowal_bow: [10, 32],
 });
 
 export class Tileset {
@@ -673,31 +727,51 @@ export class Tileset {
             coords = drawspec.tile;
         }
         else if (drawspec.wired) {
-            if (tile && tile.wire_directions) {
-                // TODO all four is a different thing entirely with two separate parts, ugh
-                // Draw the appropriate wire underlay
-                this.draw_type(tile.cell.is_powered ? '#powered' : '#unpowered', tile, tic, blit);
+            // This /should/ match CC2's draw order exactly, based on experimentation
+            let wire_radius = this.layout['#wire-width'] / 2;
+            if (tile && tile.wire_directions === 0x0f) {
+                // This is a wired tile with crossing wires, which acts a little differently
+                // Draw the base tile
+                blit(drawspec.base[0], drawspec.base[1]);
 
-                // Draw a masked part of the base tile
-                let wiredir = tile.wire_directions;
-                let wire_radius = this.layout['#wire-width'] / 2;
-                let wire0 = 0.5 - wire_radius;
-                let wire1 = 0.5 + wire_radius;
-                let [bx, by] = drawspec.base;
-                if ((wiredir & DIRECTIONS['north'].bit) === 0) {
-                    blit(bx, by, 0, 0, 1, wire0);
-                }
-                if ((wiredir & DIRECTIONS['south'].bit) === 0) {
-                    blit(bx, by + wire1, 0, wire1, 1, wire0);
-                }
-                if ((wiredir & DIRECTIONS['west'].bit) === 0) {
-                    blit(bx, by, 0, 0, wire0, 1);
-                }
-                if ((wiredir & DIRECTIONS['east'].bit) === 0) {
-                    blit(bx + wire1, by, wire1, 0, wire0, 1);
-                }
+                // Draw the two wires as separate rectangles, NS then EW
+                let wire_inset = 0.5 - wire_radius;
+                let wire_coords_ns = this.layout[
+                    tile.cell && tile.cell.powered_edges & DIRECTIONS['north'].bit ? '#powered' : '#unpowered'];
+                let wire_coords_ew = this.layout[
+                    tile.cell && tile.cell.powered_edges & DIRECTIONS['east'].bit ? '#powered' : '#unpowered'];
+                blit(wire_coords_ns[0] + wire_inset, wire_coords_ns[1], wire_inset, 0, wire_radius * 2, 1);
+                blit(wire_coords_ew[0], wire_coords_ew[1] + wire_inset, 0, wire_inset, 1, wire_radius * 2);
 
-                // Then draw the wired tile as normal
+                // Draw the cross tile on top
+                coords = drawspec.wired_cross ?? drawspec.wired;
+            }
+            else if (tile && tile.wire_directions) {
+                // Draw the base tile
+                blit(drawspec.base[0], drawspec.base[1]);
+
+                // Draw the wire part as a single rectangle, initially just a small dot in the
+                // center, but extending out to any edge that has a wire present
+                let x0 = 0.5 - wire_radius;
+                let x1 = 0.5 + wire_radius;
+                let y0 = 0.5 - wire_radius;
+                let y1 = 0.5 + wire_radius;
+                if (tile.wire_directions & DIRECTIONS['north'].bit) {
+                    y0 = 0;
+                }
+                if (tile.wire_directions & DIRECTIONS['east'].bit) {
+                    x1 = 1;
+                }
+                if (tile.wire_directions & DIRECTIONS['south'].bit) {
+                    y1 = 1;
+                }
+                if (tile.wire_directions & DIRECTIONS['west'].bit) {
+                    x0 = 0;
+                }
+                let wire_coords = this.layout[tile.cell && tile.cell.powered_edges ? '#powered' : '#unpowered'];
+                blit(wire_coords[0] + x0, wire_coords[1] + y0, x0, y0, x1 - x0, y1 - y0);
+
+                // Then draw the wired tile on top of it all
                 coords = drawspec.wired;
             }
             else {

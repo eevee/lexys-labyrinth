@@ -421,9 +421,33 @@ const TILE_ENCODING = {
         name: 'no_player1_sign',
     },
     0x5c: {
-        // TODO (modifier chooses logic gate) name: 'doppelganger2',
-        // TODO modifier: ...
-        error: "Logic gates are not yet implemented, sorry!",
+        name: 'logic_gate',
+        modifier: {
+            decode(tile, modifier) {
+                if (modifier >= 0x1e && modifier <= 0x27) {
+                    // Counter, which can't be rotated
+                    tile.direction = 'north';
+                    tile.gate_type = 'counter';
+                    tile.counter_value = modifier - 0x1e;
+                }
+                else {
+                    tile.direction = ['north', 'east', 'south', 'west'][modifier & 0x03];
+                    let type = modifier >> 2;
+                    if (type < 6) {
+                        tile.gate_type = ['not', 'and', 'or', 'xor', 'latch-cw', 'nand'][type];
+                    }
+                    else if (type === 16) {
+                        tile.gate_type = 'latch-ccw';
+                    }
+                    else {
+                        tile.gate_type = 'bogus';
+                    }
+                }
+            },
+            encode(tile) {
+                // FIXME implement
+            },
+        },
     },
     0x5e: {
         name: 'button_pink',
@@ -503,10 +527,10 @@ const TILE_ENCODING = {
         },
     },
     0x72: {
-        name: 'purple_wall',
+        name: 'purple_floor',
     },
     0x73: {
-        name: 'purple_floor',
+        name: 'purple_wall',
     },
     0x76: {
         name: '#mod8',

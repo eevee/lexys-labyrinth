@@ -95,6 +95,7 @@ export class Tile {
         }
     }
 }
+Tile.prototype.emitting_edges = 0;
 
 export class Cell extends Array {
     constructor(x, y) {
@@ -159,8 +160,8 @@ export class Cell extends Array {
         return false;
     }
 }
-Cell.prototype.was_powered = false;
-Cell.prototype.is_powered = false;
+Cell.prototype.prev_powered_edges = 0;
+Cell.prototype.powered_edges = 0;
 
 class GameEnded extends Error {}
 
@@ -228,9 +229,7 @@ export class Level {
 
         let n = 0;
         let connectables = [];
-        // Handle CC2 wiring; a contiguous region of wire is all updated as a single unit, so detect
-        // those units ahead of time for simplicity and call them "clusters"
-        this.wire_clusters = [];
+        this.power_sources = [];
         // FIXME handle traps correctly:
         // - if an actor is in the cell, set the trap to open and unstick everything in it
         for (let y = 0; y < this.height; y++) {
@@ -249,6 +248,10 @@ export class Level {
                     if (tile.type.is_hint) {
                         // Copy over the tile-specific hint, if any
                         tile.specific_hint = template_tile.specific_hint ?? null;
+                    }
+
+                    if (tile.type.is_power_source) {
+                        this.power_sources.push(tile);
                     }
 
                     // TODO well this is pretty special-casey.  maybe come up
@@ -272,9 +275,9 @@ export class Level {
                             // list?
                             tile.stuck = true;
                         }
-                    }
-                    if (! tile.stuck) {
-                        this.actors.push(tile);
+                        if (! tile.stuck) {
+                            this.actors.push(tile);
+                        }
                     }
                     cell._add(tile);
 
@@ -991,7 +994,8 @@ export class Level {
                 continue;
 
             // TODO some actors can pick up some items...
-            if (actor.type.is_player && tile.type.is_item &&
+            if (tile.type.is_item &&
+                (actor.type.is_player || cell.some(t => t.allows_all_pickup)) &&
                 this.attempt_take(actor, tile))
             {
                 if (tile.type.is_key) {
@@ -1075,78 +1079,123 @@ export class Level {
     // this needs to happen at all
     // FIXME none of this is currently undoable
     update_wiring() {
+        // Gather every tile that's emitting power.  Along the way, check whether any of them have
+        // changed since last tic, so we can skip this work entirely if none did
+        let neighbors = [];
+        let any_changed = false;
+        for (let tile of this.power_sources) {
+            if (! tile.cell)
+                continue;
+            let emitting = tile.type.get_emitting_edges(tile, this);
+            if (emitting) {
+                neighbors.push([tile.cell, emitting]);
+            }
+            if (emitting !== tile.emitting_edges) {
+                any_changed = true;
+                tile.emitting_edges = emitting;
+            }
+        }
+        // Also check actors, since any of them might be holding a lightning bolt (argh)
+        for (let actor of this.actors) {
+            if (! actor.cell)
+                continue;
+            // Only count when they're on a tile, not in transit!
+            let emitting = actor.movement_cooldown === 0 && actor.has_item('lightning_bolt');
+            if (emitting) {
+                neighbors.push([actor.cell, emitting]);
+            }
+            if (emitting !== actor.emitting_edges) {
+                any_changed = true;
+                actor.emitting_edges = emitting;
+            }
+        }
+        // If none changed, we're done
+        if (! any_changed)
+            return;
+
         // Turn off power to every cell
         // TODO wonder if i need a linear cell list, or even a flat list of all tiles (that sounds
         // like hell to keep updated though)
         for (let row of this.cells) {
             for (let cell of row) {
-                cell.was_powered = cell.is_powered;
-                cell.is_powered = false;
+                cell.prev_powered_edges = cell.powered_edges;
+                cell.powered_edges = 0;
             }
         }
 
-        // Iterate through the grid looking for emitters — tiles that are generating current — and
+        // Iterate over emitters and flood-fill outwards one edge at a time
         // propagated it via flood-fill through neighboring wires
-        for (let row of this.cells) {
-            for (let cell of row) {
-                // TODO probably this should set a prop on the tile
-                if (! cell.some(tile => tile.type.is_emitting && tile.type.is_emitting(tile, this)))
+        while (neighbors.length > 0) {
+            let [cell, source_direction] = neighbors.shift();
+            let wire = cell.get_wired_tile();
+
+            // Power this cell
+            if (typeof(source_direction) === 'number') {
+                // This cell is emitting power itself, and the source direction is actually a
+                // bitmask of directions
+                cell.powered_edges = source_direction;
+            }
+            else {
+                let bit = DIRECTIONS[source_direction].bit;
+                if (wire === null || (wire.wire_directions & bit) === 0) {
+                    // No wire on this side, so the power doesn't actually propagate, but it DOES
+                    // stay on this edge (so if this is e.g. a purple tile, it'll be powered)
+                    cell.powered_edges |= bit;
+                    continue;
+                }
+
+                // Common case: power entering a wired edge and propagating outwards.  The only
+                // special case is that four-way wiring is two separate wires, N/S and E/W
+                if (wire.wire_directions === 0x0f) {
+                    cell.powered_edges |= bit;
+                    cell.powered_edges |= DIRECTIONS[DIRECTIONS[source_direction].opposite].bit;
+                }
+                else {
+                    cell.powered_edges = wire.wire_directions;
+                }
+            }
+
+            // Propagate current to neighbors
+            for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
+                if (direction === source_direction)
+                    continue;
+                if ((cell.powered_edges & dirinfo.bit) === 0)
                     continue;
 
-                // We have an emitter!  Flood-fill outwards
-                let neighbors = [cell];
-                for (let neighbor of neighbors) {
-                    // Power it even if it's not wired itself, so that e.g. purple tiles work
-                    neighbor.is_powered = true;
+                let neighbor, neighbor_wire;
+                let opposite_bit = DIRECTIONS[dirinfo.opposite].bit;
+                if (wire && (wire.wire_tunnel_directions & dirinfo.bit)) {
+                    // Search in the given direction until we find a matching tunnel
+                    // FIXME these act like nested parens!
+                    let x = cell.x;
+                    let y = cell.y;
+                    let nesting = 0;
+                    while (true) {
+                        x += dirinfo.movement[0];
+                        y += dirinfo.movement[1];
+                        if (! this.is_point_within_bounds(x, y))
+                            break;
 
-                    let wire = neighbor.get_wired_tile();
-                    if (! wire)
-                        continue;
-
-                    // Emit along every wire direction, and add any unpowered neighbors to the
-                    // pending list to continue the floodfill
-                    // TODO but only if wires connect
-                    // TODO handle wire tunnels
-                    for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
-                        if (! (wire.wire_directions & dirinfo.bit))
-                            continue;
-
-                        let neighbor2, wire2;
-                        let opposite_bit = DIRECTIONS[dirinfo.opposite].bit;
-                        if (wire.wire_tunnel_directions & dirinfo.bit) {
-                            // Search in the given direction until we find a matching tunnel
-                            // FIXME these act like nested parens!
-                            let x = neighbor.x;
-                            let y = neighbor.y;
-                            let nesting = 0;
-                            while (true) {
-                                x += dirinfo.movement[0];
-                                y += dirinfo.movement[1];
-                                if (! this.is_point_within_bounds(x, y))
-                                    break;
-
-                                let candidate = this.cells[y][x];
-                                wire2 = candidate.get_wired_tile();
-                                if (wire2 && (wire2.wire_tunnel_directions ?? 0) & opposite_bit) {
-                                    neighbor2 = candidate;
-                                    break;
-                                }
-                            }
-                        }
-                        else {
-                            // Otherwise this is easy
-                            neighbor2 = this.get_neighboring_cell(neighbor, direction);
-                            wire2 = neighbor2.get_wired_tile();
-                        }
-
-                        if (neighbor2 && ! neighbor2.is_powered &&
-                            // Unwired tiles are OK; they might be something activated by power.
-                            // Wired tiles that do NOT connect to us are ignored.
-                            (! wire2 || wire2.wire_directions & opposite_bit))
-                        {
-                            neighbors.push(neighbor2);
+                        let candidate = this.cells[y][x];
+                        neighbor_wire = candidate.get_wired_tile();
+                        if (neighbor_wire && ((neighbor_wire.wire_tunnel_directions ?? 0) & opposite_bit)) {
+                            neighbor = candidate;
+                            break;
                         }
                     }
+                }
+                else {
+                    // No tunnel; this is easy
+                    neighbor = this.get_neighboring_cell(cell, direction);
+                    neighbor_wire = neighbor.get_wired_tile();
+                }
+
+                if (neighbor && (neighbor.powered_edges & opposite_bit) === 0 &&
+                    // Unwired tiles are OK; they might be something activated by power.
+                    // Wired tiles that do NOT connect to us are ignored.
+                    (! neighbor_wire || neighbor_wire.wire_directions & opposite_bit))
+                {
+                    neighbors.push([neighbor, dirinfo.opposite]);
                 }
             }
         }
@@ -1154,8 +1203,8 @@ export class Level {
         // Inform any affected cells of power changes
         for (let row of this.cells) {
             for (let cell of row) {
-                if (cell.was_powered !== cell.is_powered) {
-                    let method = cell.is_powered ? 'on_power' : 'on_depower';
+                if ((cell.prev_powered_edges === 0) !== (cell.powered_edges === 0)) {
+                    let method = cell.powered_edges ? 'on_power' : 'on_depower';
                     for (let tile of cell) {
                         if (tile.type[method]) {
                             tile.type[method](tile, this);
