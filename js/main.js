@@ -243,6 +243,8 @@ class Player extends PrimaryView {
             ArrowRight: 'right',
             ArrowUp: 'up',
             ArrowDown: 'down',
+            Spacebar: 'wait',
+            " ": 'wait',
             w: 'up',
             a: 'left',
             s: 'down',
@@ -304,6 +306,12 @@ class Player extends PrimaryView {
                 this.music_audio_el.pause();
             }
         });
+        
+        this.turn_based = false;
+        this.turn_based_checkbox = this.root.querySelector('.controls .turn-based');
+        this.turn_based_checkbox.addEventListener('change', ev => {
+            this.turn_based = !this.turn_based;
+        });
 
         // Bind buttons
         this.pause_button = this.root.querySelector('.controls .control-pause');
@@ -327,7 +335,7 @@ class Player extends PrimaryView {
             while (this.level.undo_stack.length > 0 &&
                 ! (moved && this.level.player.slide_mode === null))
             {
-                this.level.undo();
+                this.undo();
                 if (player_cell !== this.level.player.cell) {
                     moved = true;
                 }
@@ -409,6 +417,7 @@ class Player extends PrimaryView {
         this.previous_action = null;  // last direction we were moving, if any
         this.using_touch = false;  // true if using touch controls
         this.current_keys = new Set;  // keys that are currently held
+        this.current_keys_new = new Set; //for keys that have only been held a frame
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
             if (ev.key === 'p' || ev.key === 'Pause') {
@@ -429,7 +438,9 @@ class Player extends PrimaryView {
                     }
                     else {
                         // Restart
-                        this.restart_level();
+                        if (!this.current_keys.has(ev.key)) {
+                            this.restart_level();
+                        }
                     }
                     return;
                 }
@@ -447,6 +458,7 @@ class Player extends PrimaryView {
 
             if (this.key_mapping[ev.key]) {
                 this.current_keys.add(ev.key);
+                this.current_keys_new.add(ev.key);
                 ev.stopPropagation();
                 ev.preventDefault();
 
@@ -647,6 +659,7 @@ class Player extends PrimaryView {
     _clear_state() {
         this.set_state('waiting');
 
+        this.waiting_for_input = false;
         this.tic_offset = 0;
         this.last_advance = 0;
         this.demo_faucet = null;
@@ -693,12 +706,18 @@ class Player extends PrimaryView {
             for (let key of this.current_keys) {
                 input.add(this.key_mapping[key]);
             }
+            for (let key of this.current_keys_new) {
+                input.add(this.key_mapping[key]);
+            }
+            this.current_keys_new = new Set;
             for (let action of Object.values(this.current_touches)) {
                 input.add(action);
             }
             return input;
         }
     }
+    
+    waiting_for_input = false;
 
     advance_by(tics) {
         for (let i = 0; i < tics; i++) {
@@ -762,10 +781,43 @@ class Player extends PrimaryView {
             this.previous_input = input;
 
             this.sfx_player.advance_tic();
-            this.level.advance_tic(
-                this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null,
-                this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null,
-            );
+            
+            var primary_dir = this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null;
+            var secondary_dir =  this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null;
+            
+            //turn based logic
+            //first, handle a part 2 we just got input for
+            if (this.waiting_for_input)
+            {
+                if (!this.turn_based || primary_dir != null || input.has('wait'))
+                {
+                    this.waiting_for_input = false;
+                    this.level.advance_tic(
+                    primary_dir,
+                    secondary_dir,
+                    2);
+                    
+                }
+            }
+            else
+            {
+                this.level.advance_tic(
+                primary_dir,
+                secondary_dir,
+                1);
+                //then if we should wait for input, the player needs input and we don't have input, we set waiting_for_input, else we run part 2
+                if (this.turn_based && this.level.player_awaiting_input() && !(primary_dir != null || input.has('wait')))
+                {
+                    this.waiting_for_input = true;
+                }
+                else
+                {
+                    this.level.advance_tic(
+                    primary_dir,
+                    secondary_dir,
+                    2);
+                }
+            }
 
             if (this.level.state !== 'playing') {
                 // We either won or lost!
@@ -783,8 +835,9 @@ class Player extends PrimaryView {
             this._advance_handle = null;
             return;
         }
-
+        
         this.last_advance = performance.now();
+        
         if (this.state === 'playing') {
             this.advance_by(1);
         }
@@ -798,16 +851,29 @@ class Player extends PrimaryView {
             }
             else {
                 // Rewind by undoing one tic every tic
-                this.level.undo();
+                this.undo();
                 this.update_ui();
             }
         }
+        
+        if (this.waiting_for_input)
+        {
+            //freeze tic_offset in time so we don't try to interpolate to the next frame too soon
+            this.tic_offset = 0;
+        }
+        
         let dt = 1000 / TICS_PER_SECOND;
         if (this.state === 'rewinding') {
             // Rewind faster than normal time
             dt *= 0.5;
         }
         this._advance_handle = window.setTimeout(this._advance_bound, dt);
+    }
+
+    undo() {
+        //if we were waiting for input and undo, well, now we're not
+        this.waiting_for_input = false;
+        this.level.undo();
     }
 
     // Redraws every frame, unless the game isn't running
@@ -817,9 +883,15 @@ class Player extends PrimaryView {
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
-        this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
-        if (this.state === 'rewinding') {
-            this.tic_offset = 1 - this.tic_offset;
+        if (this.waiting_for_input) {
+            //freeze tic_offset in time
+        }
+        else
+        {
+            this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
+            if (this.state === 'rewinding') {
+                this.tic_offset = 1 - this.tic_offset;
+            }
         }
 
         this._redraw();
@@ -837,6 +909,7 @@ class Player extends PrimaryView {
 
     // Actually redraw.  Used to force drawing outside of normal play
     _redraw() {
+        this.renderer.waiting_for_input = this.waiting_for_input;
         this.renderer.draw(this.tic_offset);
     }
 
