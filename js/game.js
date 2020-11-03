@@ -167,8 +167,9 @@ class GameEnded extends Error {}
 
 // The undo stack is implemented with a ring buffer, and this is its size.  One entry per tic.
 // Based on Chrome measurements made against the pathological level CCLP4 #40 (Periodic Lasers) and
-// sitting completely idle, undo consumes about 2 MB every five seconds.
-const UNDO_STACK_SIZE = TICS_PER_SECOND * 10;
+// sitting completely idle, undo consumes about 2 MB every five seconds, so this shouldn't go beyond
+// 12 MB for any remotely reasonable level.
+const UNDO_BUFFER_SIZE = TICS_PER_SECOND * 30;
 export class Level {
     constructor(stored_level, compat = {}) {
         this.stored_level = stored_level;
@@ -228,11 +229,11 @@ export class Level {
             this._blob_modifier = Math.floor(Math.random() * 256);
         }
 
-        this.undo_stack = new Array(UNDO_STACK_SIZE);
-        for (let i = 0; i < UNDO_STACK_SIZE; i++) {
-            this.undo_stack[i] = null;
+        this.undo_buffer = new Array(UNDO_BUFFER_SIZE);
+        for (let i = 0; i < UNDO_BUFFER_SIZE; i++) {
+            this.undo_buffer[i] = null;
         }
-        this.undo_stack_index = 0;
+        this.undo_buffer_index = 0;
         this.pending_undo = this.create_undo_entry();
 
         let n = 0;
@@ -1326,20 +1327,20 @@ export class Level {
     }
 
     has_undo() {
-        let prev_index = this.undo_stack_index - 1;
+        let prev_index = this.undo_buffer_index - 1;
         if (prev_index < 0) {
-            prev_index += UNDO_STACK_SIZE;
+            prev_index += UNDO_BUFFER_SIZE;
         }
 
-        return this.undo_stack[prev_index] !== null;
+        return this.undo_buffer[prev_index] !== null;
     }
 
     commit() {
-        this.undo_stack[this.undo_stack_index] = this.pending_undo;
+        this.undo_buffer[this.undo_buffer_index] = this.pending_undo;
         this.pending_undo = this.create_undo_entry();
 
-        this.undo_stack_index += 1;
-        this.undo_stack_index %= UNDO_STACK_SIZE;
+        this.undo_buffer_index += 1;
+        this.undo_buffer_index %= UNDO_BUFFER_SIZE;
     }
 
     undo() {
@@ -1349,12 +1350,12 @@ export class Level {
         this._undo_entry(this.pending_undo);
         this.pending_undo = this.create_undo_entry();
 
-        this.undo_stack_index -= 1;
-        if (this.undo_stack_index < 0) {
-            this.undo_stack_index += UNDO_STACK_SIZE;
+        this.undo_buffer_index -= 1;
+        if (this.undo_buffer_index < 0) {
+            this.undo_buffer_index += UNDO_BUFFER_SIZE;
         }
-        this._undo_entry(this.undo_stack[this.undo_stack_index]);
-        this.undo_stack[this.undo_stack_index] = null;
+        this._undo_entry(this.undo_buffer[this.undo_buffer_index]);
+        this.undo_buffer[this.undo_buffer_index] = null;
     }
 
     // Reverse a single undo entry
@@ -1485,7 +1486,9 @@ export class Level {
     }
 
     // Tile stuff in particular
-    // TODO should add in the right layer?  maybe?
+    // TODO should add in the right layer?  maybe?  hard to say what that is when mscc levels might
+    // have things stacked in a weird order though
+    // TODO would be nice to make these not be closures but order matters much more here
 
     remove_tile(tile) {
         let cell = tile.cell;
