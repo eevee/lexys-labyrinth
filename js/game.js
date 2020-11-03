@@ -168,7 +168,6 @@ class GameEnded extends Error {}
 // The undo stack is implemented with a ring buffer, and this is its size.  One entry per tic.
 // Based on Chrome measurements made against the pathological level CCLP4 #40 (Periodic Lasers) and
 // sitting completely idle, undo consumes about 2 MB every five seconds.
-// TODO actually make it a ring buffer
 const UNDO_STACK_SIZE = TICS_PER_SECOND * 10;
 export class Level {
     constructor(stored_level, compat = {}) {
@@ -229,7 +228,11 @@ export class Level {
             this._blob_modifier = Math.floor(Math.random() * 256);
         }
 
-        this.undo_stack = [];
+        this.undo_stack = new Array(UNDO_STACK_SIZE);
+        for (let i = 0; i < UNDO_STACK_SIZE; i++) {
+            this.undo_stack[i] = null;
+        }
+        this.undo_stack_index = 0;
         this.pending_undo = this.create_undo_entry();
 
         let n = 0;
@@ -1322,13 +1325,21 @@ export class Level {
         return entry;
     }
 
+    has_undo() {
+        let prev_index = this.undo_stack_index - 1;
+        if (prev_index < 0) {
+            prev_index += UNDO_STACK_SIZE;
+        }
+
+        return this.undo_stack[prev_index] !== null;
+    }
+
     commit() {
-        this.undo_stack.push(this.pending_undo);
+        this.undo_stack[this.undo_stack_index] = this.pending_undo;
         this.pending_undo = this.create_undo_entry();
 
-        if (this.undo_stack.length > UNDO_STACK_SIZE) {
-            this.undo_stack.splice(0, this.undo_stack.length - UNDO_STACK_SIZE);
-        }
+        this.undo_stack_index += 1;
+        this.undo_stack_index %= UNDO_STACK_SIZE;
     }
 
     undo() {
@@ -1338,11 +1349,20 @@ export class Level {
         this._undo_entry(this.pending_undo);
         this.pending_undo = this.create_undo_entry();
 
-        this._undo_entry(this.undo_stack.pop());
+        this.undo_stack_index -= 1;
+        if (this.undo_stack_index < 0) {
+            this.undo_stack_index += UNDO_STACK_SIZE;
+        }
+        this._undo_entry(this.undo_stack[this.undo_stack_index]);
+        this.undo_stack[this.undo_stack_index] = null;
     }
 
     // Reverse a single undo entry
     _undo_entry(entry) {
+        if (! entry) {
+            return;
+        }
+
         // Undo in reverse order!  There's no redo, so it's okay to destroy this
         entry.reverse();
         for (let undo of entry) {

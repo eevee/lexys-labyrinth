@@ -348,7 +348,7 @@ class Player extends PrimaryView {
             // about to make a conscious move.  Note that this means undoing all the way through
             // force floors, even if you could override them!
             let moved = false;
-            while (this.level.undo_stack.length > 0 &&
+            while (this.level.has_undo() &&
                 ! (moved && this.level.player.slide_mode === null))
             {
                 this.undo();
@@ -368,7 +368,7 @@ class Player extends PrimaryView {
         });
         this.rewind_button = this.root.querySelector('.controls .control-rewind');
         this.rewind_button.addEventListener('click', ev => {
-            if (this.level.undo_stack.length > 0) {
+            if (this.level.has_undo()) {
                 this.state = 'rewinding';
             }
         });
@@ -465,7 +465,7 @@ class Player extends PrimaryView {
             }
 
             if (ev.key === 'z') {
-                if (this.level.undo_stack.length > 0 &&
+                if (this.level.has_undo() &&
                     (this.state === 'stopped' || this.state === 'playing' || this.state === 'paused'))
                 {
                     this.set_state('rewinding');
@@ -854,18 +854,15 @@ class Player extends PrimaryView {
             this.advance_by(1);
         }
         else if (this.state === 'rewinding') {
-            if (this.level.undo_stack.length === 0) {
-                // TODO detect if we hit the start of the level (rather than just running the undo
-                // buffer dry) and change to 'waiting' instead
-                // TODO pausing seems rude actually, it should just hover in-place?
-                this._advance_handle = null;
-                this.set_state('paused');
-            }
-            else {
+            if (this.level.has_undo()) {
                 // Rewind by undoing one tic every tic
                 this.undo();
                 this.update_ui();
             }
+            // If there are no undo entries left, freeze in place until the player stops rewinding,
+            // which I think is ye olde VHS behavior
+            // TODO detect if we hit the start of the level (rather than just running the undo
+            // buffer dry) and change to 'waiting' instead?
         }
 
         let dt = 1000 / TICS_PER_SECOND;
