@@ -833,7 +833,11 @@ main.--has-demo .demo-controls {
             "chips  inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
             "time   inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
             "bonus  inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            / 1fr min-content
+            /* FIXME ideally the first column would be 1fr so the hearts/time have space, but that
+             * allows hints to grow to the entire width of the window, which incredibly sucks.  i
+             * don't know how to get around this except by giving the grid a fixed width, which i
+             * guess wouldn't be that hard */
+            / min-content min-content
         ;
         row-gap: 0.5em;
         column-gap: 1em;
