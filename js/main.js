@@ -307,10 +307,24 @@ class Player extends PrimaryView {
             }
         });
         
-        this.turn_based = false;
-        this.turn_based_checkbox = this.root.querySelector('.controls .turn-based');
+        // 0: normal realtime mode
+        // 1: turn-based mode, and the next tic starts at the beginning
+        // 2: turn-based mode, and we're in mid-tic waiting for input
+        this.turn_based = 0;
+        this.turn_based_checkbox = this.root.querySelector('.controls .control-turn-based');
+        this.turn_based_checkbox.checked = false;
         this.turn_based_checkbox.addEventListener('change', ev => {
-            this.turn_based = !this.turn_based;
+            if (this.turn_based_checkbox.checked) {
+                // If we're leaving real-time mode then we're between tics
+                this.turn_based = 1;
+            }
+            else {
+                if (this.turn_based === 2) {
+                    // Finish up the tic
+                    this.advance_by(1);
+                }
+                this.turn_based = 0;
+            }
         });
 
         // Bind buttons
@@ -329,8 +343,9 @@ class Player extends PrimaryView {
         this.undo_button = this.root.querySelector('.controls .control-undo');
         this.undo_button.addEventListener('click', ev => {
             let player_cell = this.level.player.cell;
-            // Keep undoing until (a) we're on another cell and (b) we're not
-            // sliding, i.e. we're about to make a conscious move
+            // Keep undoing until (a) we're on another cell and (b) we're not sliding, i.e. we're
+            // about to make a conscious move.  Note that this means undoing all the way through
+            // force floors, even if you could override them!
             let moved = false;
             while (this.level.undo_stack.length > 0 &&
                 ! (moved && this.level.player.slide_mode === null))
@@ -417,7 +432,7 @@ class Player extends PrimaryView {
         this.previous_action = null;  // last direction we were moving, if any
         this.using_touch = false;  // true if using touch controls
         this.current_keys = new Set;  // keys that are currently held
-        this.current_keys_new = new Set; //for keys that have only been held a frame
+        this.current_keys_new = new Set; // keys that were pressed since input was last read
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
             if (ev.key === 'p' || ev.key === 'Pause') {
@@ -659,7 +674,7 @@ class Player extends PrimaryView {
     _clear_state() {
         this.set_state('waiting');
 
-        this.waiting_for_input = false;
+        this.turn_based = this.turn_based_checkbox.checked ? 1 : 0;
         this.tic_offset = 0;
         this.last_advance = 0;
         this.demo_faucet = null;
@@ -709,7 +724,7 @@ class Player extends PrimaryView {
             for (let key of this.current_keys_new) {
                 input.add(this.key_mapping[key]);
             }
-            this.current_keys_new = new Set;
+            this.current_keys_new.clear();
             for (let action of Object.values(this.current_touches)) {
                 input.add(action);
             }
@@ -717,8 +732,6 @@ class Player extends PrimaryView {
         }
     }
     
-    waiting_for_input = false;
-
     advance_by(tics) {
         for (let i = 0; i < tics; i++) {
             let input = this.get_input();
@@ -785,37 +798,26 @@ class Player extends PrimaryView {
             var primary_dir = this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null;
             var secondary_dir =  this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null;
             
-            //turn based logic
-            //first, handle a part 2 we just got input for
-            if (this.waiting_for_input)
-            {
-                if (!this.turn_based || primary_dir != null || input.has('wait'))
-                {
-                    this.waiting_for_input = false;
-                    this.level.advance_tic(
-                    primary_dir,
-                    secondary_dir,
-                    2);
-                    
+            let has_input = primary_dir !== null || input.has('wait');
+            // Turn-based mode complicates this slightly
+            // TODO advance_by(1) no longer advances by 1 tic necessarily...
+            if (this.turn_based === 2) {
+                if (has_input) {
+                    this.level.advance_tic(primary_dir, secondary_dir, 2);
+                    // TODO what if we just do the next tic part now?  but then we can never realign to a tic boundary.
+                    this.turn_based = 1;
                 }
             }
-            else
-            {
-                this.level.advance_tic(
-                primary_dir,
-                secondary_dir,
-                1);
-                //then if we should wait for input, the player needs input and we don't have input, we set waiting_for_input, else we run part 2
-                if (this.turn_based && this.level.player_awaiting_input() && !(primary_dir != null || input.has('wait')))
-                {
-                    this.waiting_for_input = true;
+            else {
+                // Start from a tic boundary
+                this.level.advance_tic(primary_dir, secondary_dir, 1);
+                if (this.turn_based > 0 && this.level.can_accept_input() && ! has_input) {
+                    // If we're in turn-based mode and could provide input here, but don't have any,
+                    // then wait until we do
+                    this.turn_based = 2;
                 }
-                else
-                {
-                    this.level.advance_tic(
-                    primary_dir,
-                    secondary_dir,
-                    2);
+                else {
+                    this.level.advance_tic(primary_dir, secondary_dir, 2);
                 }
             }
 
@@ -855,12 +857,8 @@ class Player extends PrimaryView {
                 this.update_ui();
             }
         }
-        
-        if (this.waiting_for_input)
-        {
-            //freeze tic_offset in time so we don't try to interpolate to the next frame too soon
-            this.tic_offset = 0;
-        }
+
+        // XXX tic_offset = 0 was here, what does that change
         
         let dt = 1000 / TICS_PER_SECOND;
         if (this.state === 'rewinding') {
@@ -871,9 +869,11 @@ class Player extends PrimaryView {
     }
 
     undo() {
-        //if we were waiting for input and undo, well, now we're not
-        this.waiting_for_input = false;
         this.level.undo();
+        // Undo always returns to the start of a tic
+        if (this.turn_based === 2) {
+            this.turn_based = 1;
+        }
     }
 
     // Redraws every frame, unless the game isn't running
@@ -883,11 +883,12 @@ class Player extends PrimaryView {
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
-        if (this.waiting_for_input) {
-            //freeze tic_offset in time
+        if (this.turn_based === 2) {
+            // We're frozen in mid-tic, so the clock hasn't advanced yet, but everything has already
+            // finished moving; pretend we're already on the next tic
+            this.tic_offset = 1;
         }
-        else
-        {
+        else {
             this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
             if (this.state === 'rewinding') {
                 this.tic_offset = 1 - this.tic_offset;
@@ -909,7 +910,6 @@ class Player extends PrimaryView {
 
     // Actually redraw.  Used to force drawing outside of normal play
     _redraw() {
-        this.renderer.waiting_for_input = this.waiting_for_input;
         this.renderer.draw(this.tic_offset);
     }
 
