@@ -38,7 +38,9 @@ button {
     color: white;
     background: var(--button-bg-color);
     border: 1px solid hsl(225, 10%, 15%);
-    box-shadow: 0 1px 0 hsl(225, 10%, 10%);
+    box-shadow:
+        inset 0 0 2px 1px hsl(225, 10%, 33%),
+        0 1px 0 hsl(225, 10%, 10%);
     border-radius: 0.25em;
     text-transform: lowercase;
     cursor: pointer;
@@ -47,12 +49,16 @@ button:hover {
     background: var(--button-bg-hover-color);
 }
 button:active {
-    box-shadow: none;
+    box-shadow:
+        inset 0 0 2px 1px hsl(225, 10%, 33%);
     transform: translateY(1px);
 }
 button:disabled {
     color: #606060;
     background: #202020;
+    box-shadow:
+        inset 0 0 2px 1px hsl(225, 0%, 10%),
+        0 1px 0 hsl(225, 10%, 10%);
     cursor: auto;
 }
 button.button-big {
