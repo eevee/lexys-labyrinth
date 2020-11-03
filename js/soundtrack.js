@@ -61,4 +61,19 @@ export default [{
     author: "jneen",
     twitter: "jneen_",
     path: 'music/escape-on-star-road.ogg',
+}, {
+    title: "inner orbit",
+    author: "notchris",
+    twitter: "chrismcgrane",
+    path: 'music/inner-orbit.ogg',
+}, {
+    title: "canopy",
+    author: "notchris",
+    twitter: "chrismcgrane",
+    path: 'music/canopy.ogg',
+}, {
+    title: "asteroid prairie",
+    author: "notchris",
+    twitter: "chrismcgrane",
+    path: 'music/asteroid-prairie.ogg',
 }];
