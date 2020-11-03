@@ -747,7 +747,7 @@ const TILE_TYPES = {
             }
         },
         add_press(me, level) {
-            level._set_prop(me, 'presses', (me.presses ?? 0) + 1);
+            level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
             if (me.presses === 1) {
                 // Free everything on us, if we went from 0 to 1 presses (i.e. closed to open)
                 for (let tile of Array.from(me.cell)) {
@@ -761,7 +761,7 @@ const TILE_TYPES = {
             }
         },
         remove_press(me, level) {
-            level._set_prop(me, 'presses', me.presses - 1);
+            level._set_tile_prop(me, 'presses', me.presses - 1);
             if (me.presses === 0) {
                 // Trap everything on us, if we went from 1 to 0 presses (i.e. open to closed)
                 for (let tile of me.cell) {
@@ -920,7 +920,7 @@ const TILE_TYPES = {
             for (let actor of level.actors) {
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_blue') {
-                    level._set_prop(actor, 'pending_reverse', ! actor.pending_reverse);
+                    level._set_tile_prop(actor, 'pending_reverse', ! actor.pending_reverse);
                 }
             }
         },

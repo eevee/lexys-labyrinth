@@ -1,4 +1,4 @@
-import { DIRECTIONS } from './defs.js';
+import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
 import TILE_TYPES from './tiletypes.js';
 
 export class Tile {
@@ -165,6 +165,11 @@ Cell.prototype.powered_edges = 0;
 
 class GameEnded extends Error {}
 
+// The undo stack is implemented with a ring buffer, and this is its size.  One entry per tic.
+// Based on Chrome measurements made against the pathological level CCLP4 #40 (Periodic Lasers) and
+// sitting completely idle, undo consumes about 2 MB every five seconds.
+// TODO actually make it a ring buffer
+const UNDO_STACK_SIZE = TICS_PER_SECOND * 10;
 export class Level {
     constructor(stored_level, compat = {}) {
         this.stored_level = stored_level;
@@ -225,7 +230,7 @@ export class Level {
         }
 
         this.undo_stack = [];
-        this.pending_undo = [];
+        this.pending_undo = this.create_undo_entry();
 
         let n = 0;
         let connectables = [];
@@ -376,15 +381,6 @@ export class Level {
 
     // Lynx PRNG, used unchanged in CC2
     prng() {
-        // TODO what if we just saved this stuff, as well as the RFF direction, at the beginning of
-        // each tic?
-        let rng1 = this._rng1;
-        let rng2 = this._rng2;
-        this.pending_undo.push(() => {
-            this._rng1 = rng1;
-            this._rng2 = rng2;
-        });
-
         let n = (this._rng1 >> 2) - this._rng1;
         if (!(this._rng1 & 0x02)) --n;
         this._rng1 = (this._rng1 >> 1) | (this._rng2 & 0x80);
@@ -396,7 +392,6 @@ export class Level {
     // Weird thing done by CC2 to make blobs...  more...  random
     get_blob_modifier() {
         let mod = this._blob_modifier;
-        this.pending_undo.push(() => this._blob_modifier = mod);
 
         if (this.stored_level.blob_behavior === 1) {
             // "4 patterns" just increments by 1 every time (but /after/ returning)
@@ -455,9 +450,19 @@ export class Level {
     }
 
     advance_tic_finish_movement(p1_primary_direction, p1_secondary_direction) {
+        // Store some current level state in the undo entry.  (These will often not be modified, but
+        // they only take a few bytes each so that's fine.)
+        for (let key of [
+                '_rng1', '_rng2', '_blob_modifier', 'force_floor_direction',
+                'tic_counter', 'time_remaining', 'timer_paused',
+                'chips_remaining', 'bonus_points', 'hint_shown', 'state'
+        ]) {
+            this.pending_undo.level_props[key] = this[key];
+        }
+
         // Player's secondary direction is set immediately; it applies on arrival to cells even if
         // it wasn't held the last time the player started moving
-        this._set_prop(this.player, 'secondary_direction', p1_secondary_direction);
+        this._set_tile_prop(this.player, 'secondary_direction', p1_secondary_direction);
 
         // Used to check for a monster chomping the player's tail
         this.player_leaving_cell = this.player.cell;
@@ -491,21 +496,21 @@ export class Level {
             // Decrement the cooldown here, but don't check it quite yet,
             // because stepping on cells in the next block might reset it
             if (actor.movement_cooldown > 0) {
-                this._set_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
+                this._set_tile_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
             }
 
             if (actor.animation_speed) {
                 // Deal with movement animation
-                this._set_prop(actor, 'animation_progress', actor.animation_progress + 1);
+                this._set_tile_prop(actor, 'animation_progress', actor.animation_progress + 1);
                 if (actor.animation_progress >= actor.animation_speed) {
                     if (actor.type.ttl) {
                         // This is purely an animation so it disappears once it's played
                         this.remove_tile(actor);
                         continue;
                     }
-                    this._set_prop(actor, 'previous_cell', null);
-                    this._set_prop(actor, 'animation_progress', null);
-                    this._set_prop(actor, 'animation_speed', null);
+                    this._set_tile_prop(actor, 'previous_cell', null);
+                    this._set_tile_prop(actor, 'animation_progress', null);
+                    this._set_tile_prop(actor, 'animation_speed', null);
                     if (! this.compat.tiles_react_instantly) {
                         // We need to track the actor AND the cell explicitly, because it's possible
                         // that one actor's step will cause another actor to start another move, and
@@ -552,13 +557,13 @@ export class Level {
             if (this.compat.sliding_tanks_ignore_button &&
                 actor.slide_mode && actor.pending_reverse)
             {
-                this._set_prop(actor, 'pending_reverse', false);
+                this._set_tile_prop(actor, 'pending_reverse', false);
             }
             // Blocks that were pushed while sliding will move in the push direction as soon as they
             // stop sliding, regardless of what they landed on
             if (actor.pending_push) {
                 actor.decision = actor.pending_push;
-                this._set_prop(actor, 'pending_push', null);
+                this._set_tile_prop(actor, 'pending_push', null);
                 continue;
             }
             if (actor.slide_mode === 'ice') {
@@ -578,12 +583,12 @@ export class Level {
                     actor.last_move_was_force)
                 {
                     actor.decision = p1_primary_direction;
-                    this._set_prop(actor, 'last_move_was_force', false);
+                    this._set_tile_prop(actor, 'last_move_was_force', false);
                 }
                 else {
                     actor.decision = actor.direction;
                     if (actor === this.player) {
-                        this._set_prop(actor, 'last_move_was_force', true);
+                        this._set_tile_prop(actor, 'last_move_was_force', true);
                     }
                 }
                 continue;
@@ -591,7 +596,7 @@ export class Level {
             else if (actor === this.player) {
                 if (p1_primary_direction) {
                     actor.decision = p1_primary_direction;
-                    this._set_prop(actor, 'last_move_was_force', false);
+                    this._set_tile_prop(actor, 'last_move_was_force', false);
                 }
                 continue;
             }
@@ -600,7 +605,7 @@ export class Level {
                 let direction = actor.direction;
                 if (actor.pending_reverse) {
                     direction = DIRECTIONS[actor.direction].opposite;
-                    this._set_prop(actor, 'pending_reverse', false);
+                    this._set_tile_prop(actor, 'pending_reverse', false);
                 }
                 // Tanks are controlled explicitly so they don't check if they're blocked
                 // TODO tanks in traps turn around, but tanks on cloners do not, and i use the same
@@ -791,12 +796,6 @@ export class Level {
         let tic_counter = this.tic_counter;
         this.tic_counter += 1;
         if (this.time_remaining !== null && ! this.timer_paused) {
-            let time_remaining = this.time_remaining;
-            this.pending_undo.push(() => {
-                this.tic_counter = tic_counter;
-                this.time_remaining = time_remaining;
-            });
-
             this.time_remaining -= 1;
             if (this.time_remaining <= 0) {
                 this.fail('time');
@@ -804,11 +803,6 @@ export class Level {
             else if (this.time_remaining % 20 === 0 && this.time_remaining < 30 * 20) {
                 this.sfx.play_once('tick');
             }
-        }
-        else {
-            this.pending_undo.push(() => {
-                this.tic_counter = tic_counter;
-            });
         }
     }
 
@@ -891,7 +885,7 @@ export class Level {
                             {
                                 // If the push failed and the obstacle is in the middle of a slide,
                                 // remember this as the next move it'll make
-                                this._set_prop(tile, 'pending_push', direction);
+                                this._set_tile_prop(tile, 'pending_push', direction);
                             }
                             if (actor === this.player) {
                                 actor.is_pushing = true;
@@ -937,7 +931,7 @@ export class Level {
         this.move_to(actor, goal_cell, speed);
 
         // Set movement cooldown since we just moved
-        this._set_prop(actor, 'movement_cooldown', speed);
+        this._set_tile_prop(actor, 'movement_cooldown', speed);
         return true;
     }
 
@@ -948,9 +942,9 @@ export class Level {
         if (actor.cell === goal_cell)
             return;
 
-        this._set_prop(actor, 'previous_cell', actor.cell);
-        this._set_prop(actor, 'animation_speed', speed);
-        this._set_prop(actor, 'animation_progress', 0);
+        this._set_tile_prop(actor, 'previous_cell', actor.cell);
+        this._set_tile_prop(actor, 'animation_speed', speed);
+        this._set_tile_prop(actor, 'animation_progress', 0);
 
         let original_cell = actor.cell;
         this.remove_tile(actor);
@@ -972,7 +966,7 @@ export class Level {
         // Check for a couple effects that always apply immediately
         // TODO do blocks smash monsters?
         if (actor === this.player) {
-            this._set_prop(this, 'hint_shown', null);
+            this.hint_shown = null;
         }
         for (let tile of goal_cell) {
             if (actor.type.is_player && tile.type.is_monster) {
@@ -990,7 +984,7 @@ export class Level {
             }
 
             if (actor === this.player && tile.type.is_hint) {
-                this._set_prop(this, 'hint_shown', tile.specific_hint ?? this.stored_level.hint);
+                this.hint_shown = tile.specific_hint ?? this.stored_level.hint;
             }
         }
 
@@ -1321,13 +1315,19 @@ export class Level {
     // -------------------------------------------------------------------------
     // Undo handling
 
+    create_undo_entry() {
+        let entry = [];
+        entry.tile_changes = new Map;
+        entry.level_props = {};
+        return entry;
+    }
+
     commit() {
         this.undo_stack.push(this.pending_undo);
-        this.pending_undo = [];
+        this.pending_undo = this.create_undo_entry();
 
-        // Limit the stack to, idk, 200 tics (10 seconds)
-        if (this.undo_stack.length > 200) {
-            this.undo_stack.splice(0, this.undo_stack.length - 200);
+        if (this.undo_stack.length > UNDO_STACK_SIZE) {
+            this.undo_stack.splice(0, this.undo_stack.length - UNDO_STACK_SIZE);
         }
     }
 
@@ -1335,17 +1335,26 @@ export class Level {
         this.aid = Math.max(1, this.aid);
 
         // In turn-based mode, we might still be in mid-tic with a partial undo stack; do that first
-        this.pending_undo.reverse();
-        for (let undo of this.pending_undo) {
-            undo();
-        }
-        this.pending_undo = [];
+        this._undo_entry(this.pending_undo);
+        this.pending_undo = this.create_undo_entry();
 
-        let entry = this.undo_stack.pop();
+        this._undo_entry(this.undo_stack.pop());
+    }
+
+    // Reverse a single undo entry
+    _undo_entry(entry) {
         // Undo in reverse order!  There's no redo, so it's okay to destroy this
         entry.reverse();
         for (let undo of entry) {
             undo();
+        }
+        for (let [tile, changes] of entry.tile_changes) {
+            for (let [key, value] of changes) {
+                tile[key] = value;
+            }
+        }
+        for (let [key, value] of Object.entries(entry.level_props)) {
+            this[key] = value;
         }
     }
 
@@ -1354,26 +1363,37 @@ export class Level {
     // including the state of a single tile, should do it through one of these
     // for undo/rewind purposes
 
-    _set_prop(obj, key, val) {
-        let old_val = obj[key];
-        if (val === old_val)
+    _set_tile_prop(tile, key, val) {
+        if (tile[key] === val)
             return;
-        this.pending_undo.push(() => obj[key] = old_val);
-        obj[key] = val;
+
+        let changes = this.pending_undo.tile_changes.get(tile);
+        if (! changes) {
+            changes = new Map;
+            this.pending_undo.tile_changes.set(tile, changes);
+        }
+
+        // If we haven't yet done so, log the original value
+        if (! changes.has(key)) {
+            changes.set(key, tile[key]);
+        }
+        // If there's an original value already logged, and it's the value we're about to change
+        // back to, then delete the change
+        else if (changes.get(key) === val) {
+            changes.delete(key);
+        }
+
+        tile[key] = val;
     }
 
     collect_chip() {
-        let current = this.chips_remaining;
-        if (current > 0) {
+        if (this.chips_remaining > 0) {
             this.sfx.play_once('get-chip');
-            this.pending_undo.push(() => this.chips_remaining = current);
             this.chips_remaining--;
         }
     }
 
     adjust_bonus(add, mult = 1) {
-        let current = this.bonus_points;
-        this.pending_undo.push(() => this.bonus_points = current);
         this.bonus_points = Math.ceil(this.bonus_points * mult) + add;
     }
 
@@ -1381,14 +1401,10 @@ export class Level {
         if (this.time_remaining === null)
             return;
 
-        this.pending_undo.push(() => this.timer_paused = ! this.timer_paused);
         this.timer_paused = ! this.timer_paused;
     }
 
     adjust_timer(dt) {
-        let current = this.time_remaining;
-        this.pending_undo.push(() => this.time_remaining = current);
-
         // Untimed levels become timed levels with 0 seconds remaining
         this.time_remaining = Math.max(0, (this.time_remaining ?? 0) + dt * 20);
         if (this.time_remaining <= 0) {
@@ -1410,7 +1426,6 @@ export class Level {
         }
 
         this.pending_undo.push(() => {
-            this.state = 'playing';
             this.fail_reason = null;
             this.player.fail_reason = null;
         });
@@ -1422,7 +1437,6 @@ export class Level {
 
     win() {
         this.sfx.play_once('win');
-        this.pending_undo.push(() => this.state = 'playing');
         this.state = 'success';
         throw new GameEnded;
     }
@@ -1472,8 +1486,8 @@ export class Level {
     spawn_animation(cell, name) {
         let type = TILE_TYPES[name];
         let tile = new Tile(type);
-        this._set_prop(tile, 'animation_speed', tile.type.ttl);
-        this._set_prop(tile, 'animation_progress', 0);
+        this._set_tile_prop(tile, 'animation_speed', tile.type.ttl);
+        this._set_tile_prop(tile, 'animation_progress', 0);
         cell._add(tile);
         this.actors.push(tile);
         this.pending_undo.push(() => {
@@ -1492,8 +1506,8 @@ export class Level {
             if (! TILE_TYPES[current].is_actor) {
                 console.warn("Transmuting a non-actor into an animation!");
             }
-            this._set_prop(tile, 'animation_speed', tile.type.ttl);
-            this._set_prop(tile, 'animation_progress', 0);
+            this._set_tile_prop(tile, 'animation_speed', tile.type.ttl);
+            this._set_tile_prop(tile, 'animation_progress', 0);
         }
     }
 
@@ -1566,23 +1580,15 @@ export class Level {
 
     // Mark an actor as sliding
     make_slide(actor, mode) {
-        let current = actor.slide_mode;
-        this.pending_undo.push(() => actor.slide_mode = current);
-        actor.slide_mode = mode;
+        this._set_tile_prop(actor, 'slide_mode', mode);
     }
 
     // Change an actor's direction
     set_actor_direction(actor, direction) {
-        let current = actor.direction;
-        this.pending_undo.push(() => actor.direction = current);
-        actor.direction = direction;
+        this._set_tile_prop(actor, 'direction', direction);
     }
 
     set_actor_stuck(actor, is_stuck) {
-        let current = actor.stuck;
-        if (current === is_stuck)
-            return;
-        this.pending_undo.push(() => actor.stuck = current);
-        actor.stuck = is_stuck;
+        this._set_tile_prop(actor, 'stuck', is_stuck);
     }
 }
