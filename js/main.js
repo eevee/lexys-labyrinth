@@ -306,24 +306,25 @@ class Player extends PrimaryView {
                 this.music_audio_el.pause();
             }
         });
-        
+
         // 0: normal realtime mode
         // 1: turn-based mode, and the next tic starts at the beginning
         // 2: turn-based mode, and we're in mid-tic waiting for input
-        this.turn_based = 0;
+        this.turn_mode = 0;
         this.turn_based_checkbox = this.root.querySelector('.controls .control-turn-based');
         this.turn_based_checkbox.checked = false;
         this.turn_based_checkbox.addEventListener('change', ev => {
             if (this.turn_based_checkbox.checked) {
                 // If we're leaving real-time mode then we're between tics
-                this.turn_based = 1;
+                this.turn_mode = 1;
             }
             else {
-                if (this.turn_based === 2) {
-                    // Finish up the tic
+                if (this.turn_mode === 2) {
+                    // Finish up the tic with dummy input
+                    this.level.advance_tic(null, null, 2);
                     this.advance_by(1);
                 }
-                this.turn_based = 0;
+                this.turn_mode = 0;
             }
         });
 
@@ -674,7 +675,7 @@ class Player extends PrimaryView {
     _clear_state() {
         this.set_state('waiting');
 
-        this.turn_based = this.turn_based_checkbox.checked ? 1 : 0;
+        this.turn_mode = this.turn_based_checkbox.checked ? 1 : 0;
         this.tic_offset = 0;
         this.last_advance = 0;
         this.demo_faucet = null;
@@ -731,7 +732,7 @@ class Player extends PrimaryView {
             return input;
         }
     }
-    
+
     advance_by(tics) {
         for (let i = 0; i < tics; i++) {
             let input = this.get_input();
@@ -794,31 +795,40 @@ class Player extends PrimaryView {
             this.previous_input = input;
 
             this.sfx_player.advance_tic();
-            
-            var primary_dir = this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null;
-            var secondary_dir =  this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null;
-            
-            let has_input = primary_dir !== null || input.has('wait');
-            // Turn-based mode complicates this slightly
-            // TODO advance_by(1) no longer advances by 1 tic necessarily...
-            if (this.turn_based === 2) {
-                if (has_input) {
-                    this.level.advance_tic(primary_dir, secondary_dir, 2);
-                    // TODO what if we just do the next tic part now?  but then we can never realign to a tic boundary.
-                    this.turn_based = 1;
-                }
+
+            let primary_dir = this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null;
+            let secondary_dir = this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null;
+
+            // Turn-based mode is considered assistance, but only if the game actually attempts to
+            // progress while it's enabled
+            if (this.turn_mode > 0) {
+                this.level.aid = Math.max(1, this.level.aid);
             }
-            else {
-                // Start from a tic boundary
-                this.level.advance_tic(primary_dir, secondary_dir, 1);
-                if (this.turn_based > 0 && this.level.can_accept_input() && ! has_input) {
-                    // If we're in turn-based mode and could provide input here, but don't have any,
-                    // then wait until we do
-                    this.turn_based = 2;
+
+            let has_input = primary_dir !== null || input.has('wait');
+            // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
+            if (this.turn_mode === 2) {
+                if (has_input) {
+                    // Finish the current tic, then continue as usual.  This means the end of the
+                    // tic doesn't count against the number of tics to advance -- because it already
+                    // did, the first time we tried it
+                    this.level.advance_tic(primary_dir, secondary_dir, 2);
+                    this.turn_mode = 1;
                 }
                 else {
-                    this.level.advance_tic(primary_dir, secondary_dir, 2);
+                    continue;
                 }
+            }
+
+            // We should now be at the start of a tic
+            this.level.advance_tic(primary_dir, secondary_dir, 1);
+            if (this.turn_mode > 0 && this.level.can_accept_input() && ! has_input) {
+                // If we're in turn-based mode and could provide input here, but don't have any,
+                // then wait until we do
+                this.turn_mode = 2;
+            }
+            else {
+                this.level.advance_tic(primary_dir, secondary_dir, 2);
             }
 
             if (this.level.state !== 'playing') {
@@ -837,9 +847,9 @@ class Player extends PrimaryView {
             this._advance_handle = null;
             return;
         }
-        
+
         this.last_advance = performance.now();
-        
+
         if (this.state === 'playing') {
             this.advance_by(1);
         }
@@ -858,8 +868,6 @@ class Player extends PrimaryView {
             }
         }
 
-        // XXX tic_offset = 0 was here, what does that change
-        
         let dt = 1000 / TICS_PER_SECOND;
         if (this.state === 'rewinding') {
             // Rewind faster than normal time
@@ -871,8 +879,8 @@ class Player extends PrimaryView {
     undo() {
         this.level.undo();
         // Undo always returns to the start of a tic
-        if (this.turn_based === 2) {
-            this.turn_based = 1;
+        if (this.turn_mode === 2) {
+            this.turn_mode = 1;
         }
     }
 
@@ -883,7 +891,7 @@ class Player extends PrimaryView {
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
-        if (this.turn_based === 2) {
+        if (this.turn_mode === 2) {
             // We're frozen in mid-tic, so the clock hasn't advanced yet, but everything has already
             // finished moving; pretend we're already on the next tic
             this.tic_offset = 1;
@@ -1097,7 +1105,7 @@ class Player extends PrimaryView {
                     overlay_top = random_choice([
                         "you did it!", "nice going!", "great job!", "good work!",
                         "onwards!", "tubular!", "yeehaw!", "hot damn!",
-                        "alphanumeric!", "nice dynamic typing!", 
+                        "alphanumeric!", "nice dynamic typing!",
                     ]);
                 }
                 if (this.using_touch) {

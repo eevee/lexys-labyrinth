@@ -60,7 +60,7 @@ export class CanvasRenderer {
             sx * tw, sy * th, w * tw, h * th,
             dx * tw, dy * th, w * tw, h * th);
     }
-    
+
     draw(tic_offset = 0) {
         if (! this.level) {
             console.warn("CanvasRenderer.draw: No level to render");
