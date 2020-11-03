@@ -528,7 +528,7 @@ class Player extends PrimaryView {
 
             // Figure out where these touches are, relative to the game area
             // TODO allow starting a level without moving?
-            let rect = touch_target.getBoundingClientRect();
+            let rect = this.level_el.getBoundingClientRect();
             for (let touch of ev.changedTouches) {
                 // Normalize touch coordinates to [-1, 1]
                 let rx = (touch.clientX - rect.left) / rect.width * 2 - 1;
@@ -1243,10 +1243,13 @@ class Player extends PrimaryView {
     adjust_scale() {
         // TODO make this optional
         let style = window.getComputedStyle(this.root);
+        // If we're not visible, no layout information is available and this is impossible
+        if (style['display'] === 'none')
+            return;
+
         let is_portrait = !! style.getPropertyValue('--is-portrait');
         // The base size is the size of the canvas, i.e. the viewport size times the tile size --
         // but note that we have 2x4 extra tiles for the inventory depending on layout
-        // TODO if there's ever a portrait view for phones, this will need adjusting
         let base_x, base_y;
         if (is_portrait) {
             base_x = this.conductor.tileset.size_x * this.renderer.viewport_size_x;
@@ -1256,24 +1259,43 @@ class Player extends PrimaryView {
             base_x = this.conductor.tileset.size_x * (this.renderer.viewport_size_x + 4);
             base_y = this.conductor.tileset.size_y * this.renderer.viewport_size_y;
         }
-        // The main UI is centered in a flex item with auto margins, so the extra space available is
-        // the size of those margins (which naturally discounts the size of the buttons and music
-        // title and whatnot, so those automatically reserve their own space)
-        if (style['display'] === 'none') {
-            // the computed margins can be 'auto' in this case
-            return;
+        // Unfortunately, finding the available space is a little tricky.  The container is a CSS
+        // flex item, and the flex cell doesn't correspond directly to any element, so there's no
+        // way for us to query its size directly.  We also have various stuff up top and down below
+        // that shouldn't count as available space.  So instead we take a rough guess by adding up:
+        // - the space currently taken up by the canvas
+        let avail_x = this.renderer.canvas.offsetWidth;
+        let avail_y = this.renderer.canvas.offsetHeight;
+        // - the space currently taken up by the inventory, depending on orientation
+        if (is_portrait) {
+            avail_y += this.inventory_el.offsetHeight;
         }
-        let extra_x = parseFloat(style['margin-left']) + parseFloat(style['margin-right']);
-        let extra_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);
-        // The total available space, then, is the current size of the canvas (and inventory, when
-        // appropriate) plus the size of the margins
-        let total_x = extra_x + this.renderer.canvas.offsetWidth + this.inventory_el.offsetWidth;
-        let total_y = extra_y + this.renderer.canvas.offsetHeight;
+        else {
+            avail_x += this.inventory_el.offsetWidth;
+        }
+        // - the difference between the size of the play area and the size of our root (which will
+        //   add in any gap around the player, e.g. if the controls stretch the root to be wider)
+        let root_rect = this.root.getBoundingClientRect();
+        let player_rect = this.root.querySelector('.-main-area').getBoundingClientRect();
+        avail_x += root_rect.width - player_rect.width;
+        avail_y += root_rect.height - player_rect.height;
+        // - the margins around our root, which consume all the extra space
+        let margin_x = parseFloat(style['margin-left']) + parseFloat(style['margin-right']);
+        let margin_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);
+        avail_x += margin_x;
+        avail_y += margin_y;
+        // If those margins are zero, by the way, we risk being too big for the viewport already,
+        // and we need to subtract any extra scroll on the body
+        if (margin_x === 0 || margin_y === 0) {
+            avail_x -= document.body.scrollWidth - document.body.clientWidth;
+            avail_y -= document.body.scrollHeight - document.body.clientHeight;
+        }
+
         let dpr = window.devicePixelRatio || 1.0;
         // Divide to find the biggest scale that still fits.  But don't exceed 90% of the available
         // space, or it'll feel cramped (except on small screens, where being too small HURTS).
-        let maxfrac = total_x < 800 ? 1 : 0.9;
-        let scale = Math.floor(maxfrac * dpr * Math.min(total_x / base_x, total_y / base_y));
+        let maxfrac = is_portrait ? 1 : 0.9;
+        let scale = Math.floor(maxfrac * dpr * Math.min(avail_x / base_x, avail_y / base_y));
         if (scale <= 1) {
             scale = 1;
         }

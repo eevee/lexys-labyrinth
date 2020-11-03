@@ -10,7 +10,7 @@
     <meta name="og:image" content="https://c.eev.ee/lexys-labyrinth/og-preview.png">
     <meta name="og:title" content="Lexy's Labyrinth">
     <meta name="og:description" content="A (work in progress) reimplementation of Chip's Challenge 1 and 2, using entirely free assets.">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 </head>
 <body data-mode="splash">
     <header id="header-main">
@@ -34,9 +34,13 @@
     <header id="header-level">
         <h3 id="level-name">Level 1 — Key Pyramid</h3>
         <nav>
-            <button id="main-prev-level" type="button">←</button>
+            <button id="main-prev-level" type="button">
+                <svg class="svg-icon" viewBox="0 0 16 16" title="previous"><path d="M14,1 2,8 14,14 z"></svg>
+            </button>
             <button id="main-choose-level" type="button">Level select</button>
-            <button id="main-next-level" type="button">→</button>
+            <button id="main-next-level" type="button">
+                <svg class="svg-icon" viewBox="0 0 16 16" title="next"><path d="M2,1 14,8 2,14 z"></svg>
+            </button>
         </nav>
     </header>
     <main id="splash">
@@ -117,10 +121,18 @@
         </div>
         <div class="controls">
             <div class="play-controls">
-                <button class="control-pause" type="button">Pause <span class="keyhint">(p)</span></button>
-                <button class="control-restart" type="button">Restart</button>
-                <button class="control-undo" type="button">Undo</button>
-                <button class="control-rewind" type="button">Rewind <span class="keyhint">(z)</span></button>
+                <button class="control-pause" type="button">
+                    <svg class="svg-icon" viewBox="0 0 16 16" title="pause"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></svg>
+                    <span class="keyhint">(p)</span></button>
+                <button class="control-restart" type="button">
+                    <svg class="svg-icon" viewBox="0 0 16 16" title="restart"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></svg>
+                    </button>
+                <button class="control-undo" type="button">
+                    <svg class="svg-icon" viewBox="0 0 16 16" title="undo"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></svg>
+                    </button>
+                <button class="control-rewind" type="button">
+                    <svg class="svg-icon" viewBox="0 0 16 16" title="rewind"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></svg>
+                    <span class="keyhint">(z)</span></button>
                 <label><input class="control-turn-based" type="checkbox"> Turn-based mode</label>
             </div>
             <div class="demo-controls">
