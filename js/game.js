@@ -82,7 +82,9 @@ export class Tile {
         return (
             this.type.pushes && this.type.pushes[tile.type.name] &&
             (! tile.type.allows_push || tile.type.allows_push(tile, direction)) &&
-            ! tile.stuck);
+            // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
+            // which would fail, but it would still change the block's direction
+            ! tile.cell.blocks_leaving(tile, direction));
     }
 
     // Inventory stuff
@@ -155,12 +157,14 @@ export class Cell extends Array {
 
     blocks_leaving(actor, direction) {
         for (let tile of this) {
-            if (tile !== actor &&
-                ! tile.type.is_swivel && tile.type.thin_walls &&
-                tile.type.thin_walls.has(direction))
-            {
+            if (tile === actor)
+                continue;
+
+            if (tile.type.traps && tile.type.traps(tile, actor))
                 return true;
-            }
+
+            if (tile.type.blocks_leaving && tile.type.blocks_leaving(tile, actor, direction))
+                return true;
         }
         return false;
     }
@@ -266,7 +270,6 @@ export class Level {
 
                 let stored_cell = this.stored_level.linear_cells[n];
                 n++;
-                let has_cloner, has_trap, has_forbidden;
 
                 for (let template_tile of stored_cell) {
                     let tile = Tile.from_template(template_tile);
@@ -279,30 +282,13 @@ export class Level {
                         this.power_sources.push(tile);
                     }
 
-                    // TODO well this is pretty special-casey.  maybe come up
-                    // with a specific pass at the beginning of the level?
-                    // TODO also assumes a specific order...
-                    if (tile.type.name === 'cloner') {
-                        has_cloner = true;
-                    }
-                    if (tile.type.name === 'trap') {
-                        has_trap = true;
-                    }
-
                     if (tile.type.is_player) {
                         // TODO handle multiple players, also chip and melinda both
                         // TODO complain if no player
                         this.player = tile;
                     }
                     if (tile.type.is_actor) {
-                        if (has_cloner) {
-                            // TODO is there any reason not to add clone templates to the actor
-                            // list?
-                            tile.stuck = true;
-                        }
-                        if (! tile.stuck) {
-                            this.actors.push(tile);
-                        }
+                        this.actors.push(tile);
                     }
                     cell._add(tile);
 
@@ -581,9 +567,9 @@ export class Level {
             {
                 this._set_tile_prop(actor, 'pending_reverse', false);
             }
-            // Blocks that were pushed while sliding will move in the push direction as soon as they
-            // stop sliding, regardless of what they landed on
             if (actor.pending_push) {
+                // Blocks that were pushed while sliding will move in the push direction as soon as
+                // they stop sliding, regardless of what they landed on
                 actor.decision = actor.pending_push;
                 this._set_tile_prop(actor, 'pending_push', null);
                 continue;
@@ -620,6 +606,13 @@ export class Level {
                     actor.decision = p1_primary_direction;
                     this._set_tile_prop(actor, 'last_move_was_force', false);
                 }
+                continue;
+            }
+            else if (actor.cell.some(tile => tile.type.traps && tile.type.traps(tile, actor))) {
+                // An actor in a cloner or a closed trap can't turn
+                // TODO because of this, if a tank is trapped when a blue button is pressed, then
+                // when released, it will make one move out of the trap and /then/ turn around and
+                // go back into the trap.  this is consistent with CC2 but not ms/lynx
                 continue;
             }
             else if (actor.type.movement_mode === 'forward') {
@@ -715,9 +708,7 @@ export class Level {
 
             // Check which of those directions we *can*, probably, move in
             // TODO i think player on force floor will still have some issues here
-            // FIXME probably bail earlier for stuck actors so the prng isn't advanced?  what is the
-            // lynx behavior?  also i hear something about blobs on cloners??
-            if (direction_preference && ! actor.stuck) {
+            if (direction_preference) {
                 let fallback_direction;
                 for (let direction of direction_preference) {
                     if (direction === 'WALKER') {
@@ -836,9 +827,6 @@ export class Level {
             return false;
 
         this.set_actor_direction(actor, direction);
-
-        if (actor.stuck)
-            return false;
 
         // Record our speed, and halve it below if we're stepping onto a sliding tile
         let speed = actor.type.movement_speed;
@@ -1627,9 +1615,5 @@ export class Level {
     // Change an actor's direction
     set_actor_direction(actor, direction) {
         this._set_tile_prop(actor, 'direction', direction);
-    }
-
-    set_actor_stuck(actor, is_stuck) {
-        this._set_tile_prop(actor, 'stuck', is_stuck);
     }
 }

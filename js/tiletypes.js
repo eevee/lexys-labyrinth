@@ -43,6 +43,10 @@ function on_ready_force_floor(me, level) {
     }
 }
 
+function blocks_leaving_thin_walls(me, actor, direction) {
+    return me.type.thin_walls.has(direction);
+}
+
 function player_visual_state(me) {
     if (! me) {
         return 'normal';
@@ -169,22 +173,27 @@ const TILE_TYPES = {
     thinwall_n: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north']),
+        blocks_leaving: blocks_leaving_thin_walls,
     },
     thinwall_s: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south']),
+        blocks_leaving: blocks_leaving_thin_walls,
     },
     thinwall_e: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['east']),
+        blocks_leaving: blocks_leaving_thin_walls,
     },
     thinwall_w: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['west']),
+        blocks_leaving: blocks_leaving_thin_walls,
     },
     thinwall_se: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'east']),
+        blocks_leaving: blocks_leaving_thin_walls,
     },
     fake_wall: {
         draw_layer: LAYER_TERRAIN,
@@ -263,7 +272,6 @@ const TILE_TYPES = {
     swivel_ne: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north', 'east']),
-        is_swivel: true,
         on_depart(me, level, other) {
             if (other.direction === 'north') {
                 level.transmute_tile(me, 'swivel_se');
@@ -276,7 +284,6 @@ const TILE_TYPES = {
     swivel_se: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'east']),
-        is_swivel: true,
         on_depart(me, level, other) {
             if (other.direction === 'south') {
                 level.transmute_tile(me, 'swivel_ne');
@@ -289,7 +296,6 @@ const TILE_TYPES = {
     swivel_sw: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['south', 'west']),
-        is_swivel: true,
         on_depart(me, level, other) {
             if (other.direction === 'south') {
                 level.transmute_tile(me, 'swivel_nw');
@@ -302,7 +308,6 @@ const TILE_TYPES = {
     swivel_nw: {
         draw_layer: LAYER_OVERLAY,
         thin_walls: new Set(['north', 'west']),
-        is_swivel: true,
         on_depart(me, level, other) {
             if (other.direction === 'north') {
                 level.transmute_tile(me, 'swivel_sw');
@@ -450,6 +455,7 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         thin_walls: new Set(['south', 'west']),
         slide_mode: 'ice',
+        blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
                 level.set_actor_direction(other, 'east');
@@ -463,6 +469,7 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         thin_walls: new Set(['north', 'west']),
         slide_mode: 'ice',
+        blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
                 level.set_actor_direction(other, 'east');
@@ -476,6 +483,7 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         thin_walls: new Set(['north', 'east']),
         slide_mode: 'ice',
+        blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
                 level.set_actor_direction(other, 'west');
@@ -489,6 +497,7 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         thin_walls: new Set(['south', 'east']),
         slide_mode: 'ice',
+        blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
                 level.set_actor_direction(other, 'west');
@@ -718,30 +727,30 @@ const TILE_TYPES = {
         draw_layer: LAYER_TERRAIN,
         // TODO not the case for an empty one in cc2, apparently
         blocks_all: true,
+        traps(me, actor) {
+            return ! actor._clone_release;
+        },
         activate(me, level) {
-            let cell = me.cell;
-            // Copy, so we don't end up repeatedly cloning the same object
-            for (let tile of Array.from(cell)) {
-                if (tile !== me && tile.type.is_actor) {
-                    // Copy this stuff in case the movement changes it
-                    let type = tile.type;
-                    let direction = tile.direction;
+            let actor = me.cell.get_actor();
+            if (! actor)
+                return;
 
-                    // Unstick and try to move the actor; if it's blocked,
-                    // abort the clone
-                    level.set_actor_stuck(tile, false);
-                    if (level.attempt_step(tile, direction)) {
-                        level.add_actor(tile);
-                        // FIXME add this underneath, just above the cloner
-                        let new_tile = new tile.constructor(type, direction);
-                        level.add_tile(new_tile, cell);
-                        level.set_actor_stuck(new_tile, true);
-                    }
-                    else {
-                        level.set_actor_stuck(tile, true);
-                    }
-                }
+            // Copy this stuff in case the movement changes it
+            // TODO should anything else be preserved?
+            let type = actor.type;
+            let direction = actor.direction;
+
+            // Unstick and try to move the actor; if it's blocked, abort the clone.
+            // This temporary flag tells us to let it leave; it doesn't need to be undoable, since
+            // it doesn't persist for more than a tic
+            actor._clone_release = true;
+            if (level.attempt_step(actor, direction)) {
+                // FIXME add this underneath, just above the cloner
+                let new_template = new actor.constructor(type, direction);
+                level.add_tile(new_template, me.cell);
+                level.add_actor(new_template);
             }
+            delete actor._clone_release;
         },
         // Also clones on rising pulse or gray button
         on_power(me, level) {
@@ -753,45 +762,17 @@ const TILE_TYPES = {
     },
     trap: {
         draw_layer: LAYER_TERRAIN,
-        on_ready(me, level) {
-            // Trap any actor standing on us, unless we already know we're pressed
-            if (me.presses)
-                return;
-
-            for (let tile of me.cell) {
-                if (tile.type.is_actor) {
-                    tile.stuck = true;
-                }
-            }
-        },
         add_press_ready(me, level, other) {
-            // Same as below, but without using the undo stack or ejection
+            // Same as below, but without ejection
             me.presses = (me.presses ?? 0) + 1;
-            if (me.presses === 1) {
-                for (let tile of me.cell) {
-                    if (tile.type.is_actor) {
-                        tile.stuck = false;
-                    }
-                }
-            }
         },
-        on_arrive(me, level, other) {
-            if (me.presses) {
-                // Lynx: Traps immediately eject their contents, if possible
-                // TODO compat this, cc2 doens't do it!
-                //level.attempt_step(other, other.direction);
-            }
-            else {
-                level.set_actor_stuck(other, true);
-            }
-        },
+        // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
         add_press(me, level) {
             level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
             if (me.presses === 1) {
                 // Free everything on us, if we went from 0 to 1 presses (i.e. closed to open)
                 for (let tile of Array.from(me.cell)) {
                     if (tile.type.is_actor) {
-                        level.set_actor_stuck(tile, false);
                         // Forcibly move anything released from a trap, to keep it in sync with
                         // whatever pushed the button
                         level.attempt_step(tile, tile.direction);
@@ -801,23 +782,16 @@ const TILE_TYPES = {
         },
         remove_press(me, level) {
             level._set_tile_prop(me, 'presses', me.presses - 1);
-            if (me.presses === 0) {
-                // Trap everything on us, if we went from 1 to 0 presses (i.e. open to closed)
-                for (let tile of me.cell) {
-                    if (tile.type.is_actor) {
-                        level.set_actor_stuck(tile, true);
-                    }
-                }
-            }
+        },
+        traps(me, actor) {
+            return ! me.presses;
         },
         on_power(me, level) {
             // Treat being powered or not as an extra kind of brown button press
             me.type.add_press(me, level);
-            console.log("powering UP", me.presses);
         },
         on_depower(me, level) {
             me.type.remove_press(me, level);
-            console.log("powering down...", me.presses);
         },
         visual_state(me) {
             if (me && me.presses) {
