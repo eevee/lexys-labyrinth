@@ -772,6 +772,10 @@ export class Editor extends PrimaryView {
             return;
 
         let type = TILE_TYPES[name];
+        let direction;
+        if (type.is_actor) {
+            direction = 'south';
+        }
         let cell = this.stored_level.cells[y][x];
         // For terrain tiles, erase the whole cell.  For other tiles, only
         // replace whatever's on the same layer
@@ -779,7 +783,7 @@ export class Editor extends PrimaryView {
         // combine e.g. the tent with thin walls
         if (type.draw_layer === 0) {
             cell.length = 0;
-            cell.push({type});
+            cell.push({type, direction});
         }
         else {
             for (let i = cell.length - 1; i >= 0; i--) {
@@ -787,7 +791,7 @@ export class Editor extends PrimaryView {
                     cell.splice(i, 1);
                 }
             }
-            cell.push({type});
+            cell.push({type, direction});
             cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
         }
     }

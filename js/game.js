@@ -4,7 +4,9 @@ import TILE_TYPES from './tiletypes.js';
 export class Tile {
     constructor(type, direction = 'south') {
         this.type = type;
-        this.direction = direction;
+        if (type.is_actor) {
+            this.direction = direction;
+        }
         this.cell = null;
 
         if (type.is_actor) {

@@ -1428,7 +1428,7 @@ class Splash extends PrimaryView {
                 cell.push({type: TILE_TYPES['floor']});
                 stored_level.linear_cells.push(cell);
             }
-            stored_level.linear_cells[0].push({type: TILE_TYPES['player']});
+            stored_level.linear_cells[0].push({type: TILE_TYPES['player'], direction: 'south'});
 
             // FIXME definitely gonna need a name here chief
             let stored_game = new format_base.StoredGame(null);
