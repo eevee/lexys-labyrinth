@@ -766,9 +766,18 @@ export class Editor extends PrimaryView {
         }
     }
 
+    is_in_level(x, y) {
+        return 0 <= x && x < this.stored_level.size_x && 0 <= y && y < this.stored_level.size_y;
+    }
+
     place_in_cell(x, y, name) {
         // TODO weird api?
         if (! name)
+            return;
+
+        // TODO seems like a big problem to silently ignore, but it can happen from mouse
+        // coordinates while drawing
+        if (! this.is_in_level(x, y))
             return;
 
         let type = TILE_TYPES[name];
