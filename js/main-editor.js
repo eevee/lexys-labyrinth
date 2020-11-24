@@ -46,7 +46,7 @@ class MouseOperation {
 
         // Same as above but for the previous mouse position
         this.mx1 = this.mx0;
-        this.my1 = this.mx1;
+        this.my1 = this.my0;
         this.gx1f = this.gx0f;
         this.gy1f = this.gy0f;
         this.gx1 = this.gx0;

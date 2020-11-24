@@ -39,8 +39,8 @@ button {
     background: var(--button-bg-color);
     border: 1px solid hsl(225, 10%, 15%);
     box-shadow:
-        inset 0 0 2px 1px hsl(225, 10%, 33%),
-        0 1px 0 hsl(225, 10%, 10%);
+        inset 0 0 0 1px hsl(225, 10%, 33%),
+        0 1px 1px hsl(225, 10%, 10%);
     border-radius: 0.25em;
     text-transform: lowercase;
     cursor: pointer;
@@ -875,7 +875,7 @@ main.--has-demo .demo-controls {
     grid:
         "controls   controls"   min-content
         "palette    level"      1fr
-        / calc((32px + 4px) * 8) 1fr
+        / min-content 1fr
     ;
     gap: 0.5em;
 
@@ -957,6 +957,7 @@ main.--has-demo .demo-controls {
     background: url(icons/tool-bg-unselected.png) no-repeat;
     border: none;
     border-radius: 0;
+    box-shadow: none;
 }
 .icon-button-set button.-selected {
     background-image: url(icons/tool-bg-selected.png);
@@ -967,7 +968,6 @@ main.--has-demo .demo-controls {
 
 #editor .palette {
     grid-area: palette;
-    min-width: 20vw;
     padding-right: 0.25em;  /* in case of scrollbar */
     overflow-y: auto;
 }
@@ -982,12 +982,16 @@ main.--has-demo .demo-controls {
 }
 #editor .palette section {
     display: grid;
-    grid: auto-flow 32px / repeat(auto-fit, 32px);
+    margin: 0.33em 4px;  /* matches gap */
+    grid: auto-flow 32px / repeat(8, 32px);
     gap: 4px;
 }
 .palette-entry {
-    margin: 0.25em;
+}
+.palette-entry:hover {
+    box-shadow: 0 0 0 1px black, 0 0 0 3px hsl(225, 100%, 75%);
 }
 .palette-entry.--selected {
-    box-shadow: 0 0 0 1px black, 0 0 0 2px white;
+    z-index: 1;
+    box-shadow: 0 0 0 1px black, 0 0 0 3px white;
 }
