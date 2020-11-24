@@ -45,18 +45,18 @@ export class Tile {
     }
 
     blocks(other, direction, level) {
-        if (this.type.blocks_all)
+        // Extremely awkward special case: items don't block monsters if the cell also contains an
+        // item modifier (i.e. "no" sign) or a player
+        // TODO would love to get this outta here
+        if (this.type.is_item &&
+            this.cell.some(tile => tile.type.item_modifier || tile.type.is_player))
+            return false;
+
+        if (this.type.blocks_collision & other.type.collision_mask)
             return true;
 
         if (this.type.thin_walls &&
             this.type.thin_walls.has(DIRECTIONS[direction].opposite))
-            return true;
-
-        if (other.type.is_player && this.type.blocks_players)
-            return true;
-        if (other.type.is_monster && this.type.blocks_monsters)
-            return true;
-        if (other.type.is_block && this.type.blocks_blocks)
             return true;
 
         if (this.type.blocks)
@@ -152,6 +152,14 @@ export class Cell extends Array {
     get_item() {
         for (let tile of this) {
             if (tile.type.is_item)
+                return tile;
+        }
+        return null;
+    }
+
+    get_item_mod() {
+        for (let tile of this) {
+            if (tile.type.item_modifier)
                 return tile;
         }
         return null;
@@ -1025,9 +1033,9 @@ export class Level {
             if (actor.ignores(tile.type.name))
                 continue;
 
-            // TODO some actors can pick up some items...
             if (tile.type.is_item &&
-                (actor.type.is_player || cell.some(t => t.allows_all_pickup)) &&
+                (actor.type.has_inventory ||
+                    cell.some(t => t.type.item_modifier === 'pickup')) &&
                 this.attempt_take(actor, tile))
             {
                 if (tile.type.is_key) {
@@ -1545,10 +1553,15 @@ export class Level {
     // Have an actor try to pick up a particular tile; it's prevented if there's a no sign, and the
     // tile is removed if successful
     attempt_take(actor, tile) {
-        if (! tile.cell.some(t => t.type.disables_pickup) &&
-            this.give_actor(actor, tile.type.name))
-        {
+        let mod = tile.cell.get_item_mod();
+        if (mod && mod.type.item_modifier === 'ignore')
+            return false;
+
+        if (this.give_actor(actor, tile.type.name)) {
             this.remove_tile(tile);
+            if (mod && mod.type.item_modifier === 'pickup') {
+                this.remove_tile(mod);
+            }
             return true;
         }
         return false;

@@ -1,13 +1,5 @@
-import { DIRECTIONS } from './defs.js';
+import { COLLISION, DIRECTIONS, DRAW_LAYERS } from './defs.js';
 import { random_choice } from './util.js';
-
-// Draw layers
-const LAYER_TERRAIN = 0;
-const LAYER_ITEM = 1;
-const LAYER_ITEM_MOD = 2;
-const LAYER_ACTOR = 3;
-const LAYER_OVERLAY = 4;
-// TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
 function on_ready_force_floor(me, level) {
     // At the start of the level, if there's an actor on a force floor:
@@ -91,51 +83,56 @@ function player_visual_state(me) {
 const TILE_TYPES = {
     // Floors and walls
     floor: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
     },
     floor_letter: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
     },
+    // TODO possibly this should be a single tile
     floor_custom_green: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.ghost,
     },
     floor_custom_pink: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.ghost,
     },
     floor_custom_yellow: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.ghost,
     },
     floor_custom_blue: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.ghost,
     },
     wall: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all_but_ghost,
     },
     wall_custom_green: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     wall_custom_pink: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     wall_custom_yellow: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     wall_custom_blue: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     wall_invisible: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         // FIXME cc2 seems to make these flicker briefly
-        blocks_all: true,
+        blocks_collision: COLLISION.all_but_ghost,
     },
     wall_appearing: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all_but_ghost,
         on_bump(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'wall');
@@ -143,9 +140,8 @@ const TILE_TYPES = {
         },
     },
     popwall: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_ready(me, level) {
             if (level.compat.auto_convert_ccl_popwalls &&
                 me.cell.some(tile => tile.type.is_actor))
@@ -162,42 +158,41 @@ const TILE_TYPES = {
     // LL specific tile that can only be stepped on /twice/, originally used to repair differences
     // with popwall behavior between Lynx and Steam
     popwall2: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_depart(me, level, other) {
             level.transmute_tile(me, 'popwall');
         },
     },
     // FIXME in a cc1 tileset, these tiles are opaque  >:S
     thinwall_n: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['north']),
         blocks_leaving: blocks_leaving_thin_walls,
     },
     thinwall_s: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['south']),
         blocks_leaving: blocks_leaving_thin_walls,
     },
     thinwall_e: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['east']),
         blocks_leaving: blocks_leaving_thin_walls,
     },
     thinwall_w: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['west']),
         blocks_leaving: blocks_leaving_thin_walls,
     },
     thinwall_se: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['south', 'east']),
         blocks_leaving: blocks_leaving_thin_walls,
     },
     fake_wall: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all_but_ghost,
         on_ready(me, level) {
             if (level.compat.auto_convert_ccl_blue_walls &&
                 me.cell.some(tile => tile.type.is_actor))
@@ -214,9 +209,8 @@ const TILE_TYPES = {
         },
     },
     fake_floor: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_bump(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'floor');
@@ -224,12 +218,12 @@ const TILE_TYPES = {
         },
     },
     popdown_wall: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all_but_ghost,
     },
     popdown_floor: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         // FIXME should be on_approach
         on_arrive(me, level, other) {
             // FIXME could probably do this with state?  or, eh
@@ -237,8 +231,8 @@ const TILE_TYPES = {
         },
     },
     popdown_floor_visible: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         on_depart(me, level, other) {
             // FIXME possibly changes back too fast, not even visible for a tic for me (much like stepping on a button oops)
             level.transmute_tile(me, 'popdown_floor');
@@ -246,31 +240,29 @@ const TILE_TYPES = {
     },
     // TODO these also block the corresponding mirror actors
     no_player1_sign: {
-        draw_layer: LAYER_TERRAIN,
-        blocks(me, level, other) {
-            return (other.type.name === 'player');
-        },
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.player1,
     },
     no_player2_sign: {
-        draw_layer: LAYER_TERRAIN,
-        blocks(me, level, other) {
-            return (other.type.name === 'player2');
-        },
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.player2,
     },
     steel: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     canopy: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
+        // TODO augh, blobs will specifically not move from one canopy to another
+        blocks_collision: COLLISION.bug | COLLISION.rover,
     },
 
     // Swivel doors
     swivel_floor: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
     },
     swivel_ne: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['north', 'east']),
         on_depart(me, level, other) {
             if (other.direction === 'north') {
@@ -282,7 +274,7 @@ const TILE_TYPES = {
         },
     },
     swivel_se: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['south', 'east']),
         on_depart(me, level, other) {
             if (other.direction === 'south') {
@@ -294,7 +286,7 @@ const TILE_TYPES = {
         },
     },
     swivel_sw: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['south', 'west']),
         on_depart(me, level, other) {
             if (other.direction === 'south') {
@@ -306,7 +298,7 @@ const TILE_TYPES = {
         },
     },
     swivel_nw: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['north', 'west']),
         on_depart(me, level, other) {
             if (other.direction === 'north') {
@@ -320,13 +312,13 @@ const TILE_TYPES = {
 
     // Railroad
     railroad: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         // TODO a lot!!
     },
 
     // Locked doors
     door_red: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         blocks(me, level, other) {
             // TODO not quite sure if this one is right; there are complex interactions with monsters, e.g. most monsters can eat blue keys but can't actually use them
             return ! (other.type.has_inventory && other.has_item('key_red'));
@@ -339,7 +331,7 @@ const TILE_TYPES = {
         },
     },
     door_blue: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         blocks(me, level, other) {
             return ! (other.type.has_inventory && other.has_item('key_blue'));
         },
@@ -351,7 +343,7 @@ const TILE_TYPES = {
         },
     },
     door_yellow: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         blocks(me, level, other) {
             return ! (other.type.has_inventory && other.has_item('key_yellow'));
         },
@@ -363,7 +355,7 @@ const TILE_TYPES = {
         },
     },
     door_green: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         blocks(me, level, other) {
             return ! (other.type.has_inventory && other.has_item('key_green'));
         },
@@ -377,9 +369,8 @@ const TILE_TYPES = {
 
     // Terrain
     dirt: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         blocks(me, level, other) {
             return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
         },
@@ -388,8 +379,8 @@ const TILE_TYPES = {
         },
     },
     gravel: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.monster,
         blocks(me, level, other) {
             return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
         },
@@ -397,10 +388,8 @@ const TILE_TYPES = {
 
     // Hazards
     fire: {
-        draw_layer: LAYER_TERRAIN,
-        blocks(me, level, other) {
-            return (other.type.is_monster && other.type.name !== 'fireball');
-        },
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.monster & ~COLLISION.fireball,
         on_arrive(me, level, other) {
             if (other.type.name === 'ice_block') {
                 level.remove_tile(other);
@@ -415,7 +404,8 @@ const TILE_TYPES = {
         },
     },
     water: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.ghost,
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
             level.sfx.play_once('splash', me.cell);
@@ -440,7 +430,8 @@ const TILE_TYPES = {
         },
     },
     turtle: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.ghost | COLLISION.fireball,
         on_depart(me, level, other) {
             level.transmute_tile(me, 'water');
             // TODO feels like we should spawn water underneath us, then transmute ourselves into the splash?
@@ -448,11 +439,11 @@ const TILE_TYPES = {
         },
     },
     ice: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'ice',
     },
     ice_sw: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['south', 'west']),
         slide_mode: 'ice',
         blocks_leaving: blocks_leaving_thin_walls,
@@ -466,7 +457,7 @@ const TILE_TYPES = {
         },
     },
     ice_nw: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['north', 'west']),
         slide_mode: 'ice',
         blocks_leaving: blocks_leaving_thin_walls,
@@ -480,7 +471,7 @@ const TILE_TYPES = {
         },
     },
     ice_ne: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['north', 'east']),
         slide_mode: 'ice',
         blocks_leaving: blocks_leaving_thin_walls,
@@ -494,7 +485,7 @@ const TILE_TYPES = {
         },
     },
     ice_se: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['south', 'east']),
         slide_mode: 'ice',
         blocks_leaving: blocks_leaving_thin_walls,
@@ -508,7 +499,7 @@ const TILE_TYPES = {
         },
     },
     force_floor_n: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
@@ -516,7 +507,7 @@ const TILE_TYPES = {
         },
     },
     force_floor_e: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
@@ -524,7 +515,7 @@ const TILE_TYPES = {
         },
     },
     force_floor_s: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
@@ -532,7 +523,7 @@ const TILE_TYPES = {
         },
     },
     force_floor_w: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
@@ -540,7 +531,7 @@ const TILE_TYPES = {
         },
     },
     force_floor_all: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
         // TODO ms: this is random, and an acting wall to monsters (!)
@@ -550,7 +541,7 @@ const TILE_TYPES = {
         },
     },
     slime: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         // FIXME kills everything except ghosts, blobs, blocks
         // FIXME blobs spread slime onto floor tiles, even destroying wiring
         on_arrive(me, level, other) {
@@ -560,7 +551,7 @@ const TILE_TYPES = {
         },
     },
     bomb: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         on_arrive(me, level, other) {
             level.remove_tile(me);
             if (other.type.is_player) {
@@ -573,9 +564,8 @@ const TILE_TYPES = {
         },
     },
     thief_tools: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             level.sfx.play_once('thief', me.cell);
             level.take_all_tools_from_actor(other);
@@ -585,9 +575,8 @@ const TILE_TYPES = {
         },
     },
     thief_keys: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             level.sfx.play_once('thief', me.cell);
             level.take_all_keys_from_actor(other);
@@ -597,8 +586,9 @@ const TILE_TYPES = {
         },
     },
     no_sign: {
-        draw_layer: LAYER_ITEM_MOD,
-        disables_pickup: true,
+        draw_layer: DRAW_LAYERS.item_mod,
+        item_modifier: 'ignore',
+        collision_allow: COLLISION.monster,
         blocks(me, level, other) {
             let item;
             for (let tile of me.cell) {
@@ -611,22 +601,24 @@ const TILE_TYPES = {
         },
     },
     bestowal_bow: {
-        draw_layer: LAYER_ITEM_MOD,
-        allows_all_pickup: true,
+        draw_layer: DRAW_LAYERS.item_mod,
+        item_modifier: 'pickup',
     },
 
     // Mechanisms
     dirt_block: {
-        draw_layer: LAYER_ACTOR,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.actor,
+        collision_mask: COLLISION.block_cc1,
+        blocks_collision: COLLISION.all,
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire', 'flame_jet_on']),
         movement_speed: 4,
     },
     ice_block: {
-        draw_layer: LAYER_ACTOR,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.actor,
+        collision_mask: COLLISION.block_cc2,
+        blocks_collision: COLLISION.all,
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
@@ -641,8 +633,9 @@ const TILE_TYPES = {
         // TODO floor in water
         // TODO destroyed in slime
         // TODO rotate on train tracks
-        draw_layer: LAYER_ACTOR,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.actor,
+        collision_mask: COLLISION.block_cc2,
+        blocks_collision: COLLISION.all,
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
@@ -657,24 +650,23 @@ const TILE_TYPES = {
         },
     },
     green_floor: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         on_gray_button(me, level) {
             level.transmute_tile(me, 'green_wall');
         },
     },
     green_wall: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all_but_ghost,
         on_gray_button(me, level) {
             level.transmute_tile(me, 'green_floor');
         },
     },
     green_chip: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_chip: true,
         is_required_chip: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.collect_chip();
@@ -684,7 +676,7 @@ const TILE_TYPES = {
         // Not affected by gray buttons
     },
     green_bomb: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_required_chip: true,
         on_arrive(me, level, other) {
             level.remove_tile(me);
@@ -699,7 +691,7 @@ const TILE_TYPES = {
         // Not affected by gray buttons
     },
     purple_floor: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         on_gray_button(me, level) {
             level.transmute_tile(me, 'purple_wall');
         },
@@ -711,8 +703,8 @@ const TILE_TYPES = {
         },
     },
     purple_wall: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all_but_ghost,
         on_gray_button(me, level) {
             level.transmute_tile(me, 'purple_floor');
         },
@@ -724,9 +716,9 @@ const TILE_TYPES = {
         },
     },
     cloner: {
-        draw_layer: LAYER_TERRAIN,
-        // TODO not the case for an empty one in cc2, apparently
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        // FIXME can also catch bowling balls
+        blocks_collision: COLLISION.player | COLLISION.block_cc1 | COLLISION.monster,
         traps(me, actor) {
             return ! actor._clone_release;
         },
@@ -761,7 +753,7 @@ const TILE_TYPES = {
         },
     },
     trap: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         add_press_ready(me, level, other) {
             // Same as below, but without ejection
             me.presses = (me.presses ?? 0) + 1;
@@ -783,6 +775,7 @@ const TILE_TYPES = {
         remove_press(me, level) {
             level._set_tile_prop(me, 'presses', me.presses - 1);
         },
+        // FIXME also doesn't trap ghosts, is that a special case???
         traps(me, actor) {
             return ! me.presses;
         },
@@ -803,7 +796,7 @@ const TILE_TYPES = {
         },
     },
     transmogrifier: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         _mogrifications: {
             player: 'player2',
             player2: 'player',
@@ -840,13 +833,13 @@ const TILE_TYPES = {
         },
     },
     teleport_blue: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         teleport_dest_order(me, level, other) {
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
         },
     },
     teleport_red: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         teleport_try_all_directions: true,
         teleport_allow_override: true,
         teleport_dest_order(me, level, other) {
@@ -854,7 +847,7 @@ const TILE_TYPES = {
         },
     },
     teleport_green: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         teleport_try_all_directions: true,
         teleport_dest_order(me, level, other) {
             let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
@@ -873,7 +866,7 @@ const TILE_TYPES = {
         },
     },
     teleport_yellow: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         teleport_allow_override: true,
         teleport_dest_order(me, level, other) {
             // FIXME special pickup behavior; NOT an item though, does not combine with no sign
@@ -885,7 +878,7 @@ const TILE_TYPES = {
     // - Multiple such inputs cancel each other out
     // - Gray button toggles it permanently
     flame_jet_off: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         activate(me, level) {
             level.transmute_tile(me, 'flame_jet_on');
         },
@@ -897,7 +890,7 @@ const TILE_TYPES = {
         },
     },
     flame_jet_on: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         activate(me, level) {
             level.transmute_tile(me, 'flame_jet_off');
         },
@@ -925,7 +918,7 @@ const TILE_TYPES = {
     },
     // Buttons
     button_blue: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
 
@@ -942,7 +935,7 @@ const TILE_TYPES = {
         },
     },
     button_yellow: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
 
@@ -960,7 +953,7 @@ const TILE_TYPES = {
         },
     },
     button_green: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
 
@@ -990,7 +983,7 @@ const TILE_TYPES = {
         },
     },
     button_brown: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         connects_to: 'trap',
         connect_order: 'forward',
         on_ready(me, level) {
@@ -1023,7 +1016,7 @@ const TILE_TYPES = {
         },
     },
     button_red: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         connects_to: 'cloner',
         connect_order: 'forward',
         on_arrive(me, level, other) {
@@ -1039,7 +1032,7 @@ const TILE_TYPES = {
         },
     },
     button_orange: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         connects_to: new Set(['flame_jet_off', 'flame_jet_on']),
         connect_order: 'diamond',
         // Both stepping on and leaving the button have the same effect: toggle the state of the
@@ -1062,7 +1055,7 @@ const TILE_TYPES = {
         },
     },
     button_pink: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
         get_emitting_edges(me, level) {
             // We emit current as long as there's an actor fully on us
@@ -1082,7 +1075,7 @@ const TILE_TYPES = {
     },
     button_black: {
         // TODO not implemented
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
         get_emitting_edges(me, level) {
             // We emit current as long as there's NOT an actor fully on us
@@ -1096,7 +1089,7 @@ const TILE_TYPES = {
     },
     button_gray: {
         // TODO only partially implemented
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
 
@@ -1131,7 +1124,7 @@ const TILE_TYPES = {
             'latch-cw': [],
             'latch-ccw': [],
         },
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
         get_emitting_edges(me, level) {
             if (me.gate_type === 'and') {
@@ -1167,9 +1160,8 @@ const TILE_TYPES = {
 
     // Time alteration
     stopwatch_bonus: {
-        draw_layer: LAYER_ITEM,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.remove_tile(me);
@@ -1178,9 +1170,8 @@ const TILE_TYPES = {
         },
     },
     stopwatch_penalty: {
-        draw_layer: LAYER_ITEM,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.remove_tile(me);
@@ -1189,9 +1180,8 @@ const TILE_TYPES = {
         },
     },
     stopwatch_toggle: {
-        draw_layer: LAYER_ITEM,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.pause_timer();
@@ -1201,56 +1191,56 @@ const TILE_TYPES = {
 
     // Critters
     bug: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster | COLLISION.bug,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'follow-left',
         movement_speed: 4,
     },
     paramecium: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'follow-right',
         movement_speed: 4,
     },
     ball: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'bounce',
         movement_speed: 4,
     },
     walker: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'bounce-random',
         movement_speed: 4,
     },
     tank_blue: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'forward',
         movement_speed: 4,
     },
     tank_yellow: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         pushes: {
             dirt_block: true,
             ice_block: true,
@@ -1259,60 +1249,61 @@ const TILE_TYPES = {
         movement_speed: 4,
     },
     blob: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'random',
         movement_speed: 8,
     },
     teeth: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'pursue',
         movement_speed: 4,
         uses_teeth_hesitation: true,
     },
     fireball: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster | COLLISION.fireball,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'turn-right',
         movement_speed: 4,
         ignores: new Set(['fire', 'flame_jet_on']),
     },
     glider: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         movement_mode: 'turn-left',
         movement_speed: 4,
         ignores: new Set(['water']),
     },
     ghost: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.ghost,
+        blocks_collision: COLLISION.all_but_player,
+        has_inventory: true,
         movement_mode: 'turn-right',
         movement_speed: 4,
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
     },
     floor_mimic: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster,
+        blocks_collision: COLLISION.all_but_player,
         // TODO not like teeth; always pursues
         // TODO takes 3 turns off!
         movement_mode: 'pursue',
@@ -1321,11 +1312,11 @@ const TILE_TYPES = {
     rover: {
         // TODO this guy is a nightmare
         // TODO pushes blocks apparently??
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        collision_mask: COLLISION.monster | COLLISION.rover,
+        blocks_collision: COLLISION.all_but_player,
         can_reveal_walls: true,
         movement_mode: 'random',
         movement_speed: 4,
@@ -1335,14 +1326,14 @@ const TILE_TYPES = {
     key_red: {
         // TODO Red key can ONLY be picked up by players (and doppelgangers), no other actor that
         // has an inventory
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_key: true,
     },
     key_blue: {
         // Blue key is picked up by dirt blocks and all monsters, including those that don't have an
         // inventory normally
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_key: true,
         on_arrive(me, level, other) {
@@ -1357,35 +1348,31 @@ const TILE_TYPES = {
         },
     },
     key_yellow: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_key: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
     },
     key_green: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_key: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
     },
     // Boots
     // TODO note: ms allows blocks to pass over tools
     cleats: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
     },
     suction_boots: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         item_ignores: new Set([
             'force_floor_n',
             'force_floor_s',
@@ -1395,93 +1382,84 @@ const TILE_TYPES = {
         ]),
     },
     fire_boots: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         item_ignores: new Set(['fire', 'flame_jet_on']),
     },
     flippers: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         item_ignores: new Set(['water']),
     },
     hiking_boots: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         // FIXME uhh these "ignore" that dirt and gravel block us, but they don't ignore the on_arrive, so, uhhhh
     },
     // Other tools
     dynamite: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         // FIXME does a thing when dropped, but that isn't implemented at all yet
     },
     bowling_ball: {
         // TODO not implemented, rolls when dropped, has an inventory, yadda yadda
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
     },
     xray_eye: {
         // TODO not implemented
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
     },
     helmet: {
         // TODO not implemented
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
     },
     railroad_sign: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         // FIXME this doesn't work any more, need to put it in railroad blocks impl
         item_ignores: new Set(['railroad']),
     },
     foil: {
         // TODO not implemented
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
     },
     lightning_bolt: {
         // TODO not implemented
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
     },
 
     // Progression
     player: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_player: true,
+        collision_mask: COLLISION.player1,
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -1496,9 +1474,10 @@ const TILE_TYPES = {
         visual_state: player_visual_state,
     },
     player2: {
-        draw_layer: LAYER_ACTOR,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_player: true,
+        collision_mask: COLLISION.player2,
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -1514,11 +1493,10 @@ const TILE_TYPES = {
         visual_state: player_visual_state,
     },
     chip: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_chip: true,
         is_required_chip: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.collect_chip();
@@ -1527,10 +1505,9 @@ const TILE_TYPES = {
         },
     },
     chip_extra: {
-        draw_layer: LAYER_ITEM,
+        draw_layer: DRAW_LAYERS.item,
         is_chip: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.collect_chip();
@@ -1539,9 +1516,8 @@ const TILE_TYPES = {
         },
     },
     score_10: {
-        draw_layer: LAYER_ITEM,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.adjust_bonus(10);
@@ -1550,9 +1526,8 @@ const TILE_TYPES = {
         },
     },
     score_100: {
-        draw_layer: LAYER_ITEM,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.adjust_bonus(100);
@@ -1561,9 +1536,8 @@ const TILE_TYPES = {
         },
     },
     score_1000: {
-        draw_layer: LAYER_ITEM,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.adjust_bonus(1000);
@@ -1572,9 +1546,8 @@ const TILE_TYPES = {
         },
     },
     score_2x: {
-        draw_layer: LAYER_ITEM,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.adjust_bonus(0, 2);
@@ -1584,15 +1557,13 @@ const TILE_TYPES = {
     },
 
     hint: {
-        draw_layer: LAYER_TERRAIN,
+        draw_layer: DRAW_LAYERS.terrain,
         is_hint: true,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster,
     },
     socket: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2 | COLLISION.monster,
         blocks(me, level, other) {
             return (level.chips_remaining > 0);
         },
@@ -1604,9 +1575,8 @@ const TILE_TYPES = {
         },
     },
     exit: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_monsters: true,
-        blocks_blocks: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2 | COLLISION.monster,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.win();
@@ -1616,39 +1586,41 @@ const TILE_TYPES = {
 
     // VFX
     splash: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
-        blocks_players: true,
+        collision_mask: 0,
+        blocks_collision: COLLISION.player,
         ttl: 6,
     },
     explosion: {
-        draw_layer: LAYER_OVERLAY,
+        draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
-        blocks_players: true,
+        collision_mask: 0,
+        blocks_collision: COLLISION.player,
         ttl: 6,
     },
 
     // Invalid tiles that appear in some CCL levels because community level
     // designers love to make nonsense
     bogus_player_win: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     bogus_player_swimming: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     bogus_player_drowned: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     bogus_player_burned_fire: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
     bogus_player_burned: {
-        draw_layer: LAYER_TERRAIN,
-        blocks_all: true,
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.all,
     },
 };
 
@@ -1658,9 +1630,13 @@ for (let [name, type] of Object.entries(TILE_TYPES)) {
 
     if (type.draw_layer === undefined ||
         type.draw_layer !== Math.floor(type.draw_layer) ||
-        type.draw_layer >= 5)
+        type.draw_layer >= DRAW_LAYERS.MAX)
     {
         console.error(`Tile type ${name} has a bad draw layer`);
+    }
+
+    if (type.is_actor && type.collision_mask === undefined) {
+        console.error(`Tile type ${name} is an actor but has no collision mask`);
     }
 }
 

@@ -500,7 +500,7 @@ const EDITOR_PALETTE = [{
     tiles: [
         'key_blue', 'key_red', 'key_yellow', 'key_green',
         'flippers', 'fire_boots', 'cleats', 'suction_boots',
-        'no_sign', // 'bestowal_bow',
+        'no_sign', 'bestowal_bow',
     ],
 }, {
     title: "Creatures",
