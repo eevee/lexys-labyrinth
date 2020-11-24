@@ -137,6 +137,22 @@ export class Cell extends Array {
         return ret;
     }
 
+    get_actor() {
+        for (let tile of this) {
+            if (tile.type.is_actor)
+                return tile;
+        }
+        return null;
+    }
+
+    get_item() {
+        for (let tile of this) {
+            if (tile.type.is_item)
+                return tile;
+        }
+        return null;
+    }
+
     blocks_leaving(actor, direction) {
         for (let tile of this) {
             if (tile !== actor &&
@@ -371,6 +387,8 @@ export class Level {
                 }
             }
         }
+        // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
+        this.pending_undo = this.create_undo_entry();
     }
 
     can_accept_input() {

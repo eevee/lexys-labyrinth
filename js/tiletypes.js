@@ -9,6 +9,40 @@ const LAYER_ACTOR = 3;
 const LAYER_OVERLAY = 4;
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 
+function on_ready_force_floor(me, level) {
+    // At the start of the level, if there's an actor on a force floor:
+    // - use on_arrive to set the actor's direction
+    // - set the slide_mode (normally done by the main game loop)
+    // - item bestowal: if they're being pushed into a wall and standing on an item, pick up the
+    //   item, even if they couldn't normally pick items up
+    let actor = me.cell.get_actor();
+    if (! actor)
+        return;
+
+    me.type.on_arrive(me, level, actor);
+    if (me.type.slide_mode) {
+        actor.slide_mode = me.type.slide_mode;
+    }
+
+    // Item bestowal
+    // TODO seemingly lynx/cc2 only pick RFF direction at decision time, but that's in conflict with
+    // doing this here; decision time hasn't happened yet, but we need to know what direction we're
+    // moving to know whether bestowal happens?  so what IS the cause of item bestowal?
+    let neighbor = level.get_neighboring_cell(me.cell, actor.direction);
+    if (! neighbor)
+        return;
+    if (! neighbor.blocks_entering(actor, actor.direction, level, true))
+        return;
+    let item = me.cell.get_item();
+    if (! item)
+        return;
+    if (level.attempt_take(actor, item) && actor.ignores(me.type.name)) {
+        // If they just picked up suction boots, they're no longer sliding
+        // TODO this feels hacky, shouldn't the slide mode be erased some other way?
+        actor.slide_mode = null;
+    }
+}
+
 function player_visual_state(me) {
     if (! me) {
         return 'normal';
@@ -467,6 +501,7 @@ const TILE_TYPES = {
     force_floor_n: {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
+        on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'north');
         },
@@ -474,6 +509,7 @@ const TILE_TYPES = {
     force_floor_e: {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
+        on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'east');
         },
@@ -481,6 +517,7 @@ const TILE_TYPES = {
     force_floor_s: {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
+        on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'south');
         },
@@ -488,6 +525,7 @@ const TILE_TYPES = {
     force_floor_w: {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
+        on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'west');
         },
@@ -495,6 +533,7 @@ const TILE_TYPES = {
     force_floor_all: {
         draw_layer: LAYER_TERRAIN,
         slide_mode: 'force',
+        on_ready: on_ready_force_floor,
         // TODO ms: this is random, and an acting wall to monsters (!)
         // TODO lynx/cc2 check this at decision time, which may affect ordering
         on_arrive(me, level, other) {

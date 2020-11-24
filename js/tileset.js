@@ -5,12 +5,14 @@ import TILE_TYPES from './tiletypes.js';
 // XXX special kinds of drawing i know this has for a fact:
 // - letter tiles draw from a block of half-tiles onto the center of the base
 // - slime and walkers have double-size tiles when moving
+// - force floors are cropped from a double-size tile
 // - wired tiles are a whole thing
 // - thin walls are packed into just two tiles
 // - rover has a half-tile overlay for its direction?
 // - railroad tracks overlay a Lot
 // - directional blocks have arrows in an awkward layout, not 4x4 grid but actually positioned on the edges
 // - green and purple toggle walls use an overlay
+// - turtles use an overlay
 export const CC2_TILESET_LAYOUT = {
     '#wire-width': 1/16,
 
