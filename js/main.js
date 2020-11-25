@@ -368,8 +368,11 @@ class Player extends PrimaryView {
         });
         this.rewind_button = this.root.querySelector('.controls .control-rewind');
         this.rewind_button.addEventListener('click', ev => {
-            if (this.level.has_undo()) {
-                this.state = 'rewinding';
+            if (this.state === 'rewinding') {
+                this.set_state('playing');
+            }
+            else if (this.level.has_undo()) {
+                this.set_state('rewinding');
             }
         });
         // Demo playback
@@ -928,8 +931,10 @@ class Player extends PrimaryView {
     }
 
     update_ui() {
-        this.pause_button.disabled = !(this.state === 'playing' || this.state === 'paused');
+        this.pause_button.disabled = !(this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding');
         this.restart_button.disabled = (this.state === 'waiting');
+        this.undo_button.disabled = ! this.level.has_undo();
+        this.rewind_button.disabled = ! (this.level.has_undo() || this.state === 'rewinding');
 
         // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;
