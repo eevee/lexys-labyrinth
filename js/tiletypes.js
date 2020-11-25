@@ -654,12 +654,18 @@ const TILE_TYPES = {
         on_gray_button(me, level) {
             level.transmute_tile(me, 'green_wall');
         },
+        on_power(me, level) {
+            me.type.on_gray_button(me, level);
+        },
     },
     green_wall: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
         on_gray_button(me, level) {
             level.transmute_tile(me, 'green_floor');
+        },
+        on_power(me, level) {
+            me.type.on_gray_button(me, level);
         },
     },
     green_chip: {
@@ -1116,42 +1122,114 @@ const TILE_TYPES = {
     logic_gate: {
         // gate_type: not, and, or, xor, nand, latch-cw, latch-ccw, counter, bogus
         _gate_types: {
-            not: ['out', null, 'in1', null],
-            and: ['out', 'in2', null, 'in1'],
-            or: [],
-            xor: [],
-            nand: [],
-            'latch-cw': [],
-            'latch-ccw': [],
+            not: ['out0', null, 'in0', null],
+            and: ['out0', 'in0', null, 'in1'],
+            or: ['out0', 'in0', null, 'in1'],
+            xor: ['out0', 'in0', null, 'in1'],
+            nand: ['out0', 'in0', null, 'in1'],
+            // in0 is the trigger, in1 is the input
+            'latch-cw': ['out0', 'in0', null, 'in1'],
+            // in0 is the input, in1 is the trigger
+            'latch-ccw': ['out0', 'in0', null, 'in1'],
+            // inputs: inc, dec; outputs: overflow, underflow
+            counter: ['out1', 'in0', 'in1', 'out0'],
         },
         draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
+        on_ready(me, level) {
+            me.gate_def = me.type._gate_types[me.gate_type];
+            if (me.gate_type === 'latch-cw' || me.gate_type === 'latch-ccw') {
+                me.memory = false;
+            }
+            else if (me.gate_type === 'counter') {
+                me.memory = me.memory ?? 0;
+                me.incrementing = false;
+                me.decrementing = false;
+                me.underflowing = false;
+                me.direction = 'north';
+            }
+        },
         get_emitting_edges(me, level) {
-            if (me.gate_type === 'and') {
-                let vars = {};
-                let out_bit = 0;
-                let dir = me.direction;
-                for (let name of me.type._gate_types[me.gate_type]) {
-                    let dirinfo = DIRECTIONS[dir];
-                    if (name === 'out') {
-                        out_bit |= dirinfo.bit;
-                    }
-                    else if (name) {
-                        vars[name] = (me.cell.powered_edges & dirinfo.bit) !== 0;
-                    }
-                    dir = dirinfo.right;
+            // Collect which of our edges are powered, in clockwise order starting from our
+            // direction, matching _gate_types
+            let input0 = false, input1 = false;
+            let output0 = false, output1 = false;
+            let outbit0 = 0, outbit1 = 0;
+            let dir = me.direction;
+            for (let i = 0; i < 4; i++) {
+                let cxn = me.gate_def[i];
+                let dirinfo = DIRECTIONS[dir];
+                if (cxn === 'in0') {
+                    input0 = (me.cell.powered_edges & dirinfo.bit) !== 0;
                 }
+                else if (cxn === 'in1') {
+                    input1 = (me.cell.powered_edges & dirinfo.bit) !== 0;
+                }
+                else if (cxn === 'out0') {
+                    outbit0 = dirinfo.bit;
+                }
+                else if (cxn === 'out1') {
+                    outbit1 = dirinfo.bit;
+                }
+                dir = dirinfo.right;
+            }
 
-                if (vars.in1 && vars.in2) {
-                    return out_bit;
-                }
-                else {
-                    return 0;
-                }
+            if (me.gate_type === 'not') {
+                output0 = ! input0;
             }
-            else {
-                return 0;
+            else if (me.gate_type === 'and') {
+                output0 = input0 && input1;
             }
+            else if (me.gate_type === 'or') {
+                output0 = input0 || input1;
+            }
+            else if (me.gate_type === 'xor') {
+                output0 = input0 !== input1;
+            }
+            else if (me.gate_type === 'nand') {
+                output0 = ! (input0 && input1);
+            }
+            else if (me.gate_type === 'latch-cw') {
+                if (input0) {
+                    level._set_tile_prop(me, 'memory', input1);
+                }
+                output0 = me.memory;
+            }
+            else if (me.gate_type === 'latch-ccw') {
+                if (input1) {
+                    level._set_tile_prop(me, 'memory', input0);
+                }
+                output0 = me.memory;
+            }
+            else if (me.gate_type === 'counter') {
+                let inc = input0 && ! me.incrementing;
+                let dec = input1 && ! me.decrementing;
+                let mem = me.memory;
+                if (inc || dec) {
+                    level._set_tile_prop(me, 'underflowing', false);
+                }
+                if (inc && ! dec) {
+                    mem++;
+                    if (mem > 9) {
+                        mem = 0;
+                        output0 = true;
+                    }
+                }
+                else if (dec && ! inc) {
+                    mem--;
+                    if (mem < 0) {
+                        mem = 9;
+                        // Underflow is persistent until the next pulse
+                        level._set_tile_prop(me, 'underflowing', true);
+                    }
+                }
+                output1 = me.underflowing;
+                level._set_tile_prop(me, 'memory', mem);
+                level._set_tile_prop(me, 'incrementing', input0);
+                level._set_tile_prop(me, 'decrementing', input1);
+            }
+
+            return (output0 ? outbit0 : 0) | (output1 ? outbit1 : 0);
         },
         visual_state(me) {
             return me.gate_type;

@@ -428,7 +428,7 @@ const TILE_ENCODING = {
                     // Counter, which can't be rotated
                     tile.direction = 'north';
                     tile.gate_type = 'counter';
-                    tile.counter_value = modifier - 0x1e;
+                    tile.memory = modifier - 0x1e;
                 }
                 else {
                     tile.direction = ['north', 'east', 'south', 'west'][modifier & 0x03];

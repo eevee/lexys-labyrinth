@@ -401,58 +401,52 @@ export const CC2_TILESET_LAYOUT = {
     ],
 
     logic_gate: {
-        // TODO currently, 'wired' can't coexist with visual state etc...
-        // TODO *long sigh*  of course, logic gates have parts with independent current too
-        // for a north-facing gate with two inputs, we have:
-        // - north output: just a wire, doesn't include center.  -r 0 w -r
-        // - west output: bottom left quadrant, except for the middle wire part, but including the
-        // horizontal wire.  0 -r -r +r
-        // - east output: same but includes middle wire.  -r -r +r +r
-        // TODO check if they're flipped for latches facing the other way
-        'latch-ccw': {
-            north: [8, 21],
-            east: [9, 21],
-            south: [10, 21],
-            west: [11, 21],
+        special: 'logic-gate',
+        logic_gate_tiles: {
+            'latch-ccw': {
+                north: [8, 21],
+                east: [9, 21],
+                south: [10, 21],
+                west: [11, 21],
+            },
+            not: {
+                north: [0, 25],
+                east: [1, 25],
+                south: [2, 25],
+                west: [3, 25],
+            },
+            and: {
+                north: [4, 25],
+                east: [5, 25],
+                south: [6, 25],
+                west: [7, 25],
+            },
+            or: {
+                north: [8, 25],
+                east: [9, 25],
+                south: [10, 25],
+                west: [11, 25],
+            },
+            xor: {
+                north: [12, 25],
+                east: [13, 25],
+                south: [14, 25],
+                west: [15, 25],
+            },
+            'latch-cw': {
+                north: [0, 26],
+                east: [1, 26],
+                south: [2, 26],
+                west: [3, 26],
+            },
+            nand: {
+                north: [4, 26],
+                east: [5, 26],
+                south: [6, 26],
+                west: [7, 26],
+            },
+            counter: [14, 26],
         },
-        not: {
-            north: [0, 25],
-            east: [1, 25],
-            south: [2, 25],
-            west: [3, 25],
-        },
-        and: {
-            north: [4, 25],
-            east: [5, 25],
-            south: [6, 25],
-            west: [7, 25],
-        },
-        or: {
-            north: [8, 25],
-            east: [9, 25],
-            south: [10, 25],
-            west: [11, 25],
-        },
-        xor: {
-            north: [12, 25],
-            east: [13, 25],
-            south: [14, 25],
-            west: [15, 25],
-        },
-        'latch-cw': {
-            north: [0, 26],
-            east: [1, 26],
-            south: [2, 26],
-            west: [3, 26],
-        },
-        nand: {
-            north: [4, 26],
-            east: [5, 26],
-            south: [6, 26],
-            west: [7, 26],
-        },
-        // FIXME need to draw the number as well
-        counter: [14, 26],
     },
 
     '#unpowered': [13, 26],
@@ -731,6 +725,94 @@ export class Tileset {
         this.draw_type(tile.type.name, tile, tic, blit);
     }
 
+    // Draw a "standard" drawspec, which is either:
+    // - a single tile: [x, y]
+    // - an animation: [[x0, y0], [x1, y1], ...]
+    // - a directional tile: { north: T, east: T, ... } where T is either of the above
+    _draw_standard(drawspec, tile, tic, blit, mask = []) {
+        // If we have an object, it must be a table of directions
+        let coords = drawspec;
+        if (!(coords instanceof Array)) {
+            coords = coords[(tile && tile.direction) ?? 'south'];
+        }
+
+        // Deal with animation
+        if (coords[0] instanceof Array) {
+            if (tic !== null) {
+                if (tile && tile.animation_speed) {
+                    // This tile reports its own animation timing (in tics), so trust that, and just
+                    // use the current tic's fraction.
+                    // That said: adjusting animation speed complicates this slightly.  Consider the
+                    // player's walk animation, which takes 4 tics to complete, during which time we
+                    // cycle through 8 frames.  Playing that at half speed means only half the
+                    // animation actually plays, but if the player continues walking, then on the
+                    // NEXT four tics, we should play the other half.  To make this work, use the
+                    // tic as a global timer as well: if the animation started on tics 0-4, play the
+                    // first half; if it started on tics 5-8, play the second half.  They could get
+                    // out of sync if the player hesitates, but no one will notice that, and this
+                    // approach minimizes storing extra state.
+                    let i = (tile.animation_progress + tic % 1) / tile.animation_speed;
+                    // But do NOT do this for explosions or splashes, which have a fixed duration
+                    // and only play once
+                    if (this.animation_slowdown > 1 && ! tile.type.ttl) {
+                        // i ranges from [0, 1), but a slowdown of N means we'll only play the first
+                        // 1/N of it before the game ends (or loops) the animation.
+                        // So increase by [0..N-1] to get it in some other range, then divide by N
+                        // to scale back down to [0, 1)
+                        i += Math.floor(tic / tile.animation_speed % this.animation_slowdown);
+                        i /= this.animation_slowdown;
+                    }
+                    coords = coords[Math.floor(i * coords.length)];
+                }
+                else {
+                    // This tile animates on a global timer, one cycle every quarter of a second
+                    coords = coords[Math.floor(tic / this.animation_slowdown % 5 / 5 * coords.length)];
+                }
+            }
+            else {
+                coords = coords[0];
+            }
+        }
+
+        blit(coords[0], coords[1], ...mask);
+    }
+
+    _draw_logic_gate(drawspec, tile, tic, blit) {
+        // Layer 1: wiring state
+        // Always draw the unpowered wire base
+        let unpowered_coords = this.layout['#unpowered'];
+        let powered_coords = this.layout['#powered'];
+        blit(...unpowered_coords);
+        if (tile && tile.cell) {
+            // What goes on top varies a bit...
+            // FIXME implement for NOT and counter!
+            let r = this.layout['#wire-width'] / 2;
+            if (tile.cell.powered_edges & DIRECTIONS[tile.direction].bit) {
+                // Output (on top)
+                let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0, 0.5 + r, 0.5);
+                blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+            }
+            if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].right].bit) {
+                // Right input, which includes the middle
+                let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0.5 - r, 1, 1);
+                blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+            }
+            if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].left].bit) {
+                // Left input, which does not include the middle
+                let [x0, y0, x1, y1] = this._rotate(tile.direction, 0, 0.5 - r, 0.5 - r, 1);
+                blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+            }
+        }
+
+        // Layer 2: the tile itself
+        this._draw_standard(drawspec.logic_gate_tiles[tile.gate_type], tile, tic, blit);
+
+        // Layer 3: counter number
+        if (tile.gate_type === 'counter') {
+            blit(0, 3, tile.memory * 0.75, 0, 0.75, 1, 0.125, 0);
+        }
+    }
+
     // Draws a tile type, given by name.  Passing in a tile is optional, but
     // without it you'll get defaults.
     draw_type(name, tile, tic, blit) {
@@ -752,6 +834,14 @@ export class Tileset {
             }
             else {
                 drawspec = drawspec.overlay;
+            }
+        }
+
+        // TODO shift everything to use this style, this is ridiculous
+        if (drawspec.special) {
+            if (drawspec.special === 'logic-gate') {
+                this._draw_logic_gate(drawspec, tile, tic, blit);
+                return;
             }
         }
 
@@ -989,6 +1079,21 @@ export class Tileset {
             }
             let offset = (1 - scale) / 2;
             blit(sx, sy, 0, 0, 0.5, 0.5, offset, offset);
+        }
+    }
+
+    _rotate(direction, x0, y0, x1, y1) {
+        if (direction === 'east') {
+            return [1 - y1, x0, 1 - y0, x1];
+        }
+        else if (direction === 'south') {
+            return [1 - x1, 1 - y1, 1 - x0, 1 - y0];
+        }
+        else if (direction === 'west') {
+            return [y0, 1 - x1, y1, 1 - x0];
+        }
+        else {
+            return [x0, y0, x1, y1];
         }
     }
 }
