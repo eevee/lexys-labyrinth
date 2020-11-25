@@ -53,13 +53,18 @@ export const COLLISION = {
     block_cc1:          0x0004,
     block_cc2:          0x0008,  // ice + directional
 
-    // NOTE: "monster" does NOT include ghost, because it so rarely overlaps anything else
-    monster:            0x0100,
-    // Some monsters also have their own extra flag because of weird behavior
+    // Monsters are a little complicated, because some of them have special rules, e.g. fireballs
+    // aren't blocked by fire.
+    // For a monster's MASK, you should use ONLY ONE of these specific monster bits (if
+    // appropriate), OR the generic bit -- DO NOT combine them!
+    monster_generic:    0x0100,
     fireball:           0x0200,
     bug:                0x0400,
     rover:              0x1000,
     ghost:              0x8000,
+    // For a tile's COLLISION, use one of these bit combinations
+    monster_solid:      0x7f00,  // everything but ghost
+    monster_any:        0xff00,  // everything including ghost
 
     // Combo masks used for matching
     all_but_ghost:      0xffff & ~0x8000,
