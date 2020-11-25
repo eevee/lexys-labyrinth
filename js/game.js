@@ -1140,9 +1140,11 @@ export class Level {
             if (! actor.cell)
                 continue;
             // Only count when they're on a tile, not in transit!
+            // FIXME this causes us to power mechanisms next to us, but we're only supposed to touch
+            // wire we're standing on?
             let emitting = actor.movement_cooldown === 0 && actor.has_item('lightning_bolt');
             if (emitting) {
-                neighbors.push([actor.cell, emitting]);
+                neighbors.push([actor.cell, 0x0f]);
             }
             if (emitting !== actor.emitting_edges) {
                 any_changed = true;
@@ -1227,7 +1229,9 @@ export class Level {
                 else {
                     // No tunnel; this is easy
                     neighbor = this.get_neighboring_cell(cell, direction);
-                    neighbor_wire = neighbor.get_wired_tile();
+                    if (neighbor) {
+                        neighbor_wire = neighbor.get_wired_tile();
+                    }
                 }
 
                 if (neighbor && (neighbor.powered_edges & opposite_bit) === 0 &&

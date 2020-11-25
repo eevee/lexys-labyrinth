@@ -3,16 +3,36 @@ import TILE_TYPES from './tiletypes.js';
 
 // TODO really need to specify this format more concretely, whoof
 // XXX special kinds of drawing i know this has for a fact:
-// - letter tiles draw from a block of half-tiles onto the center of the base
-// - slime and walkers have double-size tiles when moving
+// - letter tiles draw from a block (one of two blocks!) of half-tiles onto the center of the base
 // - force floors are cropped from a double-size tile
-// - wired tiles are a whole thing
+// - wired tiles are a whole thing (floor)
 // - thin walls are packed into just two tiles
-// - rover has a half-tile overlay for its direction?
-// - railroad tracks overlay a Lot
 // - directional blocks have arrows in an awkward layout, not 4x4 grid but actually positioned on the edges
 // - green and purple toggle walls use an overlay
-// - turtles use an overlay
+// - turtles use an overlay, seem to pick a tile at random every so often
+// - animations are common, should maybe have configurable timing??
+// - custom floors and walls /should/ be consolidated into a single tile probably
+// - thin walls should probably be consolidated?
+// - traps have a state
+
+// special features i currently have
+// - directions for actors, can be used anywhere
+// - arrows: for directional blocks
+// - mask: for thin walls (though the idea is useful in many more places)
+// - wired: for wired tiles
+// - overlay: for green/purple walls mostly, also some bogus cc1 tiles
+
+// things that are currently NOT handled
+// - bomb is supposed to have a fuse
+// - critters should only animate when moving
+// - rover animation depends on behavior, also has a quarter-tile overlay for its direction
+// - slime and walkers have double-size tiles when moving
+// - logic gates draw over the stuff underneath them
+// - railroad tracks overlay a Lot
+// - canopy, at all
+// - swivel's floor (eugh)
+// - xray vision
+// - editor vision
 export const CC2_TILESET_LAYOUT = {
     '#wire-width': 1/16,
 
@@ -76,8 +96,8 @@ export const CC2_TILESET_LAYOUT = {
     green_chip: [9, 3],
     chip_extra: [10, 3],
     chip: [11, 3],
-    // bribe
-    // mercury boot
+    bribe: [12, 3],
+    speed_boots: [13, 3],
     // canopy, xray
 
     // TODO lit
@@ -112,7 +132,7 @@ export const CC2_TILESET_LAYOUT = {
     cleats: [2, 6],
     suction_boots: [3, 6],
     hiking_boots: [4, 6],
-    // speed boots...?  not boots though
+    lightning_bolt: [5, 6],
     // weird translucent spiral
     // weird translucent red
     button_blue: [8, 6],
@@ -300,7 +320,14 @@ export const CC2_TILESET_LAYOUT = {
 
     force_floor_all: [[0, 21], [1, 21], [2, 21], [3, 21], [4, 21], [5, 21], [6, 21], [7, 21]],
     // latches
-    // switch
+    light_switch_off: {
+        base: [14, 21],
+        wired: [12, 21],
+    },
+    light_switch_on: {
+        base: [14, 21],
+        wired: [13, 21],
+    },
     thief_keys: [15, 21],
 
     player: {
@@ -376,6 +403,12 @@ export const CC2_TILESET_LAYOUT = {
     logic_gate: {
         // TODO currently, 'wired' can't coexist with visual state etc...
         // TODO *long sigh*  of course, logic gates have parts with independent current too
+        // for a north-facing gate with two inputs, we have:
+        // - north output: just a wire, doesn't include center.  -r 0 w -r
+        // - west output: bottom left quadrant, except for the middle wire part, but including the
+        // horizontal wire.  0 -r -r +r
+        // - east output: same but includes middle wire.  -r -r +r +r
+        // TODO check if they're flipped for latches facing the other way
         'latch-ccw': {
             north: [8, 21],
             east: [9, 21],
@@ -742,8 +775,8 @@ export class Tileset {
                     tile.cell && tile.cell.powered_edges & DIRECTIONS['north'].bit ? '#powered' : '#unpowered'];
                 let wire_coords_ew = this.layout[
                     tile.cell && tile.cell.powered_edges & DIRECTIONS['east'].bit ? '#powered' : '#unpowered'];
-                blit(wire_coords_ns[0] + wire_inset, wire_coords_ns[1], wire_inset, 0, wire_radius * 2, 1);
-                blit(wire_coords_ew[0], wire_coords_ew[1] + wire_inset, 0, wire_inset, 1, wire_radius * 2);
+                blit(wire_coords_ns[0], wire_coords_ns[1], wire_inset, 0, wire_radius * 2, 1);
+                blit(wire_coords_ew[0], wire_coords_ew[1], 0, wire_inset, 1, wire_radius * 2);
 
                 // Draw the cross tile on top
                 coords = drawspec.wired_cross ?? drawspec.wired;
@@ -771,7 +804,7 @@ export class Tileset {
                     x0 = 0;
                 }
                 let wire_coords = this.layout[tile.cell && tile.cell.powered_edges ? '#powered' : '#unpowered'];
-                blit(wire_coords[0] + x0, wire_coords[1] + y0, x0, y0, x1 - x0, y1 - y0);
+                blit(wire_coords[0], wire_coords[1], x0, y0, x1 - x0, y1 - y0);
 
                 // Then draw the wired tile on top of it all
                 coords = drawspec.wired;
@@ -877,7 +910,7 @@ export class Tileset {
             // Continue on with masking
             coords = drawspec.tile;
             let [x0, y0, w, h] = drawspec.mask;
-            blit(coords[0] + x0, coords[1] + y0, x0, y0, w, h);
+            blit(coords[0], coords[1], x0, y0, w, h);
         }
         else {
             if (!coords) console.error(name, tile);
@@ -891,38 +924,41 @@ export class Tileset {
             let tunnel_length = 12/32;
             let tunnel_offset = (1 - tunnel_width) / 2;
             if (tile.wire_tunnel_directions & DIRECTIONS['north'].bit) {
-                blit(tunnel_coords[0] + tunnel_offset, tunnel_coords[1],
+                blit(tunnel_coords[0], tunnel_coords[1],
                     tunnel_offset, 0, tunnel_width, tunnel_length);
             }
             if (tile.wire_tunnel_directions & DIRECTIONS['south'].bit) {
-                blit(tunnel_coords[0] + tunnel_offset, tunnel_coords[1] + 1 - tunnel_length,
+                blit(tunnel_coords[0], tunnel_coords[1],
                     tunnel_offset, 1 - tunnel_length, tunnel_width, tunnel_length);
             }
             if (tile.wire_tunnel_directions & DIRECTIONS['west'].bit) {
-                blit(tunnel_coords[0], tunnel_coords[1] + tunnel_offset,
+                blit(tunnel_coords[0], tunnel_coords[1],
                     0, tunnel_offset, tunnel_length, tunnel_width);
             }
             if (tile.wire_tunnel_directions & DIRECTIONS['east'].bit) {
-                blit(tunnel_coords[0] + 1 - tunnel_length, tunnel_coords[1] + tunnel_offset,
+                blit(tunnel_coords[0], tunnel_coords[1],
                     1 - tunnel_length, tunnel_offset, tunnel_length, tunnel_width);
             }
         }
 
         // Directional blocks have arrows drawn on top
+        // TODO does cc2 draw even if there are no arrows?
         if (drawspec.arrows && tile && tile.arrows) {
             let [x, y] = drawspec.arrows;
+            let x0 = 0.25, y0 = 0.25, x1 = 0.75, y1 = 0.75;
             if (tile.arrows.has('north')) {
-                blit(x, y, 0, 0, 1, 0.25);
+                y0 = 0;
             }
             if (tile.arrows.has('east')) {
-                blit(x + 0.75, y, 0.75, 0, 0.25, 1);
+                x1 = 1;
             }
             if (tile.arrows.has('south')) {
-                blit(x, y + 0.75, 0, 0.75, 1, 0.25);
+                y1 = 1;
             }
             if (tile.arrows.has('west')) {
-                blit(x, y, 0, 0, 0.25, 1);
+                x0 = 0;
             }
+            blit(x, y, x0, y0, x1 - x0, y1 - y0);
         }
 
         // Special behavior for special objects
@@ -952,7 +988,7 @@ export class Tileset {
                 sy = (letter_spec.y0 + Math.floor(n / w)) * scale;
             }
             let offset = (1 - scale) / 2;
-            blit(sx, sy, offset, offset, scale, scale);
+            blit(sx, sy, 0, 0, 0.5, 0.5, offset, offset);
         }
     }
 }

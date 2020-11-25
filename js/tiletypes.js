@@ -1157,6 +1157,27 @@ const TILE_TYPES = {
             return me.gate_type;
         },
     },
+    // Light switches, kinda like the pink/black buttons but persistent
+    light_switch_off: {
+        draw_layer: DRAW_LAYERS.terrain,
+        is_power_source: true,
+        get_emitting_edges(me, level) {
+            return 0;
+        },
+        on_arrive(me, level, other) {
+            level.transmute_tile(me, 'light_switch_on');
+        },
+    },
+    light_switch_on: {
+        draw_layer: DRAW_LAYERS.terrain,
+        is_power_source: true,
+        get_emitting_edges(me, level) {
+            return me.wire_directions;
+        },
+        on_arrive(me, level, other) {
+            level.transmute_tile(me, 'light_switch_off');
+        },
+    },
 
     // Time alteration
     stopwatch_bonus: {
@@ -1447,6 +1468,20 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
     },
     lightning_bolt: {
+        // TODO not implemented
+        draw_layer: DRAW_LAYERS.item,
+        is_item: true,
+        is_tool: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+    },
+    speed_boots: {
+        // TODO not implemented
+        draw_layer: DRAW_LAYERS.item,
+        is_item: true,
+        is_tool: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+    },
+    bribe: {
         // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,

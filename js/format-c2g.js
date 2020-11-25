@@ -405,7 +405,7 @@ const TILE_ENCODING = {
         error: "Timid chomper is not yet implemented, sorry!",
     },
     0x58: {
-        // TODO??? unused in main levels -- name: 'doppelganger2',
+        // TODO??? unused in main levels -- name: '',
         has_next: true,
         extra_args: [arg_direction],
         error: "Explosion animation is not implemented, sorry!",
@@ -465,7 +465,6 @@ const TILE_ENCODING = {
     0x62: {
         name: 'lightning_bolt',
         has_next: true,
-        error: "The lightning bolt is not yet implemented, sorry!",
     },
     0x63: {
         name: 'tank_yellow',
@@ -609,11 +608,11 @@ const TILE_ENCODING = {
     },
     0x88: {
         name: 'light_switch_off',
-        error: "The light switch is not yet implemented, sorry!",
+        modifier: modifier_wire,
     },
     0x89: {
         name: 'light_switch_on',
-        error: "The light switch is not yet implemented, sorry!",
+        modifier: modifier_wire,
     },
     0x8a: {
         name: 'thief_keys',
@@ -637,12 +636,10 @@ const TILE_ENCODING = {
     0x8f: {
         name: 'bribe',
         has_next: true,
-        error: "The bribe is not yet implemented, sorry!",
     },
     0x90: {
         name: 'speed_boots',
         has_next: true,
-        error: "The speed boots are not yet implemented, sorry!",
     },
     0x91: {
         name: 'hook',

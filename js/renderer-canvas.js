@@ -1,4 +1,4 @@
-import { DIRECTIONS } from './defs.js';
+import { DIRECTIONS, DRAW_LAYERS } from './defs.js';
 import { mk } from './util.js';
 import TILE_TYPES from './tiletypes.js';
 
@@ -125,33 +125,44 @@ export class CanvasRenderer {
         let y1 = Math.min(this.level.size_y - 1, Math.ceil(y0 + this.viewport_size_y));
         // Draw one layer at a time, so animated objects aren't overdrawn by
         // neighboring terrain
-        // XXX layer count hardcoded here
         // FIXME this is a bit inefficient when there are a lot of rarely-used layers; consider
         // instead drawing everything under actors, then actors, then everything above actors?
-        for (let layer = 0; layer < 5; layer++) {
+        for (let layer = 0; layer < DRAW_LAYERS.MAX; layer++) {
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
                     for (let tile of this.level.cells[y][x]) {
                         if (tile.type.draw_layer !== layer)
                             continue;
 
+                        let vx, vy;
                         if (tile.type.is_actor &&
                             // FIXME kind of a hack for the editor, which uses bare tile objects
                             tile.visual_position)
                         {
                             // Handle smooth scrolling
-                            let [vx, vy] = tile.visual_position(tic_offset);
+                            [vx, vy] = tile.visual_position(tic_offset);
                             // Round this to the pixel grid too!
                             vx = Math.floor(vx * tw + 0.5) / tw;
                             vy = Math.floor(vy * th + 0.5) / th;
-                            this.tileset.draw(tile, tic, (sx, sy, dx = 0, dy = 0, w = 1, h = w) =>
-                                this.blit(this.ctx, sx, sy, vx - x0 + dx, vy - y0 + dy, w, h));
                         }
                         else {
                             // Non-actors can't move
-                            this.tileset.draw(tile, tic, (sx, sy, dx = 0, dy = 0, w = 1, h = w) =>
-                                this.blit(this.ctx, sx, sy, x - x0 + dx, y - y0 + dy, w, h));
+                            vx = x;
+                            vy = y;
                         }
+
+                        // Note that the blit we pass to the tileset has a different signature:
+                        // blit(
+                        //     source_tile_x, source_tile_y,
+                        //     mask_x = 0, mask_y = 0, mask_width = 1, mask_height = mask_width,
+                        //     mask_dx = mask_x, mask_dy = mask_y)
+                        // This makes it easier to use in the extremely common case of drawing
+                        // part of one tile atop another tile, but still aligned to the grid.
+                        this.tileset.draw(tile, tic, (tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) =>
+                            this.blit(this.ctx,
+                                tx + mx, ty + my,
+                                vx - x0 + mdx, vy - y0 + mdy,
+                                mw, mh));
                     }
                 }
             }
