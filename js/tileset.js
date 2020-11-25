@@ -115,6 +115,7 @@ export const CC2_TILESET_LAYOUT = {
     wall_custom_blue: [15, 4],
 
     explosion: [[0, 5], [1, 5], [2, 5], [3, 5]],
+    splash_slime: [[0, 5], [1, 5], [2, 5], [3, 5]],
     splash: [[4, 5], [5, 5], [6, 5], [7, 5]],
     flame_jet_off: [8, 5],
     flame_jet_on: [[9, 5], [10, 5], [11, 5]],
@@ -263,13 +264,13 @@ export const CC2_TILESET_LAYOUT = {
     },
 
     walker: [0, 13],
-    // TODO walker animations span multiple tiles, rgh
+    // FIXME walker animations span multiple tiles
     helmet: [0, 14],
     stopwatch_toggle: [14, 14],
     stopwatch_bonus: [15, 14],
 
     blob: [0, 15],
-    // TODO blob animations also span multiple tiles
+    // FIXME blob animations span multiple tiles
     // TODO [0, 16] some kinda red/blue outline
     floor_mimic: [0, 2],  // TODO [14, 16] with xray
     // TODO [15, 16] some kinda yellow/black outline
@@ -367,6 +368,7 @@ export const CC2_TILESET_LAYOUT = {
         },
         // These are frames from the splash/explosion animations
         drowned: [5, 5],
+        slimed: [5, 5],
         burned: [1, 5],
         exploded: [1, 5],
         failed: [1, 5],
@@ -489,6 +491,7 @@ export const CC2_TILESET_LAYOUT = {
         },
         // These are frames from the splash/explosion animations
         drowned: [5, 5],
+        slimed: [5, 5],
         burned: [1, 5],
         exploded: [1, 5],
         failed: [1, 5],
@@ -696,8 +699,12 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
             south: [6, 33],
             west: [7, 33],
         },
+        slimed: [1, 38],
     }),
     // TODO player2 equivalents
+    player2: Object.assign({}, CC2_TILESET_LAYOUT.player2, {
+        slimed: [1, 38],
+    }),
     bogus_player_burned_fire: {
         overlay: [6, 33],
         base: 'fire',
@@ -710,6 +717,24 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     // Custom tiles
     popwall2: [9, 32],
     bestowal_bow: [10, 32],
+
+    // Blob and walker in all four directions
+    blob: {
+        north: [[0, 35], [1, 35], [2, 35], [3, 35], [4, 35], [5, 35], [6, 35], [7, 35]],
+        east: [[8, 35], [9, 35], [10, 35], [11, 35], [12, 35], [13, 35], [14, 35], [15, 35]],
+        south: [[0, 36], [1, 36], [2, 36], [3, 36], [4, 36], [5, 36], [6, 36], [7, 36]],
+        west: [[8, 36], [9, 36], [10, 36], [11, 36], [12, 36], [13, 36], [14, 36], [15, 36]],
+    },
+    walker: {
+        north: [[0, 37], [1, 37], [2, 37], [3, 37]],
+        east: [[4, 37], [5, 37], [6, 37], [7, 37]],
+        // Same animations but played backwards
+        south: [[2, 37], [1, 37], [0, 37], [3, 37]],
+        west: [[6, 37], [5, 37], [4, 37], [7, 37]],
+    },
+
+    // Custom VFX
+    splash_slime: [[0, 38], [1, 38], [2, 38], [3, 38]],
 });
 
 export class Tileset {

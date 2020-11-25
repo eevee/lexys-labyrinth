@@ -53,6 +53,9 @@ function player_visual_state(me) {
     else if (me.fail_reason === 'exploded') {
         return 'exploded';
     }
+    else if (me.fail_reason === 'slimed') {
+        return 'slimed';
+    }
     else if (me.fail_reason) {
         return 'failed';
     }
@@ -547,6 +550,17 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.name === 'dirt_block' || other.type.name === 'ice_block') {
                 level.transmute_tile(me, 'floor');
+            }
+            else if (other.type.name === 'ghost') {
+                // No effect
+            }
+            else if (other.type.is_player) {
+                level.fail('slimed');
+            }
+            else {
+                // FIXME needs a sound effect
+                level.sfx.play_once('splash', me.cell);
+                level.transmute_tile(other, 'splash_slime');
             }
         },
     },
@@ -1706,6 +1720,14 @@ const TILE_TYPES = {
         ttl: 6,
     },
     explosion: {
+        draw_layer: DRAW_LAYERS.overlay,
+        is_actor: true,
+        collision_mask: 0,
+        blocks_collision: COLLISION.player,
+        ttl: 6,
+    },
+    // Custom VFX (identical function, but different aesthetic)
+    splash_slime: {
         draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
         collision_mask: 0,
