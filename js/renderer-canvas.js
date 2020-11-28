@@ -11,7 +11,6 @@ export class CanvasRenderer {
         // to do so, but then we wouldn't make a canvas so it couldn't be
         // hooked, yadda yadda
         if (fixed_size) {
-            this.viewport_is_fixed = true;
             this.viewport_size_x = fixed_size;
             this.viewport_size_y = fixed_size;
         }
@@ -25,12 +24,20 @@ export class CanvasRenderer {
         this.ctx = this.canvas.getContext('2d');
         this.viewport_x = 0;
         this.viewport_y = 0;
+        this.viewport_dirty = false;
         this.use_rewind_effect = false;
     }
 
     set_level(level) {
         this.level = level;
         // TODO update viewport size...  or maybe Game should do that since you might be cheating
+    }
+
+    // Change the viewport size.  DOES NOT take effect until the next redraw!
+    set_viewport_size(x, y) {
+        this.viewport_size_x = x;
+        this.viewport_size_y = y;
+        this.viewport_dirty = true;
     }
 
     cell_coords_from_event(ev) {
@@ -65,6 +72,14 @@ export class CanvasRenderer {
         if (! this.level) {
             console.warn("CanvasRenderer.draw: No level to render");
             return;
+        }
+
+        if (this.viewport_dirty) {
+            this.viewport_dirty = false;
+            this.canvas.setAttribute('width', this.tileset.size_x * this.viewport_size_x);
+            this.canvas.setAttribute('height', this.tileset.size_y * this.viewport_size_y);
+            this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
+            this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
         }
 
         let tic = (this.level.tic_counter ?? 0) + tic_offset;

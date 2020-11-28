@@ -913,10 +913,9 @@ main.--has-demo .demo-controls {
 #editor svg.level-editor-overlay {
     position: absolute;
     top: 0;
+    bottom: 0;
     left: 0;
-    /* FIXME get real size */
-    width: 1024px;
-    height: 1024px;
+    right: 0;
     /* allow clicks to go through us! */
     pointer-events: none;
 

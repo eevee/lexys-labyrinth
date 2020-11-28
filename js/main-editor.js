@@ -3,7 +3,7 @@ import * as c2g from './format-c2g.js';
 import { PrimaryView, DialogOverlay } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
-import { mk, mk_svg, walk_grid } from './util.js';
+import { SVG_NS, mk, mk_svg, walk_grid } from './util.js';
 
 class EditorShareOverlay extends DialogOverlay {
     constructor(conductor, url) {
@@ -613,14 +613,13 @@ export class Editor extends PrimaryView {
 
         // FIXME need this in load_level which is called even if we haven't been setup yet
         this.connections_g = mk_svg('g');
+        // This SVG draws vectors on top of the editor, like monster paths and button connections
+        this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'}, this.connections_g);
+        this.viewport_el.append(this.renderer.canvas, this.svg_overlay);
     }
 
     setup() {
         // Level canvas and mouse handling
-        // This SVG draws vectors on top of the editor, like monster paths and button connections
-        // FIXME change viewBox in load_level, can't right now because order of ops
-        this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'}, this.connections_g);
-        this.viewport_el.append(this.renderer.canvas, this.svg_overlay);
         this.mouse_op = null;
         this.viewport_el.addEventListener('mousedown', ev => {
             this.cancel_mouse_operation();
@@ -769,6 +768,7 @@ export class Editor extends PrimaryView {
     load_level(stored_level) {
         // TODO support a game too i guess
         this.stored_level = stored_level;
+        this.update_viewport_size();
 
         // XXX need this for renderer compat.  but i guess it's nice in general idk
         this.stored_level.cells = [];
@@ -801,6 +801,11 @@ export class Editor extends PrimaryView {
         if (this.active) {
             this.renderer.draw();
         }
+    }
+
+    update_viewport_size() {
+        this.renderer.set_viewport_size(this.stored_level.size_x, this.stored_level.size_y);
+        this.svg_overlay.setAttribute('viewBox', `0 0 ${this.stored_level.size_x} ${this.stored_level.size_y}`);
     }
 
     select_tool(tool) {
