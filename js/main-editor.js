@@ -84,6 +84,19 @@ class MouseOperation {
         this.cleanup();
     }
 
+    *iter_touched_cells(gxf, gyf) {
+        for (let pt of walk_grid(
+            this.gx1f, this.gy1f, gxf, gyf,
+            // Bound the grid walk to one cell beyond the edges of the level, so that dragging the
+            // mouse in from outside the actual edges still works reliably
+            -1, -1, this.editor.stored_level.size_x, this.editor.stored_level.size_y))
+        {
+            if (this.editor.is_in_bounds(...pt)) {
+                yield pt;
+            }
+        }
+    }
+
     // Implement these
     start() {}
     step(x, y) {}
@@ -94,8 +107,9 @@ class MouseOperation {
 
 class PanOperation extends MouseOperation {
     step(mx, my) {
-        this.editor.viewport_el.scrollLeft -= mx - this.mx1;
-        this.editor.viewport_el.scrollTop -= my - this.my1;
+        let target = this.editor.viewport_el.parentNode;
+        target.scrollLeft -= mx - this.mx1;
+        target.scrollTop -= my - this.my1;
     }
 }
 
@@ -107,7 +121,7 @@ class PencilOperation extends DrawOperation {
         this.editor.place_in_cell(this.gx1, this.gy1, this.editor.palette_selection);
     }
     step(mx, my, gxf, gyf) {
-        for (let [x, y] of walk_grid(this.gx1f, this.gy1f, gxf, gyf)) {
+        for (let [x, y] of this.iter_touched_cells(gxf, gyf)) {
             this.editor.place_in_cell(x, y, this.editor.palette_selection);
         }
     }
@@ -125,7 +139,7 @@ class ForceFloorOperation extends DrawOperation {
         // the same direction, but shouldn't
         let i = 0;
         let prevx, prevy;
-        for (let [x, y] of walk_grid(this.gx1f, this.gy1f, gxf, gyf)) {
+        for (let [x, y] of this.iter_touched_cells(gxf, gyf)) {
             i++;
             // The very first cell is the one the mouse was already in, and we don't
             // have a movement direction yet, so leave that alone
@@ -542,7 +556,7 @@ export class Editor extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#editor'));
 
-        this.viewport_el = this.root.querySelector('.level');
+        this.viewport_el = this.root.querySelector('.editor-canvas .-container');
 
         // FIXME don't hardcode size here, convey this to renderer some other way
         this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
@@ -575,6 +589,7 @@ export class Editor extends PrimaryView {
             }
             else if (ev.button === 1) {
                 // Middle button: always pan
+                console.log("middle button!");
                 this.mouse_op = new PanOperation(this, ev);
 
                 ev.preventDefault();
@@ -593,7 +608,10 @@ export class Editor extends PrimaryView {
                 this.renderer.draw();
             }
         });
-        this.viewport_el.addEventListener('mousemove', ev => {
+        // Once the mouse is down, we should accept mouse movement anywhere
+        window.addEventListener('mousemove', ev => {
+            if (! this.active)
+                return;
             if (! this.mouse_op)
                 return;
             if ((ev.buttons & this.mouse_op.button_mask) === 0) {
@@ -766,18 +784,13 @@ export class Editor extends PrimaryView {
         }
     }
 
-    is_in_level(x, y) {
+    is_in_bounds(x, y) {
         return 0 <= x && x < this.stored_level.size_x && 0 <= y && y < this.stored_level.size_y;
     }
 
     place_in_cell(x, y, name) {
         // TODO weird api?
         if (! name)
-            return;
-
-        // TODO seems like a big problem to silently ignore, but it can happen from mouse
-        // coordinates while drawing
-        if (! this.is_in_level(x, y))
             return;
 
         let type = TILE_TYPES[name];

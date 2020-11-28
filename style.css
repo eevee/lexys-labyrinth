@@ -883,14 +883,31 @@ main.--has-demo .demo-controls {
     margin: auto 1em;
 }
 
-#editor .level {
+#editor .editor-canvas {
     grid-area: level;
     position: relative;
     overflow: auto;
-    /* Padding and background make it easier to tell when we're at the edge of the map */
-    /* TODO padding should be half a cell, and svg should respect it too */
-    /* padding: 1em; */
+    /* Flex layout to center the canvas and overlay together */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-items: safe center;
+    justify-content: safe center;
     background: #202020;
+    border: 0.125em solid black;
+}
+#editor .editor-canvas .-container {
+    /* Give the canvas/overlay a bit of a margin; it has to be a border because, due to some quirk
+     * of overflowing flexboxes I guess, padding and margins won't extend the scroll area on the
+     * right and bottom */
+    /* TODO padding should be half a cell? */
+    border: 1em solid transparent;
+}
+#editor .editor-canvas canvas {
+    display: block;
+    width: calc(var(--viewport-width) * var(--tile-width) * var(--scale));
+    --viewport-width: 9;
+    --viewport-height: 9;
 }
 /* SVG overlays */
 #editor svg.level-editor-overlay {

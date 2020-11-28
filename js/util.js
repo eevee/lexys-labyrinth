@@ -153,7 +153,7 @@ export function string_from_buffer_ascii(buf, start = 0, len) {
 }
 
 // Cast a line through a grid and yield every cell it touches
-export function* walk_grid(x0, y0, x1, y1) {
+export function* walk_grid(x0, y0, x1, y1, min_a, min_b, max_a, max_b) {
     // TODO if the ray starts outside the grid (extremely unlikely), we should
     // find the point where it ENTERS the grid, otherwise the 'while'
     // conditions below will stop immediately
@@ -193,27 +193,24 @@ export function* walk_grid(x0, y0, x1, y1) {
         step_a = -step_a;
         offset_x = 1 - offset_x;
     }
-    // Zero offset means we're on a grid line, so we're actually a full cell
-    // away from the next grid line
-    if (offset_x === 0) {
+    else if (offset_x === 0) {
+        // Zero offset means we're on a grid line, so we're a full cell away from the next grid line
+        // (if we're moving forward; if we're moving backward, the next cell really is 0 away)
         offset_x = 1;
     }
     let step_b = 1;
-    let offset_y = 1 - (y0  - b);
+    let offset_y = 1 - (y0 - b);
     if (dy < 0) {
         dy = -dy;
         step_b = -step_b;
         offset_y = 1 - offset_y;
     }
-    if (offset_y === 0) {
+    else if (offset_y === 0) {
         offset_y = 1;
     }
 
     let err = dy * offset_x - dx * offset_y;
 
-    let min_a = 0, min_b = 0;
-    // TODO get these passed in fool
-    let max_a = 31, max_b = 31;
     if (dx > dy) {
         // Main axis is x/a
         while (min_a <= a && a <= max_a && min_b <= b && b <= max_b) {
@@ -252,6 +249,8 @@ export function* walk_grid(x0, y0, x1, y1) {
         }
     }
 }
+window.walk_grid = walk_grid;
+// console.table(Array.from(walk_grid(13, 27.133854389190674, 12.90625, 27.227604389190674)))
 
 // Root class to indirect over where we might get files from
 // - a pool of uploaded in-memory files
