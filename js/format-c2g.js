@@ -372,8 +372,9 @@ const TILE_ENCODING = {
     0x4f: {
         name: 'railroad',
         modifier: {
+            _parts: ['ne', 'se', 'sw', 'ne', 'ew', 'ns'],
             decode(tile, mask) {
-                // TODO railroad props
+                tile.railroad_bits = mask;
             },
             encode(tile) {
                 // TODO

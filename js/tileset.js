@@ -504,8 +504,36 @@ export const CC2_TILESET_LAYOUT = {
     ],
 
     // TODO handle train tracks!  this is gonna be complicated.
-    railroad: [9, 10],
-    railroad_sign: [4, 31],
+    railroad: {
+        special: 'railroad',
+        base: [9, 10],
+        railroad_ties: {
+            ne: [0, 30],
+            se: [1, 30],
+            sw: [2, 30],
+            nw: [3, 30],
+            ew: [4, 30],
+            ns: [5, 30],
+        },
+        railroad_switch: [6, 31],
+        railroad_inactive: {
+            ne: [7, 30],
+            se: [8, 30],
+            sw: [9, 30],
+            nw: [10, 30],
+            ew: [11, 30],
+            ns: [12, 30],
+        },
+        railroad_active: {
+            ne: [13, 30],
+            se: [14, 30],
+            sw: [15, 30],
+            nw: [0, 31],
+            ew: [1, 31],
+            ns: [2, 31],
+        },
+    },
+    railroad_sign: [3, 31],
     dirt: [4, 31],
     no_player2_sign: [5, 31],
     no_player1_sign: [6, 31],
@@ -838,6 +866,43 @@ export class Tileset {
         }
     }
 
+    _draw_railroad(drawspec, tile, tic, blit) {
+        // All railroads have regular gravel underneath
+        // TODO would be nice to disambiguate since it's possible to have nothing visible
+        this._draw_standard(this.layout['gravel'], tile, tic, blit);
+
+        // FIXME what do i draw if there's no tile?
+        let part_order = ['ne', 'se', 'sw', 'nw', 'ew', 'ns'];
+        let visible_parts = [];
+        let topmost_part = null;
+        for (let [i, part] of part_order.entries()) {
+            if (tile && (tile.railroad_bits & (1 << i))) {
+                if ((tile.railroad_bits >> 8) === i) {
+                    topmost_part = part;
+                }
+                visible_parts.push(part);
+            }
+        }
+
+        let has_switch = (tile && (tile.railroad_bits & 0x40));
+        for (let part of visible_parts) {
+            this._draw_standard(drawspec.railroad_ties[part], tile, tic, blit);
+        }
+        let tracks = has_switch ? drawspec.railroad_inactive : drawspec.railroad_active;
+        for (let part of visible_parts) {
+            if (part !== topmost_part) {
+                this._draw_standard(tracks[part], tile, tic, blit);
+            }
+        }
+
+        if (topmost_part) {
+            this._draw_standard(drawspec.railroad_active[topmost_part], tile, tic, blit);
+        }
+        if (has_switch) {
+            this._draw_standard(drawspec.railroad_switch, tile, tic, blit);
+        }
+    }
+
     // Draws a tile type, given by name.  Passing in a tile is optional, but
     // without it you'll get defaults.
     draw_type(name, tile, tic, blit) {
@@ -866,6 +931,10 @@ export class Tileset {
         if (drawspec.special) {
             if (drawspec.special === 'logic-gate') {
                 this._draw_logic_gate(drawspec, tile, tic, blit);
+                return;
+            }
+            else if (drawspec.special === 'railroad') {
+                this._draw_railroad(drawspec, tile, tic, blit);
                 return;
             }
         }
