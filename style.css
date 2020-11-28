@@ -885,7 +885,6 @@ main.--has-demo .demo-controls {
 
 #editor .editor-canvas {
     grid-area: level;
-    position: relative;
     overflow: auto;
     /* Flex layout to center the canvas and overlay together */
     display: flex;
@@ -897,6 +896,7 @@ main.--has-demo .demo-controls {
     border: 0.125em solid black;
 }
 #editor .editor-canvas .-container {
+    position: relative;
     /* Give the canvas/overlay a bit of a margin; it has to be a border because, due to some quirk
      * of overflowing flexboxes I guess, padding and margins won't extend the scroll area on the
      * right and bottom */

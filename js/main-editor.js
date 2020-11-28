@@ -34,6 +34,8 @@ class MouseOperation {
         this.editor = editor;
         this.target = target;
         this.button_mask = MOUSE_BUTTON_MASKS[ev.button];
+        this.modifier = null;  // or 'shift' or 'ctrl' (ctrl takes precedent)
+        this._update_modifier(ev);
 
         // Client coordinates of the initial click
         this.mx0 = ev.clientX;
@@ -56,13 +58,14 @@ class MouseOperation {
     }
 
     cell(gx, gy) {
-        return this.editor.stored_level.cells[Math.floor(gy)][Math.floor(gx)];
+        return this.editor.cell(Math.floor(gx), Math.floor(gy));
     }
 
     do_mousemove(ev) {
         let [gxf, gyf] = this.editor.renderer.real_cell_coords_from_event(ev);
         let gx = Math.floor(gxf);
         let gy = Math.floor(gyf);
+        this._update_modifier(ev);
 
         this.step(ev.clientX, ev.clientY, gxf, gyf, gx, gy);
 
@@ -72,6 +75,18 @@ class MouseOperation {
         this.gy1f = gyf;
         this.gx1 = gx;
         this.gy1 = gy;
+    }
+
+    _update_modifier(ev) {
+        if (ev.ctrlKey) {
+            this.modifier = 'ctrl';
+        }
+        else if (ev.shiftKey) {
+            this.modifier = 'shift';
+        }
+        else {
+            this.modifier = null;
+        }
     }
 
     do_commit() {
@@ -118,10 +133,44 @@ class DrawOperation extends MouseOperation {
 
 class PencilOperation extends DrawOperation {
     start() {
-        this.editor.place_in_cell(this.gx1, this.gy1, this.editor.palette_selection);
+        this.handle_cell(this.gx0, this.gy0);
     }
-    step(mx, my, gxf, gyf) {
-        for (let [x, y] of this.iter_touched_cells(gxf, gyf)) {
+    step(mx, my, gxf, gyf, gx, gy) {
+        if (this.modifier === 'ctrl') {
+            this.handle_cell(gx, gy);
+        }
+        else {
+            for (let [x, y] of this.iter_touched_cells(gxf, gyf)) {
+                this.handle_cell(x, y);
+            }
+        }
+    }
+
+    handle_cell(x, y) {
+        if (this.modifier === 'ctrl') {
+            let cell = this.cell(x, y);
+            if (cell) {
+                // FIXME the selected tile should actually be a template
+                // FIXME this doesn't update the ui
+                this.editor.palette_selection = cell[cell.length - 1].type.name;
+            }
+        }
+        else if (this.modifier === 'shift') {
+            // Aggressive mode: erase whatever's already in the cell
+            let cell = this.cell(x, y);
+            cell.length = 0;
+            let type = TILE_TYPES[this.editor.palette_selection];
+            if (type.draw_layer !== 0) {
+                cell.push({type: TILE_TYPES.floor});
+            }
+            let direction;
+            if (type.is_actor) {
+                direction = 'south';
+            }
+            cell.push({type, direction});
+        }
+        else {
+            // Default operation: only erase whatever's on the same layer
             this.editor.place_in_cell(x, y, this.editor.palette_selection);
         }
     }
@@ -193,6 +242,7 @@ class ForceFloorOperation extends DrawOperation {
 
 // Tiles the "adjust" tool will turn into each other
 const ADJUST_TOGGLES = {
+    // TODO shouldn't this convert regular walls into regular floors then?
     floor_custom_green: 'wall_custom_green',
     floor_custom_pink: 'wall_custom_pink',
     floor_custom_yellow: 'wall_custom_yellow',
@@ -589,7 +639,6 @@ export class Editor extends PrimaryView {
             }
             else if (ev.button === 1) {
                 // Middle button: always pan
-                console.log("middle button!");
                 this.mouse_op = new PanOperation(this, ev);
 
                 ev.preventDefault();
@@ -788,6 +837,15 @@ export class Editor extends PrimaryView {
         return 0 <= x && x < this.stored_level.size_x && 0 <= y && y < this.stored_level.size_y;
     }
 
+    cell(x, y) {
+        if (this.is_in_bounds(x, y)) {
+            return this.stored_level.cells[y][x];
+        }
+        else {
+            return null;
+        }
+    }
+
     place_in_cell(x, y, name) {
         // TODO weird api?
         if (! name)
@@ -799,23 +857,16 @@ export class Editor extends PrimaryView {
             direction = 'south';
         }
         let cell = this.stored_level.cells[y][x];
-        // For terrain tiles, erase the whole cell.  For other tiles, only
-        // replace whatever's on the same layer
+        // Replace whatever's on the same layer
         // TODO probably not the best heuristic yet, since i imagine you can
         // combine e.g. the tent with thin walls
-        if (type.draw_layer === 0) {
-            cell.length = 0;
-            cell.push({type, direction});
-        }
-        else {
-            for (let i = cell.length - 1; i >= 0; i--) {
-                if (cell[i].type.draw_layer === type.draw_layer) {
-                    cell.splice(i, 1);
-                }
+        for (let i = cell.length - 1; i >= 0; i--) {
+            if (cell[i].type.draw_layer === type.draw_layer) {
+                cell.splice(i, 1);
             }
-            cell.push({type, direction});
-            cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
         }
+        cell.push({type, direction});
+        cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
     }
 
     cancel_mouse_operation() {
