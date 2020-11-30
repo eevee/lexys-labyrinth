@@ -316,7 +316,138 @@ const TILE_TYPES = {
     // Railroad
     railroad: {
         draw_layer: DRAW_LAYERS.terrain,
-        // TODO a lot!!
+        _track_order: [
+            ['north', 'east'],
+            ['south', 'east'],
+            ['south', 'west'],
+            ['north', 'west'],
+            ['east', 'west'],
+            ['north', 'south'],
+        ],
+        // FIXME railroad_bits sucks, split into some useful variables
+        on_ready(me) {
+            // If there's already an actor on top of us, assume it entered the way it's already
+            // facing (which may be illegal, in which case it can't leave)
+            let actor = me.cell.get_actor();
+            if (actor) {
+                me.entered_direction = actor.direction;
+            }
+        },
+        // TODO feel like "ignores" was the wrong idea and there should just be some magic flags for
+        // particular objects that can be immune to.  or maybe those objects should have their own
+        // implementations of immunity
+        _is_affected(me, other) {
+            if (other.type.name === 'ghost')
+                return false;
+            if (other.has_item('railroad_sign'))
+                return false;
+            return true;
+        },
+        *_iter_tracks(me) {
+            let order = me.type._track_order;
+            if (me.railroad_bits & 0x40) {
+                // FIXME what happens if the "top" track is not actually a valid track???
+                yield order[me.railroad_bits >> 8];
+            }
+            else {
+                for (let [i, track] of order.entries()) {
+                    if (me.railroad_bits & (1 << i)) {
+                        yield track;
+                    }
+                }
+            }
+        },
+        _switch_track(me, level) {
+            if (me.railroad_bits & 0x40) {
+                let current = me.railroad_bits >> 8;
+                for (let i = 0, l = me.type._track_order.length; i < l; i++) {
+                    current = (current + 1) % l;
+                    if (me.railroad_bits & (1 << current))
+                        break;
+                }
+                level._set_tile_prop(me, 'railroad_bits', (current << 8) | (me.railroad_bits & 0xff));
+            }
+        },
+        has_opening(me, direction) {
+            for (let track of me.type._iter_tracks(me)) {
+                if (track.indexOf(direction) >= 0) {
+                    return true;
+                }
+            }
+            return false;
+        },
+        blocks(me, level, other, direction) {
+            return me.type._is_affected(me, other) &&
+                ! me.type.has_opening(me, DIRECTIONS[direction].opposite);
+        },
+        blocks_leaving(me, other, direction) {
+            // FIXME needs the same logic as redirect_exit, so that an illegal entrance can't leave
+            // at all
+            return me.type._is_affected(me, other) && ! me.type.has_opening(me, direction);
+        },
+        on_arrive(me, level, other) {
+            // FIXME actually this happens even if you have the sign so it shouldn't ignore!!
+            level._set_tile_prop(me, 'entered_direction', other.direction);
+        },
+        on_depart(me, level, other) {
+            if (other.type.name === 'directional_block') {
+                // Directional blocks are rotated when they leave
+                if (other.direction === DIRECTIONS[me.entered_direction].right) {
+                    let new_arrows = new Set;
+                    for (let arrow of other.arrows) {
+                        new_arrows.add(DIRECTIONS[arrow].right);
+                    }
+                    level._set_tile_prop(other, 'arrows', new_arrows);
+                }
+                else if (other.direction === DIRECTIONS[me.entered_direction].left) {
+                    let new_arrows = new Set;
+                    for (let arrow of other.arrows) {
+                        new_arrows.add(DIRECTIONS[arrow].left);
+                    }
+                    level._set_tile_prop(other, 'arrows', new_arrows);
+                }
+            }
+
+            // FIXME this only happens if we're unwired, but i don't have a way to check that atm
+            me.type._switch_track(me, level);
+        },
+        on_power(me, level) {
+            me.type._switch_track(me, level);
+        },
+        on_gray_button(me, level) {
+            me.type._switch_track(me, level);
+        },
+        redirect_exit(me, other, direction) {
+            if (! me.type._is_affected(me, other))
+                return direction;
+
+            let legal_exits = new Set;
+            let entered_from = DIRECTIONS[me.entered_direction].opposite;
+            for (let track of me.type._iter_tracks(me)) {
+                if (track[0] === entered_from) {
+                    legal_exits.add(track[1]);
+                }
+                else if (track[1] === entered_from) {
+                    legal_exits.add(track[0]);
+                }
+            }
+            if (legal_exits.has(direction)) {
+                return direction;
+            }
+            if (legal_exits.has(DIRECTIONS[direction].right)) {
+                return DIRECTIONS[direction].right;
+            }
+            if (legal_exits.has(DIRECTIONS[direction].left)) {
+                return DIRECTIONS[direction].left;
+            }
+            if (legal_exits.has(DIRECTIONS[direction].opposite)) {
+                return DIRECTIONS[direction].opposite;
+            }
+            // FIXME i think in this case the actor gets stuck, but, facing which way?
+            return direction;
+        },
+        // FIXME track switches on depart or power or gray button
+        // FIXME rotate dir blocks
     },
 
     // Locked doors
@@ -1549,8 +1680,6 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        // FIXME this doesn't work any more, need to put it in railroad blocks impl
-        item_ignores: new Set(['railroad']),
     },
     foil: {
         // TODO not implemented

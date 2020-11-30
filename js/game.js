@@ -44,6 +44,8 @@ export class Tile {
         }
     }
 
+    // TODO don't love that the arg order is different here vs tile type, but also don't love that
+    // the name is the same?
     blocks(other, direction, level) {
         // Extremely awkward special case: items don't block monsters if the cell also contains an
         // item modifier (i.e. "no" sign) or a player
@@ -60,7 +62,7 @@ export class Tile {
             return true;
 
         if (this.type.blocks)
-            return this.type.blocks(this, level, other);
+            return this.type.blocks(this, level, other, direction);
 
         return false;
     }
@@ -188,6 +190,16 @@ export class Cell extends Array {
             }
         }
         return false;
+    }
+
+    // Special railroad ability: change the direction we attempt to leave
+    redirect_exit(actor, direction) {
+        for (let tile of this) {
+            if (tile.type.redirect_exit) {
+                return tile.type.redirect_exit(tile, actor, direction);
+            }
+        }
+        return direction;
     }
 }
 Cell.prototype.prev_powered_edges = 0;
@@ -731,6 +743,8 @@ export class Level {
                     }
                     fallback_direction = direction;
 
+                    direction = actor.cell.redirect_exit(actor, direction);
+
                     let dest_cell = this.get_neighboring_cell(actor.cell, direction);
                     if (! dest_cell)
                         continue;
@@ -836,6 +850,7 @@ export class Level {
         if (actor.movement_cooldown > 0)
             return false;
 
+        direction = actor.cell.redirect_exit(actor, direction);
         this.set_actor_direction(actor, direction);
 
         // Record our speed, and halve it below if we're stepping onto a sliding tile
