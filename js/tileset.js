@@ -515,7 +515,7 @@ export const CC2_TILESET_LAYOUT = {
             ew: [4, 30],
             ns: [5, 30],
         },
-        railroad_switch: [6, 31],
+        railroad_switch: [6, 30],
         railroad_inactive: {
             ne: [7, 30],
             se: [8, 30],
