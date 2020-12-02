@@ -54,10 +54,22 @@ export class Overlay {
         overlay.addEventListener('click', ev => {
             this.close();
         });
+
+        return overlay;
     }
 
     close() {
         this.root.closest('.overlay').remove();
+    }
+}
+
+// Overlay styled like a popup of some sort
+export class TransientOverlay extends Overlay {
+    open() {
+        // TODO i don't like how vaguely arbitrary this feels.
+        let overlay = super.open();
+        overlay.classList.add('--transient');
+        return overlay;
     }
 }
 

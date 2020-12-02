@@ -328,6 +328,7 @@ const TILE_TYPES = {
         on_ready(me) {
             // If there's already an actor on top of us, assume it entered the way it's already
             // facing (which may be illegal, in which case it can't leave)
+            // FIXME wrong!  > Yeah, so in the high byte, the low nibble encodes the active track. What's missing is that the high nibble encodes a direction value, which is required when a mob starts out on top of the track: it represents the direction the mob was going when it entered the tile, which controls which way it can go on the track.
             let actor = me.cell.get_actor();
             if (actor) {
                 me.entered_direction = actor.direction;

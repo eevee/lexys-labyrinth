@@ -24,7 +24,9 @@ function _mk(el, children) {
 export function mk(tag_selector, ...children) {
     let [tag, ...classes] = tag_selector.split('.');
     let el = document.createElement(tag);
-    el.classList = classes.join(' ');
+    if (classes.length > 0) {
+        el.classList = classes.join(' ');
+    }
     return _mk(el, children);
 }
 
@@ -32,7 +34,9 @@ export const SVG_NS = 'http://www.w3.org/2000/svg';
 export function mk_svg(tag_selector, ...children) {
     let [tag, ...classes] = tag_selector.split('.');
     let el = document.createElementNS(SVG_NS, tag);
-    el.classList = classes.join(' ');
+    if (classes.length > 0) {
+        el.classList = classes.join(' ');
+    }
     return _mk(el, children);
 }
 

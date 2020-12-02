@@ -143,6 +143,11 @@ svg.svg-icon {
     right: 0;
     background: #fff4;
 }
+.overlay.--transient {
+    align-items: start;
+    justify-content: start;
+    background: none;
+}
 .dialog {
     display: flex;
     flex-direction: column;
@@ -1010,4 +1015,61 @@ main.--has-demo .demo-controls {
 .palette-entry.--selected {
     z-index: 1;
     box-shadow: 0 0 0 1px black, 0 0 0 3px white;
+}
+
+/* Mini editors for specific tiles with complex properties */
+/* FIXME should this stuff be on an overlay container class? */
+form.editor-popup-tile-editor {
+    position: relative;
+    padding: 0.5em;
+    color: black;
+    background: white;
+    border: 1px solid black;
+    box-shadow: 0 2px 4px #0004;
+
+    margin-top: 1em;
+
+    --chevron-offset: 0px;
+}
+form.editor-popup-tile-editor.--above {
+    margin-top: -1em;
+}
+.popup-chevron {
+    position: absolute;
+    border: 1em solid transparent;
+    left: var(--chevron-offset);
+    margin-left: -1em;
+
+    top: -1em;
+    border-top: none;
+    border-bottom-color: white;
+    filter: drop-shadow(0 -1px 0 black);
+}
+form.editor-popup-tile-editor.--above .popup-chevron {
+    top: auto;
+    bottom: -1em;
+    border: 1em solid transparent;
+    border-bottom: none;
+    border-top-color: white;
+    filter: drop-shadow(0 1px 0 black);
+}
+/* Letter floor tiles, which let you pick the character to use; show them as a grid.  Note the
+ * characters are preceded by radio buttons, which we hide for simplicity */
+ol.editor-letter-tile-picker {
+    display: grid;
+    grid: auto-flow 1.5em / repeat(16, 1.5em);
+    text-align: center;
+    font-family: monospace;
+}
+ol.editor-letter-tile-picker label,
+ol.editor-letter-tile-picker .-glyph {
+    display: block;
+    height: 100%;
+}
+ol.editor-letter-tile-picker input[type=radio] {
+    display: none;
+}
+ol.editor-letter-tile-picker input[type=radio]:checked + .-glyph {
+    background: hsl(225, 75%, 90%);
+    outline: 2px solid hsl(225, 75%, 80%);
 }

@@ -1,6 +1,6 @@
 import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
 import * as c2g from './format-c2g.js';
-import { PrimaryView, DialogOverlay } from './main-base.js';
+import { PrimaryView, TransientOverlay, DialogOverlay } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
 import { SVG_NS, mk, mk_svg, walk_grid } from './util.js';
@@ -266,7 +266,17 @@ const ADJUST_TOGGLES = {
 };
 class AdjustOperation extends MouseOperation {
     start() {
-        let cell = this.editor.stored_level.cells[this.gy1][this.gx1];
+        let cell = this.cell(this.gx1, this.gy1);
+        if (this.modifier === 'ctrl') {
+            for (let tile of cell) {
+                if (tile.type.name === 'floor_letter') {
+                    // TODO use the tile's bbox, not the mouse position
+                    this.editor.open_tile_prop_overlay(tile, this.mx0, this.my0);
+                    break;
+                }
+            }
+            return;
+        }
         for (let tile of cell) {
             // Toggle tiles that go in obvious pairs
             let other = ADJUST_TOGGLES[tile.type.name];
@@ -282,6 +292,7 @@ class AdjustOperation extends MouseOperation {
     }
     // Adjust tool doesn't support dragging
     // TODO should it?
+    // TODO if it does then it should end as soon as you spawn a popup
 }
 
 // FIXME currently allows creating outside the map bounds and moving beyond the right/bottom, sigh
@@ -472,9 +483,10 @@ const EDITOR_TOOLS = {
     pencil: {
         icon: 'icons/tool-pencil.png',
         name: "Pencil",
-        desc: "Draw individual tiles",
+        desc: "Click to draw.  Right click to erase.  Hold Shift to affect all layers.  Ctrl-click to eyedrop.",
         op1: PencilOperation,
         //op2: EraseOperation,
+        //hover: show current selection under cursor
     },
     line: {
         // TODO not implemented
@@ -503,7 +515,7 @@ const EDITOR_TOOLS = {
     adjust: {
         icon: 'icons/tool-adjust.png',
         name: "Adjust",
-        desc: "Toggle blocks and rotate actors",
+        desc: "Click to rotate actor or toggle terrain.  Right click to rotate in reverse.  Hold Shift to always affect terrain.  Ctrl-click to edit properties of complex tiles (wires, railroads, hints, etc.)",
         op1: AdjustOperation,
     },
     connect: {
@@ -601,6 +613,49 @@ const EDITOR_PALETTE = [{
         'teleport_yellow',
     ],
 }];
+
+// FIXME could very much stand to have a little animation when appearing
+class LetterTileEditor extends TransientOverlay {
+    constructor(conductor) {
+        let root = mk('form.editor-popup-tile-editor');
+        root.append(mk('span.popup-chevron'));
+        super(conductor, root);
+        this.tile = null;
+
+        let list = mk('ol.editor-letter-tile-picker');
+        root.append(list);
+        this.glyph_elements = {};
+        for (let c = 32; c < 128; c++) {
+            let glyph = String.fromCharCode(c);
+            let input = mk('input', {type: 'radio', name: 'glyph', value: glyph});
+            this.glyph_elements[glyph] = input;
+            let item = mk('li', mk('label', input, mk('span.-glyph', glyph)));
+            list.append(item);
+        }
+
+        list.addEventListener('change', ev => {
+            let glyph = this.root.elements['glyph'].value;
+            if (this.tile) {
+                this.tile.ascii_code = glyph.charCodeAt(0);
+                // FIXME should be able to mark tiles as dirty, also this is sure a mouthful
+                this.conductor.editor.renderer.draw();
+            }
+        });
+    }
+
+    edit_tile(tile) {
+        this.tile = tile;
+        this.root.elements['glyph'].value = String.fromCharCode(tile.ascii_code);
+    }
+
+    static configure_tile_defaults(tile) {
+        tile.ascii_code = 32;
+    }
+}
+
+const EDITOR_TILES_WITH_PROPS = {
+    floor_letter: LetterTileEditor,
+};
 
 export class Editor extends PrimaryView {
     constructor(conductor) {
@@ -872,6 +927,41 @@ export class Editor extends PrimaryView {
         }
         cell.push({type, direction});
         cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
+    }
+
+    open_tile_prop_overlay(tile, x0, y0) {
+        this.cancel_mouse_operation();
+        let overlay_class = EDITOR_TILES_WITH_PROPS[tile.type.name];
+        let overlay = new overlay_class(this.conductor);
+        overlay.edit_tile(tile);
+        overlay.open();
+
+        // FIXME move this into TransientOverlay or some other base class
+        let root = overlay.root;
+        // Vertical position: either above or below, preferring the side that has more space
+        if (y0 > document.body.clientHeight / 2) {
+            // Above
+            root.classList.add('--above');
+            root.style.top = `${y0 - root.offsetHeight}px`;
+        }
+        else {
+            // Below
+            root.classList.remove('--above');
+            root.style.top = `${y0}px`;
+        }
+        // Horizontal position: centered, but kept within the screen
+        let left;
+        let margin = 8;  // prefer to not quite touch the edges
+        let halfwidth = root.offsetWidth / 2 + margin;
+        if (document.body.clientWidth / 2 < halfwidth) {
+            // It doesn't fit on the screen at all, so there's nothing we can do; just center it
+            left = (document.body.clientWidth - root.offsetWidth) / 2;
+        }
+        else {
+            left = Math.max(margin, Math.min(document.body.clientWidth - halfwidth, x0 - halfwidth));
+        }
+        root.style.left = `${left}px`;
+        root.style.setProperty('--chevron-offset', `${x0 - left}px`);
     }
 
     cancel_mouse_operation() {
