@@ -239,6 +239,81 @@ class ForceFloorOperation extends DrawOperation {
     }
 }
 
+// TODO entered cell should get blank railroad?
+// TODO maybe place a straight track in the new cell so it looks like we're doing something, then
+// fix it if it wasn't there?
+class TrackOperation extends DrawOperation {
+    start() {
+        // Do nothing to start; we only lay track when the mouse leaves a cell
+        this.entry_direction = null;
+    }
+    step(mx, my, gxf, gyf) {
+        // Walk the mouse movement and, for every tile we LEAVE, add a railroad track matching the
+        // two edges of it that we crossed.
+        let prevx = null, prevy = null;
+        for (let [x, y] of this.iter_touched_cells(gxf, gyf)) {
+            if (prevx === null || prevy === null) {
+                prevx = x;
+                prevy = y;
+                continue;
+            }
+
+            // Figure out which way we're leaving the tile
+            let exit_direction;
+            if (x === prevx) {
+                if (y > prevy) {
+                    exit_direction = 'south';
+                }
+                else {
+                    exit_direction = 'north';
+                }
+            }
+            else {
+                if (x > prevx) {
+                    exit_direction = 'east';
+                }
+                else {
+                    exit_direction = 'west';
+                }
+            }
+
+            // If the entry direction is missing or bogus, lay straight track
+            if (this.entry_direction === null || this.entry_direction === exit_direction) {
+                this.entry_direction = DIRECTIONS[exit_direction].opposite;
+            }
+
+            // Get the corresponding bit
+            let bit = null;
+            for (let [i, track] of TILE_TYPES['railroad']._track_order.entries()) {
+                if ((track[0] === this.entry_direction && track[1] === exit_direction) ||
+                    (track[1] === this.entry_direction && track[0] === exit_direction))
+                {
+                    bit = 1 << i;
+                    break;
+                }
+            }
+
+            if (bit === null)
+                continue;
+
+            // Update the cell we just left
+            let cell = this.cell(prevx, prevy);
+            let terrain = cell[0];
+            if (terrain.type.name === 'railroad') {
+                terrain.railroad_bits |= bit;
+            }
+            else {
+                terrain = { type: TILE_TYPES['railroad'], railroad_bits: bit };
+                this.editor.place_in_cell(prevx, prevy, terrain);
+            }
+
+            prevx = x;
+            prevy = y;
+            this.entry_direction = DIRECTIONS[exit_direction].opposite;
+        }
+    }
+}
+
 // Tiles the "adjust" tool will turn into each other
 const ADJUST_TOGGLES_CW = {};
 const ADJUST_TOGGLES_CCW = {};
@@ -539,6 +614,13 @@ const EDITOR_TOOLS = {
         desc: "Draw force floors following the cursor.",
         op1: ForceFloorOperation,
     },
+    tracks: {
+        icon: 'icons/tool-tracks.png',
+        name: "Tracks",
+        desc: "Draw tracks following the cursor.\nLeft click: Lay tracks\nRight click: Erase tracks\nCtrl-click: Toggle track switch",
+        op1: TrackOperation,
+        op2: TrackOperation,
+    },
     adjust: {
         icon: 'icons/tool-adjust.png',
         name: "Adjust",
@@ -570,7 +652,7 @@ const EDITOR_TOOLS = {
     // slade when you have some selected?
     // TODO ah, railroads...
 };
-const EDITOR_TOOL_ORDER = ['pencil', 'force-floors', 'adjust', 'camera'];
+const EDITOR_TOOL_ORDER = ['pencil', 'adjust', 'force-floors', 'tracks', 'camera'];
 
 // TODO this MUST use a LL tileset!
 const EDITOR_PALETTE = [{
