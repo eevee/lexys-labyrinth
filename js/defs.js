@@ -34,6 +34,8 @@ export const DIRECTIONS = {
         opposite: 'west',
     },
 };
+// Should match the bit ordering above, and CC2's order
+export const DIRECTION_ORDER = ['north', 'east', 'south', 'west'];
 
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 export const DRAW_LAYERS = {

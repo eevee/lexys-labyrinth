@@ -1,4 +1,4 @@
-import { DIRECTIONS } from './defs.js';
+import { DIRECTIONS, DIRECTION_ORDER } from './defs.js';
 import * as format_base from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 import * as util from './util.js';
@@ -374,11 +374,28 @@ const TILE_ENCODING = {
         modifier: {
             _parts: ['ne', 'se', 'sw', 'ne', 'ew', 'ns'],
             decode(tile, mask) {
-                tile.railroad_bits = mask;
+                // Leave the track parts alone as a bitmask; the type has a list of them
+                tile.tracks = mask & 0x3f;
+                // Check for a switch, which is a bit number in the above mask
+                if (mask & 0x40) {
+                    tile.track_switch = (mask >> 8) & 0x0f;
+                }
+                else {
+                    tile.track_switch = null;
+                }
+                // Initial actor facing is in the highest nybble
+                tile.entered_direction = (mask >> 12) & 0x03;
             },
             encode(tile) {
-                // TODO
-                return 0;
+                let ret = tile.tracks & 0x3f;
+                if (tile.track_switch !== null) {
+                    ret |= 0x40;
+                    ret |= tile.track_switch << 8;
+                }
+                if (tile.entered_direction) {
+                    ret |= DIRECTION_ORDER.indexOf(tile.entered_direction) << 12;
+                }
+                return ret;
             },
         },
     },
@@ -519,10 +536,25 @@ const TILE_ENCODING = {
         name: 'floor_letter',
         modifier: {
             decode(tile, ascii_code) {
-                tile.ascii_code = ascii_code;
+                if (ascii_code < 28 || ascii_code >= 96) {
+                    // Invalid
+                    tile.overlaid_glyph = "?";
+                }
+                else if (ascii_code < 32) {
+                    // Arrows are stored goofily
+                    tile.overlaid_glyph = ["⬆", "➡", "⬇", "⬅"][ascii_code - 28];
+                }
+                else {
+                    tile.overlaid_glyph = String.fromCharCode(ascii_code);
+                }
             },
             encode(tile) {
-                return tile.ascii_code;
+                let arrow_index = ["⬆", "➡", "⬇", "⬅"].indexOf(tile.overlaid_glyph);
+                if (arrow_index >= 0) {
+                    return arrow_index + 28;
+                }
+
+                return tile.overlaid_glyph.charCodeAt(0);
             },
         },
     },
@@ -798,11 +830,10 @@ export function parse_level(buf, number = 1) {
                 level.hint = str;
             }
             else if (type === 'NOTE') {
-                // Author's comments...  but might also include multiple hints
-                // for levels with multiple hint tiles, delineated by [CLUE].
-                // For my purposes, extra hints are associated with the
-                // individual tiles, so we'll map those later
-                [level.comment, ...extra_hints] = str.split(/^\[CLUE\]$/mg);
+                // Author's comments...  but might also include multiple hints for levels with
+                // multiple hint tiles, delineated by [CLUE] (anywhere in the line (!)).
+                // LL treats extra hints as tile properties, so store them for later
+                [level.comment, ...extra_hints] = str.split(/\n?^.*\[CLUE\].*$\n?/mg);
             }
             continue;
         }
@@ -1018,13 +1049,14 @@ export function parse_level(buf, number = 1) {
     }
 
     // Connect extra hints
-    let h = 0;
-    for (let tile of hint_tiles) {
-        if (h > extra_hints.length)
-            break;
-
-        tile.specific_hint = extra_hints[h];
-        h++;
+    for (let [i, tile] of hint_tiles.entries()) {
+        if (i < extra_hints.length) {
+            tile.hint_text = extra_hints[i];
+        }
+        else {
+            // Fall back to regular hint
+            tile.hint_text = null;
+        }
     }
 
     return level;

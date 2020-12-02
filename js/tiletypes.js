@@ -90,6 +90,9 @@ const TILE_TYPES = {
     },
     floor_letter: {
         draw_layer: DRAW_LAYERS.terrain,
+        populate_defaults(me) {
+            me.overlaid_glyph = "?";
+        },
     },
     // TODO possibly this should be a single tile
     floor_custom_green: {
@@ -316,7 +319,7 @@ const TILE_TYPES = {
     // Railroad
     railroad: {
         draw_layer: DRAW_LAYERS.terrain,
-        _track_order: [
+        track_order: [
             ['north', 'east'],
             ['south', 'east'],
             ['south', 'west'],
@@ -324,15 +327,12 @@ const TILE_TYPES = {
             ['east', 'west'],
             ['north', 'south'],
         ],
-        // FIXME railroad_bits sucks, split into some useful variables
-        on_ready(me) {
-            // If there's already an actor on top of us, assume it entered the way it's already
-            // facing (which may be illegal, in which case it can't leave)
-            // FIXME wrong!  > Yeah, so in the high byte, the low nibble encodes the active track. What's missing is that the high nibble encodes a direction value, which is required when a mob starts out on top of the track: it represents the direction the mob was going when it entered the tile, which controls which way it can go on the track.
-            let actor = me.cell.get_actor();
-            if (actor) {
-                me.entered_direction = actor.direction;
-            }
+        populate_defaults(me) {
+            me.tracks = 0;  // bitmask of bits 0-5, corresponding to track order above
+            me.track_switch = null;  // null, or 0-5 indicating the active switched track
+            // If there's already an actor on us, it's treated as though it entered the tile moving
+            // in this direction, which is given in the save file and defaults to zero i.e. north
+            me.entered_direction = 'north';
         },
         // TODO feel like "ignores" was the wrong idea and there should just be some magic flags for
         // particular objects that can be immune to.  or maybe those objects should have their own
@@ -345,28 +345,28 @@ const TILE_TYPES = {
             return true;
         },
         *_iter_tracks(me) {
-            let order = me.type._track_order;
-            if (me.railroad_bits & 0x40) {
+            let order = me.type.track_order;
+            if (me.track_switch !== null) {
                 // FIXME what happens if the "top" track is not actually a valid track???
-                yield order[me.railroad_bits >> 8];
+                yield order[me.track_switch];
             }
             else {
                 for (let [i, track] of order.entries()) {
-                    if (me.railroad_bits & (1 << i)) {
+                    if (me.tracks & (1 << i)) {
                         yield track;
                     }
                 }
             }
         },
         _switch_track(me, level) {
-            if (me.railroad_bits & 0x40) {
-                let current = me.railroad_bits >> 8;
-                for (let i = 0, l = me.type._track_order.length; i < l; i++) {
+            if (me.track_switch !== null) {
+                let current = me.track_switch;
+                for (let i = 0, l = me.type.track_order.length; i < l; i++) {
                     current = (current + 1) % l;
-                    if (me.railroad_bits & (1 << current))
+                    if (me.tracks & (1 << current))
                         break;
                 }
-                level._set_tile_prop(me, 'railroad_bits', (current << 8) | (me.railroad_bits & 0xff));
+                level._set_tile_prop(me, 'track_switch', current);
             }
         },
         has_opening(me, direction) {
@@ -1817,6 +1817,9 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         is_hint: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        populate_defaults(me) {
+            me.hint_text = null;  // optional, may use level's hint instead
+        },
     },
     socket: {
         draw_layer: DRAW_LAYERS.terrain,

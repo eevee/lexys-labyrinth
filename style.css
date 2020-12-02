@@ -1077,7 +1077,16 @@ form.editor-popup-tile-editor {
 form.editor-popup-tile-editor.--above {
     margin-top: -1em;
 }
-.popup-chevron {
+form.editor-popup-tile-editor h3 {
+    border-bottom: 1px dotted #606060;
+}
+form.editor-popup-tile-editor * + h3 {
+    margin-top: 0.25em;
+}
+/* Use ::before for a chevron pointing at the tile in question */
+form.editor-popup-tile-editor::before {
+    content: '';
+    display: block;
     position: absolute;
     border: 1em solid transparent;
     left: var(--chevron-offset);
@@ -1088,7 +1097,7 @@ form.editor-popup-tile-editor.--above {
     border-bottom-color: white;
     filter: drop-shadow(0 -1px 0 black);
 }
-form.editor-popup-tile-editor.--above .popup-chevron {
+form.editor-popup-tile-editor.--above::before {
     top: auto;
     bottom: -1em;
     border: 1em solid transparent;
@@ -1100,7 +1109,7 @@ form.editor-popup-tile-editor.--above .popup-chevron {
  * characters are preceded by radio buttons, which we hide for simplicity */
 ol.editor-letter-tile-picker {
     display: grid;
-    grid: auto-flow 1.5em / repeat(16, 1.5em);
+    grid: auto-flow 1.5em / repeat(17, 1.5em);
     text-align: center;
     font-family: monospace;
 }
@@ -1123,5 +1132,28 @@ textarea.editor-hint-tile-text {
     height: 20vh;
     min-width: 15rem;
     min-height: 5rem;
+    border: none;
     font-family: serif;
+}
+/* Railroad tracks are...  complicated */
+ul.editor-railroad-tile-tracks {
+    display: grid;
+    grid: auto-flow 3em / repeat(3, 3em);
+    gap: 0.25em;
+}
+ul.editor-railroad-tile-tracks input {
+    display: none;
+}
+ul.editor-railroad-tile-tracks svg {
+    display: block;
+    width: 3em;
+    fill: none;
+    stroke: #c0c0c0;
+    stroke-width: 2;
+}
+ul.editor-railroad-tile-tracks input:checked + svg {
+    stroke: hsl(225, 90%, 50%);
+}
+ul.editor-railroad-tile-tracks.--switch input:checked + svg {
+    stroke: hsl(15, 90%, 50%);
 }

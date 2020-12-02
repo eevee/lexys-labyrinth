@@ -63,18 +63,25 @@ export const CC2_TILESET_LAYOUT = {
     wall_invisible: [0, 2],
     wall_appearing: [0, 2],
     wall: [1, 2],
-    floor_letter: [2, 2],
-    'floor_letter#ascii': {
-        x0: 0,
-        y0: 0,
-        width: 16,
-        height: 1,
-    },
-    'floor_letter#arrows': {
-        north: [14, 31],
-        east: [14.5, 31],
-        south: [15, 31],
-        west: [15.5, 31],
+    floor_letter: {
+        special: 'letter',
+        base: [2, 2],
+        letter_glyphs: {
+            // Arrows
+            "⬆": [14, 31],
+            "➡": [14.5, 31],
+            "⬇": [15, 31],
+            "⬅": [15.5, 31],
+        },
+        letter_ranges: [{
+            // ASCII text (only up through uppercase)
+            range: [32, 96],
+            x0: 0,
+            y0: 0,
+            w: 0.5,
+            h: 0.5,
+            columns: 32,
+        }],
     },
     thief_tools: [3, 2],
     socket: [4, 2],
@@ -830,6 +837,31 @@ export class Tileset {
         blit(coords[0], coords[1], ...mask);
     }
 
+    _draw_letter(drawspec, tile, tic, blit) {
+        this._draw_standard(drawspec.base, tile, tic, blit);
+
+        let glyph = tile.overlaid_glyph;
+        if (drawspec.letter_glyphs[glyph]) {
+            let [x, y] = drawspec.letter_glyphs[glyph];
+            // XXX size is hardcoded here, but not below, meh
+            blit(x, y, 0, 0, 0.5, 0.5, 0.25, 0.25);
+        }
+        else {
+            // Look for a range
+            let u = glyph.charCodeAt(0);
+            for (let rangedef of drawspec.letter_ranges) {
+                if (rangedef.range[0] <= u && u < rangedef.range[1]) {
+                    let t = u - rangedef.range[0];
+                    let x = rangedef.x0 + rangedef.w * (t % rangedef.columns);
+                    let y = rangedef.y0 + rangedef.h * Math.floor(t / rangedef.columns);
+                    blit(x, y, 0, 0, rangedef.w, rangedef.h,
+                        (1 - rangedef.w) / 2, (1 - rangedef.h) / 2);
+                    break;
+                }
+            }
+        }
+    }
+
     _draw_logic_gate(drawspec, tile, tic, blit) {
         // Layer 1: wiring state
         // Always draw the unpowered wire base
@@ -876,15 +908,15 @@ export class Tileset {
         let visible_parts = [];
         let topmost_part = null;
         for (let [i, part] of part_order.entries()) {
-            if (tile && (tile.railroad_bits & (1 << i))) {
-                if ((tile.railroad_bits >> 8) === i) {
+            if (tile && (tile.tracks & (1 << i))) {
+                if (tile.track_switch === i) {
                     topmost_part = part;
                 }
                 visible_parts.push(part);
             }
         }
 
-        let has_switch = (tile && (tile.railroad_bits & 0x40));
+        let has_switch = (tile && tile.track_switch !== null);
         for (let part of visible_parts) {
             this._draw_standard(drawspec.railroad_ties[part], tile, tic, blit);
         }
@@ -929,7 +961,11 @@ export class Tileset {
 
         // TODO shift everything to use this style, this is ridiculous
         if (drawspec.special) {
-            if (drawspec.special === 'logic-gate') {
+            if (drawspec.special === 'letter') {
+                this._draw_letter(drawspec, tile, tic, blit);
+                return;
+            }
+            else if (drawspec.special === 'logic-gate') {
                 this._draw_logic_gate(drawspec, tile, tic, blit);
                 return;
             }
@@ -1143,36 +1179,6 @@ export class Tileset {
                 x0 = 0;
             }
             blit(x, y, x0, y0, x1 - x0, y1 - y0);
-        }
-
-        // Special behavior for special objects
-        // TODO? hardcode this less?
-        if (name === 'floor_letter' && tile) {
-            let n = tile.ascii_code - 32;
-            let scale = 0.5;
-            let sx, sy;
-            if (n < 0) {
-                // Arrows
-                if (n < -4) {
-                    // Default to south
-                    n = -2;
-                }
-
-                let direction = ['north', 'east', 'south', 'west'][n + 4];
-                [sx, sy] = this.layout['floor_letter#arrows'][direction];
-            }
-            else {
-                // ASCII text (only up through uppercase)
-                let letter_spec = this.layout['floor_letter#ascii'];
-                if (n > letter_spec.width / scale * letter_spec.height / scale) {
-                    n = 0;
-                }
-                let w = letter_spec.width / scale;
-                sx = (letter_spec.x0 + n % w) * scale;
-                sy = (letter_spec.y0 + Math.floor(n / w)) * scale;
-            }
-            let offset = (1 - scale) / 2;
-            blit(sx, sy, 0, 0, 0.5, 0.5, offset, offset);
         }
     }
 

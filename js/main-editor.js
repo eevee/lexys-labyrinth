@@ -284,7 +284,7 @@ class TrackOperation extends DrawOperation {
 
             // Get the corresponding bit
             let bit = null;
-            for (let [i, track] of TILE_TYPES['railroad']._track_order.entries()) {
+            for (let [i, track] of TILE_TYPES['railroad'].track_order.entries()) {
                 if ((track[0] === this.entry_direction && track[1] === exit_direction) ||
                     (track[1] === this.entry_direction && track[0] === exit_direction))
                 {
@@ -300,10 +300,12 @@ class TrackOperation extends DrawOperation {
             let cell = this.cell(prevx, prevy);
             let terrain = cell[0];
             if (terrain.type.name === 'railroad') {
-                terrain.railroad_bits |= bit;
+                terrain.tracks |= bit;
             }
             else {
-                terrain = { type: TILE_TYPES['railroad'], railroad_bits: bit };
+                terrain = { type: TILE_TYPES['railroad'] };
+                terrain.type.populate_defaults(terrain);
+                terrain.tracks |= bit;
                 this.editor.place_in_cell(prevx, prevy, terrain);
             }
 
@@ -364,17 +366,19 @@ class AdjustOperation extends MouseOperation {
         for (let tile of cell) {
             // Rotate railroads, which are a bit complicated
             if (tile.type.name === 'railroad') {
-                let new_bits = 0;
-                for (let [i, new_bit] of [1, 2, 3, 0, 5, 4].entries()) {
-                    if (tile.railroad_bits & (1 << i)) {
-                        new_bits |= (1 << new_bit);
+                let new_tracks = 0;
+                let rotated_tracks = [1, 2, 3, 0, 5, 4];
+                for (let [i, new_bit] of rotated_tracks.entries()) {
+                    if (tile.tracks & (1 << i)) {
+                        new_tracks |= (1 << new_bit);
                     }
                 }
-                if (tile.railroad_bits & 0x40) {
-                    new_bits |= 0x40;
+                tile.tracks = new_tracks;
+
+                if (tile.switch_track !== null) {
+                    tile.switch_track = rotated_tracks[tile.switch_track];
                 }
-                // TODO high byte also
-                tile.railroad_bits = new_bits;
+                tile.entered_direction = DIRECTIONS[tile.entered_direction].right;
             }
 
             // TODO also directional blocks
@@ -832,7 +836,6 @@ export class Editor extends PrimaryView {
         this.selected_tile_el.addEventListener('click', ev => {
             if (this.palette_selection && TILES_WITH_PROPS[this.palette_selection.type.name]) {
                 // FIXME use tile bounds
-                // FIXME redraw the tile after editing
                 this.open_tile_prop_overlay(this.palette_selection, ev.clientX, ev.clientY);
             }
         });
@@ -973,11 +976,6 @@ export class Editor extends PrimaryView {
             name = tile.type.name;
         }
 
-        // FIXME should redraw in an existing canvas
-        this.selected_tile_el.textContent = '';
-        // FIXME should draw the actual tile!!
-        this.selected_tile_el.append(this.renderer.create_tile_type_canvas(name, tile));
-
         if (this.palette_selection) {
             let entry = this.palette[this.palette_selection.type.name];
             if (entry) {
@@ -989,10 +987,24 @@ export class Editor extends PrimaryView {
             this.palette[name].classList.add('--selected');
         }
 
+        this.mark_tile_dirty(tile);
+
         // Some tools obviously don't work with a palette selection, in which case changing tiles
         // should default you back to the pencil
         if (this.current_tool === 'adjust') {
             this.select_tool('pencil');
+        }
+    }
+
+    mark_tile_dirty(tile) {
+        // TODO partial redraws!  until then, redraw everything
+        if (tile === this.palette_selection) {
+            // FIXME should redraw in an existing canvas
+            this.selected_tile_el.textContent = '';
+            this.selected_tile_el.append(this.renderer.create_tile_type_canvas(tile.type.name, tile));
+        }
+        else {
+            this.renderer.draw();
         }
     }
 
@@ -1051,13 +1063,13 @@ export class Editor extends PrimaryView {
         // Horizontal position: centered, but kept within the screen
         let left;
         let margin = 8;  // prefer to not quite touch the edges
-        let halfwidth = root.offsetWidth / 2 + margin;
-        if (document.body.clientWidth / 2 < halfwidth) {
+        if (document.body.clientWidth < root.offsetWidth + margin * 2) {
             // It doesn't fit on the screen at all, so there's nothing we can do; just center it
             left = (document.body.clientWidth - root.offsetWidth) / 2;
         }
         else {
-            left = Math.max(margin, Math.min(document.body.clientWidth - halfwidth, x0 - halfwidth));
+            left = Math.max(margin, Math.min(document.body.clientWidth - root.offsetWidth - margin,
+                x0 - root.offsetWidth / 2));
         }
         root.style.left = `${left}px`;
         root.style.setProperty('--chevron-offset', `${x0 - left}px`);

@@ -297,7 +297,7 @@ export class Level {
                     let tile = Tile.from_template(template_tile);
                     if (tile.type.is_hint) {
                         // Copy over the tile-specific hint, if any
-                        tile.specific_hint = template_tile.specific_hint ?? null;
+                        tile.hint_text = template_tile.hint_text ?? null;
                     }
 
                     if (tile.type.is_power_source) {
@@ -390,7 +390,7 @@ export class Level {
                         tile.type.on_ready(tile, this);
                     }
                     if (cell === this.player.cell && tile.type.is_hint) {
-                        this.hint_shown = tile.specific_hint ?? this.stored_level.hint;
+                        this.hint_shown = tile.hint_text ?? this.stored_level.hint;
                     }
                 }
             }
@@ -1019,7 +1019,7 @@ export class Level {
             }
 
             if (actor === this.player && tile.type.is_hint) {
-                this.hint_shown = tile.specific_hint ?? this.stored_level.hint;
+                this.hint_shown = tile.hint_text ?? this.stored_level.hint;
             }
         }
 
