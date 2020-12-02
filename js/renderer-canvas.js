@@ -202,11 +202,11 @@ export class CanvasRenderer {
         }
     }
 
-    create_tile_type_canvas(name) {
+    create_tile_type_canvas(name, tile = null) {
         let canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
         let ctx = canvas.getContext('2d');
-        this.tileset.draw_type(name, null, 0, (sx, sy, dx = 0, dy = 0, w = 1, h = w) =>
-            this.blit(ctx, sx, sy, dx, dy, w, h));
+        this.tileset.draw_type(name, tile, 0, (tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) =>
+            this.blit(ctx, tx + mx, ty + my, mdx, mdy, mw, mh));
         return canvas;
     }
 }

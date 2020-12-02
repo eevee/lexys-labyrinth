@@ -949,21 +949,63 @@ main.--has-demo .demo-controls {
 }
 
 #editor .controls {
+    /* TODO with the hint area gone i don't think this needs to be a grid?  could just flex */
     grid-area: controls;
     display: grid;
     grid:
-        "toolbar    layer   direction   menu" auto
-        "hint       hint    hint        hint" 1.5em
+        "tile   toolbar    layer   direction   .       menu" auto
+        / auto auto auto auto 1fr auto
     ;
+    align-items: center;
+    column-gap: 1em;
+}
+#editor .controls #editor-tile {
+    grid-area: tile;
+}
+#editor .controls #editor-tile canvas {
+    display: block;
 }
 #editor .controls #editor-toolbar {
     grid-area: toolbar;
 }
+#editor-toolbar .-help {
+    opacity: 0;
+    visibility: hidden;
+    z-index: 1;
+    position: absolute;
+    margin-top: -0.25em;
+    margin-left: -0.5em;
+    padding: 0.33em 0.75em;
+    pointer-events: none;
+
+    border: 1px solid black;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    text-transform: none;
+    text-align: left;
+    background: hsl(225, 10%, 20%);
+    box-shadow: 0 1px 2px 1px #0004;
+
+    transition-property: margin-top, opacity, visibility;
+    transition-timing-function: ease-out;
+    transition-duration: 0.125s, 0.125s, 0s;
+    transition-delay: 0s, 0s, 0.125s;
+}
+#editor-toolbar .-help h3 {
+    font-size: 1.25em;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid currentColor;
+}
+#editor-toolbar button:hover .-help {
+    opacity: 1;
+    z-index: 2;  /* show above any that are in mid-fade */
+    visibility: visible;
+    margin-top: 0.25em;
+    transition-delay: 0.5s;
+    transition-timing-function: ease-in;
+}
 #editor .controls .-buttons {
     grid-area: menu;
-}
-#editor .controls #editor-tool-help {
-    grid-area: hint;
 }
 .icon-button-set {
     display: flex;
@@ -988,6 +1030,7 @@ main.--has-demo .demo-controls {
 }
 
 #editor .palette {
+    isolation: isolate;
     grid-area: palette;
     padding-right: 0.25em;  /* in case of scrollbar */
     overflow-y: auto;
@@ -1072,4 +1115,13 @@ ol.editor-letter-tile-picker input[type=radio] {
 ol.editor-letter-tile-picker input[type=radio]:checked + .-glyph {
     background: hsl(225, 75%, 90%);
     outline: 2px solid hsl(225, 75%, 80%);
+}
+/* Hint tiles accept prose */
+textarea.editor-hint-tile-text {
+    font-size: 1.5em;
+    width: 20vw;
+    height: 20vh;
+    min-width: 15rem;
+    min-height: 5rem;
+    font-family: serif;
 }

@@ -1,4 +1,5 @@
 import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
+import { TILES_WITH_PROPS } from './editor-tile-overlays.js';
 import * as c2g from './format-c2g.js';
 import { PrimaryView, TransientOverlay, DialogOverlay } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
@@ -150,16 +151,14 @@ class PencilOperation extends DrawOperation {
         if (this.modifier === 'ctrl') {
             let cell = this.cell(x, y);
             if (cell) {
-                // FIXME the selected tile should actually be a template
-                // FIXME this doesn't update the ui
-                this.editor.palette_selection = cell[cell.length - 1].type.name;
+                this.editor.select_palette(cell[cell.length - 1]);
             }
         }
         else if (this.modifier === 'shift') {
             // Aggressive mode: erase whatever's already in the cell
             let cell = this.cell(x, y);
             cell.length = 0;
-            let type = TILE_TYPES[this.editor.palette_selection];
+            let type = this.editor.palette_selection.type;
             if (type.draw_layer !== 0) {
                 cell.push({type: TILE_TYPES.floor});
             }
@@ -269,7 +268,7 @@ class AdjustOperation extends MouseOperation {
         let cell = this.cell(this.gx1, this.gy1);
         if (this.modifier === 'ctrl') {
             for (let tile of cell) {
-                if (tile.type.name === 'floor_letter') {
+                if (TILES_WITH_PROPS[tile.type.name] !== undefined) {
                     // TODO use the tile's bbox, not the mouse position
                     this.editor.open_tile_prop_overlay(tile, this.mx0, this.my0);
                     break;
@@ -483,7 +482,7 @@ const EDITOR_TOOLS = {
     pencil: {
         icon: 'icons/tool-pencil.png',
         name: "Pencil",
-        desc: "Click to draw.  Right click to erase.  Hold Shift to affect all layers.  Ctrl-click to eyedrop.",
+        desc: "Place, erase, and select tiles.\nLeft click: draw\nRight click: erase\nShift: Replace all layers\nCtrl-click: eyedrop",
         op1: PencilOperation,
         //op2: EraseOperation,
         //hover: show current selection under cursor
@@ -509,13 +508,13 @@ const EDITOR_TOOLS = {
     'force-floors': {
         icon: 'icons/tool-force-floors.png',
         name: "Force floors",
-        desc: "Draw force floors in the direction you draw",
+        desc: "Draw force floors following the cursor.",
         op1: ForceFloorOperation,
     },
     adjust: {
         icon: 'icons/tool-adjust.png',
         name: "Adjust",
-        desc: "Click to rotate actor or toggle terrain.  Right click to rotate in reverse.  Hold Shift to always affect terrain.  Ctrl-click to edit properties of complex tiles (wires, railroads, hints, etc.)",
+        desc: "Edit existing tiles.\nLeft click: rotate actor or toggle terrain\nRight click: rotate or toggle in reverse\nShift: always target terrain\nCtrl-click: edit properties of complex tiles\n(wires, railroads, hints, etc.)",
         op1: AdjustOperation,
     },
     connect: {
@@ -534,7 +533,7 @@ const EDITOR_TOOLS = {
         icon: 'icons/tool-camera.png',
         name: "Camera",
         desc: "Draw and edit custom camera regions",
-        help: "Draw and edit camera regions.  Right-click to erase a region.  When the player is within a camera region, the camera will avoid showing anything outside that region.  LL only.",
+        help: "Draw and edit camera regions.\n(LL only.  When the player is within a camera region,\nthe camera stays locked inside it.)\nLeft click: create or edit a region\nRight click: erase a region",
         op1: CameraOperation,
         op2: CameraEraseOperation,
     },
@@ -614,48 +613,6 @@ const EDITOR_PALETTE = [{
     ],
 }];
 
-// FIXME could very much stand to have a little animation when appearing
-class LetterTileEditor extends TransientOverlay {
-    constructor(conductor) {
-        let root = mk('form.editor-popup-tile-editor');
-        root.append(mk('span.popup-chevron'));
-        super(conductor, root);
-        this.tile = null;
-
-        let list = mk('ol.editor-letter-tile-picker');
-        root.append(list);
-        this.glyph_elements = {};
-        for (let c = 32; c < 128; c++) {
-            let glyph = String.fromCharCode(c);
-            let input = mk('input', {type: 'radio', name: 'glyph', value: glyph});
-            this.glyph_elements[glyph] = input;
-            let item = mk('li', mk('label', input, mk('span.-glyph', glyph)));
-            list.append(item);
-        }
-
-        list.addEventListener('change', ev => {
-            let glyph = this.root.elements['glyph'].value;
-            if (this.tile) {
-                this.tile.ascii_code = glyph.charCodeAt(0);
-                // FIXME should be able to mark tiles as dirty, also this is sure a mouthful
-                this.conductor.editor.renderer.draw();
-            }
-        });
-    }
-
-    edit_tile(tile) {
-        this.tile = tile;
-        this.root.elements['glyph'].value = String.fromCharCode(tile.ascii_code);
-    }
-
-    static configure_tile_defaults(tile) {
-        tile.ascii_code = 32;
-    }
-}
-
-const EDITOR_TILES_WITH_PROPS = {
-    floor_letter: LetterTileEditor,
-};
 
 export class Editor extends PrimaryView {
     constructor(conductor) {
@@ -758,7 +715,17 @@ export class Editor extends PrimaryView {
         });
 
         // Toolbox
-        let toolbox = mk('div.icon-button-set')
+        // Selected tile
+        this.selected_tile_el = this.root.querySelector('.controls #editor-tile');
+        this.selected_tile_el.addEventListener('click', ev => {
+            if (this.palette_selection && TILES_WITH_PROPS[this.palette_selection.type.name]) {
+                // FIXME use tile bounds
+                // FIXME redraw the tile after editing
+                this.open_tile_prop_overlay(this.palette_selection, ev.clientX, ev.clientY);
+            }
+        });
+        // Tools themselves
+        let toolbox = mk('div.icon-button-set', {id: 'editor-toolbar'});
         this.root.querySelector('.controls').append(toolbox);
         this.tool_button_els = {};
         for (let toolname of EDITOR_TOOL_ORDER) {
@@ -771,8 +738,8 @@ export class Editor extends PrimaryView {
                 mk('img', {
                     src: tooldef.icon,
                     alt: tooldef.name,
-                    title: `${tooldef.name}: ${tooldef.desc}`,
                 }),
+                mk('div.-help', mk('h3', tooldef.name), tooldef.desc),
             );
             this.tool_button_els[toolname] = button;
             toolbox.append(button);
@@ -874,16 +841,40 @@ export class Editor extends PrimaryView {
         this.tool_button_els[this.current_tool].classList.add('-selected');
     }
 
-    select_palette(name) {
-        if (name === this.palette_selection)
-            return;
+    select_palette(name_or_tile) {
+        let name, tile;
+        if (typeof name_or_tile === 'string') {
+            name = name_or_tile;
+            if (this.palette_selection && name === this.palette_selection.type.name)
+                return;
+
+            tile = { type: TILE_TYPES[name] };
+            if (tile.type.is_actor) {
+                tile.direction = 'south';
+            }
+            if (TILES_WITH_PROPS[name]) {
+                TILES_WITH_PROPS[name].configure_tile_defaults(tile);
+            }
+        }
+        else {
+            tile = Object.assign({}, name_or_tile);
+            name = tile.type.name;
+        }
+
+        // FIXME should redraw in an existing canvas
+        this.selected_tile_el.textContent = '';
+        // FIXME should draw the actual tile!!
+        this.selected_tile_el.append(this.renderer.create_tile_type_canvas(name, tile));
 
         if (this.palette_selection) {
-            this.palette[this.palette_selection].classList.remove('--selected');
+            let entry = this.palette[this.palette_selection.type.name];
+            if (entry) {
+                entry.classList.remove('--selected');
+            }
         }
-        this.palette_selection = name;
-        if (this.palette_selection) {
-            this.palette[this.palette_selection].classList.add('--selected');
+        this.palette_selection = tile;
+        if (this.palette[name]) {
+            this.palette[name].classList.add('--selected');
         }
 
         // Some tools obviously don't work with a palette selection, in which case changing tiles
@@ -906,32 +897,28 @@ export class Editor extends PrimaryView {
         }
     }
 
-    place_in_cell(x, y, name) {
+    place_in_cell(x, y, tile) {
         // TODO weird api?
-        if (! name)
+        if (! tile)
             return;
 
-        let type = TILE_TYPES[name];
-        let direction;
-        if (type.is_actor) {
-            direction = 'south';
-        }
         let cell = this.stored_level.cells[y][x];
         // Replace whatever's on the same layer
         // TODO probably not the best heuristic yet, since i imagine you can
         // combine e.g. the tent with thin walls
         for (let i = cell.length - 1; i >= 0; i--) {
-            if (cell[i].type.draw_layer === type.draw_layer) {
+            if (cell[i].type.draw_layer === tile.type.draw_layer) {
                 cell.splice(i, 1);
             }
         }
-        cell.push({type, direction});
+        cell.push(Object.assign({}, tile));
         cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
     }
 
     open_tile_prop_overlay(tile, x0, y0) {
         this.cancel_mouse_operation();
-        let overlay_class = EDITOR_TILES_WITH_PROPS[tile.type.name];
+        // FIXME keep these around, don't recreate them constantly
+        let overlay_class = TILES_WITH_PROPS[tile.type.name];
         let overlay = new overlay_class(this.conductor);
         overlay.edit_tile(tile);
         overlay.open();

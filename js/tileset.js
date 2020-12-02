@@ -1147,7 +1147,7 @@ export class Tileset {
 
         // Special behavior for special objects
         // TODO? hardcode this less?
-        if (name === 'floor_letter') {
+        if (name === 'floor_letter' && tile) {
             let n = tile.ascii_code - 32;
             let scale = 0.5;
             let sx, sy;
