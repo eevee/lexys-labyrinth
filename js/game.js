@@ -48,10 +48,10 @@ export class Tile {
     // the name is the same?
     blocks(other, direction, level) {
         // Extremely awkward special case: items don't block monsters if the cell also contains an
-        // item modifier (i.e. "no" sign) or a player
+        // item modifier (i.e. "no" sign) or a real player
         // TODO would love to get this outta here
         if (this.type.is_item &&
-            this.cell.some(tile => tile.type.item_modifier || tile.type.is_player))
+            this.cell.some(tile => tile.type.item_modifier || tile.type.is_real_player))
             return false;
 
         if (this.type.blocks_collision & other.type.collision_mask)
@@ -281,6 +281,7 @@ export class Level {
         let n = 0;
         let connectables = [];
         this.power_sources = [];
+        this.players = [];
         // FIXME handle traps correctly:
         // - if an actor is in the cell, set the trap to open and unstick everything in it
         for (let y = 0; y < this.height; y++) {
@@ -304,10 +305,8 @@ export class Level {
                         this.power_sources.push(tile);
                     }
 
-                    if (tile.type.is_player) {
-                        // TODO handle multiple players, also chip and melinda both
-                        // TODO complain if no player
-                        this.player = tile;
+                    if (tile.type.is_real_player) {
+                        this.players.push(tile);
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);
@@ -320,6 +319,12 @@ export class Level {
                 }
             }
         }
+        // TODO complain if no player
+        this.player = this.players[0];
+        this.player_index = 0;
+        // Used for doppelgangers
+        this.player1_move = null;
+        this.player2_move = null;
 
         // Connect buttons and teleporters
         let num_cells = this.width * this.height;
@@ -485,7 +490,8 @@ export class Level {
         for (let key of [
                 '_rng1', '_rng2', '_blob_modifier', 'force_floor_direction',
                 'tic_counter', 'time_remaining', 'timer_paused',
-                'chips_remaining', 'bonus_points', 'hint_shown', 'state'
+                'chips_remaining', 'bonus_points', 'hint_shown', 'state',
+                'player1_move', 'player2_move',
         ]) {
             this.pending_undo.level_props[key] = this[key];
         }
@@ -608,6 +614,7 @@ export class Level {
                 // XXX this in particular has some subtleties in lynx (e.g. you
                 // can override forwards??) and DEFINITELY all kinds of stuff
                 // in ms
+                // XXX unclear what impact this has on doppelgangers
                 if (actor === this.player &&
                     p1_primary_direction &&
                     actor.last_move_was_force)
@@ -624,6 +631,15 @@ export class Level {
                 continue;
             }
             else if (actor === this.player) {
+                // Sorry for the confusion; "p1" and "p2" in the direction args refer to physical
+                // human players, NOT to the two types of player tiles!
+                if (this.player.type.name === 'player') {
+                    this.player1_move = p1_primary_direction;
+                }
+                else {
+                    this.player2_move = p1_primary_direction;
+                }
+
                 if (p1_primary_direction) {
                     actor.decision = p1_primary_direction;
                     this._set_tile_prop(actor, 'last_move_was_force', false);
@@ -636,6 +652,11 @@ export class Level {
                 // when released, it will make one move out of the trap and /then/ turn around and
                 // go back into the trap.  this is consistent with CC2 but not ms/lynx
                 continue;
+            }
+            // FIXME seems like all this could be moved into a tile type function since it's all
+            // only used basically one time each
+            else if (actor.type.decide_movement) {
+                direction_preference = actor.type.decide_movement(actor, this);
             }
             else if (actor.type.movement_mode === 'forward') {
                 // blue tank behavior: keep moving forward, reverse if the flag is set
@@ -791,7 +812,7 @@ export class Level {
 
             // Players can also bump the tiles in the cell next to the one they're leaving
             let dir2 = actor.secondary_direction;
-            if (actor.type.is_player && dir2 &&
+            if (actor.type.is_real_player && dir2 &&
                 ! old_cell.blocks_leaving(actor, dir2))
             {
                 let neighbor = this.get_neighboring_cell(old_cell, dir2);
@@ -808,6 +829,18 @@ export class Level {
                         }
                     }
                 }
+            }
+        }
+
+        // In the event that the player is sliding (and thus not deliberately moving), remember
+        // their current movement direction.
+        // This is hokey, and doing it here is even hokier, but it seems to match CC2 behavior.
+        if (this.player.movement_cooldown > 0) {
+            if (this.player.type.name === 'player') {
+                this.player1_move = this.player.direction;
+            }
+            else {
+                this.player2_move = this.player.direction;
             }
         }
 
@@ -999,18 +1032,17 @@ export class Level {
         }
 
         // Check for a couple effects that always apply immediately
-        // TODO do blocks smash monsters?
         if (actor === this.player) {
             this.hint_shown = null;
         }
         for (let tile of goal_cell) {
-            if (actor.type.is_player && tile.type.is_monster) {
+            if (actor.type.is_real_player && tile.type.is_monster) {
                 this.fail(tile.type.name);
             }
-            else if (actor.type.is_monster && tile.type.is_player) {
+            else if (actor.type.is_monster && tile.type.is_real_player) {
                 this.fail(actor.type.name);
             }
-            else if (actor.type.is_block && tile.type.is_player) {
+            else if (actor.type.is_block && tile.type.is_real_player) {
                 this.fail('squished');
             }
 

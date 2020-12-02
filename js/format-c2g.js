@@ -496,13 +496,11 @@ const TILE_ENCODING = {
         name: 'doppelganger1',
         has_next: true,
         extra_args: [arg_direction],
-        error: "Doppelganger Lexy is not yet implemented, sorry!",
     },
     0x66: {
         name: 'doppelganger2',
         has_next: true,
         extra_args: [arg_direction],
-        error: "Doppelganger Cerise is not yet implemented, sorry!",
     },
     0x68: {
         name: 'bowling_ball',

@@ -142,7 +142,15 @@ export const CC2_TILESET_LAYOUT = {
     hiking_boots: [4, 6],
     lightning_bolt: [5, 6],
     // weird translucent spiral
-    // weird translucent red
+    // TODO dopps can push but i don't think they have any other visuals
+    doppelganger1: {
+        base: [7, 6],
+        overlay: 'player',
+    },
+    doppelganger2: {
+        base: [7, 6],
+        overlay: 'player2',
+    },
     button_blue: [8, 6],
     button_green: [9, 6],
     button_red: [10, 6],
@@ -946,10 +954,15 @@ export class Tileset {
 
         if (drawspec.overlay) {
             // Goofy overlay thing used for green/purple toggle tiles and
-            // southeast thin walls.  Draw the base (a type name), then draw
+            // southeast thin walls.  Draw the base (a type name or drawspec), then draw
             // the overlay (either a type name or a regular draw spec).
             // TODO chance of infinite recursion here
-            this.draw_type(drawspec.base, tile, tic, blit);
+            if (typeof drawspec.base === 'string') {
+                this.draw_type(drawspec.base, tile, tic, blit);
+            }
+            else {
+                this._draw_standard(drawspec.base, tile, tic, blit);
+            }
             if (typeof drawspec.overlay === 'string') {
                 this.draw_type(drawspec.overlay, tile, tic, blit);
                 return;

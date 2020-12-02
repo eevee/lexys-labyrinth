@@ -1716,6 +1716,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_player: true,
+        is_real_player: true,
         collision_mask: COLLISION.player1,
         has_inventory: true,
         can_reveal_walls: true,
@@ -1734,6 +1735,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_player: true,
+        is_real_player: true,
         collision_mask: COLLISION.player2,
         has_inventory: true,
         can_reveal_walls: true,
@@ -1748,6 +1750,57 @@ const TILE_TYPES = {
             key_yellow: true,
         },
         visual_state: player_visual_state,
+    },
+    doppelganger1: {
+        draw_layer: DRAW_LAYERS.actor,
+        is_actor: true,
+        is_player: true,
+        is_monster: true,
+        collision_mask: COLLISION.player1,
+        blocks_collision: COLLISION.all_but_player,
+        has_inventory: true,
+        can_reveal_walls: true,  // XXX i think?
+        movement_speed: 4,
+        movement_mode: 'copy1',
+        pushes: {
+            dirt_block: true,
+            ice_block: true,
+            directional_block: true,
+        },
+        infinite_items: {
+            key_green: true,
+        },
+        decide_movement(me, level) {
+            if (level.player1_move) {
+                return [level.player1_move];
+            }
+            else {
+                return null;
+            }
+        },
+        //visual_state: doppelganger_visual_state,
+    },
+    doppelganger2: {
+        draw_layer: DRAW_LAYERS.actor,
+        is_actor: true,
+        is_player: true,
+        is_monster: true,
+        collision_mask: COLLISION.player2,
+        blocks_collision: COLLISION.all_but_player,
+        has_inventory: true,
+        can_reveal_walls: true,  // XXX i think?
+        movement_speed: 4,
+        movement_mode: 'copy2',
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        pushes: {
+            dirt_block: true,
+            ice_block: true,
+            directional_block: true,
+        },
+        infinite_items: {
+            key_yellow: true,
+        },
+        //visual_state: doppelganger_visual_state,
     },
     chip: {
         draw_layer: DRAW_LAYERS.item,
