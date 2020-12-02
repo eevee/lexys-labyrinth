@@ -240,29 +240,39 @@ class ForceFloorOperation extends DrawOperation {
 }
 
 // Tiles the "adjust" tool will turn into each other
-const ADJUST_TOGGLES = {
-    // TODO shouldn't this convert regular walls into regular floors then?
-    floor_custom_green: 'wall_custom_green',
-    floor_custom_pink: 'wall_custom_pink',
-    floor_custom_yellow: 'wall_custom_yellow',
-    floor_custom_blue: 'wall_custom_blue',
-    wall_custom_green: 'floor_custom_green',
-    wall_custom_pink: 'floor_custom_pink',
-    wall_custom_yellow: 'floor_custom_yellow',
-    wall_custom_blue: 'floor_custom_blue',
-    fake_floor: 'fake_wall',
-    fake_wall: 'fake_floor',
-    wall_invisible: 'wall_appearing',
-    wall_appearing: 'wall_invisible',
-    green_floor: 'green_wall',
-    green_wall: 'green_floor',
-    green_bomb: 'green_chip',
-    green_chip: 'green_bomb',
-    purple_floor: 'purple_wall',
-    purple_wall: 'purple_floor',
-    thief_keys: 'thief_tools',
-    thief_tools: 'thief_keys',
-};
+const ADJUST_TOGGLES_CW = {};
+const ADJUST_TOGGLES_CCW = {};
+{
+    for (let cycle of [
+        ['chip', 'chip_extra'],
+        // TODO shouldn't this convert regular walls into regular floors then?
+        ['floor_custom_green', 'wall_custom_green'],
+        ['floor_custom_pink', 'wall_custom_pink'],
+        ['floor_custom_yellow', 'wall_custom_yellow'],
+        ['floor_custom_blue', 'wall_custom_blue'],
+        ['fake_floor', 'fake_wall'],
+        ['popdown_floor', 'popdown_wall'],
+        ['wall_invisible', 'wall_appearing'],
+        ['green_floor', 'green_wall'],
+        ['green_bomb', 'green_chip'],
+        ['purple_floor', 'purple_wall'],
+        ['thief_keys', 'thief_tools'],
+        ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
+        ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
+        ['ff_north', 'ff_east', 'ff_south', 'ff_west'],
+        ['ice', 'ff_all'],
+        ['water', 'turtle'],
+        ['no_player1_sign', 'no_player2_sign'],
+        ['flame_jet_off', 'flame_jet_on'],
+    ])
+    {
+        for (let [i, tile] of cycle.entries()) {
+            let other = cycle[(i + 1) % cycle.length];
+            ADJUST_TOGGLES_CW[tile] = other;
+            ADJUST_TOGGLES_CCW[other] = tile;
+        }
+    }
+}
 class AdjustOperation extends MouseOperation {
     start() {
         let cell = this.cell(this.gx1, this.gy1);
@@ -277,10 +287,28 @@ class AdjustOperation extends MouseOperation {
             return;
         }
         for (let tile of cell) {
+            // Rotate railroads, which are a bit complicated
+            if (tile.type.name === 'railroad') {
+                let new_bits = 0;
+                for (let [i, new_bit] of [1, 2, 3, 0, 5, 4].entries()) {
+                    if (tile.railroad_bits & (1 << i)) {
+                        new_bits |= (1 << new_bit);
+                    }
+                }
+                if (tile.railroad_bits & 0x40) {
+                    new_bits |= 0x40;
+                }
+                // TODO high byte also
+                tile.railroad_bits = new_bits;
+            }
+
+            // TODO also directional blocks
+
             // Toggle tiles that go in obvious pairs
-            let other = ADJUST_TOGGLES[tile.type.name];
+            let other = ADJUST_TOGGLES_CW[tile.type.name];
             if (other) {
                 tile.type = TILE_TYPES[other];
+                continue;
             }
 
             // Rotate actors
@@ -575,7 +603,9 @@ const EDITOR_PALETTE = [{
     tiles: [
         'key_blue', 'key_red', 'key_yellow', 'key_green',
         'flippers', 'fire_boots', 'cleats', 'suction_boots',
-        'no_sign', 'bestowal_bow',
+        'bribe', 'railroad_sign', 'hiking_boots', 'speed_boots',
+        'xray_eye', 'helmet', 'foil', 'lightning_bolt',
+        'bowling_ball', 'dynamite', 'no_sign', 'bestowal_bow',
     ],
 }, {
     title: "Creatures",

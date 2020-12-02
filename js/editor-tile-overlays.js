@@ -87,4 +87,5 @@ export const TILES_WITH_PROPS = {
     // TODO cloner arrows
     // TODO railroad parts
     // TODO later, custom floor/wall selection
+    // TODO directional blocks
 };

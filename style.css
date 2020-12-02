@@ -906,7 +906,7 @@ main.--has-demo .demo-controls {
      * of overflowing flexboxes I guess, padding and margins won't extend the scroll area on the
      * right and bottom */
     /* TODO padding should be half a cell? */
-    border: 1em solid transparent;
+    border: 2em solid transparent;
 }
 #editor .editor-canvas canvas {
     display: block;
