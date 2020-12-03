@@ -329,8 +329,13 @@ function parse_level(bytes, number) {
     return level;
 }
 
+// This thin wrapper is passed to StoredGame as the parser function
+function _parse_level_from_stored_meta(meta) {
+    return parse_level(meta.bytes, meta.number);
+}
+
 export function parse_game(buf) {
-    let game = new format_base.StoredGame(null, parse_level);
+    let game = new format_base.StoredGame(null, _parse_level_from_stored_meta);
 
     let full_view = new DataView(buf);
     let magic = full_view.getUint32(0, true);

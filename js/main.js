@@ -456,6 +456,9 @@ class Player extends PrimaryView {
         this.current_keys_new = new Set; // keys that were pressed since input was last read
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
+            if (! this.active)
+                return;
+
             if (ev.key === 'p' || ev.key === 'Pause') {
                 this.toggle_pause();
                 return;
@@ -505,6 +508,9 @@ class Player extends PrimaryView {
             }
         });
         key_target.addEventListener('keyup', ev => {
+            if (! this.active)
+                return;
+
             if (ev.key === 'z') {
                 if (this.state === 'rewinding') {
                     this.set_state('playing');
@@ -1455,28 +1461,33 @@ class Splash extends PrimaryView {
                 await this.search_multi_source(new util.EntryFileSource(entries));
             },
         });
+    }
 
-        // Bind to "create level" button
-        this.root.querySelector('#splash-create-level').addEventListener('click', ev => {
-            let stored_level = new format_base.StoredLevel(1);
-            stored_level.size_x = 32;
-            stored_level.size_y = 32;
-            for (let i = 0; i < 1024; i++) {
-                let cell = new format_base.StoredCell;
-                cell.push({type: TILE_TYPES['floor']});
-                stored_level.linear_cells.push(cell);
-            }
-            stored_level.linear_cells[0].push({type: TILE_TYPES['player'], direction: 'south'});
-
-            // FIXME definitely gonna need a name here chief
-            let stored_game = new format_base.StoredGame(null);
-            stored_game.level_metadata.push({
-                stored_level: stored_level,
-            });
-            this.conductor.load_game(stored_game);
-
-            this.conductor.switch_to_editor();
+    setup() {
+        // Editor interface
+        // (this has to be handled here because we need to examine the editor,
+        // which hasn't yet been created in our constructor)
+        // Bind to "create" buttons
+        this.root.querySelector('#splash-create-pack').addEventListener('click', ev => {
+            this.conductor.editor.create_pack();
         });
+        this.root.querySelector('#splash-create-level').addEventListener('click', ev => {
+            this.conductor.editor.create_scratch_level();
+        });
+        // Add buttons for any existing packs
+        let packs = this.conductor.editor.stash.packs;
+        let pack_keys = Object.keys(packs);
+        pack_keys.sort((a, b) => packs[a].last_modified - packs[b].last_modified);
+        let editor_list = this.root.querySelector('#splash-your-levels');
+        for (let key of pack_keys) {
+            let pack = packs[key];
+            let button = mk('button', {type: 'button'}, pack.title);
+            // TODO make a container so this can be 1 event
+            button.addEventListener('click', ev => {
+                this.conductor.editor.load_editor_pack(key);
+            });
+            editor_list.append(button);
+        }
     }
 
     // Look for something we can load, and load it
@@ -1808,8 +1819,16 @@ class LevelBrowserOverlay extends DialogOverlay {
 }
 
 // Central dispatcher of what we're doing and what we've got loaded
+// We store several kinds of things in localStorage:
+// Main storage:
+//   packs
+//   options
 const STORAGE_KEY = "Lexy's Labyrinth";
+// Records for playing a pack
 const STORAGE_PACK_PREFIX = "Lexy's Labyrinth: ";
+// Metadata for an edited pack
+// - list of the levels they own and basic metadata like name
+// Stored individual levels: given dummy names, all indexed on their own
 class Conductor {
     constructor(tileset) {
         this.stored_game = null;
@@ -1943,6 +1962,8 @@ class Conductor {
             };
         }
 
+        this.level_pack_name_el.textContent = stored_game.title;
+
         this.player.load_game(stored_game);
         this.editor.load_game(stored_game);
 
@@ -1955,21 +1976,25 @@ class Conductor {
             this.stored_level = this.stored_game.load_level(level_index);
         }
         catch (e) {
+            console.error(e);
             new LevelErrorOverlay(this, e).open();
             return false;
         }
 
         this.level_index = level_index;
 
-        // FIXME do better
-        this.level_name_el.textContent = `Level ${level_index + 1} — ${this.stored_level.title}`;
-
-        document.title = `${PAGE_TITLE} - ${this.stored_level.title}`;
+        this.update_level_title();
         this.update_nav_buttons();
 
         this.player.load_level(this.stored_level);
         this.editor.load_level(this.stored_level);
         return true;
+    }
+
+    update_level_title() {
+        this.level_name_el.textContent = `Level ${this.stored_level.number} — ${this.stored_level.title}`;
+
+        document.title = `${this.stored_level.title} [#${this.stored_level.number}] — ${this.stored_game.title} — ${PAGE_TITLE}`;
     }
 
     update_nav_buttons() {
@@ -2019,16 +2044,13 @@ class Conductor {
         // TODO handle errors
         // TODO cancel a download if we start another one?
         let buf = await util.fetch(path);
-        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path);
+        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, title);
     }
 
     async parse_and_load_game(buf, source, path, identifier, title) {
         if (identifier === undefined) {
             identifier = this.extract_identifier_from_path(path);
         }
-
-        // TODO get title out of C2G when it's supported
-        this.level_pack_name_el.textContent = title ?? identifier ?? '(untitled)';
 
         // TODO also support tile world's DAC when reading from local??
         // TODO ah, there's more metadata in CCX, crapola
@@ -2045,7 +2067,6 @@ class Conductor {
         else if (magic.toLowerCase() === 'game') {
             // TODO this isn't really a magic number and isn't required to be first, so, maybe
             // this one should just go by filename
-            console.log(path);
             let dir;
             if (! path.match(/[/]/)) {
                 dir = '';
@@ -2058,6 +2079,12 @@ class Conductor {
         else {
             throw new Error("Unrecognized file format");
         }
+
+        // TODO load title for a C2G
+        if (! stored_game.title) {
+            stored_game.title = title ?? identifier ?? "Untitled pack";
+        }
+
         if (this.load_game(stored_game, identifier)) {
             this.switch_to_player();
         }

@@ -1060,6 +1060,11 @@ export function parse_level(buf, number = 1) {
     return level;
 }
 
+// This thin wrapper is passed to StoredGame as the parser function
+function _parse_level_from_stored_meta(meta) {
+    return parse_level(meta.bytes, meta.number);
+}
+
 
 // Write 1, 2, or 4 bytes to a DataView
 function write_n_bytes(view, start, n, value) {
@@ -1211,6 +1216,10 @@ class C2M {
 export function synthesize_level(stored_level) {
     let c2m = new C2M;
     c2m.add_section('CC2M', '133');
+
+    if (stored_level.title) {
+        c2m.add_section('TITL', stored_level.title);
+    }
 
     // Store camera regions
     // TODO LL feature, should be distinguished somehow
@@ -1677,7 +1686,7 @@ const MAX_SIMULTANEOUS_REQUESTS = 5;
     let resolve;
     let promise = new Promise((res, rej) => { resolve = res });
 
-    let game = new format_base.StoredGame(undefined, parse_level);
+    let game = new format_base.StoredGame(undefined, _parse_level_from_stored_meta);
     let parser;
     let active_map_fetches = new Set;
     let pending_map_fetches = [];
@@ -1754,7 +1763,7 @@ const MAX_SIMULTANEOUS_REQUESTS = 5;
 
 // Individual levels don't make sense on their own, but we can wrap them in a dummy one-level game
 export function wrap_individual_level(buf) {
-    let game = new format_base.StoredGame(undefined, parse_level);
+    let game = new format_base.StoredGame(undefined, _parse_level_from_stored_meta);
     let meta = {
         index: 0,
         number: 1,

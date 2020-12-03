@@ -1,10 +1,83 @@
 import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
 import { TILES_WITH_PROPS } from './editor-tile-overlays.js';
+import * as format_base from './format-base.js';
 import * as c2g from './format-c2g.js';
-import { PrimaryView, TransientOverlay, DialogOverlay } from './main-base.js';
+import { PrimaryView, TransientOverlay, DialogOverlay, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
-import { SVG_NS, mk, mk_svg, walk_grid } from './util.js';
+import { SVG_NS, mk, mk_svg, string_from_buffer_ascii, bytestring_to_buffer, walk_grid } from './util.js';
+
+class EditorLevelMetaOverlay extends DialogOverlay {
+    constructor(conductor, stored_level) {
+        super(conductor);
+        this.set_title("edit level metadata");
+        let dl = mk('dl.formgrid');
+        this.main.append(dl);
+
+        let time_limit_input = mk('input', {name: 'time_limit', type: 'range', min: 0, max: 999, value: stored_level.time_limit});
+        let time_limit_output = mk('output');
+        let update_time_limit = () => {
+            let time_limit = parseInt(time_limit_input.value, 10);
+            let text;
+            if (time_limit === 0) {
+                text = "No time limit";
+            }
+            else {
+                text = `${time_limit} (${Math.floor(time_limit / 60)}:${('0' + String(time_limit % 60)).slice(-2)})`;
+            }
+            time_limit_output.textContent = text;
+        };
+        update_time_limit();
+        time_limit_input.addEventListener('input', update_time_limit);
+
+        dl.append(
+            mk('dt', "Title"),
+            mk('dd', mk('input', {name: 'title', type: 'text', value: stored_level.title})),
+            mk('dt', "Time limit"),
+            mk('dd', time_limit_input, " ", time_limit_output),
+            mk('dt', "Size"),
+            mk('dd',
+                "Width: ",
+                mk('input', {name: 'size_x', type: 'number', min: 10, max: 100, value: stored_level.size_x}),
+                mk('br'),
+                "Height: ",
+                mk('input', {name: 'size_y', type: 'number', min: 10, max: 100, value: stored_level.size_y}),
+            ),
+        );
+        // TODO:
+        // - author
+        // - chips?
+        // - password???
+        // - comment
+        // - viewport size mode
+        // - rng/blob behavior
+        // - use CC1 tools
+        // - hide logic
+        // - "unviewable", "read only"
+
+        let ok = mk('button', {type: 'button'}, "make it so");
+        ok.addEventListener('click', ev => {
+            let els = this.root.elements;
+
+            let title = els.title.value;
+            if (title !== stored_level.title) {
+                stored_level.title = title;
+                this.conductor.update_level_title();
+            }
+
+            stored_level.time_limit = parseInt(els.time_limit.value, 10);
+
+            let size_x = parseInt(els.size_x.value, 10);
+            let size_y = parseInt(els.size_y.value, 10);
+            if (size_x !== stored_level.size_x || size_y !== stored_level.size_y) {
+                this.conductor.editor.resize_level(size_x, size_y);
+            }
+
+            this.close();
+        });
+        this.footer.append(ok);
+    }
+}
 
 class EditorShareOverlay extends DialogOverlay {
     constructor(conductor, url) {
@@ -217,7 +290,7 @@ class ForceFloorOperation extends DrawOperation {
             // The second cell tells us the direction to use for the first, assuming it
             // had some kind of force floor
             if (i === 2) {
-                let prevcell = this.editor.stored_level.cells[prevy][prevx];
+                let prevcell = this.editor.cell(prevx, prevy);
                 if (prevcell[0].type.name.startsWith('force_floor_')) {
                     prevcell[0].type = TILE_TYPES[name];
                 }
@@ -225,7 +298,7 @@ class ForceFloorOperation extends DrawOperation {
 
             // Drawing a loop with force floors creates ice (but not in the previous
             // cell, obviously)
-            let cell = this.editor.stored_level.cells[y][x];
+            let cell = this.editor.cell(x, y);
             if (cell[0].type.name.startsWith('force_floor_') &&
                 cell[0].type.name !== name)
             {
@@ -736,6 +809,21 @@ export class Editor extends PrimaryView {
 
         this.viewport_el = this.root.querySelector('.editor-canvas .-container');
 
+        // Load editor state; we may need this before setup() since we create new levels before
+        // actually loading the editor proper
+        this.stash = load_json_from_storage("Lexy's Labyrinth editor");
+        if (! this.stash) {
+            this.stash = {
+                packs: {},  // key: { title, level_count, last_modified }
+                // More pack data is stored separately under the key, as {
+                //   levels: [{key, title}],
+                // }
+                // Levels are also stored under separate keys, encoded as C2M.
+            };
+        }
+        this.pack_stash = null;
+        this.level_stash = null;
+
         // FIXME don't hardcode size here, convey this to renderer some other way
         this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
 
@@ -762,6 +850,7 @@ export class Editor extends PrimaryView {
                 ev.preventDefault();
                 ev.stopPropagation();
 
+                // FIXME eventually this should be automatic
                 this.renderer.draw();
             }
             else if (ev.button === 1) {
@@ -797,6 +886,7 @@ export class Editor extends PrimaryView {
 
             this.mouse_op.do_mousemove(ev);
 
+            // FIXME !!!
             this.renderer.draw();
         });
         // TODO should this happen for a mouseup anywhere?
@@ -814,20 +904,6 @@ export class Editor extends PrimaryView {
         });
         window.addEventListener('blur', ev => {
             this.cancel_mouse_operation();
-        });
-
-        // Toolbar buttons
-        this.root.querySelector('#editor-share-url').addEventListener('click', ev => {
-            let buf = c2g.synthesize_level(this.stored_level);
-            // FIXME Not ideal, but btoa() wants a string rather than any of the myriad binary types
-            let stringy_buf = Array.from(new Uint8Array(buf)).map(n => String.fromCharCode(n)).join('');
-            // Make URL-safe and strip trailing padding
-            let data = btoa(stringy_buf).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
-            let url = new URL(location);
-            url.searchParams.delete('level');
-            url.searchParams.delete('setpath');
-            url.searchParams.append('level', data);
-            new EditorShareOverlay(this.conductor, url.toString()).open();
         });
 
         // Toolbox
@@ -869,6 +945,45 @@ export class Editor extends PrimaryView {
             this.select_tool(button.getAttribute('data-tool'));
         });
 
+        // Toolbar buttons for saving, exporting, etc.
+        let button_container = mk('div.-buttons');
+        this.root.querySelector('.controls').append(button_container);
+        let _make_button = (label, onclick) => {
+            let button = mk('button', {type: 'button'}, label);
+            button.addEventListener('click', onclick);
+            button_container.append(button);
+            return button;
+        };
+        _make_button("Properties...", ev => {
+            new EditorLevelMetaOverlay(this.conductor, this.stored_level).open();
+        });
+        this.save_button = _make_button("Save", ev => {
+            // TODO need feedback.  or maybe not bc this should be replaced with autosave later
+            // TODO also need to update the pack data's last modified time
+            if (! this.conductor.stored_game.editor_metadata)
+                return;
+
+            let buf = c2g.synthesize_level(this.stored_level);
+            let stringy_buf = string_from_buffer_ascii(buf);
+            window.localStorage.setItem(this.stored_level.editor_metadata.key, stringy_buf);
+        });
+        if (this.stored_level) {
+            this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
+        }
+        _make_button("Share", ev => {
+            let buf = c2g.synthesize_level(this.stored_level);
+            // FIXME Not ideal, but btoa() wants a string rather than any of the myriad binary types
+            let stringy_buf = Array.from(new Uint8Array(buf)).map(n => String.fromCharCode(n)).join('');
+            // Make URL-safe and strip trailing padding
+            let data = btoa(stringy_buf).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
+            let url = new URL(location);
+            url.searchParams.delete('level');
+            url.searchParams.delete('setpath');
+            url.searchParams.append('level', data);
+            new EditorShareOverlay(this.conductor, url.toString()).open();
+        });
+        //_make_button("Toggle green objects");
+
         // Tile palette
         let palette_el = this.root.querySelector('.palette');
         this.palette = {};  // name => element
@@ -899,15 +1014,113 @@ export class Editor extends PrimaryView {
         this.renderer.draw();
     }
 
+    _make_cell() {
+        let cell = new format_base.StoredCell;
+        cell.push({type: TILE_TYPES['floor']});
+        return cell;
+    }
+
+    _make_empty_level(number, size_x, size_y) {
+        let stored_level = new format_base.StoredLevel(number);
+        stored_level.size_x = size_x;
+        stored_level.size_y = size_y;
+        for (let i = 0; i < size_x * size_y; i++) {
+            stored_level.linear_cells.push(this._make_cell());
+        }
+        stored_level.linear_cells[0].push({type: TILE_TYPES['player'], direction: 'south'});
+        return stored_level;
+    }
+
+    create_pack() {
+        // TODO get a dialog for asking about level meta first?  or is jumping directly into the editor better?
+        let stored_level = this._make_empty_level(1, 32, 32);
+
+        let pack_key = `LLP-${Date.now()}`;
+        let level_key = `LLL-${Date.now()}`;
+        let stored_pack = new format_base.StoredPack(pack_key);
+        stored_pack.editor_metadata = {
+            key: pack_key,
+        };
+        stored_level.editor_metadata = {
+            key: level_key,
+        };
+        // FIXME should convert this to the storage-backed version when switching levels, rather
+        // than keeping it around?
+        stored_pack.level_metadata.push({
+            stored_level: stored_level,
+            key: level_key,
+            title: stored_level.title,
+            index: 0,
+            number: 1,
+        });
+        this.conductor.load_game(stored_pack);
+
+        this.stash.packs[pack_key] = {
+            title: "Untitled pack",
+            level_count: 1,
+            last_modified: Date.now(),
+        };
+        save_json_to_storage("Lexy's Labyrinth editor", this.stash);
+
+        save_json_to_storage(pack_key, {
+            levels: [{
+                key: level_key,
+                title: stored_level.title,
+                last_modified: Date.now(),
+            }],
+        });
+
+        let buf = c2g.synthesize_level(stored_level);
+        let stringy_buf = string_from_buffer_ascii(buf);
+        window.localStorage.setItem(level_key, stringy_buf);
+
+        this.conductor.switch_to_editor();
+    }
+
+    create_scratch_level() {
+        let stored_level = this._make_empty_level(1, 32, 32);
+
+        let stored_pack = new format_base.StoredPack(null);
+        stored_pack.level_metadata.push({
+            stored_level: stored_level,
+        });
+        this.conductor.load_game(stored_pack);
+
+        this.conductor.switch_to_editor();
+    }
+
+    load_editor_pack(pack_key) {
+        let pack_stash = load_json_from_storage(pack_key);
+        let stored_pack = new format_base.StoredPack(pack_key, meta => {
+            let buf = bytestring_to_buffer(localStorage.getItem(meta.key));
+            let stored_level = c2g.parse_level(buf, meta.number);
+            stored_level.editor_metadata = {
+                key: meta.key,
+            };
+            return stored_level;
+        });
+        stored_pack.editor_metadata = {
+            key: pack_key,
+        };
+
+        for (let [i, leveldata] of pack_stash.levels.entries()) {
+            stored_pack.level_metadata.push({
+                key: leveldata.key,
+                title: leveldata.title,
+                index: i,
+                number: i + 1,
+            });
+        }
+        this.conductor.load_game(stored_pack);
+
+        this.conductor.switch_to_editor();
+    }
+
     load_game(stored_game) {
     }
 
-    load_level(stored_level) {
-        // TODO support a game too i guess
-        this.stored_level = stored_level;
-        this.update_viewport_size();
-
-        // XXX need this for renderer compat.  but i guess it's nice in general idk
+    _xxx_update_stored_level_cells() {
+        // XXX need this for renderer compat, not used otherwise
         this.stored_level.cells = [];
         let row;
         for (let [i, cell] of this.stored_level.linear_cells.entries()) {
@@ -917,6 +1130,14 @@ export class Editor extends PrimaryView {
             }
             row.push(cell);
         }
+    }
+
+    load_level(stored_level) {
+        // TODO support a game too i guess
+        this.stored_level = stored_level;
+        this.update_viewport_size();
+
+        this._xxx_update_stored_level_cells();
 
         // Load connections
         this.connections_g.textContent = '';
@@ -937,6 +1158,10 @@ export class Editor extends PrimaryView {
         this.renderer.set_level(stored_level);
         if (this.active) {
             this.renderer.draw();
+        }
+
+        if (this.save_button) {
+            this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
         }
     }
 
@@ -1014,7 +1239,7 @@ export class Editor extends PrimaryView {
 
     cell(x, y) {
         if (this.is_in_bounds(x, y)) {
-            return this.stored_level.cells[y][x];
+            return this.stored_level.linear_cells[this.stored_level.coords_to_scalar(x, y)];
         }
         else {
             return null;
@@ -1026,7 +1251,7 @@ export class Editor extends PrimaryView {
         if (! tile)
             return;
 
-        let cell = this.stored_level.cells[y][x];
+        let cell = this.cell(x, y);
         // Replace whatever's on the same layer
         // TODO probably not the best heuristic yet, since i imagine you can
         // combine e.g. the tent with thin walls
@@ -1080,6 +1305,22 @@ export class Editor extends PrimaryView {
             this.mouse_op.do_abort();
             this.mouse_op = null;
         }
+    }
+
+    resize_level(size_x, size_y, x0 = 0, y0 = 0) {
+        let new_cells = [];
+        for (let y = y0; y < y0 + size_y; y++) {
+            for (let x = x0; x < x0 + size_x; x++) {
+                new_cells.push(this.cell(x, y) ?? this._make_cell());
+            }
+        }
+
+        this.stored_level.linear_cells = new_cells;
+        this.stored_level.size_x = size_x;
+        this.stored_level.size_y = size_y;
+        this._xxx_update_stored_level_cells();
+        this.update_viewport_size();
+        this.renderer.draw();
     }
 }
 

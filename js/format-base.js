@@ -48,12 +48,13 @@ export class StoredLevel {
     }
 }
 
-export class StoredGame {
+export class StoredPack {
     constructor(identifier, level_loader) {
         this.identifier = identifier;
+        this.title = "";
         this._level_loader = level_loader;
 
-        // Simple objects containing keys:
+        // Simple objects containing keys that are usually:
         // title: level title
         // index: level index, used internally only
         // number: level number (may not match index due to C2G shenanigans)
@@ -76,7 +77,9 @@ export class StoredGame {
         }
         else {
             // Otherwise, attempt to load the level
-            return this._level_loader(meta.bytes, meta.number);
+            return this._level_loader(meta);
         }
     }
 }
+
+export const StoredGame = StoredPack;

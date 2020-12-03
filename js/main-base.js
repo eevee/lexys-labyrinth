@@ -76,7 +76,7 @@ export class TransientOverlay extends Overlay {
 // Overlay styled like a dialog box
 export class DialogOverlay extends Overlay {
     constructor(conductor) {
-        super(conductor, mk('div.dialog'));
+        super(conductor, mk('form.dialog'));
 
         this.root.append(
             this.header = mk('header'),
@@ -114,4 +114,12 @@ export class ConfirmOverlay extends DialogOverlay {
         });
         this.footer.append(yes, no);
     }
+}
+
+export function load_json_from_storage(key) {
+    return JSON.parse(window.localStorage.getItem(key));
+}
+
+export function save_json_to_storage(key, value) {
+    window.localStorage.setItem(key, JSON.stringify(value));
 }

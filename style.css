@@ -193,6 +193,15 @@ svg.svg-icon {
     background: #f0d0d0;
     padding: 0.5em 1em;
 }
+dl.formgrid {
+    display: grid;
+    grid: auto-flow min-content / 1fr 4fr;
+    gap: 1em;
+    margin: 0;
+}
+dl.formgrid > dd {
+    margin: 0;
+}
 
 /* Individual overlays */
 table.level-browser {

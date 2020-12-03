@@ -157,6 +157,11 @@ export function string_from_buffer_ascii(buf, start = 0, len) {
     return String.fromCharCode.apply(null, new Uint8Array(buf, start, len));
 }
 
+// Converts a string to a buffer, using NO ENCODING, assuming single-byte characters
+export function bytestring_to_buffer(bytestring) {
+    return Uint8Array.from(bytestring, c => c.charCodeAt(0)).buffer;
+}
+
 // Cast a line through a grid and yield every cell it touches
 export function* walk_grid(x0, y0, x1, y1, min_a, min_b, max_a, max_b) {
     // TODO if the ray starts outside the grid (extremely unlikely), we should
