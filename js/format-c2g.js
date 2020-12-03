@@ -1117,10 +1117,18 @@ function compress(buf) {
         // If we found a match that's worth copying (i.e. shorter than just writing a data block),
         // then do so
         let do_copy = (best_length > 3);
+
+        // If we're not copying, add this byte to a pending data block /now/, so the next block can
+        // catch it if it happens to be the last byte
+        if (! do_copy) {
+            pending_data_length += 1;
+            p++;
+        }
+
         // Write out any pending data block if necessary -- i.e. if we're about to write a copy
         // block, if we're at the max size of a data block, or if this is the end of the data
         if (pending_data_length > 0 &&
-            (do_copy || pending_data_length === 127 || p === buf.byteLength - 1))
+            (do_copy || pending_data_length === 127 || p >= buf.byteLength))
         {
             outbytes[q] = pending_data_length;
             q++;
@@ -1131,17 +1139,13 @@ function compress(buf) {
             pending_data_length = 0;
         }
 
+        // Finally, do a copy
         if (do_copy) {
             outbytes[q] = 0x80 + best_length;
             outbytes[q + 1] = p - best_start;
             q += 2;
             // Update p, noting that we might've done a copy into the future
             p += best_length;
-        }
-        else {
-            // Otherwise, add this to a pending data block
-            pending_data_length += 1;
-            p++;
         }
 
         // If we ever exceed the uncompressed length, don't even bother
