@@ -961,8 +961,12 @@ class Player extends PrimaryView {
         this.undo_button.disabled = ! this.level.has_undo();
         this.rewind_button.disabled = ! (this.level.has_undo() || this.state === 'rewinding');
 
-        this.drop_button.disabled = ! (this.state === 'playing' && this.level.player.toolbelt && this.level.player.toolbelt.length > 0);
-        this.cycle_button.disabled = ! (this.state === 'playing' && this.level.player.toolbelt && this.level.player.toolbelt.length > 1);
+        this.drop_button.disabled = ! (
+            this.state === 'playing' && ! this.level.stored_level.use_cc1_boots &&
+            this.level.player.toolbelt && this.level.player.toolbelt.length > 0);
+        this.cycle_button.disabled = ! (
+            this.state === 'playing' && ! this.level.stored_level.use_cc1_boots &&
+            this.level.player.toolbelt && this.level.player.toolbelt.length > 1);
         this.swap_button.disabled = ! (this.state === 'playing' && this.level.players.length > 1);
 
         // TODO can we do this only if they actually changed?

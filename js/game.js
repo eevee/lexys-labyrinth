@@ -1187,6 +1187,8 @@ export class Level {
     }
 
     cycle_inventory(actor) {
+        if (this.stored_level.use_cc1_boots)
+            return;
         if (actor.movement_cooldown > 0)
             return;
 
@@ -1197,12 +1199,14 @@ export class Level {
         }
     }
 
-    drop_item(actor) {
+    drop_item(actor, force = false) {
+        if (this.stored_level.use_cc1_boots)
+            return;
         if (actor.movement_cooldown > 0)
             return;
 
         // Drop the oldest item, i.e. the first one
-        if (actor.toolbelt && ! actor.cell.get_item()) {
+        if (actor.toolbelt && (force || ! actor.cell.get_item())) {
             let name = actor.toolbelt.shift();
             this.pending_undo.push(() => actor.toolbelt.unshift(name));
             this.add_tile(new Tile(TILE_TYPES[name]), actor.cell);
@@ -1675,6 +1679,7 @@ export class Level {
 
     // Give an item to an actor, even if it's not supposed to have an inventory
     give_actor(actor, name) {
+        // TODO support use_cc1_boots here -- silently consume dupes, only do cc1 items
         if (! actor.type.is_actor)
             return false;
 
@@ -1693,6 +1698,11 @@ export class Level {
             }
             actor.toolbelt.push(name);
             this.pending_undo.push(() => actor.toolbelt.pop());
+
+            // Nothing can hold more than four items
+            if (actor.toolbelt.length > 4) {
+                this.drop_item(actor, true);
+            }
         }
         return true;
     }
