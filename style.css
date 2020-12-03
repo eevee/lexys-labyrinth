@@ -52,6 +52,8 @@ button:active {
     box-shadow:
         inset 0 0 2px 1px hsl(225, 10%, 33%);
     transform: translateY(1px);
+    /* Need this for the editor's tool help things and i'm not questioning it */
+    z-index: 1;
 }
 button:disabled {
     color: #606060;
@@ -1013,6 +1015,7 @@ main.--has-demo .demo-controls {
     visibility: hidden;
     z-index: 1;
     position: absolute;
+    width: max-content;
     margin-top: -0.25em;
     margin-left: -0.5em;
     padding: 0.33em 0.75em;
