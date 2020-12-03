@@ -451,7 +451,7 @@ export class Level {
     // For turn-based mode, this is split into two parts: advance_tic_finish_movement completes any
     // ongoing movement started in the previous tic, and advance_tic_act allows actors to make new
     // decisions.  The player makes decisions between these two parts.
-    advance_tic(p1_primary_direction, p1_secondary_direction, pass) {
+    advance_tic(p1_actions, pass) {
         if (this.state !== 'playing') {
             console.warn(`Level.advance_tic() called when state is ${this.state}`);
             return;
@@ -460,10 +460,10 @@ export class Level {
         // TODO rip out this try/catch, it's not how the game actually works
         try {
             if (pass == 1) {
-                this.advance_tic_finish_movement(p1_primary_direction, p1_secondary_direction);
+                this.advance_tic_finish_movement(p1_actions);
             }
             else if (pass == 2) {
-                this.advance_tic_act(p1_primary_direction, p1_secondary_direction);
+                this.advance_tic_act(p1_actions);
             }
             else {
                 console.warn(`What pass is this?`);
@@ -484,7 +484,7 @@ export class Level {
         }
     }
 
-    advance_tic_finish_movement(p1_primary_direction, p1_secondary_direction) {
+    advance_tic_finish_movement(p1_actions) {
         // Store some current level state in the undo entry.  (These will often not be modified, but
         // they only take a few bytes each so that's fine.)
         for (let key of [
@@ -498,7 +498,12 @@ export class Level {
 
         // Player's secondary direction is set immediately; it applies on arrival to cells even if
         // it wasn't held the last time the player started moving
-        this._set_tile_prop(this.player, 'secondary_direction', p1_secondary_direction);
+        if (p1_actions.secondary === this.player.direction) {
+            this._set_tile_prop(this.player, 'secondary_direction', p1_actions.primary);
+        }
+        else {
+            this._set_tile_prop(this.player, 'secondary_direction', p1_actions.secondary);
+        }
 
         // Used to check for a monster chomping the player's tail
         this.player_leaving_cell = this.player.cell;
@@ -570,7 +575,7 @@ export class Level {
         }
     }
 
-    advance_tic_act(p1_primary_direction, p1_secondary_direction) {
+    advance_tic_act(p1_actions) {
         // Second pass: actors decide their upcoming movement simultaneously
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
@@ -607,43 +612,36 @@ export class Level {
                 actor.decision = actor.direction;
                 continue;
             }
-            else if (actor.slide_mode === 'force') {
-                // Only the player can make voluntary moves on a force floor,
-                // and only if their previous move was an /involuntary/ move on
-                // a force floor.  If they do, it overrides the forced move
-                // XXX this in particular has some subtleties in lynx (e.g. you
-                // can override forwards??) and DEFINITELY all kinds of stuff
-                // in ms
-                // XXX unclear what impact this has on doppelgangers
-                if (actor === this.player &&
-                    p1_primary_direction &&
-                    actor.last_move_was_force)
-                {
-                    actor.decision = p1_primary_direction;
-                    this._set_tile_prop(actor, 'last_move_was_force', false);
-                }
-                else {
-                    actor.decision = actor.direction;
-                    if (actor === this.player) {
-                        this._set_tile_prop(actor, 'last_move_was_force', true);
-                    }
-                }
-                continue;
-            }
             else if (actor === this.player) {
-                // Sorry for the confusion; "p1" and "p2" in the direction args refer to physical
-                // human players, NOT to the two types of player tiles!
-                if (this.player.type.name === 'player') {
-                    this.player1_move = p1_primary_direction;
-                }
-                else {
-                    this.player2_move = p1_primary_direction;
+                // Only the player can make voluntary moves on a force floor, and only if their
+                // previous move was an /involuntary/ move on a force floor.  If they do, it
+                // overrides the forced move
+                // XXX this in particular has some subtleties in lynx (e.g. you can override
+                // forwards??) and DEFINITELY all kinds of stuff in ms
+                // XXX unclear what impact this has on doppelgangers
+                if (actor.slide_mode === 'force' && ! (
+                    p1_actions.primary && actor.last_move_was_force))
+                {
+                    // We're forced!
+                    actor.decision = actor.direction;
+                    this._set_tile_prop(actor, 'last_move_was_force', true);
+                    continue;
                 }
 
-                if (p1_primary_direction) {
-                    actor.decision = p1_primary_direction;
+                if (p1_actions.primary) {
+                    direction_preference = [p1_actions.primary];
+                    if (p1_actions.secondary) {
+                        direction_preference.push(p1_actions.secondary);
+                    }
                     this._set_tile_prop(actor, 'last_move_was_force', false);
                 }
+                else {
+                    continue;
+                }
+            }
+            else if (actor.slide_mode === 'force') {
+                // Anything not an active player can't override force floors
+                actor.decision = actor.direction;
                 continue;
             }
             else if (actor.cell.some(tile => tile.type.traps && tile.type.traps(tile, actor))) {
@@ -753,7 +751,7 @@ export class Level {
             // TODO i think player on force floor will still have some issues here
             if (direction_preference) {
                 let fallback_direction;
-                for (let direction of direction_preference) {
+                for (let [i, direction] of direction_preference.entries()) {
                     if (direction === 'WALKER') {
                         // Walkers roll a random direction ONLY if their first attempt was blocked
                         direction = actor.direction;
@@ -765,6 +763,13 @@ export class Level {
                     fallback_direction = direction;
 
                     direction = actor.cell.redirect_exit(actor, direction);
+
+                    // If every other preference be blocked, actors unconditionally try the last one
+                    // (and might even be able to move that way by the time their turn comes!)
+                    if (i === direction_preference.length - 1) {
+                        actor.decision = direction;
+                        break;
+                    }
 
                     let dest_cell = this.get_neighboring_cell(actor.cell, direction);
                     if (! dest_cell)
@@ -778,16 +783,23 @@ export class Level {
                         break;
                     }
                 }
+            }
 
-                // If all the decisions are blocked, actors still try the last one (and might even
-                // be able to move that way by the time their turn comes around!)
-                if (actor.decision === null) {
-                    actor.decision = fallback_direction;
+            // Do some cleanup for the player
+            if (actor === this.player) {
+                // Sorry for the confusion; "p1" and "p2" in the direction args refer to physical
+                // human players, NOT to the two types of player tiles!
+                if (this.player.type.name === 'player') {
+                    this.player1_move = actor.decision;
+                }
+                else {
+                    this.player2_move = actor.decision;
                 }
             }
         }
 
         // Third pass: everyone actually moves
+        let swap_player1 = false;
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
             if (! actor.cell)
@@ -798,6 +810,19 @@ export class Level {
             if (actor.movement_cooldown > 0)
                 continue;
 
+            // Check for special player actions
+            if (actor === this.player) {
+                if (p1_actions.cycle) {
+                    this.cycle_inventory(this.player);
+                }
+                if (p1_actions.drop) {
+                    this.drop_item(this.player);
+                }
+                if (p1_actions.swap) {
+                    swap_player1 = true;
+                }
+            }
+
             if (! actor.decision)
                 continue;
 
@@ -805,7 +830,7 @@ export class Level {
             let success = this.attempt_step(actor, actor.decision);
 
             // Track whether the player is blocked, for visual effect
-            if (actor === this.player && p1_primary_direction && ! success) {
+            if (actor === this.player && actor.decision && ! success) {
                 this.sfx.play_once('blocked');
                 actor.is_blocked = true;
             }
@@ -861,6 +886,13 @@ export class Level {
             }
         }
         this.actors.length = p;
+
+        // Possibly switch players
+        if (swap_player1) {
+            this.player_index += 1;
+            this.player_index %= this.players.length;
+            this.player = this.players[this.player_index];
+        }
 
         // Advance the clock
         let tic_counter = this.tic_counter;
@@ -1151,6 +1183,29 @@ export class Level {
                     this.set_actor_direction(actor, original_direction);
                 }
             }
+        }
+    }
+
+    cycle_inventory(actor) {
+        if (actor.movement_cooldown > 0)
+            return;
+
+        // Cycle leftwards, i.e., the oldest item moves to the end of the list
+        if (actor.toolbelt) {
+            actor.toolbelt.push(actor.toolbelt.shift());
+            this.pending_undo.push(() => actor.toolbelt.unshift(actor.toolbelt.pop()));
+        }
+    }
+
+    drop_item(actor) {
+        if (actor.movement_cooldown > 0)
+            return;
+
+        // Drop the oldest item, i.e. the first one
+        if (actor.toolbelt && ! actor.cell.get_item()) {
+            let name = actor.toolbelt.shift();
+            this.pending_undo.push(() => actor.toolbelt.unshift(name));
+            this.add_tile(new Tile(TILE_TYPES[name]), actor.cell);
         }
     }
 

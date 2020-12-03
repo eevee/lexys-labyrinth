@@ -1718,6 +1718,8 @@ const TILE_TYPES = {
         is_player: true,
         is_real_player: true,
         collision_mask: COLLISION.player1,
+        // FIXME does this make us block the doppelgangers??
+        blocks_collision: COLLISION.player,
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -1737,6 +1739,7 @@ const TILE_TYPES = {
         is_player: true,
         is_real_player: true,
         collision_mask: COLLISION.player2,
+        blocks_collision: COLLISION.players,
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,

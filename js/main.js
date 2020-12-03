@@ -375,6 +375,20 @@ class Player extends PrimaryView {
                 this.set_state('rewinding');
             }
         });
+        // Game actions
+        // TODO do these need buttons??  feel like they're not discoverable otherwise
+        this.drop_button = this.root.querySelector('.actions .action-drop');
+        this.drop_button.addEventListener('click', ev => {
+            this.current_keys.add('q');
+        });
+        this.cycle_button = this.root.querySelector('.actions .action-cycle');
+        this.cycle_button.addEventListener('click', ev => {
+            this.current_keys.add('e');
+        });
+        this.swap_button = this.root.querySelector('.actions .action-swap');
+        this.swap_button.addEventListener('click', ev => {
+            this.current_keys.add('c');
+        });
         // Demo playback
         this.root.querySelector('.demo-controls .demo-play').addEventListener('click', ev => {
             if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
@@ -386,6 +400,8 @@ class Player extends PrimaryView {
                 this.play_demo();
             }
         });
+        // FIXME consolidate these into debug controls
+        /*
         this.root.querySelector('.demo-controls .demo-step-1').addEventListener('click', ev => {
             this.advance_by(1);
             this._redraw();
@@ -394,6 +410,7 @@ class Player extends PrimaryView {
             this.advance_by(4);
             this._redraw();
         });
+        */
 
         this.renderer = new CanvasRenderer(this.conductor.tileset);
         this.level_el.append(this.renderer.canvas);
@@ -753,6 +770,9 @@ class Player extends PrimaryView {
                 // newly pressed secondary action; remember, there can't be two opposing keys held,
                 // because we already checked for that above, so this is only necessary if there's
                 // not already a secondary action
+                if (this.secondary_action && ! input.has(this.secondary_action)) {
+                    this.secondary_action = null;
+                }
                 if (! this.secondary_action) {
                     for (let action of ['down', 'left', 'right', 'up']) {
                         if (action !== this.primary_action &&
@@ -795,12 +815,17 @@ class Player extends PrimaryView {
                 }
             }
 
+            let player_actions = {
+                primary: this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null,
+                secondary: this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null,
+                cycle: input.has('cycle') && ! this.previous_input.has('cycle'),
+                drop: input.has('drop') && ! this.previous_input.has('drop'),
+                swap: input.has('swap') && ! this.previous_input.has('swap'),
+            }
+
             this.previous_input = input;
 
             this.sfx_player.advance_tic();
-
-            let primary_dir = this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null;
-            let secondary_dir = this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null;
 
             // Turn-based mode is considered assistance, but only if the game actually attempts to
             // progress while it's enabled
@@ -808,14 +833,14 @@ class Player extends PrimaryView {
                 this.level.aid = Math.max(1, this.level.aid);
             }
 
-            let has_input = primary_dir !== null || input.has('wait');
+            let has_input = Object.values(player_actions).some(x => x);
             // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
             if (this.turn_mode === 2) {
                 if (has_input) {
                     // Finish the current tic, then continue as usual.  This means the end of the
                     // tic doesn't count against the number of tics to advance -- because it already
                     // did, the first time we tried it
-                    this.level.advance_tic(primary_dir, secondary_dir, 2);
+                    this.level.advance_tic(player_actions, 2);
                     this.turn_mode = 1;
                 }
                 else {
@@ -824,14 +849,14 @@ class Player extends PrimaryView {
             }
 
             // We should now be at the start of a tic
-            this.level.advance_tic(primary_dir, secondary_dir, 1);
+            this.level.advance_tic(player_actions, 1);
             if (this.turn_mode > 0 && this.level.can_accept_input() && ! has_input) {
                 // If we're in turn-based mode and could provide input here, but don't have any,
                 // then wait until we do
                 this.turn_mode = 2;
             }
             else {
-                this.level.advance_tic(primary_dir, secondary_dir, 2);
+                this.level.advance_tic(player_actions, 2);
             }
 
             if (this.level.state !== 'playing') {
@@ -931,10 +956,14 @@ class Player extends PrimaryView {
     }
 
     update_ui() {
-        this.pause_button.disabled = !(this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding');
+        this.pause_button.disabled = ! (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding');
         this.restart_button.disabled = (this.state === 'waiting');
         this.undo_button.disabled = ! this.level.has_undo();
         this.rewind_button.disabled = ! (this.level.has_undo() || this.state === 'rewinding');
+
+        this.drop_button.disabled = ! (this.state === 'playing' && this.level.player.toolbelt && this.level.player.toolbelt.length > 0);
+        this.cycle_button.disabled = ! (this.state === 'playing' && this.level.player.toolbelt && this.level.player.toolbelt.length > 1);
+        this.swap_button.disabled = ! (this.state === 'playing' && this.level.players.length > 1);
 
         // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;

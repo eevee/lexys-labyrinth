@@ -128,6 +128,7 @@ svg.svg-icon {
 
     stroke: none;
     fill: currentColor;
+    fill-rule: evenodd;
 }
 
 /* Overlay styling */
@@ -536,6 +537,7 @@ button.level-pack-button p {
         "level      bonus"      min-content
         "level      message"    1fr
         "level      inventory"  min-content
+        "level      actions"    min-content
         /* Need explicit min-content to force the hint to wrap */
         / min-content min-content
     ;
@@ -743,6 +745,15 @@ dl.score-chart .-sum {
     background: #0009;
     color: white;
 }
+#player .actions {
+    grid-area: actions;
+    display: flex;
+    gap: 0.5em;
+}
+#player .actions button {
+    flex: 1;
+    white-space: nowrap;
+}
 
 #player-music {
     grid-area: music;
@@ -766,7 +777,30 @@ dl.score-chart .-sum {
 #player .controls {
     grid-area: controls;
     display: flex;
+    gap: 0.25em;
+    justify-content: space-between;
 }
+#player button {
+    position: relative;
+}
+#player button .keyhint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -2em;
+    width: 1em;
+    margin: auto;
+    color: #404040;
+    border: 1px solid #202020;
+    border-radius: 0.25em;
+    box-shadow: 0 2px 0 #202020;
+    text-align: center;
+    text-transform: uppercase;
+}
+#player button:disabled .keyhint {
+    display: none;
+}
+
 .play-controls,
 .demo-controls {
     display: flex;
@@ -778,8 +812,6 @@ dl.score-chart .-sum {
 }
 .demo-controls {
     display: none;
-    flex: 1;
-    justify-content: flex-end;
 }
 main.--has-demo .demo-controls {
     display: flex;
@@ -831,13 +863,21 @@ main.--has-demo .demo-controls {
         /* The play area isn't necessarily the biggest thing any more, and it's ugly when stretched */
         align-items: center;
     }
+    #player .controls {
+        flex-direction: column;
+    }
+    main.--has-demo .demo-controls {
+        /* TODO need a better place for this! */
+        display: none;
+    }
     #player > .-main-area {
         /* Rearrange the grid to be vertical */
         grid:
-            "level  level"
-            "chips  inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "time   inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "bonus  inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            "level      level"
+            "chips      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            "time       inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            "bonus      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            "actions    actions"   min-content
             /* FIXME ideally the first column would be 1fr so the hearts/time have space, but that
              * allows hints to grow to the entire width of the window, which incredibly sucks.  i
              * don't know how to get around this except by giving the grid a fixed width, which i
@@ -860,7 +900,7 @@ main.--has-demo .demo-controls {
         z-index: 1;
         font-size: calc(var(--tile-height) * var(--scale) / 2.5);
     }
-    #player .controls .keyhint {
+    #player .keyhint {
         /* Hide key hints, they take up surprisingly a lot of space */
         display: none;
     }
