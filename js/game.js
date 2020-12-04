@@ -143,6 +143,14 @@ export class Cell extends Array {
         return ret;
     }
 
+    get_terrain() {
+        for (let tile of this) {
+            if (tile.type.draw_layer === 0)
+                return tile;
+        }
+        return null;
+    }
+
     get_actor() {
         for (let tile of this) {
             if (tile.type.is_actor)
@@ -1183,6 +1191,13 @@ export class Level {
                     this.set_actor_direction(actor, original_direction);
                 }
             }
+
+            if (! success && actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
+                // Super duper special yellow teleporter behavior: you pick it the fuck up
+                // FIXME not if there's only one in the level?
+                this.give_actor(actor, 'teleport_yellow');
+                this.transmute_tile(teleporter, 'floor');
+            }
         }
     }
 
@@ -1207,9 +1222,21 @@ export class Level {
 
         // Drop the oldest item, i.e. the first one
         if (actor.toolbelt && (force || ! actor.cell.get_item())) {
-            let name = actor.toolbelt.shift();
+            let name = actor.toolbelt[0];
+            if (name === 'teleport_yellow') {
+                // We can only be dropped on regular floor
+                let terrain = actor.cell.get_terrain();
+                if (terrain.type.name !== 'floor')
+                    return;
+
+                this.transmute_tile(terrain, 'teleport_yellow');
+            }
+            else {
+                this.add_tile(new Tile(TILE_TYPES[name]), actor.cell);
+            }
+
+            actor.toolbelt.shift();
             this.pending_undo.push(() => actor.toolbelt.unshift(name));
-            this.add_tile(new Tile(TILE_TYPES[name]), actor.cell);
         }
     }
 
