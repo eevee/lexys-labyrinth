@@ -730,11 +730,15 @@ const TILE_TYPES = {
                 return;
             }
 
-            if (level.take_all_tools_from_actor(other) && other === level.player) {
-                level.sfx.play_once('thief', me.cell);
-            }
+            let lost = level.take_all_tools_from_actor(other);
             if (other.type.is_player) {
+                if (level.bonus_points > 0) {
+                    lost = true;
+                }
                 level.adjust_bonus(0, 0.5);
+            }
+            if (lost && other === level.player) {
+                level.sfx.play_once('thief', me.cell);
             }
         },
     },
@@ -747,11 +751,15 @@ const TILE_TYPES = {
                 return;
             }
 
-            if (level.take_all_keys_from_actor(other) && other === level.player) {
-                level.sfx.play_once('thief', me.cell);
-            }
+            let lost = level.take_all_keys_from_actor(other);
             if (other.type.is_player) {
+                if (level.bonus_points > 0) {
+                    lost = true;
+                }
                 level.adjust_bonus(0, 0.5);
+            }
+            if (lost && other === level.player) {
+                level.sfx.play_once('thief', me.cell);
             }
         },
     },
