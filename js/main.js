@@ -321,7 +321,7 @@ class Player extends PrimaryView {
             else {
                 if (this.turn_mode === 2) {
                     // Finish up the tic with dummy input
-                    this.level.advance_tic(null, null, 2);
+                    this.level.advance_tic({primary: null, secondary: null}, 2);
                     this.advance_by(1);
                 }
                 this.turn_mode = 0;
@@ -842,7 +842,7 @@ class Player extends PrimaryView {
                 this.level.aid = Math.max(1, this.level.aid);
             }
 
-            let has_input = Object.values(player_actions).some(x => x);
+            let has_input = input.has('wait') || Object.values(player_actions).some(x => x);
             // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
             if (this.turn_mode === 2) {
                 if (has_input) {
