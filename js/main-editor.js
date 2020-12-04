@@ -30,9 +30,18 @@ class EditorLevelMetaOverlay extends DialogOverlay {
         update_time_limit();
         time_limit_input.addEventListener('input', update_time_limit);
 
+        let make_radio_set = (name, options) => {
+            let elements = [];
+            for (let [label, value] of options) {
+                elements.push();
+            }
+        };
+
         dl.append(
             mk('dt', "Title"),
             mk('dd', mk('input', {name: 'title', type: 'text', value: stored_level.title})),
+            mk('dt', "Author"),
+            mk('dd', mk('input', {name: 'author', type: 'text', value: stored_level.author})),
             mk('dt', "Time limit"),
             mk('dd', time_limit_input, " ", time_limit_output),
             mk('dt', "Size"),
@@ -43,7 +52,37 @@ class EditorLevelMetaOverlay extends DialogOverlay {
                 "Height: ",
                 mk('input', {name: 'size_y', type: 'number', min: 10, max: 100, value: stored_level.size_y}),
             ),
+            mk('dt', "Viewport"),
+            mk('dd',
+                mk('label',
+                    mk('input', {name: 'viewport', type: 'radio', value: '10'}),
+                    " 10×10 (Chip's Challenge 2 size)"),
+                mk('br'),
+                mk('label',
+                    mk('input', {name: 'viewport', type: 'radio', value: '9'}),
+                    " 9×9 (Chip's Challenge 1 size)"),
+                mk('br'),
+                mk('label',
+                    mk('input', {name: 'viewport', type: 'radio', value: '', disabled: 'disabled'}),
+                    " Split 10×10 (not yet supported)"),
+            ),
+            mk('dt', "Blob behavior"),
+            mk('dd',
+                mk('label',
+                    mk('input', {name: 'blob_behavior', type: 'radio', value: '0'}),
+                    " Deterministic (PRNG + simple convolution)"),
+                mk('br'),
+                mk('label',
+                    mk('input', {name: 'blob_behavior', type: 'radio', value: '1'}),
+                    " 4 patterns (default; PRNG + rotating offset)"),
+                mk('br'),
+                mk('label',
+                    mk('input', {name: 'blob_behavior', type: 'radio', value: '2'}),
+                    " Extra random (initial seed is truly random)"),
+            ),
         );
+        this.root.elements['viewport'].value = stored_level.viewport_size;
+        this.root.elements['blob_behavior'].value = stored_level.blob_behavior;
         // TODO:
         // - author
         // - chips?
@@ -64,6 +103,10 @@ class EditorLevelMetaOverlay extends DialogOverlay {
                 stored_level.title = title;
                 this.conductor.update_level_title();
             }
+            let author = els.author.value;
+            if (author !== stored_level.author) {
+                stored_level.author = author;
+            }
 
             stored_level.time_limit = parseInt(els.time_limit.value, 10);
 
@@ -72,6 +115,10 @@ class EditorLevelMetaOverlay extends DialogOverlay {
             if (size_x !== stored_level.size_x || size_y !== stored_level.size_y) {
                 this.conductor.editor.resize_level(size_x, size_y);
             }
+
+            stored_level.blob_behavior = parseInt(els.blob_behavior.value, 10);
+            stored_level.viewport_size = parseInt(els.viewport.value, 10);
+            this.conductor.player.update_viewport_size();
 
             this.close();
         });
@@ -409,8 +456,8 @@ const ADJUST_TOGGLES_CCW = {};
         ['thief_keys', 'thief_tools'],
         ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
         ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
-        ['ff_north', 'ff_east', 'ff_south', 'ff_west'],
-        ['ice', 'ff_all'],
+        ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
+        ['ice', 'force_floor_all'],
         ['water', 'turtle'],
         ['no_player1_sign', 'no_player2_sign'],
         ['flame_jet_off', 'flame_jet_on'],
@@ -743,11 +790,22 @@ const EDITOR_PALETTE = [{
     title: "Terrain",
     tiles: [
         'popwall',
-        'fake_floor', 'fake_wall',
-        'wall_invisible', 'wall_appearing',
+        'steel',
+        'wall_invisible',
+        'wall_appearing',
+        'fake_floor',
+        'fake_wall',
+        'popdown_floor',
+        'popdown_wall',
+
+        'floor_letter',
         'gravel',
         'dirt',
-        'dirt',
+        'slime',
+        'thief_keys',
+        'thief_tools',
+        'no_player1_sign',
+        'no_player2_sign',
 
         'floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue',
         'wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue',
@@ -765,36 +823,52 @@ const EDITOR_PALETTE = [{
         'bribe', 'railroad_sign', 'hiking_boots', 'speed_boots',
         'xray_eye', 'helmet', 'foil', 'lightning_bolt',
         'bowling_ball', 'dynamite', 'no_sign', 'bestowal_bow',
+        'score_10', 'score_100', 'score_1000', 'score_2x',
     ],
 }, {
     title: "Creatures",
     tiles: [
         'tank_blue',
+        'tank_yellow',
         'ball',
+        'walker',
         'fireball',
         'glider',
         'bug',
         'paramecium',
-        'walker',
-        'teeth',
         'blob',
+        'teeth',
     ],
 }, {
     title: "Mechanisms",
     tiles: [
-        'bomb',
         'dirt_block',
         'ice_block',
+        /*
+         * FIXME this won't work for all kinds of reasons
+        { name: 'directional_block', arrows: new Set },
+        { name: 'directional_block', arrows: new Set(['north']) },
+        { name: 'directional_block', arrows: new Set(['north', 'east']) },
+        { name: 'directional_block', arrows: new Set(['north', 'south']) },
+        { name: 'directional_block', arrows: new Set(['north', 'east', 'south']) },
+        { name: 'directional_block', arrows: new Set(['north', 'east', 'south', 'west']) },
+        */
+        'bomb',
         'button_gray',
         'button_green',
         'green_floor',
         'green_wall',
         'green_chip',
         'green_bomb',
+        'button_yellow',
         'button_blue',
         'button_red', 'cloner',
         'button_brown', 'trap',
         'button_orange', 'flame_jet_off', 'flame_jet_on',
+        'button_pink',
+        'button_black',
+        'purple_floor',
+        'purple_wall',
         'teleport_blue',
         'teleport_red',
         'teleport_green',
@@ -1025,6 +1099,7 @@ export class Editor extends PrimaryView {
         let stored_level = new format_base.StoredLevel(number);
         stored_level.size_x = size_x;
         stored_level.size_y = size_y;
+        stored_level.viewport_size = 10;
         for (let i = 0; i < size_x * size_y; i++) {
             stored_level.linear_cells.push(this._make_cell());
         }

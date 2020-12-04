@@ -8,6 +8,7 @@ export class StoredLevel {
         // TODO still not sure this belongs here
         this.number = number;  // one-based
         this.title = '';
+        this.author = '';
         this.password = null;
         this.hint = '';
         this.chips_required = 0;

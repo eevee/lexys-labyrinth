@@ -843,6 +843,7 @@ export function parse_level(buf, number = 1) {
             level.time_limit = view.getUint16(0, true);
 
             // TODO 0 - 10x10, 1 - 9x9, 2 - split, otherwise unknown which needs handling
+            // FIXME does this default to 0 if no OPTN block is present?
             let viewport = view.getUint8(2, true);
             if (viewport === 0) {
                 level.viewport_size = 10;
@@ -1219,6 +1220,22 @@ export function synthesize_level(stored_level) {
     if (stored_level.title) {
         c2m.add_section('TITL', stored_level.title);
     }
+    if (stored_level.author) {
+        c2m.add_section('AUTH', stored_level.author);
+    }
+
+    // Options block
+    let options = new Uint8Array(3);
+    new DataView(options.buffer).setUint16(0, stored_level.time_limit, true);
+    if (stored_level.viewport_size === 10) {
+        options[2] = 0;
+    }
+    else if (stored_level.viewport_size === 9) {
+        options[2] = 1;
+    }
+    // TODO split
+    // TODO for size purposes, omit the block entirely if all options are defaults?
+    c2m.add_section('OPTN', options);
 
     // Store camera regions
     // TODO LL feature, should be distinguished somehow
@@ -1240,6 +1257,7 @@ export function synthesize_level(stored_level) {
     let map_view = new DataView(map_bytes.buffer);
     map_bytes[0] = stored_level.size_x;
     map_bytes[1] = stored_level.size_y;
+    let hints = [];
     let p = 2;
     for (let cell of stored_level.linear_cells) {
         for (let i = cell.length - 1; i >= 0; i--) {
@@ -1283,9 +1301,19 @@ export function synthesize_level(stored_level) {
                 }
             }
 
+            if (tile.type.name === 'hint') {
+                hints.push(tile.hint_text);
+            }
+
             // TODO assert that the bottom tile has no next, and all the others do
         }
     }
+
+    // Collect hints first so we can put them in the comment field
+    // FIXME this does not respect global hint, but then, neither does the editor.
+    hints = hints.map(hint => hint ?? '');
+    hints.push('');
+    c2m.add_section('NOTE', hints.join('\n[CLUE]\n'));
 
     // FIXME ack, ArrayBuffer.slice makes a copy actually!  and i use it a lot in this file i think!!
     let map_buf = map_bytes.buffer.slice(0, p);
