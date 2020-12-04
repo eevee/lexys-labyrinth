@@ -695,7 +695,7 @@ const TILE_TYPES = {
             if (other.type.name === 'dirt_block' || other.type.name === 'ice_block') {
                 level.transmute_tile(me, 'floor');
             }
-            else if (other.type.name === 'ghost') {
+            else if (other.type.name === 'ghost' || other.type.name === 'blob') {
                 // No effect
             }
             else if (other.type.is_player) {
@@ -725,8 +725,14 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            level.sfx.play_once('thief', me.cell);
-            level.take_all_tools_from_actor(other);
+            if (level.take_tool_from_actor(other, 'bribe')) {
+                // TODO bribe sound
+                return;
+            }
+
+            if (level.take_all_tools_from_actor(other) && other === level.player) {
+                level.sfx.play_once('thief', me.cell);
+            }
             if (other.type.is_player) {
                 level.adjust_bonus(0, 0.5);
             }
@@ -736,8 +742,14 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            level.sfx.play_once('thief', me.cell);
-            level.take_all_keys_from_actor(other);
+            if (level.take_tool_from_actor(other, 'bribe')) {
+                // TODO bribe sound
+                return;
+            }
+
+            if (level.take_all_keys_from_actor(other) && other === level.player) {
+                level.sfx.play_once('thief', me.cell);
+            }
             if (other.type.is_player) {
                 level.adjust_bonus(0, 0.5);
             }

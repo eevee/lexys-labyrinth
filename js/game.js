@@ -223,10 +223,6 @@ const UNDO_BUFFER_SIZE = TICS_PER_SECOND * 30;
 export class Level {
     constructor(stored_level, compat = {}) {
         this.stored_level = stored_level;
-        this.width = stored_level.size_x;
-        this.height = stored_level.size_y;
-        this.size_x = stored_level.size_x;
-        this.size_y = stored_level.size_y;
         this.restart(compat);
     }
 
@@ -239,6 +235,11 @@ export class Level {
         // note that pausing is NOT handled here, but by whatever's driving our
         // event loop!
         this.state = 'playing';
+
+        this.width = this.stored_level.size_x;
+        this.height = this.stored_level.size_y;
+        this.size_x = this.stored_level.size_x;
+        this.size_y = this.stored_level.size_y;
 
         this.cells = [];
         this.player = null;
@@ -1749,19 +1750,34 @@ export class Level {
         return false;
     }
 
+    take_tool_from_actor(actor, name) {
+        if (actor.toolbelt) {
+            let index = actor.toolbelt.indexOf(name);
+            if (index >= 0) {
+                actor.toolbelt.splice(index, 1);
+                this.pending_undo.push(() => actor.toolbelt.splice(index, 0, name));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     take_all_keys_from_actor(actor) {
-        if (actor.keyring) {
+        if (actor.keyring && Object.values(actor.keyring).some(n => n > 0)) {
             let keyring = actor.keyring;
             this.pending_undo.push(() => actor.keyring = keyring);
             actor.keyring = {};
+            return true;
         }
     }
 
     take_all_tools_from_actor(actor) {
-        if (actor.toolbelt) {
+        if (actor.toolbelt && actor.toolbelt.length > 0) {
             let toolbelt = actor.toolbelt;
             this.pending_undo.push(() => actor.toolbelt = toolbelt);
             actor.toolbelt = [];
+            return true;
         }
     }
 
