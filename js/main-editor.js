@@ -282,11 +282,7 @@ class PencilOperation extends DrawOperation {
             if (type.draw_layer !== 0) {
                 cell.push({type: TILE_TYPES.floor});
             }
-            let direction;
-            if (type.is_actor) {
-                direction = 'south';
-            }
-            cell.push({type, direction});
+            this.editor.place_in_cell(x, y, this.editor.palette_selection);
         }
         else {
             // Default operation: only erase whatever's on the same layer
