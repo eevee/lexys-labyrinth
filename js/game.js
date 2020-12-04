@@ -1167,6 +1167,10 @@ export class Level {
                 if (teleporter.type.teleport_try_all_directions && dest !== teleporter) {
                     num_directions = 4;
                 }
+                // FIXME bleugh hardcode
+                if (dest === teleporter && teleporter.type.name === 'teleport_yellow') {
+                    break;
+                }
                 for (let i = 0; i < num_directions; i++) {
                     if (this.attempt_step(actor, direction)) {
                         success = true;
@@ -1196,8 +1200,10 @@ export class Level {
             if (! success && actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
                 // Super duper special yellow teleporter behavior: you pick it the fuck up
                 // FIXME not if there's only one in the level?
-                this.give_actor(actor, 'teleport_yellow');
-                this.transmute_tile(teleporter, 'floor');
+                this.attempt_take(actor, teleporter);
+                if (actor === this.player) {
+                    this.sfx.play_once('get-tool', teleporter.cell);
+                }
             }
         }
     }
@@ -1696,7 +1702,13 @@ export class Level {
             return false;
 
         if (this.give_actor(actor, tile.type.name)) {
-            this.remove_tile(tile);
+            if (tile.type.draw_layer === 0) {
+                // This should only happen for the yellow teleporter
+                this.transmute_tile(tile, 'floor');
+            }
+            else {
+                this.remove_tile(tile);
+            }
             if (mod && mod.type.item_modifier === 'pickup') {
                 this.remove_tile(mod);
             }

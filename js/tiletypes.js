@@ -1053,7 +1053,6 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         teleport_allow_override: true,
         teleport_dest_order(me, level, other) {
-            // FIXME special pickup behavior; NOT an item though, does not combine with no sign
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
         },
     },
