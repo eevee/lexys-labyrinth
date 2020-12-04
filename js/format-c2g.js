@@ -1313,6 +1313,7 @@ export function synthesize_level(stored_level) {
     // FIXME this does not respect global hint, but then, neither does the editor.
     hints = hints.map(hint => hint ?? '');
     hints.push('');
+    hints.unshift('');
     c2m.add_section('NOTE', hints.join('\n[CLUE]\n'));
 
     // FIXME ack, ArrayBuffer.slice makes a copy actually!  and i use it a lot in this file i think!!
