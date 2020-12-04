@@ -44,8 +44,13 @@ export const CC2_TILESET_LAYOUT = {
     key_blue: [5, 1],
     key_yellow: [6, 1],
     key_green: [7, 1],
-    dirt_block: [8, 1],
-    // xray
+    // FIXME these shouldn't be drawn with a hole when drawn in isolation, gruh
+    dirt_block: {
+        special: 'perception',
+        threshold: 2,
+        hidden: [8, 1],
+        revealed: [9, 1],
+    },
     ice: [10, 1],
     ice_se: [11, 1],
     ice_sw: [12, 1],
@@ -60,8 +65,19 @@ export const CC2_TILESET_LAYOUT = {
         wired_cross: [10, 26],
         is_wired_optional: true,
     },
-    wall_invisible: [0, 2],
-    wall_appearing: [0, 2],
+    // FIXME i think these are visible with the secret eye, but my tileset puts text on them, whoops
+    wall_invisible: {
+        special: 'perception',
+        threshold: 2,
+        hidden: [0, 2],
+        revealed: [9, 31],
+    },
+    wall_appearing: {
+        special: 'perception',
+        threshold: 2,
+        hidden: [0, 2],
+        revealed: [11, 31],
+    },
     wall: [1, 2],
     floor_letter: {
         special: 'letter',
@@ -92,8 +108,13 @@ export const CC2_TILESET_LAYOUT = {
         [8, 2],
         [9, 2],
     ],
-    ice_block: [10, 2],
-    // TODO ice block xray
+    // FIXME these shouldn't be drawn with a hole when drawn in isolation, gruh
+    ice_block: {
+        special: 'perception',
+        threshold: 2,
+        hidden: [10, 2],
+        revealed: [11, 2],
+    },
     score_1000: [12, 2],
     score_100: [13, 2],
     score_10: [14, 2],
@@ -128,7 +149,12 @@ export const CC2_TILESET_LAYOUT = {
     flame_jet_off: [8, 5],
     flame_jet_on: [[9, 5], [10, 5], [11, 5]],
     popdown_wall: [12, 5],
-    popdown_floor: [12, 5],
+    popdown_floor: {
+        special: 'perception',
+        threshold: 2,
+        hidden: [12, 5],
+        revealed: [13, 5],
+    },
     popdown_floor_visible: [13, 5],
     no_sign: [14, 5],
     directional_block: {
@@ -210,7 +236,13 @@ export const CC2_TILESET_LAYOUT = {
     ],
 
     fake_wall: [0, 10],
-    fake_floor: [0, 10],
+    // FIXME i think these are visible with the secret eye, but my tileset puts text on them, whoops
+    fake_floor: {
+        special: 'perception',
+        threshold: 2,
+        hidden: [0, 10],
+        revealed: [10, 31],
+    },
     // Thin walls are built piecemeal from these two tiles; the first is N/S,
     // the second is E/W
     thinwall_n: {
@@ -288,7 +320,12 @@ export const CC2_TILESET_LAYOUT = {
     blob: [0, 15],
     // FIXME blob animations span multiple tiles
     // TODO [0, 16] some kinda red/blue outline
-    floor_mimic: [0, 2],  // TODO [14, 16] with xray
+    floor_mimic: {
+        special: 'perception',
+        threshold: 1,
+        hidden: [0, 2],
+        revealed: [14, 16],
+    },
     // TODO [15, 16] some kinda yellow/black outline
 
     // timid teeth
@@ -792,7 +829,8 @@ export class Tileset {
     }
 
     draw(tile, tic, blit) {
-        this.draw_type(tile.type.name, tile, tic, blit);
+        // FIXME perception
+        this.draw_type(tile.type.name, tile, tic, 0, blit);
     }
 
     // Draw a "standard" drawspec, which is either:
@@ -947,7 +985,7 @@ export class Tileset {
 
     // Draws a tile type, given by name.  Passing in a tile is optional, but
     // without it you'll get defaults.
-    draw_type(name, tile, tic, blit) {
+    draw_type(name, tile, tic, perception, blit) {
         let drawspec = this.layout[name];
         if (! drawspec) {
             console.error(`Don't know how to draw tile type ${name}!`);
@@ -960,13 +998,13 @@ export class Tileset {
             // the overlay (either a type name or a regular draw spec).
             // TODO chance of infinite recursion here
             if (typeof drawspec.base === 'string') {
-                this.draw_type(drawspec.base, tile, tic, blit);
+                this.draw_type(drawspec.base, tile, tic, perception, blit);
             }
             else {
                 this._draw_standard(drawspec.base, tile, tic, blit);
             }
             if (typeof drawspec.overlay === 'string') {
-                this.draw_type(drawspec.overlay, tile, tic, blit);
+                this.draw_type(drawspec.overlay, tile, tic, perception, blit);
                 return;
             }
             else {
@@ -979,6 +1017,14 @@ export class Tileset {
             if (drawspec.special === 'letter') {
                 this._draw_letter(drawspec, tile, tic, blit);
                 return;
+            }
+            else if (drawspec.special === 'perception') {
+                if (perception >= drawspec.threshold) {
+                    drawspec = drawspec.revealed;
+                }
+                else {
+                    drawspec = drawspec.hidden;
+                }
             }
             else if (drawspec.special === 'logic-gate') {
                 this._draw_logic_gate(drawspec, tile, tic, blit);

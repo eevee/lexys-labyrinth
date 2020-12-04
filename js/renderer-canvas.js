@@ -26,6 +26,7 @@ export class CanvasRenderer {
         this.viewport_y = 0;
         this.viewport_dirty = false;
         this.use_rewind_effect = false;
+        this.perception = 0;  // 0 normal, 1 secret eye, 2 editor
     }
 
     set_level(level) {
@@ -205,7 +206,7 @@ export class CanvasRenderer {
     create_tile_type_canvas(name, tile = null) {
         let canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
         let ctx = canvas.getContext('2d');
-        this.tileset.draw_type(name, tile, 0, (tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) =>
+        this.tileset.draw_type(name, tile, 0, this.perception, (tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) =>
             this.blit(ctx, tx + mx, ty + my, mdx, mdy, mw, mh));
         return canvas;
     }

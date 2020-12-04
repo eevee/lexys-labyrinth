@@ -826,6 +826,7 @@ export class Editor extends PrimaryView {
 
         // FIXME don't hardcode size here, convey this to renderer some other way
         this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
+        this.renderer.perception = 2;
 
         // FIXME need this in load_level which is called even if we haven't been setup yet
         this.connections_g = mk_svg('g');
