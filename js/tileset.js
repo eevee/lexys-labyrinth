@@ -105,7 +105,8 @@ export const CC2_TILESET_LAYOUT = {
     chip: [11, 3],
     bribe: [12, 3],
     speed_boots: [13, 3],
-    // canopy, xray
+    canopy: [14, 3],
+    // canopy xray
 
     // TODO lit
     dynamite: [0, 4],
@@ -552,6 +553,7 @@ export const CC2_TILESET_LAYOUT = {
     dirt: [4, 31],
     no_player2_sign: [5, 31],
     no_player1_sign: [6, 31],
+    hook: [7, 31],
     // misc other stuff
 };
 
@@ -848,7 +850,7 @@ export class Tileset {
     _draw_letter(drawspec, tile, tic, blit) {
         this._draw_standard(drawspec.base, tile, tic, blit);
 
-        let glyph = tile.overlaid_glyph;
+        let glyph = tile ? tile.overlaid_glyph : "?";
         if (drawspec.letter_glyphs[glyph]) {
             let [x, y] = drawspec.letter_glyphs[glyph];
             // XXX size is hardcoded here, but not below, meh

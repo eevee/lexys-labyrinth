@@ -672,10 +672,9 @@ const TILE_ENCODING = {
         name: 'speed_boots',
         has_next: true,
     },
-    0x91: {
+    0x92: {
         name: 'hook',
         has_next: true,
-        error: "The hook is not yet implemented, sorry!",
     },
 };
 const REVERSE_TILE_ENCODING = {};

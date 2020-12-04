@@ -640,6 +640,9 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'north');
         },
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'force_floor_s');
+        },
     },
     force_floor_e: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -647,6 +650,9 @@ const TILE_TYPES = {
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'east');
+        },
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'force_floor_w');
         },
     },
     force_floor_s: {
@@ -656,6 +662,9 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'south');
         },
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'force_floor_n');
+        },
     },
     force_floor_w: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -663,6 +672,9 @@ const TILE_TYPES = {
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'west');
+        },
+        on_gray_button(me, level) {
+            level.transmute_tile(me, 'force_floor_e');
         },
     },
     force_floor_all: {
@@ -1705,6 +1717,12 @@ const TILE_TYPES = {
     },
     bribe: {
         // TODO not implemented
+        draw_layer: DRAW_LAYERS.item,
+        is_item: true,
+        is_tool: true,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+    },
+    hook: {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
