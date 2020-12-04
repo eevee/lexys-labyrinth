@@ -944,15 +944,16 @@ main.--has-demo .demo-controls {
     overflow: auto;
     /* Flex layout to center the canvas and overlay together */
     display: flex;
-    align-items: center;
-    justify-content: center;
+    /* This isn't supported in Chrome (still!!), so use auto margins on the child instead
     align-items: safe center;
     justify-content: safe center;
+    */
     background: #202020;
     border: 0.125em solid black;
 }
 #editor .editor-canvas .-container {
     position: relative;
+    margin: auto;
     /* Give the canvas/overlay a bit of a margin; it has to be a border because, due to some quirk
      * of overflowing flexboxes I guess, padding and margins won't extend the scroll area on the
      * right and bottom */
