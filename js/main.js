@@ -676,6 +676,9 @@ class Player extends PrimaryView {
         this.level = new Level(stored_level, this.gather_compat_options(stored_level));
         this.level.sfx = this.sfx_player;
         this.renderer.set_level(this.level);
+        this.renderer.set_viewport_size(stored_level.viewport_size, stored_level.viewport_size);
+        this.renderer.canvas.style.setProperty('--viewport-width', stored_level.viewport_size);
+        this.renderer.canvas.style.setProperty('--viewport-height', stored_level.viewport_size);
         this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
         // TODO base this on a hash of the UA + some identifier for the pack + the level index.  StoredLevel doesn't know its own index atm...
         this.change_music(this.conductor.level_index % SOUNDTRACK.length);
