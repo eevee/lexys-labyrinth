@@ -1209,7 +1209,7 @@ export class Level {
             return;
 
         // Cycle leftwards, i.e., the oldest item moves to the end of the list
-        if (actor.toolbelt) {
+        if (actor.toolbelt && actor.toolbelt.length > 1) {
             actor.toolbelt.push(actor.toolbelt.shift());
             this.pending_undo.push(() => actor.toolbelt.unshift(actor.toolbelt.pop()));
         }
@@ -1222,7 +1222,7 @@ export class Level {
             return;
 
         // Drop the oldest item, i.e. the first one
-        if (actor.toolbelt && (force || ! actor.cell.get_item())) {
+        if (actor.toolbelt && actor.toolbelt.length > 0 && (force || ! actor.cell.get_item())) {
             let name = actor.toolbelt[0];
             if (name === 'teleport_yellow') {
                 // We can only be dropped on regular floor
