@@ -83,12 +83,17 @@ export class Tile {
     }
 
     can_push(tile, direction) {
-        return (
-            this.type.pushes && this.type.pushes[tile.type.name] &&
-            (! tile.type.allows_push || tile.type.allows_push(tile, direction)) &&
-            // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
-            // which would fail, but it would still change the block's direction
-            ! tile.cell.blocks_leaving(tile, direction));
+        if (! (this.type.pushes && this.type.pushes[tile.type.name] &&
+            (! tile.type.allows_push || tile.type.allows_push(tile, direction))))
+        {
+            return false;
+        }
+
+        // Obey railroad curvature
+        direction = tile.cell.redirect_exit(tile, direction);
+        // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
+        // which would fail, but it would still change the block's direction
+        return ! tile.cell.blocks_leaving(tile, direction);
     }
 
     // Inventory stuff
@@ -1012,7 +1017,8 @@ export class Level {
     // Step on every tile in a cell we just arrived in
     step_on_cell(actor, cell) {
         let teleporter;
-        for (let tile of Array.from(cell)) {
+        // Step on topmost things first -- notably, it's safe to step on water with flippers on top
+        for (let tile of Array.from(cell).reverse()) {
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))

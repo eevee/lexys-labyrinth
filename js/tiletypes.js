@@ -1688,7 +1688,7 @@ const TILE_TYPES = {
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
         movement_speed: 4,
-        ignores: new Set(['water']),
+        ignores: new Set(['water', 'turtle']),  // doesn't cause turtles to disappear
         decide_movement(me, level) {
             // turn left: preserve current direction; if that doesn't work, turn left, then right,
             // then back the way we came
