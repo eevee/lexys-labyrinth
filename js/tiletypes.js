@@ -643,6 +643,9 @@ const TILE_TYPES = {
         on_gray_button(me, level) {
             level.transmute_tile(me, 'force_floor_s');
         },
+        on_power(me, level) {
+            level.transmute_tile(me, 'force_floor_s');
+        },
     },
     force_floor_e: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -652,6 +655,9 @@ const TILE_TYPES = {
             level.set_actor_direction(other, 'east');
         },
         on_gray_button(me, level) {
+            level.transmute_tile(me, 'force_floor_w');
+        },
+        on_power(me, level) {
             level.transmute_tile(me, 'force_floor_w');
         },
     },
@@ -665,6 +671,9 @@ const TILE_TYPES = {
         on_gray_button(me, level) {
             level.transmute_tile(me, 'force_floor_n');
         },
+        on_power(me, level) {
+            level.transmute_tile(me, 'force_floor_n');
+        },
     },
     force_floor_w: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -674,6 +683,9 @@ const TILE_TYPES = {
             level.set_actor_direction(other, 'west');
         },
         on_gray_button(me, level) {
+            level.transmute_tile(me, 'force_floor_e');
+        },
+        on_power(me, level) {
             level.transmute_tile(me, 'force_floor_e');
         },
     },
