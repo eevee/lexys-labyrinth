@@ -1060,6 +1060,12 @@ class Player extends PrimaryView {
 
         this.state = new_state;
 
+        // Drop any "new" keys when switching into playing, since they accumulate freely as long as
+        // the game isn't actually running
+        if (new_state === 'playing') {
+            this.current_keys_new.clear();
+        }
+
         // Populate the overlay
         let overlay_reason = '';
         let overlay_top = '';
