@@ -7,10 +7,40 @@ import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
 import { SVG_NS, mk, mk_svg, string_from_buffer_ascii, bytestring_to_buffer, walk_grid } from './util.js';
 
+class EditorPackMetaOverlay extends DialogOverlay {
+    constructor(conductor, stored_pack) {
+        super(conductor);
+        this.set_title("pack properties");
+        let dl = mk('dl.formgrid');
+        this.main.append(dl);
+
+        dl.append(
+            mk('dt', "Title"),
+            mk('dd', mk('input', {name: 'title', type: 'text', value: stored_pack.title})),
+        );
+        // TODO...?  what else is a property of the pack itself
+
+        this.add_button("save", () => {
+            let els = this.root.elements;
+
+            let title = els.title.value;
+            if (title !== stored_pack.title) {
+                stored_pack.title = title;
+                this.conductor.update_level_title();
+            }
+
+            this.close();
+        });
+        this.add_button("nevermind", () => {
+            this.close();
+        });
+    }
+}
+
 class EditorLevelMetaOverlay extends DialogOverlay {
     constructor(conductor, stored_level) {
         super(conductor);
-        this.set_title("edit level metadata");
+        this.set_title("level properties");
         let dl = mk('dl.formgrid');
         this.main.append(dl);
 
@@ -84,18 +114,14 @@ class EditorLevelMetaOverlay extends DialogOverlay {
         this.root.elements['viewport'].value = stored_level.viewport_size;
         this.root.elements['blob_behavior'].value = stored_level.blob_behavior;
         // TODO:
-        // - author
         // - chips?
         // - password???
         // - comment
-        // - viewport size mode
-        // - rng/blob behavior
         // - use CC1 tools
         // - hide logic
         // - "unviewable", "read only"
 
-        let ok = mk('button', {type: 'button'}, "make it so");
-        ok.addEventListener('click', ev => {
+        this.add_button("save", () => {
             let els = this.root.elements;
 
             let title = els.title.value;
@@ -122,7 +148,9 @@ class EditorLevelMetaOverlay extends DialogOverlay {
 
             this.close();
         });
-        this.footer.append(ok);
+        this.add_button("nevermind", () => {
+            this.close();
+        });
     }
 }
 
@@ -1025,18 +1053,41 @@ export class Editor extends PrimaryView {
             button_container.append(button);
             return button;
         };
-        _make_button("Properties...", ev => {
+        _make_button("Pack properties...", ev => {
+            new EditorPackMetaOverlay(this.conductor, this.conductor.stored_game).open();
+        });
+        _make_button("Level properties...", ev => {
             new EditorLevelMetaOverlay(this.conductor, this.stored_level).open();
         });
         this.save_button = _make_button("Save", ev => {
             // TODO need feedback.  or maybe not bc this should be replaced with autosave later
             // TODO also need to update the pack data's last modified time
-            if (! this.conductor.stored_game.editor_metadata)
+            let stored_game = this.conductor.stored_game;
+            if (! stored_game.editor_metadata)
                 return;
 
+            // Update the pack index; we need to do this to update the last modified time anyway, so
+            // there's no point in checking whether anything actually changed
+            let pack_key = stored_game.editor_metadata.key;
+            this.stash.packs[pack_key].title = stored_game.title;
+            this.stash.packs[pack_key].last_modified = Date.now();
+
+            // Update the pack itself
+            // TODO maybe should keep this around, but there's a tricky order of operations thing
+            // with it
+            let pack_stash = load_json_from_storage(pack_key);
+            pack_stash.title = stored_game.title;
+            pack_stash.last_modified = Date.now();
+
+            // Serialize the level itself
             let buf = c2g.synthesize_level(this.stored_level);
             let stringy_buf = string_from_buffer_ascii(buf);
+
+            // Save everything at once, level first, to minimize chances of an error getting things
+            // out of sync
             window.localStorage.setItem(this.stored_level.editor_metadata.key, stringy_buf);
+            save_json_to_storage(pack_key, pack_stash);
+            save_json_to_storage("Lexy's Labyrinth editor", this.stash);
         });
         if (this.stored_level) {
             this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
@@ -1163,6 +1214,7 @@ export class Editor extends PrimaryView {
 
     load_editor_pack(pack_key) {
         let pack_stash = load_json_from_storage(pack_key);
+
         let stored_pack = new format_base.StoredPack(pack_key, meta => {
             let buf = bytestring_to_buffer(localStorage.getItem(meta.key));
             let stored_level = c2g.parse_level(buf, meta.number);
@@ -1171,6 +1223,8 @@ export class Editor extends PrimaryView {
             };
             return stored_level;
         });
+        // TODO should this also be in the pack's stash...?
+        stored_pack.title = this.stash.packs[pack_key].title;
         stored_pack.editor_metadata = {
             key: pack_key,
         };

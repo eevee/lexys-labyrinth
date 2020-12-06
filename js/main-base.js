@@ -37,6 +37,10 @@ export class Overlay {
         this.root.addEventListener('click', ev => {
             ev.stopPropagation();
         });
+        // Block any window-level key handlers from firing when we type
+        this.root.addEventListener('keydown', ev => {
+            ev.stopPropagation();
+        });
     }
 
     open() {

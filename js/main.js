@@ -1486,10 +1486,15 @@ class Splash extends PrimaryView {
         let packs = this.conductor.editor.stash.packs;
         let pack_keys = Object.keys(packs);
         pack_keys.sort((a, b) => packs[a].last_modified - packs[b].last_modified);
-        let editor_list = this.root.querySelector('#splash-your-levels');
+        let editor_section = this.root.querySelector('#splash-your-levels');
+        let editor_list = editor_section;
         for (let key of pack_keys) {
             let pack = packs[key];
-            let button = mk('button', {type: 'button'}, pack.title);
+            let button = mk('button.button-big.level-pack-button', {type: 'button'},
+                mk('h3', pack.title),
+                // TODO whether it's yours or not?
+                // TODO number of levels?
+            );
             // TODO make a container so this can be 1 event
             button.addEventListener('click', ev => {
                 this.conductor.editor.load_editor_pack(key);
@@ -2052,7 +2057,7 @@ class Conductor {
         // TODO handle errors
         // TODO cancel a download if we start another one?
         let buf = await util.fetch(path);
-        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, title);
+        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, undefined, title);
     }
 
     async parse_and_load_game(buf, source, path, identifier, title) {
