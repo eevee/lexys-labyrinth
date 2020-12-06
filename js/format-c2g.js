@@ -420,7 +420,6 @@ const TILE_ENCODING = {
         name: 'teeth_timid',
         has_next: true,
         extra_args: [arg_direction],
-        error: "Timid chomper is not yet implemented, sorry!",
     },
     0x58: {
         // TODO??? unused in main levels -- name: '',

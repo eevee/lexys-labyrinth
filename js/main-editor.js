@@ -852,8 +852,6 @@ const EDITOR_PALETTE = [{
 }, {
     title: "Creatures",
     tiles: [
-        'doppelganger1',
-        'doppelganger2',
         'tank_blue',
         'tank_yellow',
         'ball',
@@ -862,8 +860,15 @@ const EDITOR_PALETTE = [{
         'glider',
         'bug',
         'paramecium',
-        'blob',
+
+        'doppelganger1',
+        'doppelganger2',
         'teeth',
+        'teeth_timid',
+        'floor_mimic',
+        'ghost',
+        'rover',
+        'blob',
     ],
 }, {
     title: "Mechanisms",
@@ -1146,6 +1151,7 @@ export class Editor extends PrimaryView {
 
     _make_empty_level(number, size_x, size_y) {
         let stored_level = new format_base.StoredLevel(number);
+        stored_level.title = "untitled level";
         stored_level.size_x = size_x;
         stored_level.size_y = size_y;
         stored_level.viewport_size = 10;
@@ -1206,6 +1212,7 @@ export class Editor extends PrimaryView {
         let stored_level = this._make_empty_level(1, 32, 32);
 
         let stored_pack = new format_base.StoredPack(null);
+        stored_pack.title = "scratch pack";
         stored_pack.level_metadata.push({
             stored_level: stored_level,
         });

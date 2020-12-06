@@ -284,12 +284,11 @@ export const CC2_TILESET_LAYOUT = {
 
     // TODO only animates while moving
     teeth: {
-        // NOTE: CC2 inexplicably dropped north teeth and just uses the south
-        // sprites instead
-        north: [[0, 11], [1, 11], [2, 11]],
-        east: [[3, 11], [4, 11], [5, 11]],
-        south: [[0, 11], [1, 11], [2, 11]],
-        west: [[6, 11], [7, 11], [8, 11]],
+        // NOTE: CC2 inexplicably dropped north teeth and just uses the south sprites instead
+        north: [[1, 11], [0, 11], [1, 11], [2, 11]],
+        east: [[4, 11], [3, 11], [4, 11], [5, 11]],
+        south: [[1, 11], [0, 11], [1, 11], [2, 11]],
+        west: [[7, 11], [6, 11], [7, 11], [8, 11]],
     },
     swivel_sw: [9, 11],
     swivel_nw: [10, 11],
@@ -329,6 +328,14 @@ export const CC2_TILESET_LAYOUT = {
     // TODO [15, 16] some kinda yellow/black outline
 
     // timid teeth
+    teeth_timid: {
+        // NOTE: CC2 inexplicably dropped north teeth and just uses the south sprites instead
+        // NOTE: it also skimped on timid teeth frames
+        north: [[1, 17], [0, 17]],
+        east: [[3, 17], [2, 17]],
+        south: [[1, 17], [0, 17]],
+        west: [[5, 17], [4, 17]],
+    },
     bowling_ball: [6, 17],  // TODO also +18 when rolling
     tank_yellow: {
         north: [[8, 17], [9, 17]],
@@ -763,8 +770,14 @@ export const TILE_WORLD_TILESET_LAYOUT = {
 export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     // Completed teeth sprites
     teeth: Object.assign({}, CC2_TILESET_LAYOUT.teeth, {
-        north: [[0, 32], [1, 32], [2, 32], [1, 32]],
+        north: [[1, 32], [0, 32], [1, 32], [2, 32]],
     }),
+    teeth_timid: {
+        north: [[7, 32], [6, 32], [7, 32], [8, 32]],
+        east:  [[4, 32], [2, 17], [4, 32], [3, 17]],
+        south: [[3, 32], [0, 17], [3, 32], [1, 17]],
+        west:  [[5, 32], [4, 17], [5, 32], [5, 17]],
+    },
 
     // Extra player sprites
     player: Object.assign({}, CC2_TILESET_LAYOUT.player, {

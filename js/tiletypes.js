@@ -83,6 +83,44 @@ function player_visual_state(me) {
     }
 }
 
+// Logic for chasing after the player (or running away); shared by both teeth and mimics
+function pursue_player(me, level) {
+    let player = level.player;
+    let target_cell = player.cell;
+    // CC2 behavior (not Lynx (TODO compat?)): pursue the cell the player is leaving, if
+    // they're still mostly in it
+    if (player.previous_cell && player.animation_speed &&
+        player.animation_progress <= player.animation_speed / 2)
+    {
+        target_cell = player.previous_cell;
+    }
+
+    let dx = me.cell.x - target_cell.x;
+    let dy = me.cell.y - target_cell.y;
+    let preferred_horizontal, preferred_vertical;
+    if (dx > 0) {
+        preferred_horizontal = 'west';
+    }
+    else if (dx < 0) {
+        preferred_horizontal = 'east';
+    }
+    if (dy > 0) {
+        preferred_vertical = 'north';
+    }
+    else if (dy < 0) {
+        preferred_vertical = 'south';
+    }
+    // Chooses the furthest direction, vertical wins ties
+    if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal first
+        return [preferred_horizontal, preferred_vertical].filter(x => x);
+    }
+    else {
+        // Vertical first
+        return [preferred_vertical, preferred_horizontal].filter(x => x);
+    }
+}
+
 const TILE_TYPES = {
     // Floors and walls
     floor: {
@@ -996,7 +1034,8 @@ const TILE_TYPES = {
         _mogrifications: {
             player: 'player2',
             player2: 'player',
-            // TODO mirror players too
+            doppelganger1: 'doppelganger2',
+            doppelganger2: 'doppelganger1',
 
             dirt_block: 'ice_block',
             ice_block: 'dirt_block',
@@ -1012,9 +1051,10 @@ const TILE_TYPES = {
             tank_blue: 'tank_yellow',
             tank_yellow: 'tank_blue',
 
-            // TODO teeth, timid teeth
+            teeth: 'teeth_timid',
+            teeth_timid: 'teeth',
         },
-        _blob_mogrifications: ['ball', 'walker', 'fireball', 'glider', 'paramecium', 'bug', 'tank_blue', 'teeth', /* TODO 'timid_teeth' */ ],
+        _blob_mogrifications: ['ball', 'walker', 'fireball', 'glider', 'paramecium', 'bug', 'tank_blue', 'teeth', 'teeth_timid'],
         // TODO can be wired, in which case only works when powered; other minor concerns, see wiki
         on_arrive(me, level, other) {
             let name = other.type.name;
@@ -1484,8 +1524,12 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.bug,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'follow-left',
         movement_speed: 4,
+        decide_movement(me, level) {
+            // always try turning as left as possible, and fall back to less-left turns
+            let d = DIRECTIONS[me.direction];
+            return [d.left, me.direction, d.right, d.opposite];
+        },
     },
     paramecium: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1493,8 +1537,12 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'follow-right',
         movement_speed: 4,
+        decide_movement(me, level) {
+            // always try turning as right as possible, and fall back to less-right turns
+            let d = DIRECTIONS[me.direction];
+            return [d.right, me.direction, d.left, d.opposite];
+        },
     },
     ball: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1502,8 +1550,12 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'bounce',
         movement_speed: 4,
+        decide_movement(me, level) {
+            // preserve current direction; if that doesn't work, bounce back the way we came
+            let d = DIRECTIONS[me.direction];
+            return [me.direction, d.opposite];
+        },
     },
     walker: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1511,8 +1563,22 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'bounce-random',
         movement_speed: 4,
+        decide_movement(me, level) {
+            // preserve current direction; if that doesn't work, pick a random direction, even the
+            // one we failed to move in (but ONLY then; important for RNG sync)
+            return [
+                me.direction,
+                () => {
+                    let direction = me.direction;
+                    let num_turns = level.prng() % 4;
+                    for (let i = 0; i < num_turns; i++) {
+                        direction = DIRECTIONS[direction].right;
+                    }
+                    return direction;
+                },
+            ];
+        },
     },
     tank_blue: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1520,8 +1586,21 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'forward',
         movement_speed: 4,
+        decide_movement(me, level) {
+            // always keep moving forward, but reverse if the flag is set
+            let direction = me.direction;
+            if (me.pending_reverse) {
+                direction = DIRECTIONS[me.direction].opposite;
+                level._set_tile_prop(me, 'pending_reverse', false);
+            }
+            if (me.cell.has('cloner')) {
+                // Tanks on cloners should definitely ignore the flag, but we clear it first
+                // TODO feels clumsy
+                return null;
+            }
+            return [direction];
+        }
     },
     tank_yellow: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1542,8 +1621,12 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'random',
         movement_speed: 8,
+        decide_movement(me, level) {
+            // move completely at random
+            let modifier = level.get_blob_modifier();
+            return [['north', 'east', 'south', 'west'][(level.prng() + modifier) % 4]];
+        },
     },
     teeth: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1551,9 +1634,37 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'pursue',
         movement_speed: 4,
-        uses_teeth_hesitation: true,
+        movement_parity: 2,
+        decide_movement(me, level) {
+            let preference = pursue_player(me, level);
+            if (level.player.type.name === 'player2') {
+                // Run away from Cerise
+                for (let [i, direction] of preference.entries()) {
+                    preference[i] = DIRECTIONS[direction].opposite;
+                }
+            }
+            return preference;
+        },
+    },
+    teeth_timid: {
+        draw_layer: DRAW_LAYERS.actor,
+        is_actor: true,
+        is_monster: true,
+        collision_mask: COLLISION.monster_generic,
+        blocks_collision: COLLISION.all_but_player,
+        movement_speed: 4,
+        movement_parity: 2,
+        decide_movement(me, level) {
+            let preference = pursue_player(me, level);
+            if (level.player.type.name === 'player') {
+                // Run away from Lexy
+                for (let [i, direction] of preference.entries()) {
+                    preference[i] = DIRECTIONS[direction].opposite;
+                }
+            }
+            return preference;
+        },
     },
     fireball: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1561,9 +1672,14 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.fireball,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'turn-right',
         movement_speed: 4,
         ignores: new Set(['fire', 'flame_jet_on']),
+        decide_movement(me, level) {
+            // turn right: preserve current direction; if that doesn't work, turn right, then left,
+            // then back the way we came
+            let d = DIRECTIONS[me.direction];
+            return [me.direction, d.right, d.left, d.opposite];
+        },
     },
     glider: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1571,9 +1687,14 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
-        movement_mode: 'turn-left',
         movement_speed: 4,
         ignores: new Set(['water']),
+        decide_movement(me, level) {
+            // turn left: preserve current direction; if that doesn't work, turn left, then right,
+            // then back the way we came
+            let d = DIRECTIONS[me.direction];
+            return [me.direction, d.left, d.right, d.opposite];
+        },
     },
     ghost: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1582,9 +1703,15 @@ const TILE_TYPES = {
         collision_mask: COLLISION.ghost,
         blocks_collision: COLLISION.all_but_player,
         has_inventory: true,
-        movement_mode: 'turn-right',
         movement_speed: 4,
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
+        decide_movement(me, level) {
+            // turn right: preserve current direction; if that doesn't work, turn right, then left,
+            // then back the way we came
+            // (same as fireball)
+            let d = DIRECTIONS[me.direction];
+            return [me.direction, d.right, d.left, d.opposite];
+        },
     },
     floor_mimic: {
         draw_layer: DRAW_LAYERS.actor,
@@ -1592,10 +1719,9 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_player,
-        // TODO not like teeth; always pursues
-        // TODO takes 3 turns off!
-        movement_mode: 'pursue',
         movement_speed: 4,
+        movement_parity: 4,
+        decide_movement: pursue_player,
     },
     rover: {
         // TODO this guy is a nightmare
@@ -1606,7 +1732,6 @@ const TILE_TYPES = {
         collision_mask: COLLISION.rover,
         blocks_collision: COLLISION.all_but_player,
         can_reveal_walls: true,
-        movement_mode: 'random',
         movement_speed: 4,
     },
 
@@ -1813,7 +1938,6 @@ const TILE_TYPES = {
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
-        movement_mode: 'copy1',
         pushes: {
             dirt_block: true,
             ice_block: true,
@@ -1842,7 +1966,6 @@ const TILE_TYPES = {
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
-        movement_mode: 'copy2',
         ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
         pushes: {
             dirt_block: true,
