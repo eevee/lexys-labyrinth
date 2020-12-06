@@ -864,7 +864,7 @@ const TILE_TYPES = {
         is_required_chip: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.collect_chip();
                 level.remove_tile(me);
             }
@@ -1451,7 +1451,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.remove_tile(me);
                 level.adjust_timer(+10);
             }
@@ -1461,7 +1461,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.remove_tile(me);
                 level.adjust_timer(-10);
             }
@@ -1471,7 +1471,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.pause_timer();
             }
         },
@@ -1852,6 +1852,14 @@ const TILE_TYPES = {
         infinite_items: {
             key_yellow: true,
         },
+        decide_movement(me, level) {
+            if (level.player2_move) {
+                return [level.player2_move];
+            }
+            else {
+                return null;
+            }
+        },
         //visual_state: doppelganger_visual_state,
     },
     chip: {
@@ -1860,7 +1868,7 @@ const TILE_TYPES = {
         is_required_chip: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.collect_chip();
                 level.remove_tile(me);
             }
@@ -1871,7 +1879,7 @@ const TILE_TYPES = {
         is_chip: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.collect_chip();
                 level.remove_tile(me);
             }
@@ -1881,40 +1889,49 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.adjust_bonus(10);
             }
-            level.remove_tile(me);
+            // TODO turn this into a flag on those types??  idk
+            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
+                level.remove_tile(me);
+            }
         },
     },
     score_100: {
         draw_layer: DRAW_LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.adjust_bonus(100);
             }
-            level.remove_tile(me);
+            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
+                level.remove_tile(me);
+            }
         },
     },
     score_1000: {
         draw_layer: DRAW_LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.adjust_bonus(1000);
             }
-            level.remove_tile(me);
+            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
+                level.remove_tile(me);
+            }
         },
     },
     score_2x: {
         draw_layer: DRAW_LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.adjust_bonus(0, 2);
             }
-            level.remove_tile(me);
+            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
+                level.remove_tile(me);
+            }
         },
     },
 
@@ -1933,8 +1950,8 @@ const TILE_TYPES = {
             return (level.chips_remaining > 0);
         },
         on_arrive(me, level, other) {
-            if (other.type.is_player && level.chips_remaining === 0) {
-                level.sfx.play_once('socket');
+            if (level.chips_remaining === 0) {
+                level.sfx.play_once('socket', me.cell);
                 level.transmute_tile(me, 'floor');
             }
         },

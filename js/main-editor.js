@@ -806,7 +806,7 @@ const EDITOR_TOOL_ORDER = ['pencil', 'adjust', 'force-floors', 'tracks', 'camera
 const EDITOR_PALETTE = [{
     title: "Basics",
     tiles: [
-        'player',
+        'player', 'player2',
         'chip', 'chip_extra',
         'floor', 'wall', 'hint', 'socket', 'exit',
     ],
@@ -852,6 +852,8 @@ const EDITOR_PALETTE = [{
 }, {
     title: "Creatures",
     tiles: [
+        'doppelganger1',
+        'doppelganger2',
         'tank_blue',
         'tank_yellow',
         'ball',
