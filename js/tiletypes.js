@@ -1,6 +1,10 @@
 import { COLLISION, DIRECTIONS, DRAW_LAYERS } from './defs.js';
 import { random_choice } from './util.js';
 
+function activate_me(me, level) {
+    me.type.activate(me, level);
+}
+
 function on_ready_force_floor(me, level) {
     // At the start of the level, if there's an actor on a force floor:
     // - use on_arrive to set the actor's direction
@@ -316,6 +320,11 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'swivel_nw');
             }
         },
+        activate(me, level) {
+            level.transmute_tile(me, 'swivel_se');
+        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     swivel_se: {
         draw_layer: DRAW_LAYERS.overlay,
@@ -328,6 +337,11 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'swivel_sw');
             }
         },
+        activate(me, level) {
+            level.transmute_tile(me, 'swivel_sw');
+        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     swivel_sw: {
         draw_layer: DRAW_LAYERS.overlay,
@@ -340,6 +354,11 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'swivel_se');
             }
         },
+        activate(me, level) {
+            level.transmute_tile(me, 'swivel_nw');
+        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     swivel_nw: {
         draw_layer: DRAW_LAYERS.overlay,
@@ -352,6 +371,11 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'swivel_ne');
             }
         },
+        activate(me, level) {
+            level.transmute_tile(me, 'swivel_ne');
+        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
 
     // Railroad
@@ -678,12 +702,11 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'north');
         },
-        on_gray_button(me, level) {
+        activate(me, level) {
             level.transmute_tile(me, 'force_floor_s');
         },
-        on_power(me, level) {
-            level.transmute_tile(me, 'force_floor_s');
-        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     force_floor_e: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -692,12 +715,11 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'east');
         },
-        on_gray_button(me, level) {
+        activate(me, level) {
             level.transmute_tile(me, 'force_floor_w');
         },
-        on_power(me, level) {
-            level.transmute_tile(me, 'force_floor_w');
-        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     force_floor_s: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -706,12 +728,11 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'south');
         },
-        on_gray_button(me, level) {
+        activate(me, level) {
             level.transmute_tile(me, 'force_floor_n');
         },
-        on_power(me, level) {
-            level.transmute_tile(me, 'force_floor_n');
-        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     force_floor_w: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -720,12 +741,11 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'west');
         },
-        on_gray_button(me, level) {
+        activate(me, level) {
             level.transmute_tile(me, 'force_floor_e');
         },
-        on_power(me, level) {
-            level.transmute_tile(me, 'force_floor_e');
-        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     force_floor_all: {
         draw_layer: DRAW_LAYERS.terrain,
