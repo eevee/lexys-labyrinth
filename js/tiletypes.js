@@ -1733,6 +1733,32 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all_but_player,
         can_reveal_walls: true,
         movement_speed: 4,
+        on_ready(me, level) {
+            me.current_emulatee = 0;
+            me.attempted_moves = 0;
+        },
+        _emulatees: ['teeth', 'glider', 'bug', 'ball', 'teeth_timid', 'fireball', 'paramecium', 'walker'],
+        decide_movement(me, level) {
+            if (me.attempted_moves >= 32) {
+                level._set_tile_prop(me, 'attempted_moves', me.attempted_moves - 32);
+                level._set_tile_prop(me, 'current_emulatee', (me.current_emulatee + 1) % me.type._emulatees.length);
+            }
+
+            me.attempted_moves += 1;
+            let emulatee = me.type._emulatees[me.current_emulatee];
+            let preference = TILE_TYPES[emulatee].decide_movement(me, level);
+            // TODO need to rig this so a failure counts as two moves
+            // TODO obeys step while emulating teeth (gah, i guess move that in here too)
+            return preference;
+        },
+        visual_state(me) {
+            if (me && me.current_emulatee !== undefined) {
+                return me.type._emulatees[me.current_emulatee];
+            }
+            else {
+                return 'inert';
+            }
+        },
     },
 
     // Keys, whose behavior varies
