@@ -612,36 +612,21 @@ class AdjustOperation extends MouseOperation {
             }
             return;
         }
-        for (let tile of cell) {
-            // Rotate railroads, which are a bit complicated
-            if (tile.type.name === 'railroad') {
-                let new_tracks = 0;
-                let rotated_tracks = [1, 2, 3, 0, 5, 4];
-                for (let [i, new_bit] of rotated_tracks.entries()) {
-                    if (tile.tracks & (1 << i)) {
-                        new_tracks |= (1 << new_bit);
-                    }
-                }
-                tile.tracks = new_tracks;
+        // FIXME implement shift to always target floor, or maybe start from bottom
+        for (let i = cell.length - 1; i >= 0; i--) {
+            let tile = cell[i];
 
-                if (tile.switch_track !== null) {
-                    tile.switch_track = rotated_tracks[tile.switch_track];
-                }
-                tile.entered_direction = DIRECTIONS[tile.entered_direction].right;
+            if (this.editor.rotate_tile_right(tile)) {
+                this.editor.mark_tile_dirty(tile);
+                break;
             }
-
-            // TODO also directional blocks
 
             // Toggle tiles that go in obvious pairs
             let other = ADJUST_TOGGLES_CW[tile.type.name];
             if (other) {
                 tile.type = TILE_TYPES[other];
-                continue;
-            }
-
-            // Rotate actors
-            if (TILE_TYPES[tile.type.name].is_actor) {
-                tile.direction = DIRECTIONS[tile.direction ?? 'south'].right;
+                this.editor.mark_tile_dirty(tile);
+                break;
             }
         }
     }
@@ -839,6 +824,7 @@ const EDITOR_TOOLS = {
         icon: 'icons/tool-pencil.png',
         name: "Pencil",
         desc: "Place, erase, and select tiles.\nLeft click: draw\nRight click: erase\nShift: Replace all layers\nCtrl-click: eyedrop",
+        uses_palette: true,
         op1: PencilOperation,
         //op2: EraseOperation,
         //hover: show current selection under cursor
@@ -848,18 +834,21 @@ const EDITOR_TOOLS = {
         icon: 'icons/tool-line.png',
         name: "Line",
         desc: "Draw straight lines",
+        uses_palette: true,
     },
     box: {
         // TODO not implemented
         icon: 'icons/tool-box.png',
         name: "Box",
         desc: "Fill a rectangular area with tiles",
+        uses_palette: true,
     },
     fill: {
         // TODO not implemented
         icon: 'icons/tool-fill.png',
         name: "Fill",
         desc: "Flood-fill an area with tiles",
+        uses_palette: true,
     },
     'force-floors': {
         icon: 'icons/tool-force-floors.png',
@@ -941,8 +930,8 @@ const EDITOR_PALETTE = [{
 
         'door_blue', 'door_red', 'door_yellow', 'door_green',
         'water', 'turtle', 'fire',
-        'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
-        'force_floor_n', 'force_floor_s', 'force_floor_w', 'force_floor_e', 'force_floor_all',
+        'ice', 'ice_nw', // 'ice_ne', 'ice_sw', 'ice_se',
+        'force_floor_n', /* 'force_floor_s', 'force_floor_w', 'force_floor_e', */ 'force_floor_all',
     ],
 }, {
     title: "Items",
@@ -980,38 +969,192 @@ const EDITOR_PALETTE = [{
     tiles: [
         'dirt_block',
         'ice_block',
-        /*
-         * FIXME this won't work for all kinds of reasons
-        { name: 'directional_block', arrows: new Set },
-        { name: 'directional_block', arrows: new Set(['north']) },
-        { name: 'directional_block', arrows: new Set(['north', 'east']) },
-        { name: 'directional_block', arrows: new Set(['north', 'south']) },
-        { name: 'directional_block', arrows: new Set(['north', 'east', 'south']) },
-        { name: 'directional_block', arrows: new Set(['north', 'east', 'south', 'west']) },
-        */
-        'bomb',
-        'button_gray',
-        'button_green',
+        'directional_block/0',
+        'directional_block/1',
+        'directional_block/2a',
+        'directional_block/2o',
+        'directional_block/3',
+        'directional_block/4',
+
         'green_floor',
         'green_wall',
         'green_chip',
         'green_bomb',
-        'button_yellow',
+        'button_green',
         'button_blue',
+        'button_yellow',
+        'bomb',
+
         'button_red', 'cloner',
         'button_brown', 'trap',
         'button_orange', 'flame_jet_off', 'flame_jet_on',
-        'button_pink',
-        'button_black',
-        'purple_floor',
-        'purple_wall',
+        'transmogrifier',
+
         'teleport_blue',
         'teleport_red',
         'teleport_green',
         'teleport_yellow',
-        'transmogrifier',
+        'railroad/straight',
+        'railroad/curve',
+        'railroad/switch',
+    ],
+    // TODO missing:
+    // - wires, wire tunnels        probably a dedicated tool, placing tunnels like a tile makes no sense
+    // - stopwatches                normal tiles
+    // - swivel                     special rotate logic, like ice corners
+    // - canopy                     normal tile; layering problem
+    // - thin walls                 special rotate logic, like force floors; layering problem
+    // TODO should tiles that respond to wiring and/or gray buttons be highlighted, highlightable?
+}, {
+    title: "Logic",
+    tiles: [
+        'logic_gate/not',
+        'logic_gate/and',
+        'logic_gate/or',
+        'logic_gate/xor',
+        'logic_gate/nand',
+        'logic_gate/latch-cw',
+        'logic_gate/latch-ccw',
+        'logic_gate/counter',
+        'button_pink',
+        'button_black',
+        'purple_floor',
+        'purple_wall',
+        'button_gray',
     ],
 }];
+
+const SPECIAL_PALETTE_ENTRIES = {
+    'directional_block/0':  { name: 'directional_block', arrows: new Set },
+    'directional_block/1':  { name: 'directional_block', arrows: new Set(['north']) },
+    'directional_block/2a': { name: 'directional_block', arrows: new Set(['north', 'east']) },
+    'directional_block/2o': { name: 'directional_block', arrows: new Set(['north', 'south']) },
+    'directional_block/3':  { name: 'directional_block', arrows: new Set(['north', 'east', 'south']) },
+    'directional_block/4':  { name: 'directional_block', arrows: new Set(['north', 'east', 'south', 'west']) },
+    // FIXME these should be additive/subtractive, but a track picked up from the level should replace
+    'railroad/straight':    { name: 'railroad', tracks: 1 << 5, track_switch: null, entered_direction: 'north' },
+    'railroad/curve':       { name: 'railroad', tracks: 1 << 0, track_switch: null, entered_direction: 'north' },
+    'railroad/switch':      { name: 'railroad', tracks: 0, track_switch: 0, entered_direction: 'north' },
+    'logic_gate/not':       { name: 'logic_gate', direction: 'north', gate_type: 'not' },
+    'logic_gate/and':       { name: 'logic_gate', direction: 'north', gate_type: 'and' },
+    'logic_gate/or':        { name: 'logic_gate', direction: 'north', gate_type: 'or' },
+    'logic_gate/xor':       { name: 'logic_gate', direction: 'north', gate_type: 'xor' },
+    'logic_gate/nand':      { name: 'logic_gate', direction: 'north', gate_type: 'nand' },
+    'logic_gate/latch-cw':  { name: 'logic_gate', direction: 'north', gate_type: 'latch-cw' },
+    'logic_gate/latch-ccw': { name: 'logic_gate', direction: 'north', gate_type: 'latch-ccw' },
+    'logic_gate/counter':   { name: 'logic_gate', direction: 'north', gate_type: 'counter' },
+};
+const _RAILROAD_ROTATED_LEFT = [3, 0, 1, 2, 5, 4];
+const _RAILROAD_ROTATED_RIGHT = [1, 2, 3, 0, 5, 4];
+const SPECIAL_PALETTE_BEHAVIOR = {
+    directional_block: {
+        pick_palette_entry(tile) {
+            if (tile.arrows.size === 2) {
+                let [a, b] = tile.arrows.keys();
+                if (a === DIRECTIONS[b].opposite) {
+                    return 'directional_block/2o';
+                }
+                else {
+                    return 'directional_block/2a';
+                }
+            }
+            else {
+                return `directional_block/${tile.arrows.size}`;
+            }
+        },
+        rotate_left(tile) {
+            tile.arrows = new Set(Array.from(tile.arrows, arrow => DIRECTIONS[arrow].left));
+        },
+        rotate_right(tile) {
+            tile.arrows = new Set(Array.from(tile.arrows, arrow => DIRECTIONS[arrow].right));
+        },
+    },
+    logic_gate: {
+        pick_palette_entry(tile) {
+            return `logic_gate/${tile.gate_type}`;
+        },
+        rotate_left(tile) {
+            if (tile.gate_type !== 'counter') {
+                tile.direction = DIRECTIONS[tile.direction].left;
+            }
+        },
+        rotate_right(tile) {
+            if (tile.gate_type !== 'counter') {
+                tile.direction = DIRECTIONS[tile.direction].right;
+            }
+        },
+    },
+    railroad: {
+        pick_palette_entry(tile) {
+            // This is a little fuzzy, since railroads are compound, but we just go with the first
+            // one that matches and fall back to the switch if it's empty
+            if (tile.tracks & 0x30) {
+                return 'railroad/straight';
+            }
+            if (tile.tracks) {
+                return 'railroad/curve';
+            }
+            return 'railroad/switch';
+        },
+        rotate_left(tile) {
+            let new_tracks = 0;
+            for (let i = 0; i < 6; i++) {
+                if (tile.tracks & (1 << i)) {
+                    new_tracks |= 1 << _RAILROAD_ROTATED_LEFT[i];
+                }
+            }
+            tile.tracks = new_tracks;
+
+            if (tile.track_switch !== null) {
+                tile.track_switch = _RAILROAD_ROTATED_LEFT[tile.track_switch];
+            }
+
+            if (tile.entered_direction) {
+                tile.entered_direction = DIRECTIONS[tile.entered_direction].left;
+            }
+        },
+        rotate_right(tile) {
+            let new_tracks = 0;
+            for (let i = 0; i < 6; i++) {
+                if (tile.tracks & (1 << i)) {
+                    new_tracks |= 1 << _RAILROAD_ROTATED_RIGHT[i];
+                }
+            }
+            tile.tracks = new_tracks;
+
+            if (tile.track_switch !== null) {
+                tile.track_switch = _RAILROAD_ROTATED_RIGHT[tile.track_switch];
+            }
+
+            if (tile.entered_direction) {
+                tile.entered_direction = DIRECTIONS[tile.entered_direction].right;
+            }
+        },
+    },
+};
+// Fill in some special behavior that boils down to rotating tiles which happen to be encoded as
+// different tile types
+for (let cycle of [
+    ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
+    ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
+    ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
+]) {
+    for (let [i, name] of cycle.entries()) {
+        let left = cycle[(i - 1 + cycle.length) % cycle.length];
+        let right = cycle[(i + 1) % cycle.length];
+        SPECIAL_PALETTE_BEHAVIOR[name] = {
+            pick_palette_entry(tile) {
+                return name;
+            },
+            rotate_left(tile) {
+                tile.type = TILE_TYPES[left];
+            },
+            rotate_right(tile) {
+                tile.type = TILE_TYPES[right];
+            },
+        };
+    }
+}
 
 
 export class Editor extends PrimaryView {
@@ -1047,6 +1190,28 @@ export class Editor extends PrimaryView {
     }
 
     setup() {
+        // Keyboard shortcuts
+        window.addEventListener('keydown', ev => {
+            if (! this.active)
+                return;
+
+            if (ev.key === ',') {
+                if (ev.shiftKey) {
+                    this.rotate_palette_left();
+                }
+                else if (this.palette_selection) {
+                    this.rotate_tile_left(this.palette_selection);
+                }
+            }
+            else if (ev.key === '.') {
+                if (ev.shiftKey) {
+                    this.rotate_palette_right();
+                }
+                else if (this.palette_selection) {
+                    this.rotate_tile_right(this.palette_selection);
+                }
+            }
+        });
         // Level canvas and mouse handling
         this.mouse_op = null;
         this.viewport_el.addEventListener('mousedown', ev => {
@@ -1234,11 +1399,18 @@ export class Editor extends PrimaryView {
         for (let sectiondef of EDITOR_PALETTE) {
             let section_el = mk('section');
             palette_el.append(mk('h2', sectiondef.title), section_el);
-            for (let name of sectiondef.tiles) {
-                let entry = this.renderer.create_tile_type_canvas(name);
-                entry.setAttribute('data-tile-name', name);
+            for (let key of sectiondef.tiles) {
+                let entry;
+                if (SPECIAL_PALETTE_ENTRIES[key]) {
+                    let tile = SPECIAL_PALETTE_ENTRIES[key];
+                    entry = this.renderer.create_tile_type_canvas(tile.name, tile);
+                }
+                else {
+                    entry = this.renderer.create_tile_type_canvas(key);
+                }
+                entry.setAttribute('data-palette-key', key);
                 entry.classList = 'palette-entry';
-                this.palette[name] = entry;
+                this.palette[key] = entry;
                 section_el.append(entry);
             }
         }
@@ -1247,7 +1419,18 @@ export class Editor extends PrimaryView {
             if (! entry)
                 return;
 
-            this.select_palette(entry.getAttribute('data-tile-name'));
+            let key = entry.getAttribute('data-palette-key');
+            if (SPECIAL_PALETTE_ENTRIES[key]) {
+                // Tile with preconfigured stuff on it
+                let tile = Object.assign({}, SPECIAL_PALETTE_ENTRIES[key]);
+                tile.type = TILE_TYPES[tile.name];
+                delete tile.name;
+                this.select_palette(tile);
+            }
+            else {
+                // Regular tile name
+                this.select_palette(key);
+            }
         });
         this.palette_selection = null;
         this.select_palette('floor');
@@ -1479,10 +1662,8 @@ export class Editor extends PrimaryView {
         let name, tile;
         if (typeof name_or_tile === 'string') {
             name = name_or_tile;
-            if (this.palette_selection && name === this.palette_selection.type.name)
-                return;
-
             tile = { type: TILE_TYPES[name] };
+
             if (tile.type.is_actor) {
                 tile.direction = 'south';
             }
@@ -1495,24 +1676,61 @@ export class Editor extends PrimaryView {
             name = tile.type.name;
         }
 
-        if (this.palette_selection) {
-            let entry = this.palette[this.palette_selection.type.name];
-            if (entry) {
-                entry.classList.remove('--selected');
-            }
+        // Deselect any previous selection
+        if (this.palette_selection_el) {
+            this.palette_selection_el.classList.remove('--selected');
         }
+
+        // Store the tile
         this.palette_selection = tile;
-        if (this.palette[name]) {
-            this.palette[name].classList.add('--selected');
+
+        // Select it in the palette, if possible
+        let key = name;
+        if (SPECIAL_PALETTE_BEHAVIOR[name]) {
+            key = SPECIAL_PALETTE_BEHAVIOR[name].pick_palette_entry(tile);
+        }
+        this.palette_selection_el = this.palette[key] ?? null;
+        if (this.palette_selection_el) {
+            this.palette_selection_el.classList.add('--selected');
         }
 
         this.mark_tile_dirty(tile);
 
         // Some tools obviously don't work with a palette selection, in which case changing tiles
         // should default you back to the pencil
-        if (this.current_tool === 'adjust') {
+        if (! EDITOR_TOOLS[this.current_tool].uses_palette) {
             this.select_tool('pencil');
         }
+    }
+
+    rotate_tile_left(tile) {
+        if (SPECIAL_PALETTE_BEHAVIOR[tile.type.name]) {
+            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].rotate_left(tile);
+        }
+        else if (TILE_TYPES[tile.type.name].is_actor) {
+            tile.direction = DIRECTIONS[tile.direction ?? 'south'].left;
+        }
+        else {
+            return false;
+        }
+
+        this.mark_tile_dirty(tile);
+        return true;
+    }
+
+    rotate_tile_right(tile) {
+        if (SPECIAL_PALETTE_BEHAVIOR[tile.type.name]) {
+            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].rotate_right(tile);
+        }
+        else if (TILE_TYPES[tile.type.name].is_actor) {
+            tile.direction = DIRECTIONS[tile.direction ?? 'south'].right;
+        }
+        else {
+            return false;
+        }
+
+        this.mark_tile_dirty(tile);
+        return true;
     }
 
     rotate_palette_left() {

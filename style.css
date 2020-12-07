@@ -1196,6 +1196,57 @@ main.--has-demo .demo-controls {
     box-shadow: 0 0 0 1px black, 0 0 0 3px white;
 }
 
+.editor-level-browser {
+    display: grid;
+    grid: auto-flow auto / repeat(auto-fill, minmax(13em, 1fr));  /* 12em preview wdith + padding */
+    gap: 0.5em;
+    width: 70vw;
+    /* seems to go into the parent's right padding fsr, i guess because the scrollbar is there */
+    margin-right: 1em;
+    list-style: none;
+}
+.editor-level-browser li {
+    display: grid;
+    grid:
+        "preview    preview"
+        "number     title"
+        / min-content 1fr
+    ;
+    gap: 0.25em;
+    padding: 0.5em;
+}
+.editor-level-browser li:hover {
+    background: hsl(225, 60%, 85%);
+}
+.editor-level-browser li > .-preview {
+    grid-area: preview;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12em;
+    height: 12em;
+    margin: auto;
+}
+.editor-level-browser li > .-preview:empty::before {
+    content: '···';
+    display: block;
+    font-size: 5em;
+    color: #c0c0c0;
+}
+.editor-level-browser li > .-preview canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+}
+.editor-level-browser li > .-number {
+    grid-area: number;
+    font-size: 2em;
+}
+.editor-level-browser li > .-title {
+    grid-area: title;
+    align-self: center;
+}
+
 /* Mini editors for specific tiles with complex properties */
 /* FIXME should this stuff be on an overlay container class? */
 form.editor-popup-tile-editor {
@@ -1271,24 +1322,31 @@ textarea.editor-hint-tile-text {
     border: none;
     font-family: serif;
 }
-/* Railroad tracks are...  complicated */
-ul.editor-railroad-tile-tracks {
-    display: grid;
-    grid: auto-flow 3em / repeat(3, 3em);
-    gap: 0.25em;
-}
-ul.editor-railroad-tile-tracks input {
+/* Class for a list that uses hidden inputs with svg icons, shared by directional blocks and
+ * railroad tracks */
+.editor-tile-editor-svg-parts input {
     display: none;
 }
-ul.editor-railroad-tile-tracks svg {
+.editor-tile-editor-svg-parts svg {
     display: block;
     width: 3em;
     fill: none;
     stroke: #c0c0c0;
     stroke-width: 2;
 }
-ul.editor-railroad-tile-tracks input:checked + svg {
+.editor-tile-editor-svg-parts input:checked + svg {
     stroke: hsl(225, 90%, 50%);
+}
+/* Directional blocks have arrows */
+ol.editor-directional-block-tile-arrows {
+    display: grid;
+    grid: auto-flow 3em / repeat(3, 3em);
+}
+/* Railroad tracks are...  complicated */
+ul.editor-railroad-tile-tracks {
+    display: grid;
+    grid: auto-flow 3em / repeat(3, 3em);
+    gap: 0.25em;
 }
 ul.editor-railroad-tile-tracks.--switch input:checked + svg {
     stroke: hsl(15, 90%, 50%);
