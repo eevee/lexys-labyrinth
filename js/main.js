@@ -836,6 +836,10 @@ class Player extends PrimaryView {
         this._redraw();
     }
 
+    open_level_browser() {
+        new LevelBrowserOverlay(this.conductor).open();
+    }
+
     play_demo() {
         this.restart_level();
         let demo = this.level.stored_level.demo;
@@ -1609,7 +1613,7 @@ class Splash extends PrimaryView {
         // Add buttons for any existing packs
         let packs = this.conductor.editor.stash.packs;
         let pack_keys = Object.keys(packs);
-        pack_keys.sort((a, b) => packs[a].last_modified - packs[b].last_modified);
+        pack_keys.sort((a, b) => packs[b].last_modified - packs[a].last_modified);
         let editor_section = this.root.querySelector('#splash-your-levels');
         let editor_list = editor_section;
         for (let key of pack_keys) {
@@ -1862,7 +1866,7 @@ class OptionsOverlay extends DialogOverlay {
     }
 }
 
-// List of levels
+// List of levels, used in the player
 class LevelBrowserOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
@@ -2019,9 +2023,10 @@ class Conductor {
             ev.target.blur();
         });
         this.nav_choose_level_button.addEventListener('click', ev => {
-            if (this.stored_game) {
-                new LevelBrowserOverlay(this).open();
-            }
+            if (! this.stored_game)
+                return;
+
+            this.current.open_level_browser();
             ev.target.blur();
         });
         document.querySelector('#main-change-pack').addEventListener('click', ev => {

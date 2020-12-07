@@ -154,6 +154,111 @@ class EditorLevelMetaOverlay extends DialogOverlay {
     }
 }
 
+// List of levels, used in the player
+class EditorLevelBrowserOverlay extends DialogOverlay {
+    constructor(conductor) {
+        super(conductor);
+        this.set_title("choose a level");
+
+        // Set up some infrastructure to lazily display level renders
+        this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
+        this.awaiting_renders = [];
+        this.observer = new IntersectionObserver((entries, observer) => {
+                let any_new = false;
+                let to_remove = new Set;
+                for (let entry of entries) {
+                    if (entry.target.classList.contains('--rendered'))
+                        continue;
+
+                    let index = parseInt(entry.target.getAttribute('data-index'), 10);
+                    if (entry.isIntersecting) {
+                        this.awaiting_renders.push(index);
+                        any_new = true;
+                    }
+                    else {
+                        to_remove.add(index);
+                    }
+                }
+
+                this.awaiting_renders = this.awaiting_renders.filter(index => ! to_remove.has(index));
+                if (any_new) {
+                    this.schedule_level_render();
+                }
+            },
+            { root: this.main },
+        );
+        this.list = mk('ol.editor-level-browser');
+        for (let [i, meta] of conductor.stored_game.level_metadata.entries()) {
+            let title = meta.title;
+            let li = mk('li',
+                {'data-index': i},
+                mk('div.-preview'),
+                mk('div.-number', {}, meta.number),
+                mk('div.-title', {}, meta.error ? "(error!)" : meta.title),
+            );
+
+            this.list.append(li);
+
+            if (meta.error) {
+                li.classList.add('--error');
+            }
+            else {
+                this.observer.observe(li);
+            }
+        }
+        this.main.append(this.list);
+
+        this.list.addEventListener('click', ev => {
+            let li = ev.target.closest('li');
+            if (! li)
+                return;
+
+            let index = parseInt(li.getAttribute('data-index'), 10);
+            if (this.conductor.change_level(index)) {
+                this.close();
+            }
+        });
+
+        this.add_button("new level", ev => {
+            this.conductor.editor.append_new_level();
+            this.close();
+        });
+        this.add_button("nevermind", ev => {
+            this.close();
+        });
+    }
+
+    schedule_level_render() {
+        if (this._handle)
+            return;
+        this._handle = setTimeout(() => { this.render_level() }, 100);
+    }
+
+    render_level() {
+        this._handle = null;
+        if (this.awaiting_renders.length === 0)
+            return;
+
+        let index = this.awaiting_renders.shift();
+        let element = this.list.childNodes[index];
+        let stored_level = this.conductor.stored_game.load_level(index);
+        this.conductor.editor._xxx_update_stored_level_cells(stored_level);
+        this.renderer.set_level(stored_level);
+        this.renderer.set_viewport_size(stored_level.size_x, stored_level.size_y);
+        this.renderer.draw();
+        let canvas = mk('canvas', {
+            width: stored_level.size_x * this.conductor.tileset.size_x / 4,
+            height: stored_level.size_y * this.conductor.tileset.size_y / 4,
+        });
+        canvas.getContext('2d').drawImage(this.renderer.canvas, 0, 0, canvas.width, canvas.height);
+        element.querySelector('.-preview').append(canvas);
+        element.classList.add('--rendered');
+
+        this.schedule_level_render();
+    }
+}
+
+
 class EditorShareOverlay extends DialogOverlay {
     constructor(conductor, url) {
         super(conductor);
@@ -904,6 +1009,7 @@ const EDITOR_PALETTE = [{
         'teleport_red',
         'teleport_green',
         'teleport_yellow',
+        'transmogrifier',
     ],
 }];
 
@@ -1050,6 +1156,15 @@ export class Editor extends PrimaryView {
 
             this.select_tool(button.getAttribute('data-tool'));
         });
+
+        // Rotation buttons, which affect both the palette tile and the entire palette
+        this.palette_rotation_index = 0;
+        this.palette_actor_direction = 'south';
+        let rotate_left_button = mk('button.--image', {type: 'button'}, mk('img', {src: '/icons/rotate-left.png'}));
+        rotate_left_button.addEventListener('click', ev => {
+            this.rotate_palette_left();
+        });
+        // TODO finish this up: this.root.querySelector('.controls').append(rotate_left_button);
 
         // Toolbar buttons for saving, exporting, etc.
         let button_container = mk('div.-buttons');
@@ -1251,17 +1366,57 @@ export class Editor extends PrimaryView {
         this.conductor.switch_to_editor();
     }
 
+    append_new_level() {
+        let stored_pack = this.conductor.stored_game;
+        let index = stored_pack.level_metadata.length;
+        let number = index + 1;
+        let stored_level = this._make_empty_level(number, 32, 32);
+        let level_key = `LLL-${Date.now()}`;
+        stored_level.editor_metadata = {
+            key: level_key,
+        };
+        // FIXME should convert this to the storage-backed version when switching levels, rather
+        // than keeping it around?
+        stored_pack.level_metadata.push({
+            stored_level: stored_level,
+            key: level_key,
+            title: stored_level.title,
+            index: index,
+            number: number,
+        });
+
+        let pack_key = stored_pack.editor_metadata.key;
+        let stash_pack_entry = this.stash.packs[pack_key];
+        stash_pack_entry.level_count = number;
+        stash_pack_entry.last_modified = Date.now();
+        save_json_to_storage("Lexy's Labyrinth editor", this.stash);
+
+        let pack_stash = load_json_from_storage(pack_key);
+        pack_stash.levels.push({
+            key: level_key,
+            title: stored_level.title,
+            last_modified: Date.now(),
+        });
+        save_json_to_storage(pack_key, pack_stash);
+
+        let buf = c2g.synthesize_level(stored_level);
+        let stringy_buf = string_from_buffer_ascii(buf);
+        window.localStorage.setItem(level_key, stringy_buf);
+
+        this.conductor.change_level(index);
+    }
+
     load_game(stored_game) {
     }
 
-    _xxx_update_stored_level_cells() {
-        // XXX need this for renderer compat, not used otherwise
-        this.stored_level.cells = [];
+    _xxx_update_stored_level_cells(stored_level) {
+        // XXX need this for renderer compat, not used otherwise, PLEASE delete
+        stored_level.cells = [];
         let row;
-        for (let [i, cell] of this.stored_level.linear_cells.entries()) {
-            if (i % this.stored_level.size_x === 0) {
+        for (let [i, cell] of stored_level.linear_cells.entries()) {
+            if (i % stored_level.size_x === 0) {
                 row = [];
-                this.stored_level.cells.push(row);
+                stored_level.cells.push(row);
             }
             row.push(cell);
         }
@@ -1272,7 +1427,7 @@ export class Editor extends PrimaryView {
         this.stored_level = stored_level;
         this.update_viewport_size();
 
-        this._xxx_update_stored_level_cells();
+        this._xxx_update_stored_level_cells(this.stored_level);
 
         // Load connections
         this.connections_g.textContent = '';
@@ -1303,6 +1458,10 @@ export class Editor extends PrimaryView {
     update_viewport_size() {
         this.renderer.set_viewport_size(this.stored_level.size_x, this.stored_level.size_y);
         this.svg_overlay.setAttribute('viewBox', `0 0 ${this.stored_level.size_x} ${this.stored_level.size_y}`);
+    }
+
+    open_level_browser() {
+        new EditorLevelBrowserOverlay(this.conductor).open();
     }
 
     select_tool(tool) {
@@ -1354,6 +1513,12 @@ export class Editor extends PrimaryView {
         if (this.current_tool === 'adjust') {
             this.select_tool('pencil');
         }
+    }
+
+    rotate_palette_left() {
+        this.palette_rotation_index += 1;
+        this.palette_rotation_index %= 4;
+        this.palette_actor_direction = DIRECTIONS[this.palette_actor_direction].left;
     }
 
     mark_tile_dirty(tile) {
@@ -1453,7 +1618,7 @@ export class Editor extends PrimaryView {
         this.stored_level.linear_cells = new_cells;
         this.stored_level.size_x = size_x;
         this.stored_level.size_y = size_y;
-        this._xxx_update_stored_level_cells();
+        this._xxx_update_stored_level_cells(this.stored_level);
         this.update_viewport_size();
         this.renderer.draw();
     }
