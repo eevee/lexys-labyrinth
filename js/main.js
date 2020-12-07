@@ -256,6 +256,7 @@ class Player extends PrimaryView {
 
         this.scale = 1;
 
+        this.play_speed = 1;
         this.compat = {
             popwalls_react_on_arrive: false,
             auto_convert_ccl_popwalls: true,
@@ -417,12 +418,14 @@ class Player extends PrimaryView {
         this.renderer.canvas.addEventListener('auxclick', ev => {
             if (ev.button !== 1)
                 return;
-            // TODO make a real debug flag?  allow enabling this but consider it aid level 3?
-            if (! location.host.match(/localhost/))
+            if (! this.debug.enabled)
                 return;
 
             let [x, y] = this.renderer.cell_coords_from_event(ev);
             this.level.move_to(this.level.player, this.level.cells[y][x], 1);
+            // TODO this behaves a bit weirdly when paused (doesn't redraw even with a force), i
+            // think because we're still claiming a speed of 1 so time has to pass before the move
+            // actually "happens"
         });
 
         // Populate inventory
@@ -459,9 +462,18 @@ class Player extends PrimaryView {
             if (! this.active)
                 return;
 
-            if (ev.key === 'p' || ev.key === 'Pause') {
+            if (ev.key === 'p') {
                 this.toggle_pause();
                 return;
+            }
+
+            if (ev.key === 'Pause' && ! this.debug.enabled) {
+                new ConfirmOverlay(this.conductor,
+                    "Enable debug mode?  This will disable all saving of scores until you reload!",
+                    () => {
+                        this.setup_debug();
+                    },
+                ).open();
             }
 
             if (ev.key === ' ') {
@@ -618,6 +630,7 @@ class Player extends PrimaryView {
         });
 
         // Populate input debugger
+        this.debug = { enabled: false };
         this.input_el = this.root.querySelector('.input');
         this.input_action_elements = {};
         for (let [action, label] of Object.entries(ACTION_LABELS)) {
@@ -643,6 +656,102 @@ class Player extends PrimaryView {
     }
 
     setup() {
+    }
+
+    // Link up the debug panel and enable debug features
+    setup_debug() {
+        this.root.classList.add('--debug');
+        let debug_el = this.root.querySelector('#player-debug');
+        this.debug = {
+            enabled: true,
+            time_tics_el: this.root.querySelector('#player-debug-time-tics'),
+            time_moves_el: this.root.querySelector('#player-debug-time-moves'),
+            time_secs_el: this.root.querySelector('#player-debug-time-secs'),
+        };
+        // Add a button for every kind of inventory item
+        let inventory_el = debug_el.querySelector('.-inventory');
+        let make_button = (label, onclick) => {
+            let button = mk('button', {type: 'button'}, label);
+            button.addEventListener('click', onclick);
+            return button;
+        };
+        for (let name of [
+            'key_blue', 'key_red', 'key_yellow', 'key_green',
+            'flippers', 'fire_boots', 'cleats', 'suction_boots',
+            'bribe', 'railroad_sign', 'hiking_boots', 'speed_boots',
+            'xray_eye', 'helmet', 'foil', 'lightning_bolt',
+        ]) {
+            inventory_el.append(make_button(
+                mk('img', {src: this.render_inventory_tile(name)}),
+                () => {
+                    this.level.give_actor(this.level.player, name);
+                    this.update_ui();
+                }));
+        }
+        let clear_button = mk('button.-wide', {type: 'button'}, "clear inventory");
+        clear_button.addEventListener('click', ev => {
+            this.level.take_all_keys_from_actor(this.level.player);
+            this.level.take_all_tools_from_actor(this.level.player);
+            this.update_ui();
+        });
+        inventory_el.append(clear_button);
+
+        debug_el.querySelector('.-time-controls').addEventListener('click', ev => {
+            let button = ev.target.closest('button.-time-button');
+            if (! button)
+                return;
+
+            let dt = parseInt(button.getAttribute('data-dt'));
+            if (dt > 0) {
+                this.advance_by(dt);
+            }
+            else if (dt < 0) {
+                for (let i = 0; i < -dt; i++) {
+                    if (! this.level.has_undo())
+                        break;
+                    this.undo();
+                }
+            }
+            this._redraw();
+            this.update_ui();
+        });
+
+        let speed_el = debug_el.elements.speed;
+        speed_el.value = "1";
+        speed_el.addEventListener('change', ev => {
+            let speed = ev.target.value;
+            let [numer, denom] = speed.split('/');
+            this.play_speed = parseInt(numer, 10) / parseInt(denom ?? '1', 10);
+        });
+
+        debug_el.querySelector('.-buttons').append(
+            make_button("green button", () => {
+                TILE_TYPES['button_green'].do_button(this.level);
+                this._redraw();
+            }),
+            make_button("blue button", () => {
+                TILE_TYPES['button_blue'].do_button(this.level);
+                this._redraw();
+            }),
+            make_button("toggle clock", () => {
+                this.level.pause_timer();
+                this.update_ui();
+            }),
+            make_button("+10s", () => {
+                this.level.adjust_timer(+10);
+                this.update_ui();
+            }),
+            make_button("−10s", () => {
+                this.level.adjust_timer(-10);
+                this.update_ui();
+            }),
+            make_button("stop clock", () => {
+                this.level.time_remaining = null;
+                this.update_ui();
+            }),
+        );
+
+        this.update_ui();
     }
 
     activate() {
@@ -907,7 +1016,7 @@ class Player extends PrimaryView {
             // buffer dry) and change to 'waiting' instead?
         }
 
-        let dt = 1000 / TICS_PER_SECOND;
+        let dt = 1000 / (TICS_PER_SECOND * this.play_speed);
         if (this.state === 'rewinding') {
             // Rewind faster than normal time
             dt *= 0.5;
@@ -936,7 +1045,7 @@ class Player extends PrimaryView {
             this.tic_offset = 1;
         }
         else {
-            this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 / (1 / TICS_PER_SECOND));
+            this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
             if (this.state === 'rewinding') {
                 this.tic_offset = 1 - this.tic_offset;
             }
@@ -1034,6 +1143,13 @@ class Player extends PrimaryView {
         for (let action of Object.keys(ACTION_LABELS)) {
             this.input_action_elements[action].classList.toggle('--pressed', this.previous_input.has(action));
         }
+
+        if (this.debug.enabled) {
+            let t = this.level.tic_counter;
+            this.debug.time_tics_el.textContent = `${t}`;
+            this.debug.time_moves_el.textContent = `${Math.floor(t/4)}`;
+            this.debug.time_secs_el.textContent = (t / 20).toFixed(2);
+        }
     }
 
     toggle_pause() {
@@ -1108,22 +1224,24 @@ class Player extends PrimaryView {
                 let scorecard = this.level.get_scorecard();
                 let savefile = this.conductor.current_pack_savefile;
                 let old_scorecard;
-                if (! savefile.scorecards[level_index] ||
-                    savefile.scorecards[level_index].score < scorecard.score ||
-                    (savefile.scorecards[level_index].score === scorecard.score &&
-                        savefile.scorecards[level_index].aid > scorecard.aid))
-                {
-                    old_scorecard = savefile.scorecards[level_index];
+                if (! this.debug.enabled) {
+                    if (! savefile.scorecards[level_index] ||
+                        savefile.scorecards[level_index].score < scorecard.score ||
+                        (savefile.scorecards[level_index].score === scorecard.score &&
+                            savefile.scorecards[level_index].aid > scorecard.aid))
+                    {
+                        old_scorecard = savefile.scorecards[level_index];
 
-                    // Adjust the total score
-                    savefile.total_score = savefile.total_score ?? 0;
-                    if (old_scorecard) {
-                        savefile.total_score -= old_scorecard.score;
+                        // Adjust the total score
+                        savefile.total_score = savefile.total_score ?? 0;
+                        if (old_scorecard) {
+                            savefile.total_score -= old_scorecard.score;
+                        }
+                        savefile.total_score += scorecard.score;
+
+                        savefile.scorecards[level_index] = scorecard;
+                        this.conductor.save_savefile();
                     }
-                    savefile.total_score += scorecard.score;
-
-                    savefile.scorecards[level_index] = scorecard;
-                    this.conductor.save_savefile();
                 }
 
                 overlay_reason = 'success';

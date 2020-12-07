@@ -202,10 +202,15 @@ svg.svg-icon {
 dl.formgrid {
     display: grid;
     grid: auto-flow min-content / 1fr 4fr;
+    align-items: baseline;
     gap: 1em;
     margin: 0;
 }
+dl.formgrid > dt {
+    grid-column: 1;
+}
 dl.formgrid > dd {
+    grid-column: 2;
     margin: 0;
 }
 
@@ -561,7 +566,7 @@ button.level-pack-button p {
         "level      inventory"  min-content
         "level      actions"    min-content
         /* Need explicit min-content to force the hint to wrap */
-        / min-content min-content
+        / min-content min-content min-content
     ;
     column-gap: 2em;
     row-gap: 0.5em;
@@ -602,6 +607,10 @@ button.level-pack-button p {
     color: white;
     text-align: center;
     text-shadow: 0 2px 1px black;
+}
+/* Allow clicking through the overlay in debug mode */
+#player.--debug .overlay-message {
+    pointer-events: none;
 }
 #player .overlay-message p {
     margin: 0;
@@ -840,13 +849,76 @@ main.--has-demo .demo-controls {
 }
 
 /* Debug stuff */
+#player.--debug #player-debug {
+    display: grid;
+}
 #player-debug {
     display: none;
+    grid:
+        "time       inventory   options"
+        "buttons    buttons     buttons"
+        / 2fr 1fr 2fr
+    ;
+    gap: 0.25em;
+    padding: 0.5em;
     background-image: repeating-linear-gradient(135deg,
-        hsl(0, 0%, 12.5%) 0em,
-        hsl(0, 0%, 12.5%) 1em,
-        hsl(45, 25%, 12.5%) 1em,
-        hsl(45, 25%, 12.5%) 2em);
+        hsl(0, 0%, 4%) 0em,
+        hsl(0, 0%, 4%) 1em,
+        hsl(15, 25%, 8%) 1em,
+        hsl(15, 25%, 8%) 2em);
+    border: 0.25em solid hsla(30, 100%, 50%, 0.5);
+    box-shadow: inset 0 0 0.25em 0.25em #0004;
+
+}
+#player-debug > .-time {
+    grid-area: time;
+}
+#player-debug > .-time table.-time-controls {
+}
+#player-debug > .-time table.-time-controls button {
+    width: 100%;
+    text-align: inherit;
+}
+#player-debug > .-time table.-time-controls td:nth-child(1) {
+    /* go backwards button */
+    text-align: left;
+}
+#player-debug > .-time table.-time-controls td:nth-child(2) {
+    /* value */
+    width: 6em;
+    text-align: right;
+}
+#player-debug > .-time table.-time-controls td:nth-child(3) {
+    /* label */
+}
+#player-debug > .-time table.-time-controls td:nth-child(4) {
+    /* go forward button */
+    text-align: right;
+}
+#player-debug > .-options {
+    grid-area: options;
+}
+#player-debug > .-inventory {
+    grid-area: inventory;
+    display: grid;
+    margin: auto;
+    grid: auto-fill var(--tile-height) / repeat(4, var(--tile-width));
+    gap: 2px;
+}
+#player-debug > .-inventory > button {
+    padding: 0;
+}
+#player-debug > .-inventory > button > img {
+    display: block;
+}
+#player-debug > .-inventory > button.-wide {
+    grid-column: span 4;
+    padding: 0.25em;
+}
+#player-debug > .-buttons {
+    grid-area: buttons;
+    display: flex;
+    gap: 0.25em;
 }
 .input {
     display: grid;

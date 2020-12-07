@@ -1174,9 +1174,7 @@ const TILE_TYPES = {
     // Buttons
     button_blue: {
         draw_layer: DRAW_LAYERS.terrain,
-        on_arrive(me, level, other) {
-            level.sfx.play_once('button-press', me.cell);
-
+        do_button(level) {
             // Flip direction of all blue tanks
             for (let actor of level.actors) {
                 // TODO generify somehow??
@@ -1184,6 +1182,10 @@ const TILE_TYPES = {
                     level._set_tile_prop(actor, 'pending_reverse', ! actor.pending_reverse);
                 }
             }
+        },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+            me.type.do_button(level);
         },
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
@@ -1209,9 +1211,7 @@ const TILE_TYPES = {
     },
     button_green: {
         draw_layer: DRAW_LAYERS.terrain,
-        on_arrive(me, level, other) {
-            level.sfx.play_once('button-press', me.cell);
-
+        do_button(level) {
             // Swap green floors and walls
             // TODO could probably make this more compact for undo purposes
             for (let row of level.cells) {
@@ -1232,6 +1232,10 @@ const TILE_TYPES = {
                     }
                 }
             }
+        },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+            me.type.do_button(level);
         },
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
