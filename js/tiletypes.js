@@ -2114,7 +2114,7 @@ const TILE_TYPES = {
     },
     socket: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         blocks(me, level, other) {
             return (level.chips_remaining > 0);
         },
@@ -2127,7 +2127,7 @@ const TILE_TYPES = {
     },
     exit: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.monster_solid & ~COLLISION.rover,
         on_arrive(me, level, other) {
             if (other.type.is_player) {
                 level.win();
