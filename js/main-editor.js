@@ -929,9 +929,14 @@ const EDITOR_PALETTE = [{
         'wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue',
 
         'door_blue', 'door_red', 'door_yellow', 'door_green',
+        'swivel_nw',
+        'railroad/straight',
+        'railroad/curve',
+        'railroad/switch',
+
         'water', 'turtle', 'fire',
-        'ice', 'ice_nw', // 'ice_ne', 'ice_sw', 'ice_se',
-        'force_floor_n', /* 'force_floor_s', 'force_floor_w', 'force_floor_e', */ 'force_floor_all',
+        'ice', 'ice_nw',
+        'force_floor_n', 'force_floor_all',
     ],
 }, {
     title: "Items",
@@ -994,14 +999,12 @@ const EDITOR_PALETTE = [{
         'teleport_red',
         'teleport_green',
         'teleport_yellow',
-        'railroad/straight',
-        'railroad/curve',
-        'railroad/switch',
+        'stopwatch_bonus',
+        'stopwatch_penalty',
+        'stopwatch_toggle',
     ],
     // TODO missing:
     // - wires, wire tunnels        probably a dedicated tool, placing tunnels like a tile makes no sense
-    // - stopwatches                normal tiles
-    // - swivel                     special rotate logic, like ice corners
     // - canopy                     normal tile; layering problem
     // - thin walls                 special rotate logic, like force floors; layering problem
     // TODO should tiles that respond to wiring and/or gray buttons be highlighted, highlightable?
