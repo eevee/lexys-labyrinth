@@ -2099,8 +2099,6 @@ class Conductor {
             };
         }
 
-        this.level_pack_name_el.textContent = stored_game.title;
-
         this.player.load_game(stored_game);
         this.editor.load_game(stored_game);
 
@@ -2129,6 +2127,7 @@ class Conductor {
     }
 
     update_level_title() {
+        this.level_pack_name_el.textContent = this.stored_game.title;
         this.level_name_el.textContent = `Level ${this.stored_level.number} — ${this.stored_level.title}`;
 
         document.title = `${this.stored_level.title} [#${this.stored_level.number}] — ${this.stored_game.title} — ${PAGE_TITLE}`;
