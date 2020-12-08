@@ -72,6 +72,8 @@ export const CC2_TILESET_LAYOUT = {
         hidden: [0, 2],
         revealed: [9, 31],
     },
+    // FIXME this shouldn't be visible with seeing eye (or should it not spawn at all?)
+    wall_invisible_revealed: [1, 2],
     wall_appearing: {
         special: 'perception',
         threshold: 2,
@@ -627,6 +629,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     water: [0, 3],
     fire: [0, 4],
     wall_invisible: [0, 5],
+    wall_invisible_revealed: [0, 1],
     thinwall_n: [0, 6],
     thinwall_w: [0, 7],
     thinwall_s: [0, 8],

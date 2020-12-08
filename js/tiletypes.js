@@ -175,8 +175,12 @@ const TILE_TYPES = {
     },
     wall_invisible: {
         draw_layer: DRAW_LAYERS.terrain,
-        // FIXME cc2 seems to make these flicker briefly
         blocks_collision: COLLISION.all_but_ghost,
+        on_bump(me, level, other) {
+            if (other.type.can_reveal_walls) {
+                level.spawn_animation(me.cell, 'wall_invisible_revealed');
+            }
+        },
     },
     wall_appearing: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -2154,6 +2158,15 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.player,
         ttl: 6,
+    },
+    // Used as an easy way to show an invisible wall when bumped
+    wall_invisible_revealed: {
+        draw_layer: DRAW_LAYERS.terrain,
+        is_actor: true,
+        collision_mask: 0,
+        blocks_collision: 0,
+        // determined experimentally
+        ttl: 12,
     },
     // Custom VFX (identical function, but different aesthetic)
     splash_slime: {
