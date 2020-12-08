@@ -1078,12 +1078,18 @@ const SPECIAL_PALETTE_BEHAVIOR = {
             return `logic_gate/${tile.gate_type}`;
         },
         rotate_left(tile) {
-            if (tile.gate_type !== 'counter') {
+            if (tile.gate_type === 'counter') {
+                tile.memory = (tile.memory + 9) % 10;
+            }
+            else {
                 tile.direction = DIRECTIONS[tile.direction].left;
             }
         },
         rotate_right(tile) {
-            if (tile.gate_type !== 'counter') {
+            if (tile.gate_type === 'counter') {
+                tile.memory = (tile.memory + 1) % 10;
+            }
+            else {
                 tile.direction = DIRECTIONS[tile.direction].right;
             }
         },
