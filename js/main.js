@@ -380,15 +380,20 @@ class Player extends PrimaryView {
         // TODO do these need buttons??  feel like they're not discoverable otherwise
         this.drop_button = this.root.querySelector('.actions .action-drop');
         this.drop_button.addEventListener('click', ev => {
-            this.current_keys.add('q');
+            // Use the set of "buttons pressed between tics" because it's cleared automatically;
+            // otherwise these will stick around forever
+            this.current_keys_new.add('q');
+            ev.target.blur();
         });
         this.cycle_button = this.root.querySelector('.actions .action-cycle');
         this.cycle_button.addEventListener('click', ev => {
-            this.current_keys.add('e');
+            this.current_keys_new.add('e');
+            ev.target.blur();
         });
         this.swap_button = this.root.querySelector('.actions .action-swap');
         this.swap_button.addEventListener('click', ev => {
-            this.current_keys.add('c');
+            this.current_keys_new.add('c');
+            ev.target.blur();
         });
         // Demo playback
         this.root.querySelector('.demo-controls .demo-play').addEventListener('click', ev => {
