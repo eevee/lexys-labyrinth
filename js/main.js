@@ -418,6 +418,7 @@ class Player extends PrimaryView {
         });
         */
 
+        this.use_interpolation = true;
         this.renderer = new CanvasRenderer(this.conductor.tileset);
         this.level_el.append(this.renderer.canvas);
         this.renderer.canvas.addEventListener('auxclick', ev => {
@@ -647,7 +648,6 @@ class Player extends PrimaryView {
         this._advance_bound = this.advance.bind(this);
         this._redraw_bound = this.redraw.bind(this);
         // Used to determine where within a tic we are, for animation purposes
-        this.tic_offset = 0;
         this.last_advance = 0;  // performance.now timestamp
 
         // Auto-size the level canvas on resize
@@ -756,6 +756,21 @@ class Player extends PrimaryView {
             }),
         );
 
+        // Link up some options checkboxes
+        let wire_checkbox = (name, onclick) => {
+            let checkbox = debug_el.elements[name];
+            checkbox.checked = false;  // override browser memory
+            checkbox.addEventListener('click', onclick);
+        };
+        wire_checkbox('show_actor_bboxes', ev => {
+            this.renderer.show_actor_bboxes = ev.target.checked;
+            this._redraw();
+        });
+        wire_checkbox('disable_interpolation', ev => {
+            this.use_interpolation = ! ev.target.checked;
+            this._redraw();
+        });
+
         this.update_ui();
     }
 
@@ -824,7 +839,6 @@ class Player extends PrimaryView {
         this.set_state('waiting');
 
         this.turn_mode = this.turn_based_checkbox.checked ? 1 : 0;
-        this.tic_offset = 0;
         this.last_advance = 0;
         this.demo_faucet = null;
         this.current_keyring = {};
@@ -1048,19 +1062,23 @@ class Player extends PrimaryView {
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
+        let tic_offset;
         if (this.turn_mode === 2) {
             // We're frozen in mid-tic, so the clock hasn't advanced yet, but everything has already
             // finished moving; pretend we're already on the next tic
-            this.tic_offset = 1;
+            tic_offset = 1;
         }
-        else {
-            this.tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
+        else if (this.use_interpolation) {
+            tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
             if (this.state === 'rewinding') {
-                this.tic_offset = 1 - this.tic_offset;
+                tic_offset = 1 - tic_offset;
             }
         }
+        else {
+            tic_offset = 0;
+        }
 
-        this._redraw();
+        this._redraw(tic_offset);
 
         // Check for a stopped game *after* drawing, so that if the game ends, we still draw its
         // final result before stopping the draw loop
@@ -1073,9 +1091,10 @@ class Player extends PrimaryView {
         }
     }
 
-    // Actually redraw.  Used to force drawing outside of normal play
-    _redraw() {
-        this.renderer.draw(this.tic_offset);
+    // Actually redraw.  Used to force drawing outside of normal play, in which case we don't
+    // interpolate (because we're probably paused)
+    _redraw(tic_offset = 0) {
+        this.renderer.draw(tic_offset);
     }
 
     render_inventory_tile(name) {

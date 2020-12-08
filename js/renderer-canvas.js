@@ -25,6 +25,7 @@ export class CanvasRenderer {
         this.viewport_x = 0;
         this.viewport_y = 0;
         this.viewport_dirty = false;
+        this.show_actor_bboxes = false;
         this.use_rewind_effect = false;
         this.perception = 0;  // 0 normal, 1 secret eye, 2 editor
     }
@@ -180,6 +181,20 @@ export class CanvasRenderer {
                                 vx - x0 + mdx, vy - y0 + mdy,
                                 mw, mh));
                     }
+                }
+            }
+        }
+
+        if (this.show_actor_bboxes && ! this.level.linear_cells) {  // FIXME dumb hack so this doesn't happen in editor
+            this.ctx.fillStyle = '#f004';
+            for (let x = xf0; x <= x1; x++) {
+                for (let y = yf0; y <= y1; y++) {
+                    let actor = this.level.cells[y][x].get_actor();
+                    if (! actor)
+                        continue;
+                    let [vx, vy] = actor.visual_position(tic_offset);
+                    // Don't round to the pixel grid; we want to know if the bbox is misaligned!
+                    this.ctx.fillRect((vx - x0) * tw, (vy - y0) * th, 1 * tw, 1 * th);
                 }
             }
         }
