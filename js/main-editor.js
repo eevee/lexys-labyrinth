@@ -1007,6 +1007,7 @@ const EDITOR_PALETTE = [{
     // - wires, wire tunnels        probably a dedicated tool, placing tunnels like a tile makes no sense
     // - canopy                     normal tile; layering problem
     // - thin walls                 special rotate logic, like force floors; layering problem
+    // - light switches
     // TODO should tiles that respond to wiring and/or gray buttons be highlighted, highlightable?
 }, {
     title: "Logic",
@@ -1045,7 +1046,7 @@ const SPECIAL_PALETTE_ENTRIES = {
     'logic_gate/nand':      { name: 'logic_gate', direction: 'north', gate_type: 'nand' },
     'logic_gate/latch-cw':  { name: 'logic_gate', direction: 'north', gate_type: 'latch-cw' },
     'logic_gate/latch-ccw': { name: 'logic_gate', direction: 'north', gate_type: 'latch-ccw' },
-    'logic_gate/counter':   { name: 'logic_gate', direction: 'north', gate_type: 'counter' },
+    'logic_gate/counter':   { name: 'logic_gate', direction: 'north', gate_type: 'counter', memory: 0 },
 };
 const _RAILROAD_ROTATED_LEFT = [3, 0, 1, 2, 5, 4];
 const _RAILROAD_ROTATED_RIGHT = [1, 2, 3, 0, 5, 4];

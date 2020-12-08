@@ -4,6 +4,7 @@ export const DIRECTIONS = {
     north: {
         movement: [0, -1],
         bit: 0x01,
+        index: 0,
         action: 'up',
         left: 'west',
         right: 'east',
@@ -12,6 +13,7 @@ export const DIRECTIONS = {
     south: {
         movement: [0, 1],
         bit: 0x04,
+        index: 2,
         action: 'down',
         left: 'east',
         right: 'west',
@@ -20,6 +22,7 @@ export const DIRECTIONS = {
     west: {
         movement: [-1, 0],
         bit: 0x08,
+        index: 3,
         action: 'left',
         left: 'south',
         right: 'north',
@@ -28,6 +31,7 @@ export const DIRECTIONS = {
     east: {
         movement: [1, 0],
         bit: 0x02,
+        index: 1,
         action: 'right',
         left: 'north',
         right: 'south',

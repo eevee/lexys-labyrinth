@@ -462,7 +462,34 @@ const TILE_ENCODING = {
                 }
             },
             encode(tile) {
-                // FIXME implement
+                let direction_offset = DIRECTIONS[tile.direction].index;
+                if (tile.gate_type === 'not') {
+                    return 0 + direction_offset;
+                }
+                else if (tile.gate_type === 'and') {
+                    return 4 + direction_offset;
+                }
+                else if (tile.gate_type === 'or') {
+                    return 8 + direction_offset;
+                }
+                else if (tile.gate_type === 'xor') {
+                    return 12 + direction_offset;
+                }
+                else if (tile.gate_type === 'latch-cw') {
+                    return 16 + direction_offset;
+                }
+                else if (tile.gate_type === 'nand') {
+                    return 20 + direction_offset;
+                }
+                else if (tile.gate_type === 'counter') {
+                    return 30 + tile.memory;
+                }
+                else if (tile.gate_type === 'latch-ccw') {
+                    return 64 + direction_offset;
+                }
+                else {
+                    return 0xff;
+                }
             },
         },
     },
@@ -612,8 +639,11 @@ const TILE_ENCODING = {
                     tile.arrows = arrows;
                 },
                 encode(tile) {
-                    // TODO
-                    return 0;
+                    let bits = 0;
+                    for (let direction of tile.arrows) {
+                        bits |= DIRECTIONS[direction].bit;
+                    }
+                    return bits;
                 },
             },
         ],
