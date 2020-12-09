@@ -275,7 +275,15 @@ export const CC2_TILESET_LAYOUT = {
     popwall: [8, 10],
     popwall2: [8, 10],
     gravel: [9, 10],
-    ball: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10]],
+    ball: [
+        // appropriately, this animation ping-pongs
+        [10, 10], [11, 10], [12, 10], [13, 10],
+        [14, 10], [13, 10], [12, 10], [11, 10],
+        // FIXME the ball bounces so it specifically needs to play its animation every move; this
+        // defeats the ½x slowdown.  it's dumb and means this anim as written doesn't match cc2
+        [10, 10], [11, 10], [12, 10], [13, 10],
+        [14, 10], [13, 10], [12, 10], [11, 10],
+    ],
     steel: {
         // Wiring!
         base: [15, 10],
