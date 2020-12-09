@@ -1011,6 +1011,10 @@ const TILE_TYPES = {
                     Math.min(actor.animation_speed, actor.animation_progress + 1));
                 // FIXME add this underneath, just above the cloner, so the new actor is on top
                 let new_template = new actor.constructor(type, direction);
+                // TODO maybe make a type method for this
+                if (type.name === 'directional_block') {
+                    new_template.arrows = new Set(actor.arrows);
+                }
                 level.add_tile(new_template, me.cell);
                 level.add_actor(new_template);
             }
