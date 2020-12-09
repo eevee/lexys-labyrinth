@@ -785,6 +785,11 @@ const TILE_TYPES = {
     },
     bomb: {
         draw_layer: DRAW_LAYERS.item,
+        on_ready(me, level) {
+            // FIXME in cc2 only, actors on a bomb immediately explode, but that's tricky for the
+            // player since we can't kill them before the game even starts.  cc2 just murders them
+            // instantly.  maybe we could do that then
+        },
         on_arrive(me, level, other) {
             level.remove_tile(me);
             if (other.type.is_player) {
@@ -843,14 +848,12 @@ const TILE_TYPES = {
         item_modifier: 'ignore',
         collision_allow: COLLISION.monster_solid,
         blocks(me, level, other) {
-            let item;
             for (let tile of me.cell) {
-                if (tile.type.is_item) {
-                    item = tile.type.name;
-                    break;
+                if (tile.type.is_item && other.has_item(tile.type.name)) {
+                    return true;
                 }
             }
-            return item && other.has_item(item);
+            return false;
         },
     },
     bestowal_bow: {
@@ -996,7 +999,17 @@ const TILE_TYPES = {
             // it doesn't persist for more than a tic
             actor._clone_release = true;
             if (level.attempt_step(actor, direction)) {
-                // FIXME add this underneath, just above the cloner
+                // CC2 quirk: nudge the new actor out by exactly one tic
+                // TODO it appears that cc2 actually nudges the new actor out by ⅔ of a tic, or two
+                // frames, which is of course absolutely bonkers.  also, that offset is preserved as
+                // it moves around!
+                level._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
+                // TODO this is annoying and took me a minute to figure out; maybe a Tile method
+                // then.  but are these ever out of sync except for animation tiles?  can i nuke
+                // one?
+                level._set_tile_prop(actor, 'animation_progress',
+                    Math.min(actor.animation_speed, actor.animation_progress + 1));
+                // FIXME add this underneath, just above the cloner, so the new actor is on top
                 let new_template = new actor.constructor(type, direction);
                 level.add_tile(new_template, me.cell);
                 level.add_actor(new_template);

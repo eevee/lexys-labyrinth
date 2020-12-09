@@ -32,7 +32,7 @@ export class Tile {
     visual_position(tic_offset = 0) {
         let x = this.cell.x;
         let y = this.cell.y;
-        if (! this.previous_cell) {
+        if (! this.previous_cell || this.animation_speed === 0) {
             return [x, y];
         }
         else {
@@ -555,7 +555,7 @@ export class Level {
             // Decrement the cooldown here, but don't check it quite yet,
             // because stepping on cells in the next block might reset it
             if (actor.movement_cooldown > 0) {
-                this._set_tile_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
+                this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
             }
 
             if (actor.animation_speed) {
