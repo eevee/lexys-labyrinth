@@ -763,7 +763,9 @@ class Player extends PrimaryView {
             this._redraw();
         });
 
-        this.update_ui();
+        if (this.level) {
+            this.update_ui();
+        }
     }
 
     activate() {
