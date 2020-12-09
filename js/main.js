@@ -468,18 +468,9 @@ class Player extends PrimaryView {
             if (! this.active)
                 return;
 
-            if (ev.key === 'p') {
+            if (ev.key === 'p' || ev.key === 'Pause') {
                 this.toggle_pause();
                 return;
-            }
-
-            if (ev.key === 'Pause' && ! this.debug.enabled) {
-                new ConfirmOverlay(this.conductor,
-                    "Enable debug mode?  This will disable all saving of scores until you reload!",
-                    () => {
-                        this.setup_debug();
-                    },
-                ).open();
             }
 
             if (ev.key === ' ') {
@@ -664,6 +655,7 @@ class Player extends PrimaryView {
     }
 
     // Link up the debug panel and enable debug features
+    // (note that this might be called /before/ setup!)
     setup_debug() {
         this.root.classList.add('--debug');
         let debug_el = this.root.querySelector('#player-debug');
@@ -2069,6 +2061,20 @@ class Conductor {
             // TODO need to finish thinking out the exact flow between editor/player and what happens when...
             this.player.restart_level();
             this.switch_to_player();
+        });
+
+        // Bind the secret debug button: the icon in the lower left
+        document.querySelector('#header-icon').addEventListener('auxclick', ev => {
+            if (ev.button === 1 && ! this.player.debug.enabled) {
+                new ConfirmOverlay(this,
+                    "Enable debug mode in the player?  This will give you lots of toys to play with, " +
+                    "but disable all saving of scores until you reload the page!",
+                    () => {
+                        this.player.setup_debug();
+                        ev.target.src = '/icon-debug.png';
+                    },
+                ).open();
+            }
         });
 
         this.update_nav_buttons();
