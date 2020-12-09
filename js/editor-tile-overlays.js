@@ -246,10 +246,8 @@ export const TILES_WITH_PROPS = {
     hint: HintTileEditor,
     directional_block: DirectionalBlockTileEditor,
     railroad: RailroadTileEditor,
-    // TODO various wireable tiles
+    // TODO various wireable tiles (hmm not sure how that ui works)
     // TODO initial value of counter
     // TODO cloner arrows
-    // TODO railroad parts
     // TODO later, custom floor/wall selection
-    // TODO directional blocks
 };

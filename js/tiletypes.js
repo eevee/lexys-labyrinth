@@ -1514,6 +1514,8 @@ const TILE_TYPES = {
             return 0;
         },
         on_arrive(me, level, other) {
+            // TODO distinct sfx?  more clicky?
+            level.sfx.play_once('button-press', me.cell);
             level.transmute_tile(me, 'light_switch_on');
         },
     },
@@ -1524,6 +1526,7 @@ const TILE_TYPES = {
             return me.wire_directions;
         },
         on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
             level.transmute_tile(me, 'light_switch_off');
         },
     },

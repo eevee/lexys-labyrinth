@@ -258,7 +258,6 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
     }
 }
 
-
 class EditorShareOverlay extends DialogOverlay {
     constructor(conductor, url) {
         super(conductor);
@@ -280,6 +279,9 @@ class EditorShareOverlay extends DialogOverlay {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Mouse handling
+
 // Stores and controls what the mouse is doing during a movement, mostly by dispatching to functions
 // defined for the individual tools
 const MOUSE_BUTTON_MASKS = [1, 4, 2];  // MouseEvent.button/buttons are ordered differently
@@ -288,6 +290,7 @@ class MouseOperation {
         this.editor = editor;
         this.target = target;
         this.button_mask = MOUSE_BUTTON_MASKS[ev.button];
+        this.alt_mode = ev.button > 0;
         this.modifier = null;  // or 'shift' or 'ctrl' (ctrl takes precedent)
         this._update_modifier(ev);
 
@@ -406,20 +409,47 @@ class PencilOperation extends DrawOperation {
             if (cell) {
                 this.editor.select_palette(cell[cell.length - 1]);
             }
+            return;
         }
-        else if (this.modifier === 'shift') {
-            // Aggressive mode: erase whatever's already in the cell
+
+        let template = this.editor.palette_selection;
+        if (this.alt_mode) {
+            // Erase
             let cell = this.cell(x, y);
-            cell.length = 0;
-            let type = this.editor.palette_selection.type;
-            if (type.draw_layer !== 0) {
+            if (this.modifier === 'shift') {
+                // Aggressive mode: erase the entire cell
+                cell.length = 0;
                 cell.push({type: TILE_TYPES.floor});
             }
-            this.editor.place_in_cell(x, y, this.editor.palette_selection);
+            else if (template) {
+                // Erase whatever's on the same layer
+                // TODO this seems like the wrong place for this
+                for (let i = cell.length - 1; i >= 0; i--) {
+                    if (cell[i].type.draw_layer === template.type.draw_layer) {
+                        cell.splice(i, 1);
+                    }
+                }
+                this.editor.mark_cell_dirty(cell);
+            }
         }
         else {
-            // Default operation: only erase whatever's on the same layer
-            this.editor.place_in_cell(x, y, this.editor.palette_selection);
+            // Draw
+            if (! template)
+                return;
+            if (this.modifier === 'shift') {
+                // Aggressive mode: erase whatever's already in the cell
+                let cell = this.cell(x, y);
+                cell.length = 0;
+                let type = this.editor.palette_selection.type;
+                if (type.draw_layer !== 0) {
+                    cell.push({type: TILE_TYPES.floor});
+                }
+                this.editor.place_in_cell(x, y, template);
+            }
+            else {
+                // Default operation: only erase whatever's on the same layer
+                this.editor.place_in_cell(x, y, template);
+            }
         }
     }
 }
@@ -491,6 +521,8 @@ class ForceFloorOperation extends DrawOperation {
 // TODO entered cell should get blank railroad?
 // TODO maybe place a straight track in the new cell so it looks like we're doing something, then
 // fix it if it wasn't there?
+// TODO gonna need an ice tool too, so maybe i can merge all three with some base thing that tracks
+// the directions the mouse is moving?  or is FF tool too different?
 class TrackOperation extends DrawOperation {
     start() {
         // Do nothing to start; we only lay track when the mouse leaves a cell
@@ -549,9 +581,18 @@ class TrackOperation extends DrawOperation {
             let cell = this.cell(prevx, prevy);
             let terrain = cell[0];
             if (terrain.type.name === 'railroad') {
-                terrain.tracks |= bit;
+                if (this.alt_mode) {
+                    // Erase
+                    // TODO fix track switch?
+                    // TODO if this leaves tracks === 0, replace with floor?
+                    terrain.tracks &= ~bit;
+                }
+                else {
+                    // Draw
+                    terrain.tracks |= bit;
+                }
             }
-            else {
+            else if (! this.alt_mode) {
                 terrain = { type: TILE_TYPES['railroad'] };
                 terrain.type.populate_defaults(terrain);
                 terrain.tracks |= bit;
@@ -561,6 +602,171 @@ class TrackOperation extends DrawOperation {
             prevx = x;
             prevy = y;
             this.entry_direction = DIRECTIONS[exit_direction].opposite;
+        }
+    }
+}
+
+class WireOperation extends DrawOperation {
+    start() {
+        if (this.modifier === 'ctrl') {
+            // Place or remove wire tunnels
+            let cell = this.cell(this.gx0f, this.gy0f);
+            if (! cell)
+                return;
+
+            let direction;
+            // Use the offset from the center to figure out which edge of the tile to affect
+            let xoff = this.gx0f % 1 - 0.5;
+            let yoff = this.gy0f % 1 - 0.5;
+            if (Math.abs(xoff) > Math.abs(yoff)) {
+                if (xoff > 0) {
+                    direction = 'east';
+                }
+                else {
+                    direction = 'west';
+                }
+            }
+            else {
+                if (yoff > 0) {
+                    direction = 'south';
+                }
+                else {
+                    direction = 'north';
+                }
+            }
+            let bit = DIRECTIONS[direction].bit;
+
+            for (let tile of cell) {
+                if (tile.type.name !== 'floor')
+                    continue;
+                if (this.alt_mode) {
+                    tile.wire_tunnel_directions &= ~bit;
+                }
+                else {
+                    tile.wire_tunnel_directions |= bit;
+                }
+            }
+            return;
+        }
+    }
+    step(mx, my, gxf, gyf) {
+        if (this.modifier === 'ctrl') {
+            // Wire tunnels don't support dragging
+            // TODO but maybe they should??  makes erasing a lot of them easier at least
+            return;
+        }
+
+        // Wire is interesting.  Consider this diagram.
+        // +-------+
+        // | . A . |
+        // |...A...|
+        // | . A . |
+        // |BBB+CCC|
+        // | . D . |
+        // |...D...|
+        // | . D . |
+        // +-------+
+        // In order to know which of the four wire pieces in a cell (A, B, C, D) someone is trying
+        // to draw over, we use a quarter-size grid, indicated by the dots.  Then any mouse movement
+        // that crosses the first horizontal grid line means we should draw wire A.
+        // (Note that crossing either a tile boundary or the middle of a cell doesn't mean anything;
+        // for example, dragging the mouse horizontally across the A wire is meaningless.)
+        // TODO maybe i should just have a walk_grid variant that yields line crossings, christ
+        let prevqx = null, prevqy = null;
+        for (let [qx, qy] of walk_grid(
+            this.gx1f * 4, this.gy1f * 4, gxf * 4, gyf * 4,
+            // See comment in iter_touched_cells
+            -1, -1, this.editor.stored_level.size_x * 2, this.editor.stored_level.size_y * 2))
+        {
+            if (prevqx === null || prevqy === null) {
+                prevqx = qx;
+                prevqy = qy;
+                continue;
+            }
+
+            // Figure out which grid line we've crossed; direction doesn't matter, so we just get
+            // the index of the line, which matches the coordinate of the cell to the right/bottom
+            // FIXME 'continue' means we skip the update of prevs, solution is really annoying
+            // FIXME if you trace around just the outside of a tile, you'll get absolute nonsense:
+            // +---+---+
+            // |   |   |
+            // |   |.+ |
+            // |   |.| |
+            // +---+.--+
+            // | ....  |
+            // | +-|   |
+            // |   |   |
+            // +---+---+
+            let wire_direction;
+            let x, y;
+            if (qx === prevqx) {
+                // Vertical
+                let line = Math.max(qy, prevqy);
+                // Even crossings don't correspond to a wire
+                if (line % 2 === 0) {
+                    prevqx = qx;
+                    prevqy = qy;
+                    continue;
+                }
+
+                // Convert to real coordinates
+                x = Math.floor(qx / 4);
+                y = Math.floor(line / 4);
+
+                if (line % 4 === 1) {
+                    // Consult the diagram!
+                    wire_direction = 'north';
+                }
+                else {
+                    wire_direction = 'south';
+                }
+            }
+            else {
+                // Horizontal; same as above
+                let line = Math.max(qx, prevqx);
+                if (line % 2 === 0) {
+                    prevqx = qx;
+                    prevqy = qy;
+                    continue;
+                }
+
+                x = Math.floor(line / 4);
+                y = Math.floor(qy / 4);
+
+                if (line % 4 === 1) {
+                    wire_direction = 'west';
+                }
+                else {
+                    wire_direction = 'east';
+                }
+            }
+
+            if (! this.editor.is_in_bounds(x, y)) {
+                prevqx = qx;
+                prevqy = qy;
+                continue;
+            }
+
+            let cell = this.cell(x, y);
+            for (let tile of cell) {
+                // TODO probably a better way to do this
+                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off'].indexOf(tile.type.name) < 0)
+                    continue;
+
+                tile.wire_directions = tile.wire_directions ?? 0;
+                if (this.alt_mode) {
+                    // Erase
+                    tile.wire_directions &= ~DIRECTIONS[wire_direction].bit;
+                }
+                else {
+                    // Draw
+                    tile.wire_directions |= DIRECTIONS[wire_direction].bit;
+                }
+                // TODO this.editor.mark_tile_dirty(tile);
+            }
+
+            prevqx = qx;
+            prevqy = qy;
         }
     }
 }
@@ -590,6 +796,7 @@ const ADJUST_TOGGLES_CCW = {};
         ['water', 'turtle'],
         ['no_player1_sign', 'no_player2_sign'],
         ['flame_jet_off', 'flame_jet_on'],
+        ['light_switch_off', 'light_switch_on'],
     ])
     {
         for (let [i, tile] of cycle.entries()) {
@@ -616,13 +823,21 @@ class AdjustOperation extends MouseOperation {
         for (let i = cell.length - 1; i >= 0; i--) {
             let tile = cell[i];
 
-            if (this.editor.rotate_tile_right(tile)) {
+            let rotated;
+            if (this.alt_mode) {
+                // Reverse, go counterclockwise
+                rotated = this.editor.rotate_tile_left(tile);
+            }
+            else {
+                rotated = this.editor.rotate_tile_right(tile);
+            }
+            if (rotated) {
                 this.editor.mark_tile_dirty(tile);
                 break;
             }
 
             // Toggle tiles that go in obvious pairs
-            let other = ADJUST_TOGGLES_CW[tile.type.name];
+            let other = (this.alt_mode ? ADJUST_TOGGLES_CCW : ADJUST_TOGGLES_CW)[tile.type.name];
             if (other) {
                 tile.type = TILE_TYPES[other];
                 this.editor.mark_tile_dirty(tile);
@@ -826,7 +1041,7 @@ const EDITOR_TOOLS = {
         desc: "Place, erase, and select tiles.\nLeft click: draw\nRight click: erase\nShift: Replace all layers\nCtrl-click: eyedrop",
         uses_palette: true,
         op1: PencilOperation,
-        //op2: EraseOperation,
+        op2: PencilOperation,
         //hover: show current selection under cursor
     },
     line: {
@@ -868,6 +1083,7 @@ const EDITOR_TOOLS = {
         name: "Adjust",
         desc: "Edit existing tiles.\nLeft click: rotate actor or toggle terrain\nRight click: rotate or toggle in reverse\nShift: always target terrain\nCtrl-click: edit properties of complex tiles\n(wires, railroads, hints, etc.)",
         op1: AdjustOperation,
+        op2: AdjustOperation,
     },
     connect: {
         // TODO not implemented
@@ -879,7 +1095,9 @@ const EDITOR_TOOLS = {
         // TODO not implemented
         icon: 'icons/tool-wire.png',
         name: "Wire",
-        desc: "Draw CC2 wiring",
+        desc: "Edit CC2 wiring.\nLeft click: draw wires\nRight click: erase wires\nCtrl-click: toggle tunnels (floor only)",
+        op1: WireOperation,
+        op2: WireOperation,
     },
     camera: {
         icon: 'icons/tool-camera.png',
@@ -894,7 +1112,7 @@ const EDITOR_TOOLS = {
     // slade when you have some selected?
     // TODO ah, railroads...
 };
-const EDITOR_TOOL_ORDER = ['pencil', 'adjust', 'force-floors', 'tracks', 'camera'];
+const EDITOR_TOOL_ORDER = ['pencil', 'adjust', 'force-floors', 'tracks', 'wire', 'camera'];
 
 // TODO this MUST use a LL tileset!
 const EDITOR_PALETTE = [{
@@ -1022,6 +1240,8 @@ const EDITOR_PALETTE = [{
         'logic_gate/counter',
         'button_pink',
         'button_black',
+        'light_switch_off',
+        'light_switch_on',
         'purple_floor',
         'purple_wall',
         'button_gray',
@@ -1759,6 +1979,10 @@ export class Editor extends PrimaryView {
         else {
             this.renderer.draw();
         }
+    }
+
+    mark_cell_dirty(cell) {
+        this.renderer.draw();
     }
 
     is_in_bounds(x, y) {
