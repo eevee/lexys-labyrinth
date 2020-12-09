@@ -424,10 +424,15 @@ class PencilOperation extends DrawOperation {
             else if (template) {
                 // Erase whatever's on the same layer
                 // TODO this seems like the wrong place for this
+                let layer = template.type.draw_layer;
                 for (let i = cell.length - 1; i >= 0; i--) {
-                    if (cell[i].type.draw_layer === template.type.draw_layer) {
+                    if (cell[i].type.draw_layer === layer) {
                         cell.splice(i, 1);
                     }
+                }
+                // Don't allow erasing the floor entirely
+                if (layer === 0) {
+                    cell.unshift({type: TILE_TYPES.floor});
                 }
                 this.editor.mark_cell_dirty(cell);
             }
@@ -2007,6 +2012,7 @@ export class Editor extends PrimaryView {
         // Replace whatever's on the same layer
         // TODO probably not the best heuristic yet, since i imagine you can
         // combine e.g. the tent with thin walls
+        // TODO should preserve wiring if possible too
         for (let i = cell.length - 1; i >= 0; i--) {
             if (cell[i].type.draw_layer === tile.type.draw_layer) {
                 cell.splice(i, 1);
