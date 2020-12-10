@@ -463,6 +463,8 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             if (other.type.name === 'directional_block') {
                 // Directional blocks are rotated when they leave
+                // FIXME this isn't right, they rotate by the difference between their attempted
+                // move and their redirected move
                 if (other.direction === DIRECTIONS[me.entered_direction].right) {
                     let new_arrows = new Set;
                     for (let arrow of other.arrows) {
@@ -495,6 +497,9 @@ const TILE_TYPES = {
 
             let legal_exits = new Set;
             let entered_from = DIRECTIONS[me.entered_direction].opposite;
+            if (other.type.can_reverse_on_railroad) {
+                legal_exits.add(entered_from);
+            }
             for (let track of me.type._iter_tracks(me)) {
                 if (track[0] === entered_from) {
                     legal_exits.add(track[1]);
@@ -871,6 +876,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire', 'flame_jet_on']),
+        can_reverse_on_railroad: true,
         movement_speed: 4,
     },
     ice_block: {
@@ -880,6 +886,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
+        can_reverse_on_railroad: true,
         movement_speed: 4,
         pushes: {
             ice_block: true,
@@ -897,6 +904,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
+        can_reverse_on_railroad: true,
         movement_speed: 4,
         allows_push(me, direction) {
             return me.arrows && me.arrows.has(direction);
@@ -1112,31 +1120,127 @@ const TILE_TYPES = {
             }
         },
     },
+    // FIXME blue teleporters transmit current 4 ways.  red don't transmit it at all
     teleport_blue: {
         draw_layer: DRAW_LAYERS.terrain,
         teleport_dest_order(me, level, other) {
-            // FIXME wired teleports form a network, which is complicated, and logic gates
-            // complicate it further
-            return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
+            if (! me.wire_directions) {
+                // TODO cc2 has a bug where, once it wraps around to the bottom right, it seems to
+                // forget that it was ever looking for an unwired teleport and will just grab the
+                // first one it sees
+                return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
+            }
+
+            // Wired blue teleports form a network, which means we have to walk all wires from this
+            // point, collect a list of all possible blue teleports, and then sort them so we can
+            // try them in the right order.
+            // Complicating this somewhat, logic gates act as diodes: we can walk through a logic
+            // gate if we're connected to one of its inputs AND its output is enabled, but we can't
+            // walk "backwards" through it.
+            // (In CC2, this is even worse; if the game searches the circuit and ONLY finds a logic
+            // gate, it seems to recurse from there, breaking the expected order.  Worse, if it then
+            // can't find a destination teleporter, it teleports the actor "INTO" the logic gate
+            // itself; if a destination later presents itself, the actor will immediately appear,
+            // but if not, it might linger THROUGH A RESTART OR EVEN EDIT OF THE LEVEL, possibly
+            // appearing on a later playthrough or possibly crashing the game.  Suffice to say, this
+            // behavior is not and will never be emulated.  No level in CC2 or even CC2LP1 uses blue
+            // teleporters wired into logic gates, so even the ordering is not interesting imo.)
+            // Anyway, let's do a breadth-first search for teleporters.
+            let seeds = [me.cell];
+            let found = [];
+            let seen = new Set;
+            while (seeds.length > 0) {
+                console.log(seeds);
+                let next_seeds = [];
+                for (let cell of seeds) {
+                    if (seen.has(cell))
+                        continue;
+                    seen.add(cell);
+
+                    let wired = cell.get_wired_tile();
+                    if (! wired || wired.wire_directions === 0)
+                        continue;
+
+                    // Check for a blue teleporter
+                    let dest;
+                    for (let tile of cell) {
+                        if (tile.type.name === 'teleport_blue') {
+                            found.push(tile);
+                            break;
+                        }
+                    }
+
+                    // Search our neighbors
+                    for (let direction of Object.keys(DIRECTIONS)) {
+                        if (! (wired.wire_directions & DIRECTIONS[direction].bit))
+                            continue;
+                        let neighbor = level.get_neighboring_cell(cell, direction);
+                        if (! neighbor || seen.has(neighbor))
+                            continue;
+                        let neighbor_wired = neighbor.get_wired_tile();
+                        if (! neighbor_wired)
+                            continue;
+                        if (! (neighbor_wired.wire_directions & DIRECTIONS[DIRECTIONS[direction].opposite].bit))
+                            continue;
+
+                        // TODO check for logic gate
+                        // TODO need to know the direction we came in so we can get the right ones
+                        // going out!
+                        // FIXME this needs to understand crossings, and both this and basic wiring
+                        // need to understand how blue/red teleports convey current
+
+                        next_seeds.push(neighbor);
+                    }
+                }
+                seeds = next_seeds;
+            }
+
+            // Now that we have a list of candidate exits, sort it in reverse reading order,
+            // starting from ourselves.  Easiest way to do this is to make a map of cell indices,
+            // shifted so that we're at zero, then sort in reverse
+            let dest_indices = new Map;
+            let our_index = me.cell.x + me.cell.y * level.size_x;
+            let level_size = level.size_x * level.size_y;
+            for (let dest of found) {
+                dest_indices.set(dest, (
+                    (dest.cell.x + dest.cell.y * level.size_x)
+                    - our_index + level_size
+                ) % level_size);
+            }
+            found.sort((a, b) => dest_indices.get(b) - dest_indices.get(a));
+            return found;
         },
     },
     teleport_red: {
         draw_layer: DRAW_LAYERS.terrain,
         teleport_try_all_directions: true,
         teleport_allow_override: true,
+        _is_active(me) {
+            return ! (me.wire_directions && (me.cell.powered_edges & me.wire_directions) === 0);
+        },
         *teleport_dest_order(me, level, other) {
             // Wired red teleporters can be turned off, which disconnects them from every other red
-            // teleporter (but they still teleport to themselves)
-            if (level.is_cell_wired(me.cell) && me.cell.powered_edges === 0) {
+            // teleporter (but they still teleport to themselves).
+            // A red teleporter is considered wired only if it has wires itself.  However, CC2 also
+            // has the bizarre behavior of NOT considering a red teleporter wired if none of its
+            // wires are directly connected to another neighboring wire.
+            // FIXME implement that, merge current code with is_cell_wired
+            if (! this._is_active(me)) {
                 yield me;
                 return;
             }
             for (let tile of level.iter_tiles_in_reading_order(me.cell, 'teleport_red')) {
-                if (tile !== me && level.is_cell_wired(tile.cell) && tile.cell.powered_edges === 0)
-                    continue;
-                yield tile;
+                if (tile === me || this._is_active(tile)) {
+                    yield tile;
+                }
             }
         },
+        // TODO inactive ones don't animate
+        /*
+        visual_state(me) {
+            return this._is_active(me) ? 'active' : 'inactive';
+        },
+        */
     },
     teleport_green: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -1555,6 +1659,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all,
         is_actor: true,
         is_block: true,
+        can_reverse_on_railroad: true,
         movement_speed: 4,
     },
 
