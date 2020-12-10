@@ -395,28 +395,6 @@ class Player extends PrimaryView {
             this.current_keys_new.add('c');
             ev.target.blur();
         });
-        // Demo playback
-        this.root.querySelector('.demo-controls .demo-play').addEventListener('click', ev => {
-            if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
-                new ConfirmOverlay(this.conductor, "Abandon your progress and watch the replay?", () => {
-                    this.play_demo();
-                });
-            }
-            else {
-                this.play_demo();
-            }
-        });
-        // FIXME consolidate these into debug controls
-        /*
-        this.root.querySelector('.demo-controls .demo-step-1').addEventListener('click', ev => {
-            this.advance_by(1);
-            this._redraw();
-        });
-        this.root.querySelector('.demo-controls .demo-step-4').addEventListener('click', ev => {
-            this.advance_by(4);
-            this._redraw();
-        });
-        */
 
         this.use_interpolation = true;
         this.renderer = new CanvasRenderer(this.conductor.tileset);
@@ -721,7 +699,19 @@ class Player extends PrimaryView {
             this.play_speed = parseInt(numer, 10) / parseInt(denom ?? '1', 10);
         });
 
+        this.debug.replay_button = make_button("view replay", () => {
+            if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
+                new ConfirmOverlay(this.conductor, "Restart this level and watch the replay?", () => {
+                    this.play_demo();
+                });
+            }
+            else {
+                this.play_demo();
+            }
+        });
+        this._update_replay_button_enabled();
         debug_el.querySelector('.-buttons').append(
+            this.debug.replay_button,
             make_button("green button", () => {
                 TILE_TYPES['button_green'].do_button(this.level);
                 this._redraw();
@@ -768,6 +758,12 @@ class Player extends PrimaryView {
         }
     }
 
+    _update_replay_button_enabled() {
+        if (this.debug.replay_button) {
+            this.debug.replay_button.disabled = ! (this.level && this.level.stored_level.demo);
+        }
+    }
+
     activate() {
         // We can't resize when we're not visible, so do it now
         super.activate();
@@ -800,10 +796,11 @@ class Player extends PrimaryView {
         this.level.sfx = this.sfx_player;
         this.renderer.set_level(this.level);
         this.update_viewport_size();
-        this.root.classList.toggle('--has-demo', !!this.level.stored_level.demo);
         // TODO base this on a hash of the UA + some identifier for the pack + the level index.  StoredLevel doesn't know its own index atm...
         this.change_music(this.conductor.level_index % SOUNDTRACK.length);
         this._clear_state();
+
+        this._update_replay_button_enabled();
     }
 
     update_viewport_size() {

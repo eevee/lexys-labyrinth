@@ -832,20 +832,13 @@ dl.score-chart .-sum {
     display: none;
 }
 
-.play-controls,
-.demo-controls {
+.play-controls {
     display: flex;
     align-items: center;
     gap: 0.25em;
 }
 .play-controls {
     align-self: start;
-}
-.demo-controls {
-    display: none;
-}
-main.--has-demo .demo-controls {
-    display: flex;
 }
 
 /* Debug stuff */
@@ -959,10 +952,6 @@ main.--has-demo .demo-controls {
     }
     #player .controls {
         flex-direction: column;
-    }
-    main.--has-demo .demo-controls {
-        /* TODO need a better place for this! */
-        display: none;
     }
     #player > .-main-area {
         /* Rearrange the grid to be vertical */
