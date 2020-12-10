@@ -1531,6 +1531,7 @@ export class Level {
     win() {
         this.sfx.play_once('win');
         this.state = 'success';
+        this._set_tile_prop(this.player, 'exited', true);
         throw new GameEnded;
     }
 

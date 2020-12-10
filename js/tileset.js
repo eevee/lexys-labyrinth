@@ -454,6 +454,7 @@ export const CC2_TILESET_LAYOUT = {
             south: [2, 23],
             west: [10, 23],
         },
+        exited: 'normal',
         // These are frames from the splash/explosion animations
         drowned: [5, 5],
         slimed: [5, 5],
@@ -577,6 +578,7 @@ export const CC2_TILESET_LAYOUT = {
             south: [2, 28],
             west: [10, 28],
         },
+        exited: 'normal',
         // These are frames from the splash/explosion animations
         drowned: [5, 5],
         slimed: [5, 5],
@@ -817,6 +819,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
             west: [3, 33],
         },
         forced: 'skating',
+        exited: [14, 32],
         burned: {
             north: [4, 33],
             east: [5, 33],
@@ -825,8 +828,15 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
         },
         slimed: [1, 38],
     }),
-    // TODO player2 equivalents
     player2: Object.assign({}, CC2_TILESET_LAYOUT.player2, {
+        // TODO skating
+        exited: [15, 32],
+        burned: {
+            north: [12, 33],
+            east: [13, 33],
+            south: [14, 33],
+            west: [15, 33],
+        },
         slimed: [1, 38],
     }),
     bogus_player_burned_fire: {

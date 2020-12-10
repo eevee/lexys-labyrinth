@@ -63,6 +63,9 @@ function player_visual_state(me) {
     else if (me.fail_reason) {
         return 'failed';
     }
+    else if (me.exited) {
+        return 'exited';
+    }
     else if (me.cell && (me.previous_cell || me.cell).some(t => t.type.name === 'water')) {
         // CC2 shows a swimming pose while still in water, or moving away from water
         return 'swimming';
