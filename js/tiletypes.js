@@ -479,8 +479,9 @@ const TILE_TYPES = {
                 }
             }
 
-            // FIXME this only happens if we're unwired, but i don't have a way to check that atm
-            me.type._switch_track(me, level);
+            if (! level.is_cell_wired(me.cell)) {
+                me.type._switch_track(me, level);
+            }
         },
         on_power(me, level) {
             me.type._switch_track(me, level);
@@ -517,8 +518,6 @@ const TILE_TYPES = {
             // FIXME i think in this case the actor gets stuck, but, facing which way?
             return direction;
         },
-        // FIXME track switches on depart or power or gray button
-        // FIXME rotate dir blocks
     },
 
     // Locked doors
@@ -1116,6 +1115,8 @@ const TILE_TYPES = {
     teleport_blue: {
         draw_layer: DRAW_LAYERS.terrain,
         teleport_dest_order(me, level, other) {
+            // FIXME wired teleports form a network, which is complicated, and logic gates
+            // complicate it further
             return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
         },
     },
@@ -1123,8 +1124,18 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         teleport_try_all_directions: true,
         teleport_allow_override: true,
-        teleport_dest_order(me, level, other) {
-            return level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
+        *teleport_dest_order(me, level, other) {
+            // Wired red teleporters can be turned off, which disconnects them from every other red
+            // teleporter (but they still teleport to themselves)
+            if (level.is_cell_wired(me.cell) && me.cell.powered_edges === 0) {
+                yield me;
+                return;
+            }
+            for (let tile of level.iter_tiles_in_reading_order(me.cell, 'teleport_red')) {
+                if (tile !== me && level.is_cell_wired(tile.cell) && tile.cell.powered_edges === 0)
+                    continue;
+                yield tile;
+            }
         },
     },
     teleport_green: {

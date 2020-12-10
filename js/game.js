@@ -1389,6 +1389,22 @@ export class Level {
         }
     }
 
+    is_cell_wired(cell) {
+        for (let direction of Object.keys(DIRECTIONS)) {
+            let neighbor = this.get_neighboring_cell(cell, direction);
+            if (! neighbor)
+                continue;
+
+            let wired = neighbor.get_wired_tile();
+            if (! wired)
+                continue;
+
+            if (wired.wire_directions & DIRECTIONS[DIRECTIONS[direction].opposite].bit)
+                return true;
+        }
+        return false;
+    }
+
     // -------------------------------------------------------------------------
     // Undo handling
 
