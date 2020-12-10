@@ -851,6 +851,11 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     // Custom tiles
     popwall2: [9, 32],
     bestowal_bow: [10, 32],
+    circuit_block: {
+        base: [13, 32],
+        wired: [11, 32],
+        wired_cross: [12, 32],
+    },
 
     // Blob and walker in all four directions
     blob: {

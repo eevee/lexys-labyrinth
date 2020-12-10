@@ -1537,6 +1537,15 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'light_switch_off');
         },
     },
+    // LL tile: circuit block, overrides the wiring on the floor below (if any)
+    circuit_block: {
+        draw_layer: DRAW_LAYERS.actor,
+        collision_mask: COLLISION.block_cc2,
+        blocks_collision: COLLISION.all,
+        is_actor: true,
+        is_block: true,
+        movement_speed: 4,
+    },
 
     // Time alteration
     stopwatch_bonus: {
@@ -1664,6 +1673,7 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             directional_block: true,
+            circuit_block: true,
         },
         movement_speed: 4,
     },
@@ -1979,6 +1989,7 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             directional_block: true,
+            circuit_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -2000,6 +2011,7 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             directional_block: true,
+            circuit_block: true,
         },
         infinite_items: {
             key_yellow: true,
@@ -2020,6 +2032,7 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             directional_block: true,
+            circuit_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -2049,6 +2062,7 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             directional_block: true,
+            circuit_block: true,
         },
         infinite_items: {
             key_yellow: true,

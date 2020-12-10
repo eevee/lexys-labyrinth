@@ -753,9 +753,9 @@ class WireOperation extends DrawOperation {
             }
 
             let cell = this.cell(x, y);
-            for (let tile of cell) {
+            for (let tile of Array.from(cell).reverse()) {
                 // TODO probably a better way to do this
-                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off'].indexOf(tile.type.name) < 0)
+                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block'].indexOf(tile.type.name) < 0)
                     continue;
 
                 tile.wire_directions = tile.wire_directions ?? 0;
@@ -768,6 +768,7 @@ class WireOperation extends DrawOperation {
                     tile.wire_directions |= DIRECTIONS[wire_direction].bit;
                 }
                 // TODO this.editor.mark_tile_dirty(tile);
+                break;
             }
 
             prevqx = qx;
@@ -1250,6 +1251,7 @@ const EDITOR_PALETTE = [{
         'purple_floor',
         'purple_wall',
         'button_gray',
+        'circuit_block/xxx',
     ],
 }];
 
@@ -1272,6 +1274,7 @@ const SPECIAL_PALETTE_ENTRIES = {
     'logic_gate/latch-cw':  { name: 'logic_gate', direction: 'north', gate_type: 'latch-cw' },
     'logic_gate/latch-ccw': { name: 'logic_gate', direction: 'north', gate_type: 'latch-ccw' },
     'logic_gate/counter':   { name: 'logic_gate', direction: 'north', gate_type: 'counter', memory: 0 },
+    'circuit_block/xxx':    { name: 'circuit_block', direction: 'south', wire_directions: 0xf },
 };
 const _RAILROAD_ROTATED_LEFT = [3, 0, 1, 2, 5, 4];
 const _RAILROAD_ROTATED_RIGHT = [1, 2, 3, 0, 5, 4];
@@ -1364,6 +1367,11 @@ const SPECIAL_PALETTE_BEHAVIOR = {
             if (tile.entered_direction) {
                 tile.entered_direction = DIRECTIONS[tile.entered_direction].right;
             }
+        },
+    },
+    circuit_block: {
+        pick_palette_entry(tile) {
+            return 'circuit_block/xxx';
         },
     },
 };
