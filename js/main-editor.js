@@ -1169,7 +1169,7 @@ const EDITOR_PALETTE = [{
         'flippers', 'fire_boots', 'cleats', 'suction_boots',
         'bribe', 'railroad_sign', 'hiking_boots', 'speed_boots',
         'xray_eye', 'helmet', 'foil', 'lightning_bolt',
-        'bowling_ball', 'dynamite', 'no_sign', 'bestowal_bow',
+        'bowling_ball', 'dynamite', 'no_sign', 'gift_bow',
         'score_10', 'score_100', 'score_1000', 'score_2x',
     ],
 }, {
@@ -1198,12 +1198,12 @@ const EDITOR_PALETTE = [{
     tiles: [
         'dirt_block',
         'ice_block',
-        'directional_block/0',
-        'directional_block/1',
-        'directional_block/2a',
-        'directional_block/2o',
-        'directional_block/3',
-        'directional_block/4',
+        'frame_block/0',
+        'frame_block/1',
+        'frame_block/2a',
+        'frame_block/2o',
+        'frame_block/3',
+        'frame_block/4',
 
         'green_floor',
         'green_wall',
@@ -1256,12 +1256,12 @@ const EDITOR_PALETTE = [{
 }];
 
 const SPECIAL_PALETTE_ENTRIES = {
-    'directional_block/0':  { name: 'directional_block', arrows: new Set },
-    'directional_block/1':  { name: 'directional_block', arrows: new Set(['north']) },
-    'directional_block/2a': { name: 'directional_block', arrows: new Set(['north', 'east']) },
-    'directional_block/2o': { name: 'directional_block', arrows: new Set(['north', 'south']) },
-    'directional_block/3':  { name: 'directional_block', arrows: new Set(['north', 'east', 'south']) },
-    'directional_block/4':  { name: 'directional_block', arrows: new Set(['north', 'east', 'south', 'west']) },
+    'frame_block/0':  { name: 'frame_block', direction: 'south', arrows: new Set },
+    'frame_block/1':  { name: 'frame_block', direction: 'north', arrows: new Set(['north']) },
+    'frame_block/2a': { name: 'frame_block', direction: 'north', arrows: new Set(['north', 'east']) },
+    'frame_block/2o': { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'south']) },
+    'frame_block/3':  { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south']) },
+    'frame_block/4':  { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south', 'west']) },
     // FIXME these should be additive/subtractive, but a track picked up from the level should replace
     'railroad/straight':    { name: 'railroad', tracks: 1 << 5, track_switch: null, entered_direction: 'north' },
     'railroad/curve':       { name: 'railroad', tracks: 1 << 0, track_switch: null, entered_direction: 'north' },
@@ -1279,19 +1279,19 @@ const SPECIAL_PALETTE_ENTRIES = {
 const _RAILROAD_ROTATED_LEFT = [3, 0, 1, 2, 5, 4];
 const _RAILROAD_ROTATED_RIGHT = [1, 2, 3, 0, 5, 4];
 const SPECIAL_PALETTE_BEHAVIOR = {
-    directional_block: {
+    frame_block: {
         pick_palette_entry(tile) {
             if (tile.arrows.size === 2) {
                 let [a, b] = tile.arrows.keys();
                 if (a === DIRECTIONS[b].opposite) {
-                    return 'directional_block/2o';
+                    return 'frame_block/2o';
                 }
                 else {
-                    return 'directional_block/2a';
+                    return 'frame_block/2a';
                 }
             }
             else {
-                return `directional_block/${tile.arrows.size}`;
+                return `frame_block/${tile.arrows.size}`;
             }
         },
         rotate_left(tile) {

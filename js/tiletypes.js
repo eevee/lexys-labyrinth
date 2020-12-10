@@ -466,7 +466,7 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'entered_direction', other.direction);
         },
         on_depart(me, level, other) {
-            if (other.type.name === 'directional_block') {
+            if (other.type.name === 'frame_block') {
                 // Directional blocks are rotated when they leave
                 // FIXME this isn't right, they rotate by the difference between their attempted
                 // move and their redirected move
@@ -627,7 +627,7 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'dirt');
             }
-            else if (other.type.name === 'directional_block') {
+            else if (other.type.name === 'frame_block') {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'floor');
             }
@@ -868,7 +868,7 @@ const TILE_TYPES = {
             return false;
         },
     },
-    bestowal_bow: {
+    gift_bow: {
         draw_layer: DRAW_LAYERS.item_mod,
         item_modifier: 'pickup',
     },
@@ -895,10 +895,10 @@ const TILE_TYPES = {
         movement_speed: 4,
         pushes: {
             ice_block: true,
-            directional_block: true,
+            frame_block: true,
         },
     },
-    directional_block: {
+    frame_block: {
         // TODO directional, obviously
         // TODO floor in water
         // TODO destroyed in slime
@@ -917,7 +917,7 @@ const TILE_TYPES = {
         pushes: {
             dirt_block: true,
             ice_block: true,
-            directional_block: true,
+            frame_block: true,
         },
     },
     green_floor: {
@@ -1027,7 +1027,7 @@ const TILE_TYPES = {
                 // FIXME add this underneath, just above the cloner, so the new actor is on top
                 let new_template = new actor.constructor(type, direction);
                 // TODO maybe make a type method for this
-                if (type.name === 'directional_block') {
+                if (type.name === 'frame_block') {
                     new_template.arrows = new Set(actor.arrows);
                 }
                 level.add_tile(new_template, me.cell);
@@ -1793,7 +1793,7 @@ const TILE_TYPES = {
         pushes: {
             dirt_block: true,
             ice_block: true,
-            directional_block: true,
+            frame_block: true,
             circuit_block: true,
         },
         movement_speed: 4,
@@ -1963,7 +1963,7 @@ const TILE_TYPES = {
             // actors who aren't supposed to have an inventory
             // TODO make this a...  flag?  i don't know?
             // TODO major difference from lynx...
-            if (other.type.name !== 'ice_block' && other.type.name !== 'directional_block') {
+            if (other.type.name !== 'ice_block' && other.type.name !== 'frame_block') {
                 level.attempt_take(other, me);
             }
         },
@@ -2108,7 +2108,7 @@ const TILE_TYPES = {
         pushes: {
             dirt_block: true,
             ice_block: true,
-            directional_block: true,
+            frame_block: true,
             circuit_block: true,
         },
         infinite_items: {
@@ -2130,7 +2130,7 @@ const TILE_TYPES = {
         pushes: {
             dirt_block: true,
             ice_block: true,
-            directional_block: true,
+            frame_block: true,
             circuit_block: true,
         },
         infinite_items: {
@@ -2151,7 +2151,7 @@ const TILE_TYPES = {
         pushes: {
             dirt_block: true,
             ice_block: true,
-            directional_block: true,
+            frame_block: true,
             circuit_block: true,
         },
         infinite_items: {
@@ -2181,7 +2181,7 @@ const TILE_TYPES = {
         pushes: {
             dirt_block: true,
             ice_block: true,
-            directional_block: true,
+            frame_block: true,
             circuit_block: true,
         },
         infinite_items: {

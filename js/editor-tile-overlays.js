@@ -85,7 +85,7 @@ class HintTileEditor extends TileEditorOverlay {
     }
 }
 
-class DirectionalBlockTileEditor extends TileEditorOverlay {
+class FrameBlockTileEditor extends TileEditorOverlay {
     constructor(conductor) {
         super(conductor);
 
@@ -244,7 +244,7 @@ class RailroadTileEditor extends TileEditorOverlay {
 export const TILES_WITH_PROPS = {
     floor_letter: LetterTileEditor,
     hint: HintTileEditor,
-    directional_block: DirectionalBlockTileEditor,
+    frame_block: FrameBlockTileEditor,
     railroad: RailroadTileEditor,
     // TODO various wireable tiles (hmm not sure how that ui works)
     // TODO initial value of counter

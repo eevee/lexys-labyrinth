@@ -159,7 +159,7 @@ export const CC2_TILESET_LAYOUT = {
     },
     popdown_floor_visible: [13, 5],
     no_sign: [14, 5],
-    directional_block: {
+    frame_block: {
         base: [15, 5],
         arrows: [3, 10],
     },
@@ -850,7 +850,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
 
     // Custom tiles
     popwall2: [9, 32],
-    bestowal_bow: [10, 32],
+    gift_bow: [10, 32],
     circuit_block: {
         base: [13, 32],
         wired: [11, 32],

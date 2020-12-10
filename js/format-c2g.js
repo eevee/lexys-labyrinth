@@ -624,7 +624,7 @@ const TILE_ENCODING = {
         has_next: true,
     },
     0x81: {
-        name: 'directional_block',
+        name: 'frame_block',
         extra_args: [
             arg_direction,
             {
