@@ -2070,7 +2070,7 @@ class Conductor {
                     "but disable all saving of scores until you reload the page!",
                     () => {
                         this.player.setup_debug();
-                        ev.target.src = '/icon-debug.png';
+                        ev.target.src = 'icon-debug.png';
                     },
                 ).open();
             }
