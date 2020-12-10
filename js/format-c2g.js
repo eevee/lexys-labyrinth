@@ -625,6 +625,7 @@ const TILE_ENCODING = {
     },
     0x81: {
         name: 'frame_block',
+        has_next: true,
         extra_args: [
             arg_direction,
             {
@@ -647,7 +648,6 @@ const TILE_ENCODING = {
                 },
             },
         ],
-        has_next: true,
     },
     0x82: {
         name: 'floor_mimic',
@@ -704,6 +704,18 @@ const TILE_ENCODING = {
     0x92: {
         name: 'hook',
         has_next: true,
+    },
+
+    // LL-specific tiles
+    0xe0: {
+        name: 'gift_bow',
+        has_next: true,
+    },
+    0xe1: {
+        name: 'circuit_block',
+        has_next: true,
+        modifier: modifier_wire,
+        extra_args: [arg_direction],
     },
 };
 const REVERSE_TILE_ENCODING = {};
