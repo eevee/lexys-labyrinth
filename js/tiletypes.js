@@ -1884,11 +1884,10 @@ const TILE_TYPES = {
         movement_speed: 4,
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
         decide_movement(me, level) {
-            // turn right: preserve current direction; if that doesn't work, turn right, then left,
-            // then back the way we came
-            // (same as fireball)
+            // turn left: preserve current direction; if that doesn't work, turn left, then right,
+            // then back the way we came (same as glider)
             let d = DIRECTIONS[me.direction];
-            return [me.direction, d.right, d.left, d.opposite];
+            return [me.direction, d.left, d.right, d.opposite];
         },
     },
     floor_mimic: {
