@@ -159,6 +159,11 @@ const TILE_TYPES = {
     wall: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
+        on_bump(me, level, other) {
+            if (other.has_item('foil')) {
+                level.transmute_tile(me, 'steel');
+            }
+        },
     },
     wall_custom_green: {
         draw_layer: DRAW_LAYERS.terrain,
