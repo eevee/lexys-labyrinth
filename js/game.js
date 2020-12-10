@@ -831,6 +831,7 @@ export class Level {
 
         // Record our speed, and halve it below if we're stepping onto a sliding tile
         let speed = actor.type.movement_speed;
+        let double_speed = false;
 
         let move = DIRECTIONS[direction].movement;
         if (!actor.cell) console.error(actor);
@@ -855,7 +856,6 @@ export class Level {
                 // enter it (similar to Cell.blocks_entering), but if the only thing blocking us is
                 // a pushable object, we have to do two more passes: one to push anything pushable,
                 // then one to check whether we're blocked again.
-                let has_slide_tile = false;
                 let blocked_by_pushable = false;
                 for (let tile of goal_cell) {
                     if (tile.blocks(actor, direction, this)) {
@@ -872,7 +872,7 @@ export class Level {
                         continue;
 
                     if (tile.type.slide_mode) {
-                        has_slide_tile = true;
+                        double_speed = true;
                     }
 
                     // Bump tiles that we're even attempting to move into; this mostly reveals
@@ -880,10 +880,6 @@ export class Level {
                     if (tile.type.on_bump) {
                         tile.type.on_bump(tile, this, actor);
                     }
-                }
-
-                if (has_slide_tile) {
-                    speed /= 2;
                 }
 
                 // If the only thing blocking us can be pushed, give that a shot
@@ -939,6 +935,9 @@ export class Level {
         }
 
         // We're clear!
+        if (double_speed || actor.has_item('speed_boots')) {
+            speed /= 2;
+        }
         this.move_to(actor, goal_cell, speed);
 
         // Set movement cooldown since we just moved
@@ -1191,12 +1190,14 @@ export class Level {
         for (let actor of this.actors) {
             if (! actor.cell)
                 continue;
-            // Only count when they're on a tile, not in transit!
-            // FIXME this causes us to power mechanisms next to us, but we're only supposed to touch
-            // wire we're standing on?
-            let emitting = actor.movement_cooldown === 0 && actor.has_item('lightning_bolt');
-            if (emitting) {
-                neighbors.push([actor.cell, 0x0f]);
+            // Only count when they're on a floor tile AND not in transit!
+            let emitting = 0;
+            if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
+                let wired_tile = actor.cell.get_wired_tile();
+                if (wired_tile && wired_tile.type.name === 'floor') {
+                    emitting = true;
+                    neighbors.push([actor.cell, wired_tile.wire_directions]);
+                }
             }
             if (emitting !== actor.emitting_edges) {
                 any_changed = true;

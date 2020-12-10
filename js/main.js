@@ -703,7 +703,7 @@ class Player extends PrimaryView {
             if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
                 new ConfirmOverlay(this.conductor, "Restart this level and watch the replay?", () => {
                     this.play_demo();
-                });
+                }).open();
             }
             else {
                 this.play_demo();
