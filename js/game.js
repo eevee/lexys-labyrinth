@@ -32,11 +32,16 @@ export class Tile {
     visual_position(tic_offset = 0) {
         let x = this.cell.x;
         let y = this.cell.y;
-        if (! this.previous_cell || ! this.animation_speed) {
+        if (! this.previous_cell || this.movement_speed === null) {
             return [x, y];
         }
         else {
-            let p = (this.animation_progress + tic_offset) / this.animation_speed;
+            // For a movement speed of N, the cooldown is set to N during the tic an actor starts
+            // moving, then advanced to N - 1 before the tic ends.  When movement finishes, the
+            // cooldown becomes 0 at the end of a tic, but the actor doesn't decide to move again
+            // until the start of the next tic.  Thus, actors interpolate "back in time" by up to a
+            // full tic; if the cooldown is N - 1 then they interpolate from N to N - 1, and so on.
+            let p = ((this.movement_speed - 1 - this.movement_cooldown) + tic_offset) / this.movement_speed;
             return [
                 (1 - p) * this.previous_cell.x + p * x,
                 (1 - p) * this.previous_cell.y + p * y,
@@ -538,6 +543,15 @@ export class Level {
             if (actor.movement_cooldown > 0)
                 continue;
 
+            if (actor.type.ttl) {
+                // This is purely an animation and it's finished now, so remove it
+                this.remove_tile(actor);
+                continue;
+            }
+            // Our cooldown is zero, so erase any trace of being in mid-movement
+            this._set_tile_prop(actor, 'previous_cell', null);
+            this._set_tile_prop(actor, 'movement_speed', null);
+
             // Teeth can only move the first 4 of every 8 tics, and mimics only the first 4 of every
             // 16, though "first" can be adjusted
             if (actor.slide_mode === null && actor.type.movement_parity &&
@@ -672,14 +686,6 @@ export class Level {
             }
 
             this.take_actor_turn(actor, actor.decision);
-            /*
-        }
-
-        for (let i = this.actors.length - 1; i >= 0; i--) {
-            let actor = this.actors[i];
-            if (! actor.cell)
-                continue;
-            */
         }
 
         if (this.toggle_green_objects) {
@@ -790,28 +796,14 @@ export class Level {
 
         if (actor.movement_cooldown > 0) {
             this._set_tile_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
-        }
-
-        if (actor.animation_speed) {
-            // Deal with movement animation
-            // FIXME this is super hokey and was introduced because blocks didn't have a movement
-            // cooldown, but it turns out they do actually, so, delete me?
-            this._set_tile_prop(actor, 'animation_progress', actor.animation_progress + 1);
-            if (actor.animation_progress >= actor.animation_speed) {
-                if (actor.type.ttl) {
-                    // This is purely an animation so it disappears once it's played
-                    this.remove_tile(actor);
-                    console.log(this.tic_counter, 'poof!');
-                    return moved;
-                }
-                this._set_tile_prop(actor, 'animation_progress', null);
-                this._set_tile_prop(actor, 'animation_speed', null);
-                // Step on the cell before erasing the previous one, for behavior like blobs
-                // spreading slime
-                if (! this.compat.tiles_react_instantly) {
+            if (actor.movement_cooldown <= 0) {
+                // Note that we don't clear movement_speed and previous_cell (or remove animations)
+                // until the start of the next tic, because animation interpolation still needs to
+                // know that we're finishing animating here, AND a couple effects (like blobs
+                // spreading slime) need to know about the previous cell in on_arrive
+                if (! actor.type.ttl && ! this.compat.tiles_react_instantly) {
                     this.step_on_cell(actor, actor.cell);
                 }
-                this._set_tile_prop(actor, 'previous_cell', null);
             }
         }
 
@@ -937,10 +929,12 @@ export class Level {
         if (double_speed || actor.has_item('speed_boots')) {
             speed /= 2;
         }
+
+        this._set_tile_prop(actor, 'previous_cell', actor.cell);
+        this._set_tile_prop(actor, 'movement_cooldown', speed);
+        this._set_tile_prop(actor, 'movement_speed', speed);
         this.move_to(actor, goal_cell, speed);
 
-        // Set movement cooldown since we just moved
-        this._set_tile_prop(actor, 'movement_cooldown', speed);
         return true;
     }
 
@@ -950,10 +944,6 @@ export class Level {
     move_to(actor, goal_cell, speed) {
         if (actor.cell === goal_cell)
             return;
-
-        this._set_tile_prop(actor, 'previous_cell', actor.cell);
-        this._set_tile_prop(actor, 'animation_speed', speed);
-        this._set_tile_prop(actor, 'animation_progress', 0);
 
         let original_cell = actor.cell;
         this.remove_tile(actor);
@@ -1598,8 +1588,12 @@ export class Level {
     spawn_animation(cell, name) {
         let type = TILE_TYPES[name];
         let tile = new Tile(type);
-        this._set_tile_prop(tile, 'animation_speed', tile.type.ttl);
-        this._set_tile_prop(tile, 'animation_progress', 0);
+        // Co-opt movement_cooldown/speed for these despite that they aren't moving, since they're
+        // also used to animate everything else.  Decrement the cooldown immediately, to match the
+        // normal actor behavior of decrementing one's own cooldown at the end of one's turn
+        this._set_tile_prop(tile, 'movement_speed', tile.type.ttl);
+        this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl - 1);
+        this._set_tile_prop(tile, 'forced_turn_tic', this.tic_counter);
         cell._add(tile);
         this.actors.push(tile);
         this.pending_undo.push(() => {
@@ -1618,8 +1612,10 @@ export class Level {
             if (! TILE_TYPES[current].is_actor) {
                 console.warn("Transmuting a non-actor into an animation!");
             }
-            this._set_tile_prop(tile, 'animation_speed', tile.type.ttl);
-            this._set_tile_prop(tile, 'animation_progress', 0);
+            this._set_tile_prop(tile, 'previous_cell', null);
+            this._set_tile_prop(tile, 'movement_speed', tile.type.ttl);
+            this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl - 1);
+            this._set_tile_prop(tile, 'forced_turn_tic', this.tic_counter);
         }
     }
 

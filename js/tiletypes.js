@@ -82,7 +82,7 @@ function player_visual_state(me) {
     else if (me.is_pushing) {
         return 'pushing';
     }
-    else if (me.animation_speed) {
+    else if (me.movement_speed) {
         return 'moving';
     }
     else {
@@ -96,8 +96,8 @@ function pursue_player(me, level) {
     let target_cell = player.cell;
     // CC2 behavior (not Lynx (TODO compat?)): pursue the cell the player is leaving, if
     // they're still mostly in it
-    if (player.previous_cell && player.animation_speed &&
-        player.animation_progress <= player.animation_speed / 2)
+    if (player.previous_cell && player.movement_speed &&
+        player.movement_cooldown >= player.movement_speed / 2)
     {
         target_cell = player.previous_cell;
     }
