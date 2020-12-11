@@ -551,6 +551,10 @@ export class Level {
             // Our cooldown is zero, so erase any trace of being in mid-movement
             this._set_tile_prop(actor, 'previous_cell', null);
             this._set_tile_prop(actor, 'movement_speed', null);
+            // Only reset the player's is_pushing between movement, so it lasts for the whole push
+            if (actor === this.player) {
+                this._set_tile_prop(actor, 'is_pushing', false);
+            }
 
             // Teeth can only move the first 4 of every 8 tics, and mimics only the first 4 of every
             // 16, though "first" can be adjusted
@@ -701,10 +705,6 @@ export class Level {
         // This is hokey, and doing it here is even hokier, but it seems to match CC2 behavior.
         if (this.player.movement_cooldown > 0) {
             this.remember_player_move(this.player.direction);
-        }
-        // Only reset the player's is_pushing between movement, so it lasts for the whole push
-        if (this.player.movement_cooldown <= 0) {
-            this.player.is_pushing = false;
         }
 
         // Strip out any destroyed actors from the acting order
@@ -887,7 +887,7 @@ export class Level {
                             this._set_tile_prop(tile, 'pending_push', direction);
                         }
                         if (actor === this.player) {
-                            actor.is_pushing = true;
+                            this._set_tile_prop(actor, 'is_pushing', true);
                         }
                     }
 
