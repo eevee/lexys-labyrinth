@@ -123,6 +123,10 @@ a:active {
     color: hsl(0, 50%, 60%);
 }
 
+svg#svg-iconsheet {
+    /* This is a collection of SVG icons to be re-<use>d */
+    display: none;
+}
 svg.svg-icon {
     width: 1em;
     height: 1em;
@@ -912,6 +916,23 @@ dl.score-chart .-sum {
     grid-area: buttons;
     display: flex;
     gap: 0.25em;
+}
+
+#player-debug-input {
+    display: grid;
+    grid:
+        "drop   up      cycle"  1em
+        "left   .       right"  1em
+        ".      down    swap"   1em
+        / 1em 1em 1em
+    ;
+    gap: 0.5em;
+}
+#player-debug-input > svg {
+    fill: #404040;
+}
+#player-debug-input > svg.--held {
+    fill: white;
 }
 .input {
     display: grid;

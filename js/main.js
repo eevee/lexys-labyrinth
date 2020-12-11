@@ -637,6 +637,17 @@ class Player extends PrimaryView {
             time_moves_el: this.root.querySelector('#player-debug-time-moves'),
             time_secs_el: this.root.querySelector('#player-debug-time-secs'),
         };
+
+        let input_el = debug_el.querySelector('#player-debug-input');
+        this.debug.input_els = {};
+        for (let [action, label] of Object.entries({up: 'W', left: 'A', down: 'S', right: 'D', drop: 'Q', cycle: 'E', swap: 'C'})) {
+            let el = mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
+                mk_svg('use', {href: `#svg-icon-${action}`}));
+            el.style.gridArea = action;
+            this.debug.input_els[action] = el;
+            input_el.append(el);
+        }
+
         // Add a button for every kind of inventory item
         let inventory_el = debug_el.querySelector('.-inventory');
         let make_button = (label, onclick) => {
@@ -886,13 +897,14 @@ class Player extends PrimaryView {
     }
 
     get_input() {
+        let input;
         if (this.demo_faucet) {
             let step = this.demo_faucet.next();
             if (step.done) {
-                return new Set;
+                input = new Set;
             }
             else {
-                return step.value;
+                input = step.value;
             }
         }
         else {
@@ -900,7 +912,7 @@ class Player extends PrimaryView {
             // because there might be multiple keys bound to one
             // action, and it still counts as pressed as long as at
             // least one key is held
-            let input = new Set;
+            input = new Set;
             for (let key of this.current_keys) {
                 input.add(this.key_mapping[key]);
             }
@@ -911,8 +923,15 @@ class Player extends PrimaryView {
             for (let action of Object.values(this.current_touches)) {
                 input.add(action);
             }
-            return input;
         }
+
+        if (this.debug.enabled) {
+            for (let [action, el] of Object.entries(this.debug.input_els)) {
+                el.classList.toggle('--held', input.has(action));
+            }
+        }
+
+        return input;
     }
 
     advance_by(tics) {

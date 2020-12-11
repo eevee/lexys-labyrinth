@@ -13,6 +13,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 </head>
 <body data-mode="splash">
+    <svg id="svg-iconsheet">
+    <defs>
+        <!-- Actions -->
+        <g id="svg-icon-up">
+            <path d="M0,12 l8,-8 l8,8 z"></path>
+        </g>
+        <g id="svg-icon-right">
+            <use href="#svg-icon-up" transform="rotate(90 8 8)"></use>
+        </g>
+        <g id="svg-icon-down">
+            <use href="#svg-icon-up" transform="rotate(180 8 8)"></use>
+        </g>
+        <g id="svg-icon-left">
+            <use href="#svg-icon-up" transform="rotate(270 8 8)"></use>
+        </g>
+        <g id="svg-icon-drop">
+            <path d="M6,0 h4 v9 h3 l-5,5 h7 v2 h-14 v-2 h7 l-5,-5 h3"></path>
+        </g>
+        <g id="svg-icon-cycle">
+            <path d="M2,3 H11 V1 l4,4 -4,4 V7 H2 Z"></path>
+            <path d="M14,9 H5 V7 l-4,4 4,4 v-2 h9 z"></path>
+        </g>
+        <g id="svg-icon-swap">
+            <path d="m 7,1 h 2 l 1,1 V 6 L 9,7 v 4 L 8,11.5 7,11 V 7 L 6,6 V 2 Z"></path>
+            <path d="M 8,13 13,11 8,9 3,11 Z m 0,2 7,-3 V 11 L 8,8 1,11 v 1 z"></path>
+            <ellipse cx="5.5" cy="11" rx="0.75" ry="0.5"></ellipse>
+        </g>
+    </defs>
+    </svg>
     <header id="header-main">
         <img id="header-icon" src="icon.png" alt="">
         <h1>Lexy's Labyrinth</h1>
@@ -143,6 +172,8 @@
                         <option value="1/4">¼× — 5 tics per second</option>
                     </select>
                 </p>
+                <div id="player-debug-input"></div>
+                <p id="player-debug-demo-progress"></p>
             </div>
             <div class="input"></div>
             <div class="-options">
@@ -203,36 +234,29 @@
         </div>
         <div class="controls">
             <div class="play-controls">
-                <button class="control-pause" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16" title="pause"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></svg>
+                <button class="control-pause" type="button" title="pause">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></svg>
                     <span class="keyhint">p</span></button>
-                <button class="control-restart" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16" title="restart"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></svg>
+                <button class="control-restart" type="button" title="restart">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></svg>
                     </button>
-                <button class="control-undo" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16" title="undo"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></svg>
+                <button class="control-undo" type="button" title="undo">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></svg>
                     </button>
-                <button class="control-rewind" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16" title="rewind"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></svg>
+                <button class="control-rewind" type="button" title="rewind">
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></svg>
                     <span class="keyhint">z</span></button>
                 <label><input class="control-turn-based" type="checkbox"> Turn-based mode</label>
             </div>
             <div class="actions">
                 <button class="action-drop" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16" title="pause"><path d="M6,0 h4 v9 h3 l-5,5 h7 v2 h-14 v-2 h7 l-5,-5 h3"></svg>
+                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-drop"></use></svg>
                     drop <span class="keyhint">q</span></button>
                 <button class="action-cycle" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16" title="pause">
-                        <path d="M2,3 H11 V1 l4,4 -4,4 V7 H2 Z"></path>
-                        <path d="M14,9 H5 V7 l-4,4 4,4 v-2 h9 z"></path>
-                    </svg>
+                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-cycle"></use></svg>
                     cycle <span class="keyhint">e</span></button>
                 <button class="action-swap" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16" title="pause">
-                        <path d="m 7,1 h 2 l 1,1 V 6 L 9,7 v 4 L 8,11.5 7,11 V 7 L 6,6 V 2 Z"></path>
-                        <path d="M 8,13 13,11 8,9 3,11 Z m 0,2 7,-3 V 11 L 8,8 1,11 v 1 z"></path>
-                        <ellipse cx="5.5" cy="11" rx="0.75" ry="0.5"></ellipse>
-                    </svg>
+                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-swap"></use></svg>
                     switch <span class="keyhint">c</span></button>
             </div>
         </div>
