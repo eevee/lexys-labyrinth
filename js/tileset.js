@@ -292,7 +292,10 @@ export const CC2_TILESET_LAYOUT = {
         is_wired_optional: true,
     },
 
-    // TODO only animates while moving
+    // TODO should explicitly set the non-moving tile, so we can have the walk tile start with
+    // immediate movement?
+    // TODO this shouldn't run at half speed, it's already designed to be one step, and when teeth
+    // move at half speed it looks clumsy
     teeth: {
         // NOTE: CC2 inexplicably dropped north teeth and just uses the south sprites instead
         north: [[1, 11], [0, 11], [1, 11], [2, 11]],

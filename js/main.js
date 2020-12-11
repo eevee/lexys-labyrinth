@@ -309,22 +309,16 @@ class Player extends PrimaryView {
         });
 
         // 0: normal realtime mode
-        // 1: turn-based mode, and the next tic starts at the beginning
-        // 2: turn-based mode, and we're in mid-tic waiting for input
+        // 1: turn-based mode
+        // 2: turn-based mode, but we know the game is frozen waiting for input
         this.turn_mode = 0;
         this.turn_based_checkbox = this.root.querySelector('.controls .control-turn-based');
         this.turn_based_checkbox.checked = false;
         this.turn_based_checkbox.addEventListener('change', ev => {
             if (this.turn_based_checkbox.checked) {
-                // If we're leaving real-time mode then we're between tics
                 this.turn_mode = 1;
             }
             else {
-                if (this.turn_mode === 2) {
-                    // Finish up the tic with dummy input
-                    this.level.advance_tic({primary: null, secondary: null}, 2);
-                    this.advance_by(1);
-                }
                 this.turn_mode = 0;
             }
         });
@@ -971,29 +965,16 @@ class Player extends PrimaryView {
             }
 
             let has_input = input.has('wait') || Object.values(player_actions).some(x => x);
-            // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
-            if (this.turn_mode === 2) {
-                if (has_input) {
-                    // Finish the current tic, then continue as usual.  This means the end of the
-                    // tic doesn't count against the number of tics to advance -- because it already
-                    // did, the first time we tried it
-                    this.level.advance_tic(player_actions, 2);
-                    this.turn_mode = 1;
-                }
-                else {
-                    continue;
-                }
-            }
-
-            // We should now be at the start of a tic
-            this.level.advance_tic(player_actions, 1);
             if (this.turn_mode > 0 && this.level.can_accept_input() && ! has_input) {
                 // If we're in turn-based mode and could provide input here, but don't have any,
                 // then wait until we do
                 this.turn_mode = 2;
             }
             else {
-                this.level.advance_tic(player_actions, 2);
+                this.level.advance_tic(player_actions);
+                if (this.turn_mode > 1) {
+                    this.turn_mode = 1;
+                }
             }
 
             if (this.level.state !== 'playing') {
@@ -1030,6 +1011,8 @@ class Player extends PrimaryView {
             // buffer dry) and change to 'waiting' instead?
         }
 
+        // FIXME if play speed is sufficiently high, we need to advance multiple frames at once or
+        // the timeout will get capped
         let dt = 1000 / (TICS_PER_SECOND * this.play_speed);
         if (this.state === 'rewinding') {
             // Rewind faster than normal time
@@ -1040,23 +1023,17 @@ class Player extends PrimaryView {
 
     undo() {
         this.level.undo();
-        // Undo always returns to the start of a tic
-        if (this.turn_mode === 2) {
-            this.turn_mode = 1;
-        }
     }
 
     // Redraws every frame, unless the game isn't running
     redraw() {
-        // Calculate this here, not in _redraw, because that's called at weird
-        // times when the game might not have actually advanced at all yet
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
         let tic_offset;
         if (this.turn_mode === 2) {
-            // We're frozen in mid-tic, so the clock hasn't advanced yet, but everything has already
-            // finished moving; pretend we're already on the next tic
+            // We're dawdling between tics, so nothing is actually animating, but the clock hasn't
+            // advanced yet; pretend whatever's currently animating has finished
             tic_offset = 1;
         }
         else if (this.use_interpolation) {

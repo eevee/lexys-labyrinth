@@ -1013,17 +1013,7 @@ const TILE_TYPES = {
             // This temporary flag tells us to let it leave; it doesn't need to be undoable, since
             // it doesn't persist for more than a tic
             actor._clone_release = true;
-            if (level.attempt_step(actor, direction)) {
-                // CC2 quirk: nudge the new actor out by exactly one tic
-                // TODO it appears that cc2 actually nudges the new actor out by ⅔ of a tic, or two
-                // frames, which is of course absolutely bonkers.  also, that offset is preserved as
-                // it moves around!
-                level._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
-                // TODO this is annoying and took me a minute to figure out; maybe a Tile method
-                // then.  but are these ever out of sync except for animation tiles?  can i nuke
-                // one?
-                level._set_tile_prop(actor, 'animation_progress',
-                    Math.min(actor.animation_speed, actor.animation_progress + 1));
+            if (level.take_actor_turn(actor, direction, true)) {
                 // FIXME add this underneath, just above the cloner, so the new actor is on top
                 let new_template = new actor.constructor(type, direction);
                 // TODO maybe make a type method for this
@@ -1380,7 +1370,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
-            me.type.do_button(level);
+            level.toggle_green_objects = ! level.toggle_green_objects;
         },
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);

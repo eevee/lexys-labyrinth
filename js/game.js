@@ -32,7 +32,7 @@ export class Tile {
     visual_position(tic_offset = 0) {
         let x = this.cell.x;
         let y = this.cell.y;
-        if (! this.previous_cell || this.animation_speed === 0) {
+        if (! this.previous_cell || ! this.animation_speed) {
             return [x, y];
         }
         else {
@@ -466,10 +466,7 @@ export class Level {
     }
 
     // Move the game state forwards by one tic.
-    // For turn-based mode, this is split into two parts: advance_tic_finish_movement completes any
-    // ongoing movement started in the previous tic, and advance_tic_act allows actors to make new
-    // decisions.  The player makes decisions between these two parts.
-    advance_tic(p1_actions, pass) {
+    advance_tic(p1_actions) {
         if (this.state !== 'playing') {
             console.warn(`Level.advance_tic() called when state is ${this.state}`);
             return;
@@ -477,15 +474,7 @@ export class Level {
 
         // TODO rip out this try/catch, it's not how the game actually works
         try {
-            if (pass == 1) {
-                this.advance_tic_finish_movement(p1_actions);
-            }
-            else if (pass == 2) {
-                this.advance_tic_act(p1_actions);
-            }
-            else {
-                console.warn(`What pass is this?`);
-            }
+            this.advance_tic_all(p1_actions);
         }
         catch (e) {
             if (e instanceof GameEnded) {
@@ -497,12 +486,10 @@ export class Level {
         }
 
         // Commit the undo state at the end of each tic (pass 2)
-        if (pass == 2) {
-            this.commit();
-        }
+        this.commit();
     }
 
-    advance_tic_finish_movement(p1_actions) {
+    advance_tic_all(p1_actions) {
         // Store some current level state in the undo entry.  (These will often not be modified, but
         // they only take a few bytes each so that's fine.)
         for (let key of [
@@ -523,80 +510,28 @@ export class Level {
             this._set_tile_prop(this.player, 'secondary_direction', p1_actions.secondary);
         }
 
+        // Used for various tic-local effects; don't need to be undoable
         // Used to check for a monster chomping the player's tail
         this.player_leaving_cell = this.player.cell;
-        // Used for visual effect and updated later; don't need to be undoable
-        // because they only apply while holding a key down anyway
-        // TODO but maybe they should be undone anyway so rewind looks better
+        this.toggle_green_objects = false;
+        // TODO maybe this should be undone anyway so rewind looks better?
         this.player.is_blocked = false;
 
         this.sfx.set_player_position(this.player.cell);
 
-        // First pass: tick cooldowns and animations; have actors arrive in their cells.  We do the
-        // arrival as its own mini pass, for one reason: if the player dies (which will end the game
-        // immediately), we still want every time's animation to finish, or it'll look like some
-        // objects move backwards when the death screen appears!
-        let cell_steppers = [];
+        // FIRST PASS: actors decide their upcoming movement simultaneously
         // Note that we iterate in reverse order, DESPITE keeping dead actors around with null
         // cells, to match the Lynx and CC2 behavior.  This is actually important in some cases;
         // check out the start of CCLP3 #54, where the gliders will eat the blue key immediately if
-        // they act in forward order!  (More subtly, even the earlier passes do things like advance
-        // the RNG, so for replay compatibility they need to be in reverse order too.)
+        // they act in forward order!  (More subtly, even this decision pass does things like
+        // advance the RNG, so for replay compatibility it needs to be in reverse order too.)
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
-            // Actors with no cell were destroyed
-            if (! actor.cell)
-                continue;
 
             // Clear any old decisions ASAP.  Note that this prop is only used internally within a
             // single tic, so it doesn't need to be undoable
             actor.decision = null;
 
-            // Decrement the cooldown here, but don't check it quite yet,
-            // because stepping on cells in the next block might reset it
-            if (actor.movement_cooldown > 0) {
-                this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
-            }
-
-            if (actor.animation_speed) {
-                // Deal with movement animation
-                this._set_tile_prop(actor, 'animation_progress', actor.animation_progress + 1);
-                if (actor.animation_progress >= actor.animation_speed) {
-                    if (actor.type.ttl) {
-                        // This is purely an animation so it disappears once it's played
-                        this.remove_tile(actor);
-                        continue;
-                    }
-                    this._set_tile_prop(actor, 'previous_cell', null);
-                    this._set_tile_prop(actor, 'animation_progress', null);
-                    this._set_tile_prop(actor, 'animation_speed', null);
-                    if (! this.compat.tiles_react_instantly) {
-                        // We need to track the actor AND the cell explicitly, because it's possible
-                        // that one actor's step will cause another actor to start another move, and
-                        // then they'd end up stepping on the new cell they're moving to instead of
-                        // the one they just landed on!
-                        cell_steppers.push([actor, actor.cell]);
-                    }
-                }
-            }
-        }
-        for (let [actor, cell] of cell_steppers) {
-            this.step_on_cell(actor, cell);
-        }
-
-        // Now we handle wiring
-        this.update_wiring();
-
-        // Only reset the player's is_pushing between movement, so it lasts for the whole push
-        if (this.player.movement_cooldown <= 0) {
-            this.player.is_pushing = false;
-        }
-    }
-
-    advance_tic_act(p1_actions) {
-        // Second pass: actors decide their upcoming movement simultaneously
-        for (let i = this.actors.length - 1; i >= 0; i--) {
-            let actor = this.actors[i];
             if (! actor.cell)
                 continue;
 
@@ -714,20 +649,14 @@ export class Level {
             }
         }
 
-        // Third pass: everyone actually moves
+        // SECOND PASS: everyone actually moves, or acts, or whatever; this includes ticking down
+        // their movement cooldown, even if they just started moving
         let swap_player1 = false;
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
-            if (! actor.cell)
-                continue;
 
-            // Check this again, because one actor's movement might caused a later actor to move
-            // (e.g. by pressing a red or brown button)
-            if (actor.movement_cooldown > 0)
-                continue;
-
-            // Check for special player actions
-            if (actor === this.player) {
+            // Check for special player actions, which can only happen when not moving
+            if (actor === this.player && actor.movement_cooldown <= 0) {
                 if (p1_actions.cycle) {
                     this.cycle_inventory(this.player);
                 }
@@ -735,43 +664,31 @@ export class Level {
                     this.drop_item(this.player);
                 }
                 if (p1_actions.swap) {
+                    // This is delayed until the end of the tic to avoid screwing up anything
+                    // checking this.player
+                    // TODO is this correct?  what draws at the end of the tic we do this?
                     swap_player1 = true;
                 }
             }
 
-            if (! actor.decision)
-                continue;
-
-            let old_cell = actor.cell;
-            let success = this.attempt_step(actor, actor.decision);
-
-            // Track whether the player is blocked, for visual effect
-            if (actor === this.player && actor.decision && ! success) {
-                this.sfx.play_once('blocked');
-                actor.is_blocked = true;
-            }
-
-            // Players can also bump the tiles in the cell next to the one they're leaving
-            let dir2 = actor.secondary_direction;
-            if (actor.type.is_real_player && dir2 &&
-                ! old_cell.blocks_leaving(actor, dir2))
-            {
-                let neighbor = this.get_neighboring_cell(old_cell, dir2);
-                if (neighbor) {
-                    let could_push = ! neighbor.blocks_entering(actor, dir2, this, true);
-                    for (let tile of Array.from(neighbor)) {
-                        if (tile.type.on_bump) {
-                            tile.type.on_bump(tile, this, actor);
-                        }
-                        if (could_push && actor.can_push(tile, dir2)) {
-                            // Block slapping: you can shove a block by walking past it sideways
-                            // TODO i think cc2 uses the push pose and possibly even turns you here?
-                            this.attempt_step(tile, dir2);
-                        }
-                    }
-                }
-            }
+            this.take_actor_turn(actor, actor.decision);
+            /*
         }
+
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+            if (! actor.cell)
+                continue;
+            */
+        }
+
+        if (this.toggle_green_objects) {
+            TILE_TYPES['button_green'].do_button(this);
+            this.toggle_green_objects = false;
+        }
+
+        // Now we handle wiring
+        this.update_wiring();
 
         // In the event that the player is sliding (and thus not deliberately moving) or has
         // stopped, remember their current movement direction here, too.
@@ -779,9 +696,14 @@ export class Level {
         if (this.player.movement_cooldown > 0) {
             this.remember_player_move(this.player.direction);
         }
+        // Only reset the player's is_pushing between movement, so it lasts for the whole push
+        if (this.player.movement_cooldown <= 0) {
+            this.player.is_pushing = false;
+        }
 
         // Strip out any destroyed actors from the acting order
-        // FIXME this is O(n), where n is /usually/ small, but i still don't love it
+        // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
+        // necessary, either; maybe only do it every few tics?
         let p = 0;
         for (let i = 0, l = this.actors.length; i < l; i++) {
             let actor = this.actors[i];
@@ -819,6 +741,83 @@ export class Level {
         }
     }
 
+    take_actor_turn(actor, decision, forced = false) {
+        let moved = false;
+        if (! actor.cell)
+            return moved;
+
+        if (actor.movement_cooldown <= 0 && decision) {
+            // Actor is allowed to move, so do so
+            let old_cell = actor.cell;
+            moved = this.attempt_step(actor, decision);
+
+            // Track whether the player is blocked, for visual effect
+            if (actor === this.player && decision && ! moved) {
+                this.sfx.play_once('blocked');
+                actor.is_blocked = true;
+                console.log(this.tic_counter, 'bump!');
+            }
+
+            // Players can also bump the tiles in the cell next to the one they're leaving
+            let dir2 = actor.secondary_direction;
+            if (actor.type.is_real_player && dir2 &&
+                ! old_cell.blocks_leaving(actor, dir2))
+            {
+                let neighbor = this.get_neighboring_cell(old_cell, dir2);
+                if (neighbor) {
+                    let could_push = ! neighbor.blocks_entering(actor, dir2, this, true);
+                    for (let tile of Array.from(neighbor)) {
+                        if (tile.type.on_bump) {
+                            tile.type.on_bump(tile, this, actor);
+                        }
+                        if (could_push && actor.can_push(tile, dir2)) {
+                            // Block slapping: you can shove a block by walking past it sideways
+                            // TODO i think cc2 uses the push pose and possibly even turns you here?
+                            this.take_actor_turn(tile, dir2);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Tick down cooldowns, unless we already had a forced move this tic
+        if (actor.forced_turn_tic === this.tic_counter) {
+            return moved;
+        }
+        else if (forced) {
+            this._set_tile_prop(actor, 'forced_turn_tic', this.tic_counter);
+        }
+
+        if (actor.movement_cooldown > 0) {
+            this._set_tile_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
+        }
+
+        if (actor.animation_speed) {
+            // Deal with movement animation
+            // FIXME this is super hokey and was introduced because blocks didn't have a movement
+            // cooldown, but it turns out they do actually, so, delete me?
+            this._set_tile_prop(actor, 'animation_progress', actor.animation_progress + 1);
+            if (actor.animation_progress >= actor.animation_speed) {
+                if (actor.type.ttl) {
+                    // This is purely an animation so it disappears once it's played
+                    this.remove_tile(actor);
+                    console.log(this.tic_counter, 'poof!');
+                    return moved;
+                }
+                this._set_tile_prop(actor, 'animation_progress', null);
+                this._set_tile_prop(actor, 'animation_speed', null);
+                // Step on the cell before erasing the previous one, for behavior like blobs
+                // spreading slime
+                if (! this.compat.tiles_react_instantly) {
+                    this.step_on_cell(actor, actor.cell);
+                }
+                this._set_tile_prop(actor, 'previous_cell', null);
+            }
+        }
+
+        return moved;
+    }
+
     // Try to move the given actor one tile in the given direction and update
     // their cooldown.  Return true if successful.
     attempt_step(actor, direction) {
@@ -834,7 +833,6 @@ export class Level {
         let double_speed = false;
 
         let move = DIRECTIONS[direction].movement;
-        if (!actor.cell) console.error(actor);
         let goal_cell = this.get_neighboring_cell(actor.cell, direction);
 
         // TODO this could be a lot simpler if i could early-return!  should ice bumping be
@@ -886,17 +884,18 @@ export class Level {
                 if (! blocked && blocked_by_pushable) {
                     // This time make a copy, since we're modifying the contents of the cell
                     for (let tile of Array.from(goal_cell)) {
-                        if (actor.can_push(tile, direction)) {
-                            if (! this.attempt_step(tile, direction) &&
-                                tile.slide_mode !== null && tile.movement_cooldown !== 0)
-                            {
-                                // If the push failed and the obstacle is in the middle of a slide,
-                                // remember this as the next move it'll make
-                                this._set_tile_prop(tile, 'pending_push', direction);
-                            }
-                            if (actor === this.player) {
-                                actor.is_pushing = true;
-                            }
+                        if (! actor.can_push(tile, direction))
+                            continue;
+
+                        if (! this.take_actor_turn(tile, direction, true) &&
+                            tile.slide_mode !== null && tile.movement_cooldown !== 0)
+                        {
+                            // If the push failed and the obstacle is in the middle of a slide,
+                            // remember this as the next move it'll make
+                            this._set_tile_prop(tile, 'pending_push', direction);
+                        }
+                        if (actor === this.player) {
+                            actor.is_pushing = true;
                         }
                     }
 
