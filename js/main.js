@@ -439,6 +439,7 @@ class Player extends PrimaryView {
         key_target.addEventListener('keydown', ev => {
             if (! this.active)
                 return;
+            this.using_touch = false;
 
             if (ev.key === 'p' || ev.key === 'Pause') {
                 this.toggle_pause();
@@ -506,10 +507,12 @@ class Player extends PrimaryView {
         });
         // Similarly, grab touch events and translate them to directions
         this.current_touches = {};  // ident => action
+        this.touch_restart_delay = new util.DelayTimer;
         let touch_target = this.root.querySelector('.-main-area');
         let collect_touches = ev => {
             ev.stopPropagation();
             ev.preventDefault();
+            this.using_touch = true;
 
             // If state is anything other than playing/waiting, probably switch to playing, similar
             // to pressing spacebar
@@ -519,10 +522,13 @@ class Player extends PrimaryView {
                     return;
                 }
                 else if (this.state === 'stopped') {
-                    if (this.level.state === 'success') {
+                    if (this.touch_restart_delay.active) {
+                        // If it's only been a very short time since the level ended, ignore taps
+                        // here, so you don't accidentally mash restart and lose the chance to undo
+                    }
+                    else if (this.level.state === 'success') {
                         // Advance to the next level
                         // TODO game ending?
-                        // TODO this immediately begins it too, not sure why
                         this.conductor.change_level(this.conductor.level_index + 1);
                     }
                     else {
@@ -1249,6 +1255,9 @@ class Player extends PrimaryView {
             }
         }
         else if (this.state === 'stopped') {
+            // Set a timer before tapping the overlay will restart/advance
+            this.touch_restart_delay.set(2000);
+
             if (this.level.state === 'failure') {
                 overlay_reason = 'failure';
                 overlay_top = "whoops";
@@ -1256,7 +1265,7 @@ class Player extends PrimaryView {
                 overlay_bottom = random_choice(obits);
                 if (this.using_touch) {
                     // TODO touch gesture to rewind?
-                    overlay_keyhint = "tap to try again, or tap undo/rewind above";
+                    overlay_keyhint = "tap to try again, or use undo/rewind above";
                 }
                 else {
                     overlay_keyhint = "press space to try again, or Z to rewind";

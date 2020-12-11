@@ -162,6 +162,28 @@ export function bytestring_to_buffer(bytestring) {
     return Uint8Array.from(bytestring, c => c.charCodeAt(0)).buffer;
 }
 
+export class DelayTimer {
+    constructor() {
+        this.active = false;
+        this._handle = null;
+        this._bound_alarm = this._alarm.bind(this);
+    }
+
+    set(duration) {
+        if (this._handle) {
+            window.clearTimeout(this._handle);
+        }
+
+        this.active = true;
+        this._handle = window.setTimeout(this._bound_alarm, duration);
+    }
+
+    _alarm() {
+        this._handle = null;
+        this.active = false;
+    }
+}
+
 // Cast a line through a grid and yield every cell it touches
 export function* walk_grid(x0, y0, x1, y1, min_a, min_b, max_a, max_b) {
     // TODO if the ray starts outside the grid (extremely unlikely), we should
