@@ -693,6 +693,23 @@ class Player extends PrimaryView {
             this.play_speed = parseInt(numer, 10) / parseInt(denom ?? '1', 10);
         });
 
+        let viewport_el = this.root.querySelector('#player-debug-viewport');
+        viewport_el.value = "default";
+        viewport_el.addEventListener('change', ev => {
+            let viewport = ev.target.value;
+            if (viewport === 'default') {
+                this.debug.viewport_size_override = null;
+            }
+            else if (viewport === 'max') {
+                this.debug.viewport_size_override = 'max';
+            }
+            else {
+                this.debug.viewport_size_override = parseInt(viewport, 10);
+            }
+            this.update_viewport_size();
+            this._redraw();
+        });
+
         this.debug.replay_button = make_button("view replay", () => {
             if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
                 new ConfirmOverlay(this.conductor, "Restart this level and watch the replay?", () => {
@@ -798,10 +815,24 @@ class Player extends PrimaryView {
     }
 
     update_viewport_size() {
-        let size = this.conductor.stored_level.viewport_size;
-        this.renderer.set_viewport_size(size, size);
-        this.renderer.canvas.style.setProperty('--viewport-width', size);
-        this.renderer.canvas.style.setProperty('--viewport-height', size);
+        let w, h;
+        if (this.debug.enabled && this.debug.viewport_size_override) {
+            if (this.debug.viewport_size_override === 'max') {
+                w = this.level.size_x;
+                h = this.level.size_y;
+            }
+            else {
+                w = h = this.debug.viewport_size_override;
+            }
+        }
+        else {
+            w = h = this.conductor.stored_level.viewport_size;
+        }
+        this.renderer.set_viewport_size(w, h);
+        this.renderer.canvas.style.setProperty('--viewport-width', w);
+        this.renderer.canvas.style.setProperty('--viewport-height', h);
+        // TODO only if the size changed?
+        this.adjust_scale();
     }
 
     restart_level() {
