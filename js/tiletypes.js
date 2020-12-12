@@ -1048,7 +1048,7 @@ const TILE_TYPES = {
                     if (tile.type.is_actor) {
                         // Forcibly move anything released from a trap, to keep it in sync with
                         // whatever pushed the button
-                        level.attempt_step(tile, tile.direction);
+                        level.attempt_out_of_turn_step(tile, tile.direction);
                     }
                 }
             }
@@ -1338,7 +1338,7 @@ const TILE_TYPES = {
                 let actor = level.actors[i];
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_yellow') {
-                    level.attempt_step(actor, other.direction);
+                    level.attempt_out_of_turn_step(actor, other.direction);
                 }
             }
         },
