@@ -32,7 +32,10 @@ class CC2Demo {
             l--;
         }
         for (let p = 3; p < l; p += 2) {
-            duration += this.bytes[p];
+            let delay = this.bytes[p];
+            if (delay === 0xff)
+                break;
+            duration += delay;
         }
         duration = Math.floor(duration / 3);
 
@@ -66,15 +69,18 @@ class CC2Demo {
         // TODO maybe turn this into, like, a type, or something
         return {
             inputs: inputs,
+            final_input: input,
             length: duration,
             get(t) {
-                if (t >= this.inputs.length) {
-                    return new Set;
+                let input;
+                if (t < this.inputs.length) {
+                    input = this.inputs[t];
                 }
                 else {
-                    let input = this.inputs[t];
-                    return new Set(Object.entries(CC2_DEMO_INPUT_MASK).filter(([action, bit]) => input & bit).map(([action, bit]) => action));
+                    // Last input is implicitly repeated indefinitely
+                    input = this.final_input;
                 }
+                return new Set(Object.entries(CC2_DEMO_INPUT_MASK).filter(([action, bit]) => input & bit).map(([action, bit]) => action));
             },
         };
     }
