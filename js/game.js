@@ -747,7 +747,7 @@ export class Level {
         }
     }
 
-    take_actor_turn(actor, decision, forced = false) {
+    take_actor_turn(actor, decision) {
         let moved = false;
         if (! actor.cell)
             return moved;
@@ -761,7 +761,6 @@ export class Level {
             if (actor === this.player && decision && ! moved) {
                 this.sfx.play_once('blocked');
                 actor.is_blocked = true;
-                console.log(this.tic_counter, 'bump!');
             }
 
             // Players can also bump the tiles in the cell next to the one they're leaving
@@ -779,7 +778,7 @@ export class Level {
                         if (could_push && actor.can_push(tile, dir2)) {
                             // Block slapping: you can shove a block by walking past it sideways
                             // TODO i think cc2 uses the push pose and possibly even turns you here?
-                            this.take_actor_turn(tile, dir2);
+                            this.attempt_out_of_turn_step(tile, dir2);
                         }
                     }
                 }
@@ -789,9 +788,6 @@ export class Level {
         // Tick down cooldowns, unless we already had a forced move this tic
         if (actor.forced_turn_tic === this.tic_counter) {
             return moved;
-        }
-        else if (forced) {
-            this._set_tile_prop(actor, 'forced_turn_tic', this.tic_counter);
         }
 
         if (actor.movement_cooldown > 0) {
@@ -810,8 +806,8 @@ export class Level {
         return moved;
     }
 
-    // Try to move the given actor one tile in the given direction and update
-    // their cooldown.  Return true if successful.
+    // Try to move the given actor one tile in the given direction and update their cooldown.
+    // Return true if successful.
     attempt_step(actor, direction) {
         // In mid-movement, we can't even change direction!
         if (actor.movement_cooldown > 0)
@@ -879,7 +875,7 @@ export class Level {
                         if (! actor.can_push(tile, direction))
                             continue;
 
-                        if (! this.take_actor_turn(tile, direction, true) &&
+                        if (! this.attempt_out_of_turn_step(tile, direction) &&
                             tile.slide_mode !== null && tile.movement_cooldown !== 0)
                         {
                             // If the push failed and the obstacle is in the middle of a slide,
@@ -935,6 +931,18 @@ export class Level {
         this._set_tile_prop(actor, 'movement_speed', speed);
         this.move_to(actor, goal_cell, speed);
 
+        return true;
+    }
+
+    attempt_out_of_turn_step(actor, direction) {
+        if (! this.attempt_step(actor, direction))
+            return false;
+
+        // Movement ALWAYS advances by one by the end of the tic.  Either this actor has already had
+        // a turn, and we're responsible for advancing this new move, or their turn is coming up,
+        // and we use this property to prevent them from advancing a second time
+        this._set_tile_prop(actor, 'forced_turn_tic', this.tic_counter);
+        this._set_tile_prop(actor, 'movement_cooldown', actor.movement_cooldown - 1);
         return true;
     }
 
@@ -1063,7 +1071,7 @@ export class Level {
                     break;
                 }
                 for (let i = 0; i < num_directions; i++) {
-                    if (this.attempt_step(actor, direction)) {
+                    if (this.attempt_out_of_turn_step(actor, direction)) {
                         success = true;
                         // Sound plays from the origin cell simply because that's where the sfx player
                         // thinks the player is currently; position isn't updated til next turn

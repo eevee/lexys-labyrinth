@@ -1013,7 +1013,7 @@ const TILE_TYPES = {
             // This temporary flag tells us to let it leave; it doesn't need to be undoable, since
             // it doesn't persist for more than a tic
             actor._clone_release = true;
-            if (level.take_actor_turn(actor, direction, true)) {
+            if (level.attempt_out_of_turn_step(actor, direction)) {
                 // FIXME add this underneath, just above the cloner, so the new actor is on top
                 let new_template = new actor.constructor(type, direction);
                 // TODO maybe make a type method for this
