@@ -953,33 +953,19 @@ dl.score-chart .-sum {
 #player-debug-input > svg.--held {
     fill: white;
 }
-.input {
-    display: grid;
+#player-debug-demo-playback {
+    display: flex;
+    /* TODO finish this later */
     display: none;
-    grid:
-        "drop   up      cycle" 1.5em
-        "left   swap    right" 1.5em
-        ".      down    .    " 1.5em
-        / 1.5em 1.5em 1.5em
-    ;
-    gap: 0.5em;
 }
-.input-action {
-    padding: 0.25em;
-    line-height: 1;
-    color: #fff4;
-    background: #202020;
+#player-debug-demo-playback progress {
+    flex: 1;
 }
-.input-action[data-action=up] { grid-area: up; }
-.input-action[data-action=down] { grid-area: down; }
-.input-action[data-action=left] { grid-area: left; }
-.input-action[data-action=right] { grid-area: right; }
-.input-action[data-action=swap] { grid-area: swap; }
-.input-action[data-action=cycle] { grid-area: cycle; }
-.input-action[data-action=drop] { grid-area: drop; }
-.input-action.--pressed {
-    color: white;
-    background: hsl(225, 75%, 25%);
+#player-debug-demo-playback output {
+    width: 4em;
+}
+#player-debug-demo-playback span {
+    flex: none;
 }
 
 

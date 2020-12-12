@@ -275,7 +275,6 @@ class Player extends PrimaryView {
         this.time_el = this.root.querySelector('.time output');
         this.bonus_el = this.root.querySelector('.bonus output');
         this.inventory_el = this.root.querySelector('.inventory');
-        this.input_el = this.root.querySelector('.input');
         this.demo_el = this.root.querySelector('.demo');
 
         this.music_el = this.root.querySelector('#player-music');
@@ -604,15 +603,7 @@ class Player extends PrimaryView {
             }
         });
 
-        // Populate input debugger
         this.debug = { enabled: false };
-        this.input_el = this.root.querySelector('.input');
-        this.input_action_elements = {};
-        for (let [action, label] of Object.entries(ACTION_LABELS)) {
-            let el = mk('span.input-action', {'data-action': action}, label);
-            this.input_el.append(el);
-            this.input_action_elements[action] = el;
-        }
 
         this._advance_bound = this.advance.bind(this);
         this._redraw_bound = this.redraw.bind(this);
@@ -1198,10 +1189,6 @@ class Player extends PrimaryView {
             }
 
             this.current_toolbelt[i] = tool;
-        }
-
-        for (let action of Object.keys(ACTION_LABELS)) {
-            this.input_action_elements[action].classList.toggle('--pressed', this.previous_input.has(action));
         }
 
         if (this.debug.enabled) {
