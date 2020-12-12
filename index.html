@@ -115,97 +115,153 @@
         </section>
     </main>
     <main id="player" hidden>
-        <section class="-main-area">
-            <div class="level"><!-- level canvas and any overlays go here --></div>
-            <div class="overlay-message">
-                <h1 class="-top"></h1>
-                <div class="-middle"></div>
-                <p class="-bottom"></p>
-                <p class="-keyhint"></p>
+        <div id="player-main">
+            <div class="controls">
+                <div class="play-controls">
+                    <button class="control-pause" type="button" title="pause">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></svg>
+                        <span class="keyhint">p</span></button>
+                    <button class="control-restart" type="button" title="restart">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></svg>
+                        </button>
+                    <button class="control-undo" type="button" title="undo">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></svg>
+                        </button>
+                    <button class="control-rewind" type="button" title="rewind">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></svg>
+                        <span class="keyhint">z</span></button>
+                    <label><input class="control-turn-based" type="checkbox"> Turn-based mode</label>
+                </div>
+                <div class="actions">
+                    <button class="action-drop" type="button">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-drop"></use></svg>
+                        drop <span class="keyhint">q</span></button>
+                    <button class="action-cycle" type="button">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-cycle"></use></svg>
+                        cycle <span class="keyhint">e</span></button>
+                    <button class="action-swap" type="button">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-swap"></use></svg>
+                        switch <span class="keyhint">c</span></button>
+                </div>
             </div>
-            <div class="message"></div>
-            <div class="chips">
-                <h3>Hearts</h3>
-                <output></output>
+            <section id="player-game-area">
+                <div class="level"><!-- level canvas and any overlays go here --></div>
+                <div class="overlay-message">
+                    <h1 class="-top"></h1>
+                    <div class="-middle"></div>
+                    <p class="-bottom"></p>
+                    <p class="-keyhint"></p>
+                </div>
+                <div class="message"></div>
+                <div class="chips">
+                    <h3>Hearts</h3>
+                    <output></output>
+                </div>
+                <div class="time">
+                    <h3>Time</h3>
+                    <output></output>
+                </div>
+                <div class="bonus">
+                    <h3>Bonus</h3>
+                    <output></output>
+                </div>
+                <div class="inventory"></div>
+            </section>
+            <div id="player-music">
+                <div id="player-music-left">
+                    🎵 <a id="player-music-title">title</a> by <a id="player-music-author">author</a>
+                </div>
+                <div id="player-music-right">
+                    <input id="player-music-volume" type="range" min="0" max="1" step="0.05" value="1">
+                    <input id="player-music-unmute" type="checkbox" checked>
+                </div>
+                <audio loop preload="auto">
             </div>
-            <div class="time">
-                <h3>Time</h3>
-                <output></output>
-            </div>
-            <div class="bonus">
-                <h3>Bonus</h3>
-                <output></output>
-            </div>
-            <div class="inventory"></div>
-        </section>
+        </div>
         <form id="player-debug">
-            <div class="-time">
-                <table class="-time-controls">
-                    <tr>
-                        <td><button type="button" class="-time-button" data-dt="-1">← 1 tic</button></td>
-                        <td id="player-debug-time-tics">0</td>
-                        <td>tics</td>
-                        <td><button type="button" class="-time-button" data-dt="1">1 tic →</button></td>
-                    </tr>
-                    <tr>
-                        <td><button type="button" class="-time-button" data-dt="-4">← 1 move</button></td>
-                        <td id="player-debug-time-moves">0</td>
-                        <td>moves</td>
-                        <td><button type="button" class="-time-button" data-dt="4">1 move →</button></td>
-                    </tr>
-                    <tr>
-                        <td><button type="button" class="-time-button" data-dt="-20">← 1 s</button></td>
-                        <td id="player-debug-time-secs">0</td>
-                        <td>seconds</td>
-                        <td><button type="button" class="-time-button" data-dt="20">1 s →</button></td>
-                    </tr>
-                </table>
-                <p>Game speed:
-                    <select name="speed">
-                        <option value="6">6× — 120 tics per second</option>
-                        <option value="3">3× — 60 tics per second</option>
-                        <option value="2">2× — 40 tics per second</option>
-                        <option value="3/2">1½× — 30 tics per second</option>
-                        <option value="1" selected>1× — 20 tics per second</option>
-                        <option value="1/2">½× — 10 tics per second</option>
-                        <option value="1/3">⅓× — 6⅔ tics per second</option>
-                        <option value="1/4">¼× — 5 tics per second</option>
-                    </select>
-                </p>
-                <div id="player-debug-input"></div>
-                <p id="player-debug-demo-progress"></p>
+            <h3>Time</h3>
+            <table class="-time-controls">
+                <tr>
+                    <td><button type="button" class="-time-button" data-dt="-1">← 1 tic</button></td>
+                    <td id="player-debug-time-tics">0</td>
+                    <td>tics</td>
+                    <td><button type="button" class="-time-button" data-dt="1">1 tic →</button></td>
+                </tr>
+                <tr>
+                    <td><button type="button" class="-time-button" data-dt="-4">← 1 move</button></td>
+                    <td id="player-debug-time-moves">0</td>
+                    <td>moves</td>
+                    <td><button type="button" class="-time-button" data-dt="4">1 move →</button></td>
+                </tr>
+                <tr>
+                    <td><button type="button" class="-time-button" data-dt="-20">← 1 s</button></td>
+                    <td id="player-debug-time-secs">0</td>
+                    <td>seconds</td>
+                    <td><button type="button" class="-time-button" data-dt="20">1 s →</button></td>
+                </tr>
+            </table>
+            <div class="-buttons" id="player-debug-time-buttons">
+                <!-- populated in js -->
             </div>
+            <p>Game speed:
+                <select name="speed">
+                    <option value="6">6× — 120 tics per second</option>
+                    <option value="3">3× — 60 tics per second</option>
+                    <option value="2">2× — 40 tics per second</option>
+                    <option value="3/2">1½× — 30 tics per second</option>
+                    <option value="1" selected>1× — 20 tics per second</option>
+                    <option value="1/2">½× — 10 tics per second</option>
+                    <option value="1/3">⅓× — 6⅔ tics per second</option>
+                    <option value="1/4">¼× — 5 tics per second</option>
+                </select>
+            </p>
+
+            <h3>Replay</h3>
+            <!-- TODO...
+                play back replay
+                record replay, including altering it from here
+                stop replay, without restarting the level
+                show progress in %, length in tics + time
+                browse replay?  jump to any point?  label points???
+                edit manually?
+            -->
+            <div id="player-debug-input"></div>
+            <p id="player-debug-demo-progress"></p>
             <div class="input"></div>
-            <div class="-options">
-                <p> Viewport size:
-                    <select id="player-debug-viewport">
-                        <option value="default" selected>Level default (9 or 10)</option>
-                        <option value="12">12 × 12</option>
-                        <option value="16">16 × 16</option>
-                        <option value="24">24 × 24</option>
-                        <option value="32">32 × 32</option>
-                        <option value="max">Entire level</option>
-                    </select>
-                </p>
-                <ul>
-                    <li><label><input type="checkbox" name="show_actor_bboxes"> Show actor bounding boxes</label></li>
-                    <li><label><input type="checkbox" name="disable_interpolation"> Disable interpolation</label></li>
-                    <!--
-                    <li><label><input type="checkbox" disabled> Show actor info</label></li>
-                    <li><label><input type="checkbox" disabled> Freeze time for everything else</label></li>
-                    <li><label><input type="checkbox" disabled> Player is immortal</label></li>
-                    <li><label><input type="checkbox" disabled> Player ignores collision</label></li>
-                    <li><label><input type="checkbox" disabled> Player levitates</label></li>
-                    -->
-                </ul>
-                <p>(Middle-click to teleport.)</p>
-            </div>
+
+            <h3>Options</h3>
+            <p>Viewport size:
+                <select id="player-debug-viewport">
+                    <option value="default" selected>Level default (9 or 10)</option>
+                    <option value="12">12 × 12</option>
+                    <option value="16">16 × 16</option>
+                    <option value="24">24 × 24</option>
+                    <option value="32">32 × 32</option>
+                    <option value="max">Entire level</option>
+                </select>
+            </p>
+            <ul>
+                <li><label><input type="checkbox" name="show_actor_bboxes"> Show actor bounding boxes</label></li>
+                <li><label><input type="checkbox" name="disable_interpolation"> Disable interpolation</label></li>
+                <!--
+                <li><label><input type="checkbox" disabled> Show actor info</label></li>
+                <li><label><input type="checkbox" disabled> Freeze time for everything else</label></li>
+                <li><label><input type="checkbox" disabled> Player is immortal</label></li>
+                <li><label><input type="checkbox" disabled> Player ignores collision</label></li>
+                <li><label><input type="checkbox" disabled> Player levitates</label></li>
+                -->
+            </ul>
+
+            <h3>Inventory</h3>
             <div class="-inventory">
                 <!-- populated in js -->
             </div>
-            <div class="-buttons">
+
+            <h3>Misc</h3>
+            <div class="-buttons" id="player-debug-misc-buttons">
                 <!-- populated in js -->
             </div>
+            <p>Tip: Middle-click to teleport.</p>
 
             <!-- TODO?
                 - inspect with mouse
@@ -222,44 +278,6 @@
                     - total bonus flags?
             -->
         </form>
-        <div id="player-music">
-            <div id="player-music-left">
-                🎵 <a id="player-music-title">title</a> by <a id="player-music-author">author</a>
-            </div>
-            <div id="player-music-right">
-                <input id="player-music-volume" type="range" min="0" max="1" step="0.05" value="1">
-                <input id="player-music-unmute" type="checkbox" checked>
-            </div>
-            <audio loop preload="auto">
-        </div>
-        <div class="controls">
-            <div class="play-controls">
-                <button class="control-pause" type="button" title="pause">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></svg>
-                    <span class="keyhint">p</span></button>
-                <button class="control-restart" type="button" title="restart">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></svg>
-                    </button>
-                <button class="control-undo" type="button" title="undo">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></svg>
-                    </button>
-                <button class="control-rewind" type="button" title="rewind">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></svg>
-                    <span class="keyhint">z</span></button>
-                <label><input class="control-turn-based" type="checkbox"> Turn-based mode</label>
-            </div>
-            <div class="actions">
-                <button class="action-drop" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-drop"></use></svg>
-                    drop <span class="keyhint">q</span></button>
-                <button class="action-cycle" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-cycle"></use></svg>
-                    cycle <span class="keyhint">e</span></button>
-                <button class="action-swap" type="button">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-swap"></use></svg>
-                    switch <span class="keyhint">c</span></button>
-            </div>
-        </div>
     </main>
     <main id="editor" hidden>
         <header>

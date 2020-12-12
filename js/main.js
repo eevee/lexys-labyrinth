@@ -508,7 +508,7 @@ class Player extends PrimaryView {
         // Similarly, grab touch events and translate them to directions
         this.current_touches = {};  // ident => action
         this.touch_restart_delay = new util.DelayTimer;
-        let touch_target = this.root.querySelector('.-main-area');
+        let touch_target = this.root.querySelector('#player-game-area');
         let collect_touches = ev => {
             ev.stopPropagation();
             ev.preventDefault();
@@ -738,16 +738,7 @@ class Player extends PrimaryView {
             }
         });
         this._update_replay_button_enabled();
-        debug_el.querySelector('.-buttons').append(
-            this.debug.replay_button,
-            make_button("green button", () => {
-                TILE_TYPES['button_green'].do_button(this.level);
-                this._redraw();
-            }),
-            make_button("blue button", () => {
-                TILE_TYPES['button_blue'].do_button(this.level);
-                this._redraw();
-            }),
+        debug_el.querySelector('#player-debug-time-buttons').append(
             make_button("toggle clock", () => {
                 this.level.pause_timer();
                 this.update_ui();
@@ -763,6 +754,17 @@ class Player extends PrimaryView {
             make_button("stop clock", () => {
                 this.level.time_remaining = null;
                 this.update_ui();
+            }),
+        );
+        debug_el.querySelector('#player-debug-misc-buttons').append(
+            this.debug.replay_button,
+            make_button("green button", () => {
+                TILE_TYPES['button_green'].do_button(this.level);
+                this._redraw();
+            }),
+            make_button("blue button", () => {
+                TILE_TYPES['button_blue'].do_button(this.level);
+                this._redraw();
             }),
         );
 
@@ -781,6 +783,7 @@ class Player extends PrimaryView {
             this._redraw();
         });
 
+        this.adjust_scale();
         if (this.level) {
             this.update_ui();
         }
@@ -1507,9 +1510,13 @@ class Player extends PrimaryView {
         // - the difference between the size of the play area and the size of our root (which will
         //   add in any gap around the player, e.g. if the controls stretch the root to be wider)
         let root_rect = this.root.getBoundingClientRect();
-        let player_rect = this.root.querySelector('.-main-area').getBoundingClientRect();
+        let player_rect = this.root.querySelector('#player-game-area').getBoundingClientRect();
         avail_x += root_rect.width - player_rect.width;
         avail_y += root_rect.height - player_rect.height;
+        // ...minus the width of the debug panel, if visible
+        if (this.debug.enabled) {
+            avail_x -= this.root.querySelector('#player-debug').getBoundingClientRect().width;
+        }
         // - the margins around our root, which consume all the extra space
         let margin_x = parseFloat(style['margin-left']) + parseFloat(style['margin-right']);
         let margin_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);

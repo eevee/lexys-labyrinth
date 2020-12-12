@@ -306,7 +306,6 @@ label.option {
 }
 label.option:hover {
     outline: 2px solid #d0d0d0;
-    outline-radius: 2px;
 }
 label.option .option-label {
     flex: 1;
@@ -544,12 +543,9 @@ button.level-pack-button p {
 /* Player */
 
 #player {
-    flex: 0;
+    flex: 1;
+    position: relative;
     display: flex;
-    flex-direction: column;
-    justify-content: stretch;
-    gap: 0.5em;
-    margin: auto;  /* center in both directions baby */
 
     image-rendering: crisp-edges;
     image-rendering: pixelated;
@@ -558,8 +554,20 @@ button.level-pack-button p {
     --tile-height: 32px;
     --scale: 1;
 }
-#player > .-main-area {
+#player-main {
+    /* This element basically just exists so that #player can have relative positioning and the
+     * debug panel can use that to sit against the right edge; absolute positioning excludes
+     * margins, so if it were positioned as a child of THIS element, it would be stuffed into the
+     * game area (oops!) */
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    gap: 0.5em;
+    margin: auto;  /* center in both directions baby */
+}
+#player-game-area {
     isolation: isolate;
+    align-self: center;  /* don't stretch if the buttons or music blow out somehow */
     display: grid;
     align-items: center;
     grid:
@@ -570,7 +578,7 @@ button.level-pack-button p {
         "level      inventory"  min-content
         "level      actions"    min-content
         /* Need explicit min-content to force the hint to wrap */
-        / min-content min-content min-content
+        / min-content min-content
     ;
     column-gap: 2em;
     row-gap: 0.5em;
@@ -847,59 +855,67 @@ dl.score-chart .-sum {
 
 /* Debug stuff */
 #player.--debug #player-debug {
-    display: grid;
+    display: flex;
 }
 #player-debug {
+    flex: 0 0 max-content;
+    align-self: center;
     display: none;
-    grid:
-        "time       inventory   options"
-        "buttons    buttons     buttons"
-        / 2fr 1fr 2fr
-    ;
+    /* FIXME this blows out the height instead of scrolling and i cannot figure out how to make it
+     * stop, so here is an arbitrary max height on it which i extremely hate */
+    overflow: auto;
+    max-height: 75vh;
+    flex-direction: column;
+    justify-content: start;
     gap: 0.25em;
     padding: 0.5em;
     background-image: repeating-linear-gradient(135deg,
-        hsl(0, 0%, 4%) 0em,
-        hsl(0, 0%, 4%) 1em,
-        hsl(15, 25%, 8%) 1em,
-        hsl(15, 25%, 8%) 2em);
-    border: 0.25em solid hsla(30, 100%, 50%, 0.5);
+        hsl(0, 0%, 4%) 0px,
+        hsl(0, 0%, 4%) 16px,
+        hsl(30, 25%, 8%) 16px,
+        hsl(30, 25%, 8%) 32px);
+    border: 0.25em solid hsl(30, 75%, 50%);
+    border-right-width: 0;
     box-shadow: inset 0 0 0.25em 0.25em #0004;
-
 }
-#player-debug > .-time {
-    grid-area: time;
+#player-debug > h3 {
+    margin: -0.25em -0.25em 0.25em;
+    padding: 0 0.5em;
+    background: hsl(30, 60%, 20%);
+    color: black;
 }
-#player-debug > .-time table.-time-controls {
+#player-debug > * + h3 {
+    margin-top: 0.5em;
 }
-#player-debug > .-time table.-time-controls button {
+#player-debug table.-time-controls {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 0.5em;
+}
+#player-debug table.-time-controls button {
     width: 100%;
     text-align: inherit;
 }
-#player-debug > .-time table.-time-controls td:nth-child(1) {
+#player-debug table.-time-controls td:nth-child(1) {
     /* go backwards button */
     text-align: left;
 }
-#player-debug > .-time table.-time-controls td:nth-child(2) {
+#player-debug table.-time-controls td:nth-child(2) {
     /* value */
-    width: 6em;
+    width: 4em;
     text-align: right;
 }
-#player-debug > .-time table.-time-controls td:nth-child(3) {
+#player-debug table.-time-controls td:nth-child(3) {
     /* label */
 }
-#player-debug > .-time table.-time-controls td:nth-child(4) {
+#player-debug table.-time-controls td:nth-child(4) {
     /* go forward button */
     text-align: right;
 }
-#player-debug > .-options {
-    grid-area: options;
-}
-#player-debug > .-inventory {
-    grid-area: inventory;
+#player-debug .-inventory {
     display: grid;
-    margin: auto;
-    grid: auto-fill var(--tile-height) / repeat(4, var(--tile-width));
+    margin: 0 auto;
+    grid: auto-fill var(--tile-height) / repeat(8, var(--tile-width));
     gap: 2px;
 }
 #player-debug > .-inventory > button {
@@ -909,13 +925,16 @@ dl.score-chart .-sum {
     display: block;
 }
 #player-debug > .-inventory > button.-wide {
-    grid-column: span 4;
+    grid-column: span 8;
     padding: 0.25em;
 }
-#player-debug > .-buttons {
-    grid-area: buttons;
+#player-debug .-buttons {
     display: flex;
+    justify-content: space-between;
     gap: 0.25em;
+}
+#player-debug .-buttons button {
+    flex: 1 0 max-content;
 }
 
 #player-debug-input {
@@ -974,7 +993,7 @@ dl.score-chart .-sum {
     #player .controls {
         flex-direction: column;
     }
-    #player > .-main-area {
+    #player-game-area {
         /* Rearrange the grid to be vertical */
         grid:
             "level      level"
