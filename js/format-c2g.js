@@ -25,13 +25,20 @@ class CC2Demo {
         this.blob_seed = this.bytes[2];
     }
 
-    *[Symbol.iterator]() {
+    decompress() {
+        let duration = 0;
         let l = this.bytes.length;
         if (l % 2 === 0) {
             l--;
         }
-        let input = new Set;
+        for (let p = 3; p < l; p += 2) {
+            duration += this.bytes[p];
+        }
+
+        let inputs = new Uint8Array(duration);
+        let i = 0;
         let t = 0;
+        let input = 0;
         for (let p = 3; p < l; p += 2) {
             // The first byte measures how long the /previous/ input remains
             // valid, so yield that first.  Note that this is measured in 60Hz
@@ -44,24 +51,31 @@ class CC2Demo {
             t += delay;
             while (t >= 3) {
                 t -= 3;
-                yield input;
+                inputs[i] = input;
+                i++;
             }
 
-            let input_mask = this.bytes[p + 1];
-            let is_player_2 = ((input_mask & 0x80) !== 0);
+            input = this.bytes[p + 1];
+            let is_player_2 = ((input & 0x80) !== 0);
             // TODO handle player 2
             if (is_player_2)
                 continue;
+        }
 
-            for (let [action, bit] of Object.entries(CC2_DEMO_INPUT_MASK)) {
-                if ((input_mask & bit) === 0) {
-                    input.delete(action);
+        // TODO maybe turn this into, like, a type, or something
+        return {
+            inputs: inputs,
+            length: duration,
+            get(t) {
+                if (t >= this.inputs.length) {
+                    return new Set;
                 }
                 else {
-                    input.add(action);
+                    let input = this.inputs[t];
+                    return new Set(Object.entries(CC2_DEMO_INPUT_MASK).filter(([action, bit]) => input & bit).map(([action, bit]) => action));
                 }
-            }
-        }
+            },
+        };
     }
 }
 
@@ -1826,7 +1840,6 @@ const MAX_SIMULTANEOUS_REQUESTS = 5;
         resolve(game);
     }
 
-    console.log(game);
     return promise;
 }
 

@@ -898,7 +898,7 @@ class Player extends PrimaryView {
     play_demo() {
         this.restart_level();
         let demo = this.level.stored_level.demo;
-        this.demo_faucet = demo[Symbol.iterator]();
+        this.demo_faucet = demo.decompress();
         this.level.force_floor_direction = demo.initial_force_floor_direction;
         this.level._blob_modifier = demo.blob_seed;
         // FIXME should probably start playback on first real input
@@ -908,13 +908,7 @@ class Player extends PrimaryView {
     get_input() {
         let input;
         if (this.demo_faucet) {
-            let step = this.demo_faucet.next();
-            if (step.done) {
-                input = new Set;
-            }
-            else {
-                input = step.value;
-            }
+            input = this.demo_faucet.get(this.level.tic_counter);
         }
         else {
             // Convert input keys to actions.  This is only done now
