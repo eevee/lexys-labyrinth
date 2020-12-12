@@ -1118,6 +1118,7 @@ const TILE_TYPES = {
     // FIXME blue teleporters transmit current 4 ways.  red don't transmit it at all
     teleport_blue: {
         draw_layer: DRAW_LAYERS.terrain,
+        wire_propagation_mode: 'all',
         teleport_dest_order(me, level, other) {
             if (! me.wire_directions) {
                 // TODO cc2 has a bug where, once it wraps around to the bottom right, it seems to
@@ -1208,6 +1209,7 @@ const TILE_TYPES = {
     },
     teleport_red: {
         draw_layer: DRAW_LAYERS.terrain,
+        wire_propagation_mode: 'none',
         teleport_try_all_directions: true,
         teleport_allow_override: true,
         _is_active(me) {
@@ -1451,6 +1453,7 @@ const TILE_TYPES = {
     button_pink: {
         draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
+        wire_propagation_mode: 'none',
         get_emitting_edges(me, level) {
             // We emit current as long as there's an actor fully on us
             if (me.cell.some(tile => tile.type.is_actor && tile.movement_cooldown === 0)) {

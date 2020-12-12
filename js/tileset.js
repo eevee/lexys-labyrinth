@@ -1126,6 +1126,7 @@ export class Tileset {
                 // Draw the base tile
                 blit(drawspec.base[0], drawspec.base[1]);
 
+                // FIXME some tiles don't have active wiring on all sides...
                 // Draw the wire part as a single rectangle, initially just a small dot in the
                 // center, but extending out to any edge that has a wire present
                 let x0 = 0.5 - wire_radius;

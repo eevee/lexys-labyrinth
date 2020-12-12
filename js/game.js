@@ -697,7 +697,9 @@ export class Level {
             this.toggle_green_objects = false;
         }
 
-        // Now we handle wiring
+        // Now we handle wiring -- three times, because CC2 runs it once per frame, not once per tic
+        this.update_wiring();
+        this.update_wiring();
         this.update_wiring();
 
         // In the event that the player is sliding (and thus not deliberately moving) or has
@@ -1167,6 +1169,12 @@ export class Level {
     // this needs to happen at all
     // FIXME none of this is currently undoable
     update_wiring() {
+        // FIXME:
+        // - make this undoable  :(
+        // - blue tele, red tele, and pink button have different connections
+        // - would like to reuse the walk for blue teles
+        // - currently doesn't notice when circuit block moves sometimes
+
         // Gather every tile that's emitting power.  Along the way, check whether any of them have
         // changed since last tic, so we can skip this work entirely if none did
         let neighbors = [];
@@ -1236,9 +1244,17 @@ export class Level {
                     continue;
                 }
 
-                // Common case: power entering a wired edge and propagating outwards.  The only
-                // special case is that four-way wiring is two separate wires, N/S and E/W
-                if (wire.wire_directions === 0x0f) {
+                // Common case: power entering a wired edge and propagating outwards.  There are a
+                // couple special cases:
+                if (wire.type.wire_propagation_mode === 'none') {
+                    // This tile type has wires, but none of them connect to each other
+                    cell.powered_edges |= bit;
+                    continue;
+                }
+                else if (wire.wire_directions === 0x0f && wire.type.wire_propagation_mode !== 'all') {
+                    // If all four wires are present, they don't actually make a four-way
+                    // connection, but two straight wires that don't connect to each other (with the
+                    // exception of blue teleporters)
                     cell.powered_edges |= bit;
                     cell.powered_edges |= DIRECTIONS[DIRECTIONS[source_direction].opposite].bit;
                 }
