@@ -1049,13 +1049,27 @@ class Player extends PrimaryView {
 
         this.last_advance = performance.now();
 
+        // If the game is running faster than normal, we cap the timeout between game loops at 10ms
+        // and do multiple loops at a time
+        // (Note that this is a debug feature so precision is not a huge deal and I don't bother
+        // tracking fractional updates, but asking to run at 10× and only getting 2× would suck)
+        let num_advances = 1;
+        let dt = 1000 / (TICS_PER_SECOND * this.play_speed);
+        if (dt < 10) {
+            num_advances = Math.ceil(10 / dt);
+            dt = 10;
+            console.log(this.play_speed, dt, num_advances);
+        }
+
         if (this.state === 'playing') {
-            this.advance_by(1);
+            this.advance_by(num_advances);
         }
         else if (this.state === 'rewinding') {
             if (this.level.has_undo()) {
                 // Rewind by undoing one tic every tic
-                this.undo();
+                for (let i = 0; i < num_advances; i++) {
+                    this.undo();
+                }
                 this.update_ui();
             }
             // If there are no undo entries left, freeze in place until the player stops rewinding,
@@ -1064,9 +1078,6 @@ class Player extends PrimaryView {
             // buffer dry) and change to 'waiting' instead?
         }
 
-        // FIXME if play speed is sufficiently high, we need to advance multiple frames at once or
-        // the timeout will get capped
-        let dt = 1000 / (TICS_PER_SECOND * this.play_speed);
         if (this.state === 'rewinding') {
             // Rewind faster than normal time
             dt *= 0.5;
