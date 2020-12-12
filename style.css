@@ -937,7 +937,16 @@ dl.score-chart .-sum {
     flex: 1 0 max-content;
 }
 
+#player-debug .-replay-columns {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+}
+#player-debug .-replay-columns .-buttons {
+    flex-direction: column;
+}
 #player-debug-input {
+    flex: none;
     display: grid;
     grid:
         "drop   up      cycle"  1em
@@ -953,18 +962,22 @@ dl.score-chart .-sum {
 #player-debug-input > svg.--held {
     fill: white;
 }
-#player-debug-demo-playback {
-    display: flex;
-    /* TODO finish this later */
+#player-debug-replay-playback {
     display: none;
+    gap: 0.25em;
 }
-#player-debug-demo-playback progress {
+#player.--replay #player-debug-replay-playback {
+    display: flex;
+}
+#player-debug-replay-playback progress {
     flex: 1;
 }
-#player-debug-demo-playback output {
-    width: 4em;
+#player-debug-replay-playback output {
+    width: 3em;
+    width: 5ch;
+    text-align: right;
 }
-#player-debug-demo-playback span {
+#player-debug-replay-playback span {
     flex: none;
 }
 

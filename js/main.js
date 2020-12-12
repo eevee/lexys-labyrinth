@@ -635,44 +635,14 @@ class Player extends PrimaryView {
             time_secs_el: this.root.querySelector('#player-debug-time-secs'),
         };
 
-        let input_el = debug_el.querySelector('#player-debug-input');
-        this.debug.input_els = {};
-        for (let [action, label] of Object.entries({up: 'W', left: 'A', down: 'S', right: 'D', drop: 'Q', cycle: 'E', swap: 'C'})) {
-            let el = mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
-                mk_svg('use', {href: `#svg-icon-${action}`}));
-            el.style.gridArea = action;
-            this.debug.input_els[action] = el;
-            input_el.append(el);
-        }
-
-        // Add a button for every kind of inventory item
-        let inventory_el = debug_el.querySelector('.-inventory');
         let make_button = (label, onclick) => {
             let button = mk('button', {type: 'button'}, label);
             button.addEventListener('click', onclick);
             return button;
         };
-        for (let name of [
-            'key_blue', 'key_red', 'key_yellow', 'key_green',
-            'flippers', 'fire_boots', 'cleats', 'suction_boots',
-            'bribe', 'railroad_sign', 'hiking_boots', 'speed_boots',
-            'xray_eye', 'helmet', 'foil', 'lightning_bolt',
-        ]) {
-            inventory_el.append(make_button(
-                mk('img', {src: this.render_inventory_tile(name)}),
-                () => {
-                    this.level.give_actor(this.level.player, name);
-                    this.update_ui();
-                }));
-        }
-        let clear_button = mk('button.-wide', {type: 'button'}, "clear inventory");
-        clear_button.addEventListener('click', ev => {
-            this.level.take_all_keys_from_actor(this.level.player);
-            this.level.take_all_tools_from_actor(this.level.player);
-            this.update_ui();
-        });
-        inventory_el.append(clear_button);
 
+        // -- Time --
+        // Hook up back/forward buttons
         debug_el.querySelector('.-time-controls').addEventListener('click', ev => {
             let button = ev.target.closest('button.-time-button');
             if (! button)
@@ -692,43 +662,7 @@ class Player extends PrimaryView {
             this._redraw();
             this.update_ui();
         });
-
-        let speed_el = debug_el.elements.speed;
-        speed_el.value = "1";
-        speed_el.addEventListener('change', ev => {
-            let speed = ev.target.value;
-            let [numer, denom] = speed.split('/');
-            this.play_speed = parseInt(numer, 10) / parseInt(denom ?? '1', 10);
-        });
-
-        let viewport_el = this.root.querySelector('#player-debug-viewport');
-        viewport_el.value = "default";
-        viewport_el.addEventListener('change', ev => {
-            let viewport = ev.target.value;
-            if (viewport === 'default') {
-                this.debug.viewport_size_override = null;
-            }
-            else if (viewport === 'max') {
-                this.debug.viewport_size_override = 'max';
-            }
-            else {
-                this.debug.viewport_size_override = parseInt(viewport, 10);
-            }
-            this.update_viewport_size();
-            this._redraw();
-        });
-
-        this.debug.replay_button = make_button("view replay", () => {
-            if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
-                new ConfirmOverlay(this.conductor, "Restart this level and watch the replay?", () => {
-                    this.play_demo();
-                }).open();
-            }
-            else {
-                this.play_demo();
-            }
-        });
-        this._update_replay_button_enabled();
+        // Add buttons for affecting the clock
         debug_el.querySelector('#player-debug-time-buttons').append(
             make_button("toggle clock", () => {
                 this.level.pause_timer();
@@ -747,19 +681,99 @@ class Player extends PrimaryView {
                 this.update_ui();
             }),
         );
-        debug_el.querySelector('#player-debug-misc-buttons').append(
-            this.debug.replay_button,
-            make_button("green button", () => {
-                TILE_TYPES['button_green'].do_button(this.level);
-                this._redraw();
-            }),
-            make_button("blue button", () => {
-                TILE_TYPES['button_blue'].do_button(this.level);
-                this._redraw();
-            }),
-        );
+        // Hook up play speed
+        let speed_el = debug_el.elements.speed;
+        speed_el.value = "1";
+        speed_el.addEventListener('change', ev => {
+            let speed = ev.target.value;
+            let [numer, denom] = speed.split('/');
+            this.play_speed = parseInt(numer, 10) / parseInt(denom ?? '1', 10);
+        });
 
-        // Link up some options checkboxes
+        // -- Inventory --
+        // Add a button for every kind of inventory item
+        let inventory_el = debug_el.querySelector('.-inventory');
+        for (let name of [
+            'key_blue', 'key_red', 'key_yellow', 'key_green',
+            'flippers', 'fire_boots', 'cleats', 'suction_boots',
+            'bribe', 'railroad_sign', 'hiking_boots', 'speed_boots',
+            'xray_eye', 'helmet', 'foil', 'lightning_bolt',
+        ]) {
+            inventory_el.append(make_button(
+                mk('img', {src: this.render_inventory_tile(name)}),
+                () => {
+                    this.level.give_actor(this.level.player, name);
+                    this.update_ui();
+                }));
+        }
+        // Add a button to clear your inventory
+        let clear_button = mk('button.-wide', {type: 'button'}, "clear inventory");
+        clear_button.addEventListener('click', ev => {
+            this.level.take_all_keys_from_actor(this.level.player);
+            this.level.take_all_tools_from_actor(this.level.player);
+            this.update_ui();
+        });
+        inventory_el.append(clear_button);
+
+        // -- Replay --
+        // Create the input grid
+        let input_el = debug_el.querySelector('#player-debug-input');
+        this.debug.input_els = {};
+        for (let [action, label] of Object.entries({up: 'W', left: 'A', down: 'S', right: 'D', drop: 'Q', cycle: 'E', swap: 'C'})) {
+            let el = mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
+                mk_svg('use', {href: `#svg-icon-${action}`}));
+            el.style.gridArea = action;
+            this.debug.input_els[action] = el;
+            input_el.append(el);
+        }
+        // Add a button to view a replay
+        this.debug.replay_button = make_button("run level's replay", () => {
+            if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
+                new ConfirmOverlay(this.conductor, "Restart this level and watch the replay?", () => {
+                    this.play_demo();
+                }).open();
+            }
+            else {
+                this.play_demo();
+            }
+        });
+        this._update_replay_button_enabled();
+        debug_el.querySelector('.-replay-columns .-buttons').append(
+            this.debug.replay_button,
+            /*
+            mk('button', {disabled: 'disabled'}, "load external replay"),
+            mk('button', {disabled: 'disabled'}, "regain control"),
+            mk('button', {disabled: 'disabled'}, "record new replay"),
+            mk('button', {disabled: 'disabled'}, "record from here"),
+            mk('button', {disabled: 'disabled'}, "browse/edit manually"),
+            */
+        );
+        // Progress bar and whatnot
+        let replay_playback_el = debug_el.querySelector('#player-debug-replay-playback');
+        this.debug.replay_playback_el = replay_playback_el;
+        this.debug.replay_progress_el = replay_playback_el.querySelector('progress');
+        this.debug.replay_percent_el = replay_playback_el.querySelector('output');
+        this.debug.replay_duration_el = replay_playback_el.querySelector('span');
+
+        // -- Misc --
+        // Viewport size
+        let viewport_el = this.root.querySelector('#player-debug-viewport');
+        viewport_el.value = "default";
+        viewport_el.addEventListener('change', ev => {
+            let viewport = ev.target.value;
+            if (viewport === 'default') {
+                this.debug.viewport_size_override = null;
+            }
+            else if (viewport === 'max') {
+                this.debug.viewport_size_override = 'max';
+            }
+            else {
+                this.debug.viewport_size_override = parseInt(viewport, 10);
+            }
+            this.update_viewport_size();
+            this._redraw();
+        });
+        // Various checkboxes
         let wire_checkbox = (name, onclick) => {
             let checkbox = debug_el.elements[name];
             checkbox.checked = false;  // override browser memory
@@ -773,6 +787,16 @@ class Player extends PrimaryView {
             this.use_interpolation = ! ev.target.checked;
             this._redraw();
         });
+        debug_el.querySelector('#player-debug-misc-buttons').append(
+            make_button("green button", () => {
+                TILE_TYPES['button_green'].do_button(this.level);
+                this._redraw();
+            }),
+            make_button("blue button", () => {
+                TILE_TYPES['button_blue'].do_button(this.level);
+                this._redraw();
+            }),
+        );
 
         this.adjust_scale();
         if (this.level) {
@@ -875,6 +899,7 @@ class Player extends PrimaryView {
         this.time_el.classList.remove('--frozen');
         this.time_el.classList.remove('--danger');
         this.time_el.classList.remove('--warning');
+        this.root.classList.remove('--replay');
         this.root.classList.remove('--bonus-visible');
 
         this.update_ui();
@@ -894,6 +919,14 @@ class Player extends PrimaryView {
         this.level._blob_modifier = demo.blob_seed;
         // FIXME should probably start playback on first real input
         this.set_state('playing');
+        this.root.classList.add('--replay');
+
+        if (this.debug.enabled) {
+            this.debug.replay_playback_el.style.display = '';
+            let t = this.demo_faucet.length;
+            this.debug.replay_progress_el.setAttribute('max', t);
+            this.debug.replay_duration_el.textContent = `${t} tics (${util.format_duration(t / TICS_PER_SECOND)})`;
+        }
     }
 
     get_input() {
@@ -1196,6 +1229,11 @@ class Player extends PrimaryView {
             this.debug.time_tics_el.textContent = `${t}`;
             this.debug.time_moves_el.textContent = `${Math.floor(t/4)}`;
             this.debug.time_secs_el.textContent = (t / 20).toFixed(2);
+
+            if (this.demo_faucet) {
+                this.debug.replay_progress_el.setAttribute('value', t);
+                this.debug.replay_percent_el.textContent = `${Math.floor((t + 1) / this.demo_faucet.length * 100)}%`;
+            }
         }
     }
 
@@ -1954,9 +1992,7 @@ class LevelBrowserOverlay extends DialogOverlay {
 
                 // Express absolute time as mm:ss, with two decimals on the seconds (which should be
                 // able to exactly count a number of tics)
-                let absmin = Math.floor(scorecard.abstime / TICS_PER_SECOND / 60);
-                let abssec = scorecard.abstime / TICS_PER_SECOND % 60;
-                abstime = `${absmin}:${abssec < 10 ? '0' : ''}${abssec.toFixed(2)}`;
+                abstime = util.format_duration(scorecard.abstime / TICS_PER_SECOND, 2);
             }
 
             let title = meta.title;

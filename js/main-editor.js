@@ -6,6 +6,7 @@ import { PrimaryView, TransientOverlay, DialogOverlay, load_json_from_storage, s
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
 import { SVG_NS, mk, mk_svg, string_from_buffer_ascii, bytestring_to_buffer, walk_grid } from './util.js';
+import * as util from './util.js';
 
 class EditorPackMetaOverlay extends DialogOverlay {
     constructor(conductor, stored_pack) {
@@ -53,7 +54,7 @@ class EditorLevelMetaOverlay extends DialogOverlay {
                 text = "No time limit";
             }
             else {
-                text = `${time_limit} (${Math.floor(time_limit / 60)}:${('0' + String(time_limit % 60)).slice(-2)})`;
+                text = `${time_limit} (${util.format_duration(time_limit)})`;
             }
             time_limit_output.textContent = text;
         };

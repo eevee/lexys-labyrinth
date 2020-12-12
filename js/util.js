@@ -162,6 +162,12 @@ export function bytestring_to_buffer(bytestring) {
     return Uint8Array.from(bytestring, c => c.charCodeAt(0)).buffer;
 }
 
+export function format_duration(seconds, places = 0) {
+    let mins = Math.floor(seconds / 60);
+    let secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs.toFixed(places)}`;
+}
+
 export class DelayTimer {
     constructor() {
         this.active = false;

@@ -34,6 +34,7 @@ class CC2Demo {
         for (let p = 3; p < l; p += 2) {
             duration += this.bytes[p];
         }
+        duration = Math.floor(duration / 3);
 
         let inputs = new Uint8Array(duration);
         let i = 0;

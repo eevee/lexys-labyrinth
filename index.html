@@ -218,6 +218,11 @@
                 </select>
             </p>
 
+            <h3>Inventory</h3>
+            <div class="-inventory">
+                <!-- populated in js -->
+            </div>
+
             <h3>Replay</h3>
             <!-- TODO...
                 play back replay
@@ -227,18 +232,21 @@
                 browse replay?  jump to any point?  label points???
                 edit manually?
             -->
-            <div id="player-debug-input"></div>
-            <p id="player-debug-demo-playback">
+            <div class="-replay-columns">
+                <div id="player-debug-input"></div>
+                <div class="-buttons"></div>
+            </div>
+            <p id="player-debug-replay-playback">
                 <progress max="0" value="0"></progress>
                 <output>100%</output>
                 of
                 <span>0 tics (0:00s)</span>
             </p>
 
-            <h3>Options</h3>
+            <h3>Misc</h3>
             <p>Viewport size:
                 <select id="player-debug-viewport">
-                    <option value="default" selected>Level default (9 or 10)</option>
+                    <option value="default" selected>Standard</option>
                     <option value="12">12 × 12</option>
                     <option value="16">16 × 16</option>
                     <option value="24">24 × 24</option>
@@ -257,13 +265,6 @@
                 <li><label><input type="checkbox" disabled> Player levitates</label></li>
                 -->
             </ul>
-
-            <h3>Inventory</h3>
-            <div class="-inventory">
-                <!-- populated in js -->
-            </div>
-
-            <h3>Misc</h3>
             <div class="-buttons" id="player-debug-misc-buttons">
                 <!-- populated in js -->
             </div>
