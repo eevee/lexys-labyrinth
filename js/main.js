@@ -966,66 +966,44 @@ class Player extends PrimaryView {
             let input = this.get_input();
 
             // Replica of CC2 input handling, based on experimentation
-            // FIXME unclear how this should interact with undo when playing normally, and
-            // definitely wrong when playing a replay; should this be in Level??
+            let primary_action = null, secondary_action = null;
+            let current_action = DIRECTIONS[this.level.player.direction].action;
             if ((input.has('up') && input.has('down')) || (input.has('left') && input.has('right'))) {
                 // If opposing keys are ever held, stop moving and forget our state
-                this.primary_action = null;
-                this.secondary_action = null;
+                primary_action = null;
+                secondary_action = null;
             }
-            else if (this.primary_action && input.has(this.primary_action)) {
-                // Our primary action is locked in as long as it's held down, but check for a
-                // newly pressed secondary action; remember, there can't be two opposing keys held,
-                // because we already checked for that above, so this is only necessary if there's
-                // not already a secondary action
-                if (this.secondary_action && ! input.has(this.secondary_action)) {
-                    this.secondary_action = null;
-                }
-                if (! this.secondary_action) {
-                    for (let action of ['down', 'left', 'right', 'up']) {
-                        if (action !== this.primary_action &&
-                            input.has(action) && ! this.previous_input.has(action))
-                        {
-                            this.secondary_action = action;
-                            break;
-                        }
+            else if (input.has(current_action)) {
+                // If we're already holding in the same direction we're facing, that wins
+                primary_action = current_action;
+                // Any other key we're holding is secondary; remember, there can't be two opposing
+                // keys held, because we just checked for that, so at most one of these qualifies
+                for (let action of ['down', 'left', 'right', 'up']) {
+                    if (action !== primary_action && input.has(action)) {
+                        secondary_action = action;
+                        break;
                     }
                 }
             }
             else {
-                // Either we weren't holding any keys, or we let go of our primary action; either
-                // way, act like we're starting from scratch and check keys in priority order
-                // TODO actually i'm not sure these are necessary if we check the player's facing
-                // first?
-                this.primary_action = null;
-                this.secondary_action = null;
-
-                // As a tiebreaker, first check if we're holding the key corresponding to the
-                // player's facing direction
-                let player_facing_action = DIRECTIONS[this.level.player.direction].action;
-                if (input.has(player_facing_action)) {
-                    this.primary_action = player_facing_action;
-                }
-
-                for (let action of ['down', 'left', 'right', 'up']) {
+                // Check for other keys, horizontal first
+                for (let action of ['left', 'right', 'up', 'down']) {
                     if (! input.has(action))
                         continue;
 
-                    if (! this.primary_action) {
-                        this.primary_action = action;
+                    if (primary_action === null) {
+                        primary_action = action;
                     }
-                    else if (action !== this.primary_action) {
-                        // Note that because of the opposing keys check, there can never be more
-                        // than two keys held down here
-                        this.secondary_action = action;
+                    else {
+                        secondary_action = action;
                         break;
                     }
                 }
             }
 
             let player_actions = {
-                primary: this.primary_action ? ACTION_DIRECTIONS[this.primary_action] : null,
-                secondary: this.secondary_action ? ACTION_DIRECTIONS[this.secondary_action] : null,
+                primary: primary_action ? ACTION_DIRECTIONS[primary_action] : null,
+                secondary: secondary_action ? ACTION_DIRECTIONS[secondary_action] : null,
                 cycle: input.has('cycle') && ! this.previous_input.has('cycle'),
                 drop: input.has('drop') && ! this.previous_input.has('drop'),
                 swap: input.has('swap') && ! this.previous_input.has('swap'),
@@ -1082,7 +1060,6 @@ class Player extends PrimaryView {
         if (dt < 10) {
             num_advances = Math.ceil(10 / dt);
             dt = 10;
-            console.log(this.play_speed, dt, num_advances);
         }
 
         if (this.state === 'playing') {
