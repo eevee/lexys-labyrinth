@@ -919,7 +919,7 @@ export class Tileset {
                     // first half; if it started on tics 5-8, play the second half.  They could get
                     // out of sync if the player hesitates, but no one will notice that, and this
                     // approach minimizes storing extra state.
-                    let i = ((tile.movement_speed - 1 - tile.movement_cooldown) + tic % 1) / tile.movement_speed;
+                    let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1) / tile.movement_speed;
                     // But do NOT do this for explosions or splashes, which have a fixed duration
                     // and only play once
                     if (this.animation_slowdown > 1 && ! tile.type.ttl) {
@@ -1225,7 +1225,7 @@ export class Tileset {
                     // first half; if it started on tics 5-8, play the second half.  They could get
                     // out of sync if the player hesitates, but no one will notice that, and this
                     // approach minimizes storing extra state.
-                    let i = ((tile.movement_speed - 1 - tile.movement_cooldown) + tic % 1) / tile.movement_speed;
+                    let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1) / tile.movement_speed;
                     // But do NOT do this for explosions or splashes, which have a fixed duration
                     // and only play once
                     if (this.animation_slowdown > 1 && ! tile.type.ttl) {

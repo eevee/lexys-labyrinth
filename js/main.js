@@ -1099,7 +1099,7 @@ class Player extends PrimaryView {
         if (this.turn_mode === 2) {
             // We're dawdling between tics, so nothing is actually animating, but the clock hasn't
             // advanced yet; pretend whatever's currently animating has finished
-            tic_offset = 1;
+            tic_offset = 0.999;
         }
         else if (this.use_interpolation) {
             tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
@@ -1108,7 +1108,7 @@ class Player extends PrimaryView {
             }
         }
         else {
-            tic_offset = 0;
+            tic_offset = 0.999;
         }
 
         this._redraw(tic_offset);
