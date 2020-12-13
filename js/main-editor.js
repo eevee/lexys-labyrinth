@@ -1623,6 +1623,25 @@ export class Editor extends PrimaryView {
         if (this.stored_level) {
             this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
         }
+        _make_button("Download", ev => {
+            // TODO also allow download as CCL
+            // TODO support getting warnings + errors out of synthesis
+            let buf = c2g.synthesize_level(this.stored_level);
+            let blob = new Blob([buf]);
+            let url = URL.createObjectURL(blob);
+            // To download a file, um, make an <a> and click it.  Not kidding
+            let a = mk('a', {
+                href: url,
+                download: (this.stored_level.title || 'untitled') + '.c2m',
+            });
+            document.body.append(a);
+            a.click();
+            // Absolutely no idea when I'm allowed to revoke this, but surely a minute is safe
+            window.setTimeout(() => {
+                a.remove();
+                URL.revokeObjectURL(url);
+            }, 60 * 1000);
+        });
         _make_button("Share", ev => {
             let buf = c2g.synthesize_level(this.stored_level);
             // FIXME Not ideal, but btoa() wants a string rather than any of the myriad binary types
