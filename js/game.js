@@ -200,14 +200,66 @@ export class Cell extends Array {
         return false;
     }
 
-    blocks_entering(actor, direction, level, ignore_pushables = false) {
+    // Check if this actor can move this direction into this cell.  May have side effects, depending
+    // on the value of push_mode:
+    // - null: Default.  Treat pushable objects as blocking.
+    // - 'ignore': Treat pushable objects as nonblocking.
+    // - 'trace': Don't try to move pushable objects, but do check whether they could be pushed,
+    //   recursively if necessary.
+    // - 'move': Attempt to move pushable objects out of the way immediately.
+    blocks_entering(actor, direction, level, push_mode = null) {
+        let pushable_tiles = [];
+        let blocked = false;
         for (let tile of this) {
-            if (tile.blocks(actor, direction, level) &&
-                ! (ignore_pushables && actor.can_push(tile, direction)))
-            {
+            if (! tile.blocks(actor, direction, level))
+                continue;
+
+            if (push_mode === null)
                 return true;
+
+            if (! actor.can_push(tile, direction)) {
+                if (push_mode === 'move') {
+                    // Track this instead of returning immediately, because 'move' mode also bumps
+                    // every tile in the cell
+                    blocked = true;
+                }
+                else {
+                    return true;
+                }
+            }
+
+            if (push_mode === 'ignore')
+                continue;
+
+            if (push_mode === 'move' && tile.type.on_bump) {
+                tile.type.on_bump(tile, level, actor);
+            }
+
+            // Collect pushables for later, so we don't inadvertently push through a wall
+            pushable_tiles.push(tile);
+        }
+
+        if (blocked)
+            return true;
+
+        // If we got this far, all that's left is to deal with pushables
+        if (pushable_tiles.length > 0) {
+            let neighbor_cell = level.get_neighboring_cell(this, direction);
+            if (! neighbor_cell)
+                return true;
+
+            for (let tile of pushable_tiles) {
+                if (push_mode === 'trace') {
+                    if (neighbor_cell.blocks_entering(tile, direction, level, push_mode))
+                        return true;
+                }
+                else if (push_mode === 'move') {
+                    if (! level.attempt_step(tile, direction))
+                        return true;
+                }
             }
         }
+
         return false;
     }
 
@@ -489,16 +541,6 @@ export class Level {
             this.pending_undo.level_props[key] = this[key];
         }
 
-        // Player's secondary direction is set immediately; it applies on arrival to cells even if
-        // it wasn't held the last time the player started moving
-        // TODO this feels wrong to me but i'm not sure why
-        if (p1_actions.secondary === this.player.direction) {
-            this._set_tile_prop(this.player, 'secondary_direction', p1_actions.primary);
-        }
-        else {
-            this._set_tile_prop(this.player, 'secondary_direction', p1_actions.secondary);
-        }
-
         // Used for various tic-local effects; don't need to be undoable
         // TODO maybe this should be undone anyway so rewind looks better?
         this.player.is_blocked = false;
@@ -562,121 +604,11 @@ export class Level {
             if (actor.movement_cooldown > 0)
                 continue;
 
-            // Only reset the player's is_pushing between movement, so it lasts for the whole push
             if (actor === this.player) {
-                this._set_tile_prop(actor, 'is_pushing', false);
+                this.make_player_decision(actor, p1_actions);
             }
-
-            // Teeth can only move the first 4 of every 8 tics, and mimics only the first 4 of every
-            // 16, though "first" can be adjusted
-            if (actor.slide_mode === null && actor.type.movement_parity &&
-                (this.tic_counter + this.step_parity) % (actor.type.movement_parity * 4) >= 4)
-            {
-                continue;
-            }
-
-            if (this.compat.sliding_tanks_ignore_button &&
-                actor.slide_mode && actor.pending_reverse)
-            {
-                this._set_tile_prop(actor, 'pending_reverse', false);
-            }
-
-            if (actor.pending_push) {
-                // Blocks that were pushed while sliding will move in the push direction as soon as
-                // they stop sliding, regardless of what they landed on
-                actor.decision = actor.pending_push;
-                this._set_tile_prop(actor, 'pending_push', null);
-                continue;
-            }
-
-            let direction_preference;
-            if (actor.slide_mode === 'ice') {
-                // Actors can't make voluntary moves on ice; they just slide
-                actor.decision = actor.direction;
-                continue;
-            }
-            else if (actor === this.player) {
-                // Only the player can make voluntary moves on a force floor, and only if their
-                // previous move was an /involuntary/ move on a force floor.  If they do, it
-                // overrides the forced move
-                // XXX this in particular has some subtleties in lynx (e.g. you can override
-                // forwards??) and DEFINITELY all kinds of stuff in ms
-                // XXX unclear what impact this has on doppelgangers
-                if (actor.slide_mode === 'force' && ! (
-                    p1_actions.primary && actor.last_move_was_force))
-                {
-                    // We're forced!
-                    actor.decision = actor.direction;
-                    this._set_tile_prop(actor, 'last_move_was_force', true);
-                    continue;
-                }
-
-                // FIXME this isn't right; if primary is blocked, they move secondary, but they also
-                // ignore railroad redirection until next tic
-                this.remember_player_move(p1_actions.primary);
-
-                if (p1_actions.primary) {
-                    // FIXME something is wrong with direction preferences!  if you hold both keys
-                    // in a corner, no matter which you pressed first, cc2 always tries vert first
-                    // and horiz last (so you're pushing horizontally)!
-                    direction_preference = [p1_actions.primary];
-                    if (p1_actions.secondary) {
-                        direction_preference.push(p1_actions.secondary);
-                    }
-                    this._set_tile_prop(actor, 'last_move_was_force', false);
-                }
-                else {
-                    continue;
-                }
-            }
-            else if (actor.slide_mode === 'force') {
-                // Anything not an active player can't override force floors
-                actor.decision = actor.direction;
-                continue;
-            }
-            else if (actor.cell.some(tile => tile.type.traps && tile.type.traps(tile, actor))) {
-                // An actor in a cloner or a closed trap can't turn
-                // TODO because of this, if a tank is trapped when a blue button is pressed, then
-                // when released, it will make one move out of the trap and /then/ turn around and
-                // go back into the trap.  this is consistent with CC2 but not ms/lynx
-                continue;
-            }
-            else if (actor.type.decide_movement) {
-                direction_preference = actor.type.decide_movement(actor, this);
-            }
-
-            // Check which of those directions we *can*, probably, move in
-            // TODO i think player on force floor will still have some issues here
-            if (direction_preference) {
-                for (let [i, direction] of direction_preference.entries()) {
-                    if (typeof direction === 'function') {
-                        // Lazy direction calculation (used for walkers)
-                        direction = direction();
-                    }
-
-                    direction = actor.cell.redirect_exit(actor, direction);
-
-                    // If every other preference be blocked, actors unconditionally try the last one
-                    // (and might even be able to move that way by the time their turn comes!)
-                    if (i === direction_preference.length - 1) {
-                        actor.decision = direction;
-                        break;
-                    }
-
-                    let dest_cell = this.get_neighboring_cell(actor.cell, direction);
-                    if (! dest_cell)
-                        continue;
-
-                    // FIXME it looks like cc2 actually starts pushing blocks here
-                    // FIXME similarly, if the player steps into a monster cell here, they die instantly
-                    if (! actor.cell.blocks_leaving(actor, direction) &&
-                        ! dest_cell.blocks_entering(actor, direction, this, true))
-                    {
-                        // We found a good direction!  Stop here
-                        actor.decision = direction;
-                        break;
-                    }
-                }
+            else {
+                this.make_actor_decision(actor);
             }
         }
 
@@ -717,27 +649,6 @@ export class Level {
             if (actor === this.player && actor.decision && ! success) {
                 this.sfx.play_once('blocked');
                 actor.is_blocked = true;
-            }
-
-            // Players can also bump the tiles in the cell next to the one they're leaving
-            let dir2 = actor.secondary_direction;
-            if (actor.type.is_real_player && dir2 &&
-                ! old_cell.blocks_leaving(actor, dir2))
-            {
-                let neighbor = this.get_neighboring_cell(old_cell, dir2);
-                if (neighbor) {
-                    let could_push = ! neighbor.blocks_entering(actor, dir2, this, true);
-                    for (let tile of Array.from(neighbor)) {
-                        if (tile.type.on_bump) {
-                            tile.type.on_bump(tile, this, actor);
-                        }
-                        if (could_push && actor.can_push(tile, dir2)) {
-                            // Block slapping: you can shove a block by walking past it sideways
-                            // TODO i think cc2 uses the push pose and possibly even turns you here?
-                            this.attempt_out_of_turn_step(tile, dir2);
-                        }
-                    }
-                }
             }
         }
 
@@ -798,6 +709,189 @@ export class Level {
         this.commit();
     }
 
+    make_player_decision(actor, input) {
+        // Only reset the player's is_pushing between movement, so it lasts for the whole push
+        this._set_tile_prop(actor, 'is_pushing', false);
+
+        // TODO player in a cloner can't move (but player in a trap can still turn)
+
+        // The player is unusual in several ways.
+        // - Only the current player can override a force floor (and only if their last move was an
+        //   involuntary force floor slide, perhaps before some number of ice slides).
+        // - The player "block slaps", a phenomenon where they physically attempt to make both of
+        //   their desired movements, having an impact on the world if appropriate, before deciding
+        //   which of them to use
+        let direction_preference = [];
+        if (actor.slide_mode && ! (
+            actor.slide_mode === 'force' &&
+            input.primary !== null && actor.last_move_was_force))
+        {
+            direction_preference.push(actor.direction);
+
+            if (actor.slide_mode === 'force') {
+                this._set_tile_prop(actor, 'last_move_was_force', true);
+            }
+        }
+        else {
+            // FIXME this isn't right; if primary is blocked, they move secondary, but they also
+            // ignore railroad redirection until next tic
+            this.remember_player_move(input.primary);
+
+            if (input.primary) {
+                // FIXME something is wrong with direction preferences!  if you hold both keys
+                // in a corner, no matter which you pressed first, cc2 always tries vert first
+                // and horiz last (so you're pushing horizontally)!
+                // FIXME starting to think the game should just pass all the held keys down
+                // here; i have to repeat this check because the "step" phase may have changed
+                // our direction
+                // XXX if this is a slide override, and the override is into a wall, the slide
+                // direction becomes primary again; i think "slide bonk" happens to cover this at
+                // the moment, is that cromulent?
+                let d1 = input.primary, d2 = input.secondary;
+                if (d2 && d2 === actor.direction) {
+                    [d1, d2] = [d2, d1];
+                }
+                direction_preference.push(d1);
+                if (d2) {
+                    direction_preference.push(d2);
+                }
+                this._set_tile_prop(actor, 'last_move_was_force', false);
+            }
+        }
+
+        if (direction_preference.length === 0)
+            return;
+
+        // Note that we do this even if only one direction is requested, meaning that we get a
+        // chance to push blocks before anything else has moved!
+        // TODO TW's lynx source has one exception to that rule: if there are two directions,
+        // and neither one is our current facing, then we only check the horizontal one!
+        let directions_ok = direction_preference.map(direction => {
+            direction = actor.cell.redirect_exit(actor, direction);
+            let dest_cell = this.get_neighboring_cell(actor.cell, direction);
+            return (dest_cell &&
+                ! actor.cell.blocks_leaving(actor, direction) &&
+                // FIXME if the player steps into a monster cell here, they die instantly!  but only
+                // if the cell doesn't block them??
+                ! dest_cell.blocks_entering(actor, direction, this, 'move'));
+        });
+
+        if (directions_ok.length === 1) {
+            actor.decision = direction_preference[0];
+        }
+        else if (! directions_ok[0] && directions_ok[1]) {
+            // Only turn if we're blocked in our current direction AND free in the other one
+            actor.decision = direction_preference[1];
+        }
+        else {
+            actor.decision = direction_preference[0];
+        }
+
+        if (actor.slide_mode && ! directions_ok[0]) {
+            this._handle_slide_bonk(actor);
+        }
+    }
+
+    make_actor_decision(actor) {
+        // Teeth can only move the first 4 of every 8 tics, and mimics only the first 4 of every
+        // 16, though "first" can be adjusted
+        if (actor.slide_mode === null && actor.type.movement_parity &&
+            (this.tic_counter + this.step_parity) % (actor.type.movement_parity * 4) >= 4)
+        {
+            return;
+        }
+
+        // Compat flag for blue tanks
+        if (this.compat.sliding_tanks_ignore_button &&
+            actor.slide_mode && actor.pending_reverse)
+        {
+            this._set_tile_prop(actor, 'pending_reverse', false);
+        }
+
+        if (actor.pending_push) {
+            // Blocks that were pushed while sliding will move in the push direction as soon as
+            // they stop sliding, regardless of what they landed on
+            actor.decision = actor.pending_push;
+            this._set_tile_prop(actor, 'pending_push', null);
+            return;
+        }
+
+        let direction_preference;
+        if (actor.slide_mode) {
+            // Actors can't make voluntary moves while sliding; they just, ah, slide.
+            direction_preference = [actor.direction];
+        }
+        else if (actor.cell.some(tile => tile.type.traps && tile.type.traps(tile, actor))) {
+            // An actor in a cloner or a closed trap can't turn
+            // TODO because of this, if a tank is trapped when a blue button is pressed, then
+            // when released, it will make one move out of the trap and /then/ turn around and
+            // go back into the trap.  this is consistent with CC2 but not ms/lynx
+            return;
+        }
+        else if (actor.type.decide_movement) {
+            direction_preference = actor.type.decide_movement(actor, this);
+        }
+
+        // Check which of those directions we *can*, probably, move in
+        if (! direction_preference)
+            return;
+        let all_blocked = true;
+        for (let [i, direction] of direction_preference.entries()) {
+            if (typeof direction === 'function') {
+                // Lazy direction calculation (used for walkers)
+                direction = direction();
+            }
+
+            direction = actor.cell.redirect_exit(actor, direction);
+
+            let dest_cell = this.get_neighboring_cell(actor.cell, direction);
+            if (dest_cell &&
+                ! actor.cell.blocks_leaving(actor, direction) &&
+                ! dest_cell.blocks_entering(actor, direction, this, actor === this.player ? 'move' : 'trace'))
+            {
+                // We found a good direction!  Stop here
+                actor.decision = direction;
+                all_blocked = false;
+                break;
+            }
+
+            // If every other preference be blocked, actors unconditionally try the last one
+            // (and might even be able to move that way by the time their turn comes!)
+            if (i === direction_preference.length - 1) {
+                actor.decision = direction;
+            }
+        }
+
+        if (actor.slide_mode && all_blocked) {
+            this._handle_slide_bonk(actor);
+        }
+    }
+
+    _handle_slide_bonk(actor) {
+        if (actor.slide_mode === 'ice') {
+            // Actors on ice turn around when they hit something
+            actor.decision = DIRECTIONS[actor.direction].opposite;
+            this.set_actor_direction(actor, actor.decision);
+        }
+        if (actor.slide_mode !== null) {
+            // Somewhat clumsy hack: if an actor is sliding and hits something, step on the
+            // relevant tile again.  This fixes two problems: if it was on an ice corner then it
+            // needs to turn a second time even though it didn't move; and if it was a player
+            // overriding a force floor into a wall, then their direction needs to be set back
+            // to the force floor direction.
+            // (For random force floors, this does still match CC2 behavior: after an override,
+            // CC2 will try to force you in the /next/ RFF direction.)
+            // FIXME now overriding into a wall doesn't show you facing that way at all!  lynx
+            // only changes your direction at decision time by examining the floor tile...
+            for (let tile of actor.cell) {
+                if (tile.type.slide_mode === actor.slide_mode && tile.type.on_arrive) {
+                    tile.type.on_arrive(tile, this, actor);
+                }
+            }
+            actor.decision = actor.direction;
+        }
+    }
+
     // Try to move the given actor one tile in the given direction and update their cooldown.
     // Return true if successful.
     attempt_step(actor, direction) {
@@ -830,6 +924,7 @@ export class Level {
             // mid-iteration.)
             // FIXME actually, this prevents flicking!
             if (! blocked) {
+                // FIXME this can probably reuse blocks_entering now
                 // Try to move into the cell.  This is usually a simple check of whether we can
                 // enter it (similar to Cell.blocks_entering), but if the only thing blocking us is
                 // a pushable object, we have to do two more passes: one to push anything pushable,
@@ -890,26 +985,6 @@ export class Level {
         }
 
         if (blocked) {
-            if (actor.slide_mode === 'ice') {
-                // Actors on ice turn around when they hit something
-                this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
-            }
-            if (actor.slide_mode !== null) {
-                // Somewhat clumsy hack: if an actor is sliding and hits something, step on the
-                // relevant tile again.  This fixes two problems: if it was on an ice corner then it
-                // needs to turn a second time even though it didn't move; and if it was a player
-                // overriding a force floor into a wall, then their direction needs to be set back
-                // to the force floor direction.
-                // (For random force floors, this does still match CC2 behavior: after an override,
-                // CC2 will try to force you in the /next/ RFF direction.)
-                // FIXME now overriding into a wall doesn't show you facing that way at all!  lynx
-                // only changes your direction at decision time by examining the floor tile...
-                for (let tile of actor.cell) {
-                    if (tile.type.slide_mode === actor.slide_mode && tile.type.on_arrive) {
-                        tile.type.on_arrive(tile, this, actor);
-                    }
-                }
-            }
             return false;
         }
 

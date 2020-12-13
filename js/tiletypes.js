@@ -27,7 +27,7 @@ function on_ready_force_floor(me, level) {
     let neighbor = level.get_neighboring_cell(me.cell, actor.direction);
     if (! neighbor)
         return;
-    if (! neighbor.blocks_entering(actor, actor.direction, level, true))
+    if (! neighbor.blocks_entering(actor, actor.direction, level, 'trace'))
         return;
     let item = me.cell.get_item();
     if (! item)
@@ -2294,7 +2294,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 5,
         // If anything else even begins to step on an animation, it's erased
         // FIXME possibly erased too fast; cc2 shows it briefly?  could i get away with on_arrive here?
         on_approach(me, level, other) {
@@ -2306,7 +2306,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 5,
         on_approach(me, level, other) {
             level.remove_tile(me);
         },
@@ -2326,7 +2326,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 5,
         on_approach(me, level, other) {
             level.remove_tile(me);
         },
