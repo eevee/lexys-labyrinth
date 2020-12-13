@@ -365,18 +365,21 @@ const TILE_ENCODING = {
     0x47: {
         name: 'button_gray',
     },
-    // FIXME swivel floors...  argh...
     0x48: {
         name: 'swivel_sw',
+        dummy_terrain: 'swivel_floor',
     },
     0x49: {
         name: 'swivel_nw',
+        dummy_terrain: 'swivel_floor',
     },
     0x4a: {
         name: 'swivel_ne',
+        dummy_terrain: 'swivel_floor',
     },
     0x4b: {
         name: 'swivel_se',
+        dummy_terrain: 'swivel_floor',
     },
     0x4c: {
         name: 'stopwatch_bonus',
@@ -1007,7 +1010,6 @@ export function parse_level(buf, number = 1) {
                     let name = spec.name;
 
                     // Make a tile template, possibly dealing with some special cases
-                    // FIXME restore this
                     if (name === '#thinwall/canopy') {
                         // Thin walls and the canopy are combined into a single byte for some
                         // reason; split them apart here.  Which ones we get is determined by a
@@ -1046,6 +1048,13 @@ export function parse_level(buf, number = 1) {
                     cell.push(tile);
                     if (spec.modifier) {
                         spec.modifier.decode(tile, modifier);
+                    }
+
+                    // Swivels come with their own specific flooring
+                    // TODO this should go on the bottom
+                    // TODO we should sort and also only allow one thing per layer
+                    if (spec.dummy_terrain) {
+                        cell.push({type: TILE_TYPES[spec.dummy_terrain]});
                     }
 
                     if (type.is_required_chip) {
@@ -1322,10 +1331,29 @@ export function synthesize_level(stored_level) {
     let hints = [];
     let p = 2;
     for (let cell of stored_level.linear_cells) {
+        // TODO complain if duplicates on a layer
+        let dummy_terrain_tile = null;
         for (let i = cell.length - 1; i >= 0; i--) {
             let tile = cell[i];
             // FIXME does not yet support canopy or thin walls  >:S
             let spec = REVERSE_TILE_ENCODING[tile.type.name];
+
+            // Handle the swivel, a tile that draws as an overlay but is stored like terrain.  In a
+            // level, it has two parts: the swivel itself, and a dummy swivel_floor terrain which is
+            // unencodable.  To encode that, we notice when we hit a swivel (which happens first),
+            // save it until we reach the terrain layer, and then sub it in instead.
+            // TODO if i follow in tyler's footsteps and give swivel its own layer then i'll need to
+            // complicate this somewhat
+            if (tile.type.draw_layer === 0 && dummy_terrain_tile) {
+                tile = dummy_terrain_tile;
+                spec = REVERSE_TILE_ENCODING[tile.type.name];
+            }
+            else if (spec.dummy_terrain) {
+                // This is a swivel, a tile that draws as an overlay but is stored like terrain, so
+                // wait until we hit terrain and store it then
+                dummy_terrain_tile = tile;
+                continue;
+            }
 
             if (spec.modifier) {
                 let mod = spec.modifier.encode(tile);

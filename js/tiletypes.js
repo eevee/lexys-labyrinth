@@ -315,6 +315,7 @@ const TILE_TYPES = {
     swivel_floor: {
         draw_layer: DRAW_LAYERS.terrain,
     },
+    // TODO thin walls explicitly draw over swivels, so they might have their own layer
     swivel_ne: {
         draw_layer: DRAW_LAYERS.overlay,
         thin_walls: new Set(['north', 'east']),
