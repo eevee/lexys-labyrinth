@@ -500,8 +500,6 @@ export class Level {
         }
 
         // Used for various tic-local effects; don't need to be undoable
-        // Used to check for a monster chomping the player's tail
-        this.player_leaving_cell = this.player.cell;
         // TODO maybe this should be undone anyway so rewind looks better?
         this.player.is_blocked = false;
 
@@ -547,12 +545,6 @@ export class Level {
                 }
             }
         }
-
-        // Handle wiring, now that a bunch of buttons may have been pressed.  Do it three times,
-        // because CC2 runs it once per frame, not once per tic
-        this.update_wiring();
-        this.update_wiring();
-        this.update_wiring();
     }
 
     finish_tic(p1_actions) {
@@ -675,6 +667,8 @@ export class Level {
                     if (! dest_cell)
                         continue;
 
+                    // FIXME it looks like cc2 actually starts pushing blocks here
+                    // FIXME similarly, if the player steps into a monster cell here, they die instantly
                     if (! actor.cell.blocks_leaving(actor, direction) &&
                         ! dest_cell.blocks_entering(actor, direction, this, true))
                     {
@@ -753,6 +747,12 @@ export class Level {
         if (this.player.movement_cooldown > 0) {
             this.remember_player_move(this.player.direction);
         }
+
+        // Handle wiring, now that a bunch of buttons may have been pressed.  Do it three times,
+        // because CC2 runs it once per frame, not once per tic
+        this.update_wiring();
+        this.update_wiring();
+        this.update_wiring();
 
         // Strip out any destroyed actors from the acting order
         // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
@@ -979,10 +979,13 @@ export class Level {
             }
         }
 
-        // If we're stepping directly on the player, that kills them too
-        // TODO this only works because i have the player move first; in lynx the check is the other
-        // way around
-        if (actor.type.is_monster && goal_cell === this.player_leaving_cell) {
+        // If we're stepping directly on the player, that kills them too; the player and a monster
+        // must be at least 5 tics apart
+        // TODO the rules in lynx might be slightly different?
+        if (actor.type.is_monster && goal_cell === this.player.previous_cell &&
+            // Player has decided to leave their cell, but hasn't actually taken a step yet
+            this.player.movement_cooldown === this.player.movement_speed)
+        {
             this.fail(actor.type.name);
         }
 
