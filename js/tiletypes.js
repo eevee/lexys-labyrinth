@@ -1371,7 +1371,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
-            level.toggle_green_objects = ! level.toggle_green_objects;
+            this.do_button(level);
         },
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);

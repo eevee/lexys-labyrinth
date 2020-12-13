@@ -502,7 +502,6 @@ export class Level {
         // Used for various tic-local effects; don't need to be undoable
         // Used to check for a monster chomping the player's tail
         this.player_leaving_cell = this.player.cell;
-        this.toggle_green_objects = false;
         // TODO maybe this should be undone anyway so rewind looks better?
         this.player.is_blocked = false;
 
@@ -746,11 +745,6 @@ export class Level {
                     }
                 }
             }
-        }
-
-        if (this.toggle_green_objects) {
-            TILE_TYPES['button_green'].do_button(this);
-            this.toggle_green_objects = false;
         }
 
         // In the event that the player is sliding (and thus not deliberately moving) or has
