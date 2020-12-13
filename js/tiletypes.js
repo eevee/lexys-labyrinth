@@ -93,17 +93,12 @@ function player_visual_state(me) {
 // Logic for chasing after the player (or running away); shared by both teeth and mimics
 function pursue_player(me, level) {
     let player = level.player;
-    let target_cell = player.cell;
-    // CC2 behavior (not Lynx (TODO compat?)): pursue the cell the player is leaving, if
-    // they're still mostly in it
-    if (player.previous_cell && player.movement_speed &&
-        player.movement_cooldown >= player.movement_speed / 2)
-    {
-        target_cell = player.previous_cell;
-    }
+    // CC2 behavior (not Lynx (TODO compat?)): pursue the player's apparent position, not just the
+    // cell they're in
+    let [px, py] = player.visual_position();
 
-    let dx = me.cell.x - target_cell.x;
-    let dy = me.cell.y - target_cell.y;
+    let dx = me.cell.x - px;
+    let dy = me.cell.y - py;
     let preferred_horizontal, preferred_vertical;
     if (dx > 0) {
         preferred_horizontal = 'west';
