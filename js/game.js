@@ -996,6 +996,18 @@ export class Level {
             this.sfx.play_once('step-floor');
         }
 
+        // Announce we're approaching
+        for (let tile of Array.from(actor.cell)) {
+            if (tile === actor)
+                continue;
+            if (actor.ignores(tile.type.name))
+                continue;
+
+            if (tile.type.on_approach) {
+                tile.type.on_approach(tile, this, actor);
+            }
+        }
+
         if (this.compat.tiles_react_instantly) {
             this.step_on_cell(actor, actor.cell);
         }

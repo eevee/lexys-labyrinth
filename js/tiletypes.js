@@ -284,8 +284,7 @@ const TILE_TYPES = {
     popdown_floor: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
-        // FIXME should be on_approach
-        on_arrive(me, level, other) {
+        on_approach(me, level, other) {
             // FIXME could probably do this with state?  or, eh
             level.transmute_tile(me, 'popdown_floor_visible');
         },
@@ -2301,6 +2300,11 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.player,
         ttl: 6,
+        // If anything else even begins to step on an animation, it's erased
+        // FIXME possibly erased too fast; cc2 shows it briefly?  could i get away with on_arrive here?
+        on_approach(me, level, other) {
+            level.remove_tile(me);
+        },
     },
     explosion: {
         draw_layer: DRAW_LAYERS.overlay,
@@ -2308,6 +2312,9 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.player,
         ttl: 6,
+        on_approach(me, level, other) {
+            level.remove_tile(me);
+        },
     },
     // Used as an easy way to show an invisible wall when bumped
     wall_invisible_revealed: {
@@ -2325,6 +2332,9 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.player,
         ttl: 6,
+        on_approach(me, level, other) {
+            level.remove_tile(me);
+        },
     },
 
     // Invalid tiles that appear in some CCL levels because community level
