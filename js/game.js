@@ -473,13 +473,11 @@ export class Level {
             return;
         }
 
-        this.advance_tic_all(p1_actions);
-
-        // Commit the undo state at the end of each tic (pass 2)
-        this.commit();
+        this.begin_tic(p1_actions);
+        this.finish_tic(p1_actions);
     }
 
-    advance_tic_all(p1_actions) {
+    begin_tic(p1_actions) {
         // Store some current level state in the undo entry.  (These will often not be modified, but
         // they only take a few bytes each so that's fine.)
         for (let key of [
@@ -493,6 +491,7 @@ export class Level {
 
         // Player's secondary direction is set immediately; it applies on arrival to cells even if
         // it wasn't held the last time the player started moving
+        // TODO this feels wrong to me but i'm not sure why
         if (p1_actions.secondary === this.player.direction) {
             this._set_tile_prop(this.player, 'secondary_direction', p1_actions.primary);
         }
@@ -555,7 +554,9 @@ export class Level {
         this.update_wiring();
         this.update_wiring();
         this.update_wiring();
+    }
 
+    finish_tic(p1_actions) {
         // SECOND PASS: actors decide their upcoming movement simultaneously
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
@@ -799,6 +800,8 @@ export class Level {
                 this.sfx.play_once('tick');
             }
         }
+
+        this.commit();
     }
 
     // Try to move the given actor one tile in the given direction and update their cooldown.

@@ -308,16 +308,22 @@ class Player extends PrimaryView {
         });
 
         // 0: normal realtime mode
-        // 1: turn-based mode
-        // 2: turn-based mode, but we know the game is frozen waiting for input
+        // 1: turn-based mode, at the start of a tic
+        // 2: turn-based mode, in mid-tic, with the game frozen waiting for input
         this.turn_mode = 0;
         this.turn_based_checkbox = this.root.querySelector('.controls .control-turn-based');
         this.turn_based_checkbox.checked = false;
         this.turn_based_checkbox.addEventListener('change', ev => {
             if (this.turn_based_checkbox.checked) {
+                // If we're leaving real-time mode then we're between tics
                 this.turn_mode = 1;
             }
             else {
+                if (this.turn_mode === 2) {
+                    // Finish up the tic with dummy input
+                    this.level.finish_tic({primary: null, secondary: null});
+                    this.advance_by(1);
+                }
                 this.turn_mode = 0;
             }
         });
@@ -1020,16 +1026,29 @@ class Player extends PrimaryView {
             }
 
             let has_input = input.has('wait') || Object.values(player_actions).some(x => x);
+            // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
+            if (this.turn_mode === 2) {
+                if (has_input) {
+                    // Finish the current tic, then continue as usual.  This means the end of the
+                    // tic doesn't count against the number of tics to advance -- because it already
+                    // did, the first time we tried it
+                    this.level.finish_tic(player_actions);
+                    this.turn_mode = 1;
+                }
+                else {
+                    continue;
+                }
+            }
+
+            // We should now be at the start of a tic
+            this.level.begin_tic(player_actions);
             if (this.turn_mode > 0 && this.level.can_accept_input() && ! has_input) {
                 // If we're in turn-based mode and could provide input here, but don't have any,
                 // then wait until we do
                 this.turn_mode = 2;
             }
             else {
-                this.level.advance_tic(player_actions);
-                if (this.turn_mode > 1) {
-                    this.turn_mode = 1;
-                }
+                this.level.finish_tic(player_actions);
             }
 
             if (this.level.state !== 'playing') {
@@ -1088,6 +1107,10 @@ class Player extends PrimaryView {
 
     undo() {
         this.level.undo();
+        // Undo always returns to the start of a tic
+        if (this.turn_mode === 2) {
+            this.turn_mode = 1;
+        }
     }
 
     // Redraws every frame, unless the game isn't running
