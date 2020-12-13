@@ -1229,8 +1229,7 @@ function compress(buf) {
             return null;
         }
     }
-    // FIXME don't love this slice
-    return outbytes.buffer.slice(0, q);
+    return outbytes.subarray(0, q);
 }
 
 class C2M {
@@ -1323,14 +1322,23 @@ export function synthesize_level(stored_level) {
         c2m.add_section('LXCM', bytes.buffer);
     }
 
-    // FIXME well this will not do
-    let map_bytes = new Uint8Array(4096);
+    let map_bytes = new Uint8Array(1024);
     let map_view = new DataView(map_bytes.buffer);
     map_bytes[0] = stored_level.size_x;
     map_bytes[1] = stored_level.size_y;
     let hints = [];
     let p = 2;
     for (let cell of stored_level.linear_cells) {
+        // If we're in danger of running out of room in our buffer, add another kilobyte and copy
+        if (p >= map_bytes.length - 64) {
+            let new_bytes = new Uint8Array(map_bytes.length + 1024);
+            for (let i = 0; i < map_bytes.length; i++) {
+                new_bytes[i] = map_bytes[i];
+            }
+            map_bytes = new_bytes;
+            map_view = new DataView(map_bytes.buffer);
+        }
+
         // TODO complain if duplicates on a layer
         let dummy_terrain_tile = null;
         for (let i = cell.length - 1; i >= 0; i--) {
@@ -1398,6 +1406,7 @@ export function synthesize_level(stored_level) {
             // TODO assert that the bottom tile has no next, and all the others do
         }
     }
+    map_bytes = map_bytes.subarray(0, p);
 
     // Collect hints first so we can put them in the comment field
     // FIXME this does not respect global hint, but then, neither does the editor.
@@ -1406,14 +1415,12 @@ export function synthesize_level(stored_level) {
     hints.unshift('');
     c2m.add_section('NOTE', hints.join('\n[CLUE]\n'));
 
-    // FIXME ack, ArrayBuffer.slice makes a copy actually!  and i use it a lot in this file i think!!
-    let map_buf = map_bytes.buffer.slice(0, p);
-    let compressed_map = compress(map_buf);
+    let compressed_map = compress(map_bytes);
     if (compressed_map) {
         c2m.add_section('PACK', compressed_map);
     }
     else {
-        c2m.add_section('MAP ', map_buf);
+        c2m.add_section('MAP ', map_bytes);
     }
 
     c2m.add_section('END ', '');
