@@ -587,6 +587,19 @@ export class Level {
                 }
             }
         }
+
+        // Mini extra pass: deal with teleporting separately.  Otherwise, actors may have been in
+        // the way of the teleporter but finished moving away during the above loop; this is
+        // particularly bad when it happens with a block you're pushing.
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+            if (! actor.cell)
+                continue;
+
+            if (actor.just_stepped_on_teleporter) {
+                this.attempt_teleport(actor);
+            }
+        }
     }
 
     finish_tic(p1_actions) {
@@ -1087,7 +1100,6 @@ export class Level {
 
     // Step on every tile in a cell we just arrived in
     step_on_cell(actor, cell) {
-        let teleporter;
         // Step on topmost things first -- notably, it's safe to step on water with flippers on top
         for (let tile of Array.from(cell).reverse()) {
             if (tile === actor)
@@ -1108,76 +1120,80 @@ export class Level {
                 }
             }
             else if (tile.type.teleport_dest_order) {
-                teleporter = tile;
+                // This is used by an extra pass just after our caller, so it doesn't need to undo
+                actor.just_stepped_on_teleporter = tile;
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
             }
         }
+    }
+
+    attempt_teleport(actor) {
+        let teleporter = actor.just_stepped_on_teleporter;
+        actor.just_stepped_on_teleporter = null;
 
         // Handle teleporting, now that the dust has cleared
         // FIXME something funny happening here, your input isn't ignored while walking out of it?
-        if (teleporter) {
-            let original_direction = actor.direction;
-            let success = false;
-            for (let dest of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
-                // Teleporters already containing an actor are blocked and unusable
-                if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
-                    continue;
+        let original_direction = actor.direction;
+        let success = false;
+        for (let dest of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
+            // Teleporters already containing an actor are blocked and unusable
+            if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
+                continue;
 
-                // Physically move the actor to the new teleporter
-                // XXX lynx treats this as a slide and does it in a pass in the main loop
-                // XXX not especially undo-efficient
-                this.remove_tile(actor);
-                this.add_tile(actor, dest.cell);
+            // Physically move the actor to the new teleporter
+            // XXX lynx treats this as a slide and does it in a pass in the main loop
+            // XXX not especially undo-efficient
+            this.remove_tile(actor);
+            this.add_tile(actor, dest.cell);
 
-                // Red and green teleporters attempt to spit you out in every direction before
-                // giving up on a destination (but not if you return to the original).
-                // Note that we use actor.direction here (rather than original_direction) because
-                // green teleporters modify it in teleport_dest_order, to randomize the exit
-                // direction
-                let direction = actor.direction;
-                let num_directions = 1;
-                if (teleporter.type.teleport_try_all_directions && dest !== teleporter) {
-                    num_directions = 4;
-                }
-                // FIXME bleugh hardcode
-                if (dest === teleporter && teleporter.type.name === 'teleport_yellow') {
+            // Red and green teleporters attempt to spit you out in every direction before
+            // giving up on a destination (but not if you return to the original).
+            // Note that we use actor.direction here (rather than original_direction) because
+            // green teleporters modify it in teleport_dest_order, to randomize the exit
+            // direction
+            let direction = actor.direction;
+            let num_directions = 1;
+            if (teleporter.type.teleport_try_all_directions && dest !== teleporter) {
+                num_directions = 4;
+            }
+            // FIXME bleugh hardcode
+            if (dest === teleporter && teleporter.type.name === 'teleport_yellow') {
+                break;
+            }
+            for (let i = 0; i < num_directions; i++) {
+                if (this.attempt_out_of_turn_step(actor, direction)) {
+                    success = true;
+                    // Sound plays from the origin cell simply because that's where the sfx player
+                    // thinks the player is currently; position isn't updated til next turn
+                    this.sfx.play_once('teleport', teleporter.cell);
                     break;
                 }
-                for (let i = 0; i < num_directions; i++) {
-                    if (this.attempt_out_of_turn_step(actor, direction)) {
-                        success = true;
-                        // Sound plays from the origin cell simply because that's where the sfx player
-                        // thinks the player is currently; position isn't updated til next turn
-                        this.sfx.play_once('teleport', teleporter.cell);
-                        break;
-                    }
-                    else {
-                        direction = DIRECTIONS[direction].right;
-                    }
-                }
-
-                if (success) {
-                    break;
-                }
-                else if (num_directions === 4) {
-                    // Restore our original facing before continuing
-                    // (For red teleports, we try every possible destination in our original
-                    // movement direction, so this is correct.  For green teleports, we only try one
-                    // destination and then fall back to walking through the source in our original
-                    // movement direction, so this is still correct.)
-                    this.set_actor_direction(actor, original_direction);
+                else {
+                    direction = DIRECTIONS[direction].right;
                 }
             }
 
-            if (! success && actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
-                // Super duper special yellow teleporter behavior: you pick it the fuck up
-                // FIXME not if there's only one in the level?
-                this.attempt_take(actor, teleporter);
-                if (actor === this.player) {
-                    this.sfx.play_once('get-tool', teleporter.cell);
-                }
+            if (success) {
+                break;
+            }
+            else if (num_directions === 4) {
+                // Restore our original facing before continuing
+                // (For red teleports, we try every possible destination in our original
+                // movement direction, so this is correct.  For green teleports, we only try one
+                // destination and then fall back to walking through the source in our original
+                // movement direction, so this is still correct.)
+                this.set_actor_direction(actor, original_direction);
+            }
+        }
+
+        if (! success && actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
+            // Super duper special yellow teleporter behavior: you pick it the fuck up
+            // FIXME not if there's only one in the level?
+            this.attempt_take(actor, teleporter);
+            if (actor === this.player) {
+                this.sfx.play_once('get-tool', teleporter.cell);
             }
         }
     }
