@@ -1487,7 +1487,7 @@ const TOKENIZE_RX = RegExp(
         // 2: Comments are preceded by ; or // for some reason and run to the end of the line
         '|(?:;|//)(.*)' +
         // 3: Strings are double-quoted (only!) and contain no escapes
-        '|"([^"]+?)"' +
+        '|"([^"]*?)"' +
         // 4: Labels are indicated by a #, including when used with 'goto'
         // (the exact set of allowed characters is unclear and i'm fudging it here)
         '|#(\\w+)' +
