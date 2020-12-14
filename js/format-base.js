@@ -3,6 +3,51 @@ import * as util from './util.js';
 export class StoredCell extends Array {
 }
 
+export class Replay {
+    constructor(initial_force_floor_direction, blob_seed, inputs = null) {
+        this.initial_force_floor_direction = initial_force_floor_direction;
+        this.blob_seed = blob_seed;
+        this.inputs = inputs ?? new Uint8Array;
+        this.duration = this.inputs.length;
+        this.cursor = 0;
+    }
+
+    get(t) {
+        if (this.duration <= 0) {
+            return 0;
+        }
+        else if (t < this.duration) {
+            return this.inputs[t];
+        }
+        else {
+            // Last input is implicitly repeated indefinitely
+            return this.inputs[this.duration - 1];
+        }
+    }
+
+    set(t, input) {
+        if (t >= this.inputs.length) {
+            let new_inputs = new Uint8Array(this.inputs.length + 1024);
+            for (let i = 0; i < this.inputs.length; i++) {
+                new_inputs[i] = this.inputs[i];
+            }
+            this.inputs = new_inputs;
+        }
+        this.inputs[t] = input;
+        if (t >= this.duration) {
+            this.duration = t + 1;
+        }
+    }
+
+    clone() {
+        let new_inputs = new Uint8Array(this.duration);
+        for (let i = 0; i < this.duration; i++) {
+            new_inputs[i] = this.inputs[i];
+        }
+        return new this.constructor(this.initial_force_floor_direction, this.blob_seed, new_inputs);
+    }
+}
+
 export class StoredLevel {
     constructor(number) {
         // TODO still not sure this belongs here
@@ -21,6 +66,12 @@ export class StoredLevel {
         // 1 - 4 patterns (default; PRNG + rotating through 0-3)
         // 2 - extra random (like deterministic, but initial seed is "actually" random)
         this.blob_behavior = 1;
+
+        // Lazy-loading that allows for checking existence (see methods below)
+        // TODO this needs a better interface, these get accessed too much atm
+        this._replay = null;
+        this._replay_data = null;
+        this._replay_decoder = null;
 
         this.size_x = 0;
         this.size_y = 0;
@@ -46,6 +97,17 @@ export class StoredLevel {
     }
 
     check() {
+    }
+
+    get has_replay() {
+        return this._replay || (this._replay_data && this._replay_decoder);
+    }
+
+    get replay() {
+        if (! this._replay) {
+            this._replay = this._replay_decoder(this._replay_data);
+        }
+        return this._replay;
     }
 }
 

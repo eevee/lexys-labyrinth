@@ -1,11 +1,11 @@
 // TODO bugs and quirks i'm aware of:
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
-import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
+import { DIRECTIONS, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
 import { Level } from './game.js';
-import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay } from './main-base.js';
+import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay, flash_button } from './main-base.js';
 import { Editor } from './main-editor.js';
 import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
@@ -15,6 +15,13 @@ import { random_choice, mk, mk_svg, promise_event } from './util.js';
 import * as util from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
+// This prefix is LLDEMO in base64, used to be somewhat confident that a string is a valid demo
+// (it's 6 characters so it becomes exactly 8 base64 chars with no leftovers to entangle)
+const REPLAY_PREFIX = "TExERU1P";
+
+function format_replay_duration(t) {
+    return `${t} tics (${util.format_duration(t / TICS_PER_SECOND)})`;
+}
 
 // TODO:
 // - level password, if any
@@ -275,7 +282,6 @@ class Player extends PrimaryView {
         this.time_el = this.root.querySelector('.time output');
         this.bonus_el = this.root.querySelector('.bonus output');
         this.inventory_el = this.root.querySelector('.inventory');
-        this.demo_el = this.root.querySelector('.demo');
 
         this.music_el = this.root.querySelector('#player-music');
         this.music_audio_el = this.music_el.querySelector('audio');
@@ -732,30 +738,132 @@ class Player extends PrimaryView {
             this.debug.input_els[action] = el;
             input_el.append(el);
         }
-        // Add a button to view a replay
-        this.debug.replay_button = make_button("run level's replay", () => {
-            if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
-                new ConfirmOverlay(this.conductor, "Restart this level and watch the replay?", () => {
-                    this.play_demo();
-                }).open();
-            }
-            else {
-                this.play_demo();
-            }
-        });
-        this._update_replay_button_enabled();
-        debug_el.querySelector('.-replay-columns .-buttons').append(
-            this.debug.replay_button,
+        // There are two replay slots: the (read-only) one baked into the level, and the one you are
+        // editing.  You can also transfer them back and forth.
+        // This is the level slot
+        let extra_replay_elements = [];
+        extra_replay_elements.push(mk('hr'));
+        this.debug.replay_level_label = mk('p', this.level && this.level.stored_level.has_replay ? "available" : "none");
+        extra_replay_elements.push(mk('div.-replay-available', mk('h4', "From level:"), this.debug.replay_level_label));
+        this.debug.replay_level_buttons = [
+            make_button("Play", () => {
+                if (! this.level.stored_level.has_replay)
+                    return;
+                this.confirm_game_interruption("Restart this level to watch the level's built-in replay?", () => {
+                    this.restart_level();
+                    let replay = this.level.stored_level.replay;
+                    this.install_replay(replay, 'level');
+                    this.debug.replay_level_label.textContent = format_replay_duration(replay.duration);
+                });
+            }),
+            make_button("Edit", () => {
+                if (! this.level.stored_level.has_replay)
+                    return;
+                this.debug.custom_replay = this.level.stored_level.replay;
+                this._update_replay_ui();
+                this.debug.replay_custom_label.textContent = format_replay_duration(this.debug.custom_replay.duration);
+            }),
+            make_button("Copy", ev => {
+                let stored_level = this.level.stored_level;
+                if (! stored_level.has_replay)
+                    return;
+
+                let data;
+                if (stored_level._replay_decoder === c2g.decode_replay) {
+                    // No need to decode it just to encode it again
+                    data = stored_level._replay_data;
+                }
+                else {
+                    data = c2g.encode_replay(stored_level.replay);
+                }
+                // This prefix is LLDEMO in base64 (it's 6 characters so it becomes exactly 8 base64
+                // chars and won't entangle with any other characters)
+                navigator.clipboard.writeText(REPLAY_PREFIX + util.b64encode(data));
+                flash_button(ev.target);
+            }),
+            // TODO delete
+            // TODO download entire demo as a file (???)
+        ];
+        extra_replay_elements.push(mk('div.-buttons', ...this.debug.replay_level_buttons));
+        // This is the custom slot, which has rather a few more buttons
+        extra_replay_elements.push(mk('hr'));
+        this.debug.replay_custom_label = mk('p', "none");
+        extra_replay_elements.push(mk('div.-replay-available', mk('h4', "Custom:"), this.debug.replay_custom_label));
+        extra_replay_elements.push(mk('div.-buttons',
+            make_button("Record new", () => {
+                this.confirm_game_interruption("Restart this level to record a replay?", () => {
+                    this.restart_level();
+                    let replay = new format_base.Replay(
+                        this.level.force_floor_direction, this.level._blob_modifier);
+                    this.install_replay(replay, 'custom', true);
+                    this.debug.custom_replay = replay;
+                    this.debug.replay_custom_label.textContent = format_replay_duration(replay.duration);
+                    this._update_replay_ui();
+                });
+            }),
+            // TODO load from a file?
+            make_button("Paste", async ev => {
+                // FIXME firefox doesn't let this fly; provide a textbox instead
+                let string = await navigator.clipboard.readText();
+                if (string.substring(0, REPLAY_PREFIX.length) !== REPLAY_PREFIX) {
+                    alert("Not a valid replay string, sorry!");
+                    return;
+                }
+
+                let replay = c2g.decode_replay(util.b64decode(string.substring(REPLAY_PREFIX.length)));
+                this.debug.custom_replay = replay;
+                this.debug.replay_custom_label.textContent = format_replay_duration(replay.duration);
+                this._update_replay_ui();
+                flash_button(ev.target);
+            }),
+        ));
+        let row1 = [
+            make_button("Play", () => {
+                if (! this.debug.custom_replay)
+                    return;
+                this.confirm_game_interruption("Restart this level to watch your custom replay?", () => {
+                    this.restart_level();
+                    let replay = this.debug.custom_replay;
+                    this.install_replay(replay, 'custom');
+                    this.debug.replay_custom_label.textContent = format_replay_duration(replay.duration);
+                });
+            }),
             /*
-            mk('button', {disabled: 'disabled'}, "load external replay"),
-            mk('button', {disabled: 'disabled'}, "regain control"),
-            mk('button', {disabled: 'disabled'}, "record new replay"),
-            mk('button', {disabled: 'disabled'}, "record from here"),
-            mk('button', {disabled: 'disabled'}, "browse/edit manually"),
+            make_button("Record from here", () => {
+                // TODO this feels poorly thought out i guess
+            }),
             */
-        );
+        ];
+        let row2 = [
+            make_button("Save to level", () => {
+                if (! this.debug.custom_replay)
+                    return;
+
+                this.level.stored_level._replay = this.debug.custom_replay.clone();
+                this.level.stored_level._replay_data = null;
+                this.level.stored_level._replay_decoder = null;
+                this.debug.replay_level_label.textContent = format_replay_duration(this.debug.custom_replay.duration);
+                this._update_replay_ui();
+            }),
+            make_button("Copy", ev => {
+                if (! this.debug.custom_replay)
+                    return;
+
+                let data = c2g.encode_replay(this.debug.custom_replay);
+                navigator.clipboard.writeText(REPLAY_PREFIX + util.b64encode(data));
+                flash_button(ev.target);
+            }),
+            // TODO download?
+        ];
+        extra_replay_elements.push(mk('div.-buttons', ...row1));
+        extra_replay_elements.push(mk('div.-buttons', ...row2));
+        this.debug.replay_custom_buttons = [...row1, ...row2];
+        // XXX this is an experimental API but it's been supported by The Two Browsers for ages
+        debug_el.querySelector('.-replay-columns').after(...extra_replay_elements);
+        this._update_replay_ui();
+
         // Progress bar and whatnot
-        let replay_playback_el = debug_el.querySelector('#player-debug-replay-playback');
+        let replay_playback_el = debug_el.querySelector('.-replay-status > .-playback');
         this.debug.replay_playback_el = replay_playback_el;
         this.debug.replay_progress_el = replay_playback_el.querySelector('progress');
         this.debug.replay_percent_el = replay_playback_el.querySelector('output');
@@ -810,9 +918,18 @@ class Player extends PrimaryView {
         }
     }
 
-    _update_replay_button_enabled() {
-        if (this.debug.replay_button) {
-            this.debug.replay_button.disabled = ! (this.level && this.level.stored_level.demo);
+    _update_replay_ui() {
+        if (! this.debug.enabled)
+            return;
+
+        let has_level_replay = (this.level && this.level.stored_level.has_replay);
+        for (let button of this.debug.replay_level_buttons) {
+            button.disabled = ! has_level_replay;
+        }
+
+        let has_custom_replay = !! this.debug.custom_replay;
+        for (let button of this.debug.replay_custom_buttons) {
+            button.disabled = ! has_custom_replay;
         }
     }
 
@@ -852,7 +969,10 @@ class Player extends PrimaryView {
         this.change_music(this.conductor.level_index % SOUNDTRACK.length);
         this._clear_state();
 
-        this._update_replay_button_enabled();
+        this._update_replay_ui();
+        if (this.debug.enabled) {
+            this.debug.replay_level_label.textContent = this.level.stored_level.has_replay ? "available" : "none";
+        }
     }
 
     update_viewport_size() {
@@ -897,7 +1017,6 @@ class Player extends PrimaryView {
 
         this.turn_mode = this.turn_based_checkbox.checked ? 1 : 0;
         this.last_advance = 0;
-        this.demo_faucet = null;
         this.current_keyring = {};
         this.current_toolbelt = [];
 
@@ -905,8 +1024,15 @@ class Player extends PrimaryView {
         this.time_el.classList.remove('--frozen');
         this.time_el.classList.remove('--danger');
         this.time_el.classList.remove('--warning');
-        this.root.classList.remove('--replay');
+        this.root.classList.remove('--replay-playback');
+        this.root.classList.remove('--replay-recording');
         this.root.classList.remove('--bonus-visible');
+
+        if (this.debug.enabled) {
+            this.debug.replay = null;
+            this.debug.replay_slot = null;
+            this.debug.replay_recording = false;
+        }
 
         this.update_ui();
         // Force a redraw, which won't happen on its own since the game isn't running
@@ -917,28 +1043,34 @@ class Player extends PrimaryView {
         new LevelBrowserOverlay(this.conductor).open();
     }
 
-    play_demo() {
-        this.restart_level();
-        let demo = this.level.stored_level.demo;
-        this.demo_faucet = demo.decompress();
-        this.level.force_floor_direction = demo.initial_force_floor_direction;
-        this.level._blob_modifier = demo.blob_seed;
-        // FIXME should probably start playback on first real input
-        this.set_state('playing');
-        this.root.classList.add('--replay');
+    install_replay(replay, slot, record = false) {
+        if (! this.debug.enabled)
+            return;
 
-        if (this.debug.enabled) {
-            this.debug.replay_playback_el.style.display = '';
-            let t = this.demo_faucet.length;
-            this.debug.replay_progress_el.setAttribute('max', t);
-            this.debug.replay_duration_el.textContent = `${t} tics (${util.format_duration(t / TICS_PER_SECOND)})`;
+        this.debug.replay = replay;
+        this.debug.replay_slot = slot;
+        this.debug.replay_recording = record;
+        this.debug.replay_playback_el.style.display = '';
+        let t = replay.duration;
+        this.debug.replay_progress_el.setAttribute('max', t);
+        this.debug.replay_duration_el.textContent = format_replay_duration(t);
+
+        if (! record) {
+            this.level.force_floor_direction = replay.initial_force_floor_direction;
+            this.level._blob_modifier = replay.blob_seed;
+            // FIXME should probably start playback on first real input
+            this.set_state('playing');
         }
+
+        this.root.classList.toggle('--replay-playback', ! record);
+        this.root.classList.toggle('--replay-recording', record);
     }
 
     get_input() {
         let input;
-        if (this.demo_faucet) {
-            input = this.demo_faucet.get(this.level.tic_counter);
+        if (this.debug && this.debug.replay && ! this.debug.replay_recording) {
+            let mask = this.debug.replay.get(this.level.tic_counter);
+            input = new Set(Object.entries(INPUT_BITS).filter(([action, bit]) => mask & bit).map(([action, bit]) => action));
         }
         else {
             // Convert input keys to actions.  This is only done now
@@ -970,6 +1102,16 @@ class Player extends PrimaryView {
     advance_by(tics) {
         for (let i = 0; i < tics; i++) {
             let input = this.get_input();
+
+            if (this.debug && this.debug.replay && this.debug.replay_recording) {
+                let input_mask = 0;
+                for (let [action, bit] of Object.entries(INPUT_BITS)) {
+                    if (input.has(action)) {
+                        input_mask |= bit;
+                    }
+                }
+                this.debug.replay.set(this.level.tic_counter, input_mask);
+            }
 
             // Replica of CC2 input handling, based on experimentation
             let primary_action = null, secondary_action = null;
@@ -1057,7 +1199,11 @@ class Player extends PrimaryView {
                 break;
             }
         }
+
         this.update_ui();
+        if (this.debug && this.debug.replay && this.debug.replay_recording) {
+            this.debug.replay_custom_label.textContent = format_replay_duration(this.debug.custom_replay.duration);
+        }
     }
 
     // Main driver of the level; advances by one tic, then schedules itself to
@@ -1230,9 +1376,9 @@ class Player extends PrimaryView {
             this.debug.time_moves_el.textContent = `${Math.floor(t/4)}`;
             this.debug.time_secs_el.textContent = (t / 20).toFixed(2);
 
-            if (this.demo_faucet) {
+            if (this.debug.replay) {
                 this.debug.replay_progress_el.setAttribute('value', t);
-                this.debug.replay_percent_el.textContent = `${Math.floor((t + 1) / this.demo_faucet.length * 100)}%`;
+                this.debug.replay_percent_el.textContent = `${Math.floor((t + 1) / this.debug.replay.duration * 100)}%`;
             }
         }
     }
@@ -1447,6 +1593,16 @@ class Player extends PrimaryView {
             if (! this._redraw_handle) {
                 this.redraw();
             }
+        }
+    }
+
+    confirm_game_interruption(question, action) {
+        if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
+            new ConfirmOverlay(this.conductor, "Restart this level and watch the replay?", action)
+                .open();
+        }
+        else {
+            action();
         }
     }
 
@@ -2380,9 +2536,7 @@ async function main() {
     }
     else if (b64level) {
         // TODO all the more important to show errors!!
-        // FIXME Not ideal, but atob() returns a string rather than any of the myriad binary types
-        let stringy_buf = atob(b64level.replace(/-/g, '+').replace(/_/g, '/'));
-        let buf = Uint8Array.from(stringy_buf, c => c.charCodeAt(0)).buffer;
+        let buf = util.b64decode(b64level);
         await conductor.parse_and_load_game(buf, null, 'shared.c2m', null, "Shared level");
     }
 }

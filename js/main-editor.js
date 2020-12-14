@@ -2,7 +2,7 @@ import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
 import { TILES_WITH_PROPS } from './editor-tile-overlays.js';
 import * as format_base from './format-base.js';
 import * as c2g from './format-c2g.js';
-import { PrimaryView, TransientOverlay, DialogOverlay, load_json_from_storage, save_json_to_storage } from './main-base.js';
+import { PrimaryView, TransientOverlay, DialogOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
 import { SVG_NS, mk, mk_svg, string_from_buffer_ascii, bytestring_to_buffer, walk_grid } from './util.js';
@@ -267,8 +267,8 @@ class EditorShareOverlay extends DialogOverlay {
         this.main.append(mk('p.editor-share-url', {}, url));
         let copy_button = mk('button', {type: 'button'}, "Copy to clipboard");
         copy_button.addEventListener('click', ev => {
+            flash_button(ev.target);
             navigator.clipboard.writeText(url);
-            // TODO feedback?
         });
         this.main.append(copy_button);
 
@@ -1643,11 +1643,7 @@ export class Editor extends PrimaryView {
             }, 60 * 1000);
         });
         _make_button("Share", ev => {
-            let buf = c2g.synthesize_level(this.stored_level);
-            // FIXME Not ideal, but btoa() wants a string rather than any of the myriad binary types
-            let stringy_buf = Array.from(new Uint8Array(buf)).map(n => String.fromCharCode(n)).join('');
-            // Make URL-safe and strip trailing padding
-            let data = btoa(stringy_buf).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
+            let data = util.b64encode(c2g.synthesize_level(this.stored_level));
             let url = new URL(location);
             url.searchParams.delete('level');
             url.searchParams.delete('setpath');

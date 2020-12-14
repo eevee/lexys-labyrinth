@@ -1141,7 +1141,6 @@ const TILE_TYPES = {
             let found = [];
             let seen = new Set;
             while (seeds.length > 0) {
-                console.log(seeds);
                 let next_seeds = [];
                 for (let cell of seeds) {
                     if (seen.has(cell))

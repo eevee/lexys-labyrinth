@@ -120,6 +120,17 @@ export class ConfirmOverlay extends DialogOverlay {
     }
 }
 
+export function flash_button(button) {
+    button.classList.add('--button-glow-ok');
+    window.setTimeout(() => {
+        button.classList.add('--button-glow');
+        button.classList.remove('--button-glow-ok');
+    }, 10);
+    window.setTimeout(() => {
+        button.classList.remove('--button-glow');
+    }, 500);
+}
+
 export function load_json_from_storage(key) {
     return JSON.parse(window.localStorage.getItem(key));
 }

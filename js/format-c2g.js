@@ -3,87 +3,98 @@ import * as format_base from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 import * as util from './util.js';
 
-const CC2_DEMO_INPUT_MASK = {
-    drop:   0x01,
-    down:   0x02,
-    left:   0x04,
-    right:  0x08,
-    up:     0x10,
-    swap:   0x20,
-    cycle:  0x40,
-};
-
-class CC2Demo {
-    constructor(bytes) {
-        this.bytes = bytes;
-
-        // byte 0 is unknown, always 0?
-        // Force floor seed can apparently be anything; my best guess, based on the Desert Oasis
-        // replay, is that it's just incremented and allowed to overflow, so taking it mod 4 gives
-        // the correct starting direction
-        this.initial_force_floor_direction = ['north', 'east', 'south', 'west'][this.bytes[1] % 4];
-        this.blob_seed = this.bytes[2];
+export function decode_replay(bytes) {
+    if (bytes instanceof ArrayBuffer) {
+        bytes = new Uint8Array(bytes);
     }
 
-    decompress() {
-        let duration = 0;
-        let l = this.bytes.length;
-        if (l % 2 === 0) {
-            l--;
-        }
-        for (let p = 3; p < l; p += 2) {
-            let delay = this.bytes[p];
-            if (delay === 0xff)
-                break;
-            duration += delay;
-        }
-        duration = Math.floor(duration / 3);
+    // byte 0 is unknown, always 0?
+    // Force floor seed can apparently be anything; my best guess, based on the Desert Oasis
+    // replay, is that it's just incremented and allowed to overflow, so taking it mod 4 gives
+    // the correct starting direction
+    let initial_force_floor_direction = DIRECTION_ORDER[bytes[1] % 4];
+    let blob_seed = bytes[2];
 
-        let inputs = new Uint8Array(duration);
-        let i = 0;
-        let t = 0;
-        let input = 0;
-        for (let p = 3; p < l; p += 2) {
-            // The first byte measures how long the /previous/ input remains
-            // valid, so yield that first.  Note that this is measured in 60Hz
-            // frames, so we need to convert to 20Hz tics by subtracting 3
-            // frames at a time.
-            let delay = this.bytes[p];
-            if (delay === 0xff)
-                break;
+    // Add up the total length
+    let duration = 0;
+    let l = bytes.length ?? bytes.byteLength;
+    if (l % 2 === 0) {
+        l--;
+    }
+    for (let p = 3; p < l; p += 2) {
+        let delay = bytes[p];
+        if (delay === 0xff)
+            break;
+        duration += delay;
+    }
+    duration = Math.floor(duration / 3) + 1;  // leave room for final input
 
-            t += delay;
-            while (t >= 3) {
-                t -= 3;
-                inputs[i] = input;
-                i++;
+    // Inflate the replay into an array of byte-per-tic
+    let inputs = new Uint8Array(duration);
+    let i = 0;
+    let t = 0;
+    let input = 0;
+    for (let p = 3; p < l; p += 2) {
+        // The first byte measures how long the /previous/ input remains
+        // valid, so yield that first.  Note that this is measured in 60Hz
+        // frames, so we need to convert to 20Hz tics by subtracting 3
+        // frames at a time.
+        let delay = bytes[p];
+        if (delay === 0xff)
+            break;
+
+        t += delay;
+        while (t >= 3) {
+            t -= 3;
+            inputs[i] = input;
+            i++;
+        }
+
+        input = bytes[p + 1];
+        let is_player_2 = ((input & 0x80) !== 0);
+        // TODO handle player 2
+        if (is_player_2)
+            continue;
+    }
+    inputs[i] = input;
+
+    return new format_base.Replay(initial_force_floor_direction, blob_seed, inputs);
+}
+
+export function encode_replay(replay, stored_level = null) {
+    let out = new Uint8Array(1024);
+    out[0] = 0;
+    out[1] = DIRECTIONS[replay.initial_force_floor_direction].index;
+    out[2] = replay.blob_seed;
+    let p = 3;
+    let prev_input = null;
+    let count = 0;
+    for (let i = 0; i < replay.duration; i++) {
+        if (p >= out.length - 4) {
+            let new_out = new Uint8Array(Math.floor(out.length * 1.5));
+            for (let j = 0; j < out.length; j++) {
+                new_out[j] = out[j];
             }
-
-            input = this.bytes[p + 1];
-            let is_player_2 = ((input & 0x80) !== 0);
-            // TODO handle player 2
-            if (is_player_2)
-                continue;
+            out = new_out;
         }
 
-        // TODO maybe turn this into, like, a type, or something
-        return {
-            inputs: inputs,
-            final_input: input,
-            length: duration,
-            get(t) {
-                let input;
-                if (t < this.inputs.length) {
-                    input = this.inputs[t];
-                }
-                else {
-                    // Last input is implicitly repeated indefinitely
-                    input = this.final_input;
-                }
-                return new Set(Object.entries(CC2_DEMO_INPUT_MASK).filter(([action, bit]) => input & bit).map(([action, bit]) => action));
-            },
-        };
+        let input = replay.inputs[i];
+        if (input !== prev_input || count >= 252) {
+            out[p] = count;
+            out[p + 1] = input;
+            p += 2;
+            count = 3;
+            prev_input = input;
+        }
+        else {
+            count += 3;
+        }
     }
+    out[p] = 0xff;
+    p += 1;
+    out = out.subarray(0, p);
+    // TODO stick it on the level if given?
+    return out;
 }
 
 
@@ -101,7 +112,7 @@ let modifier_wire = {
 let arg_direction = {
     size: 1,
     decode(tile, dirbyte) {
-        let direction = ['north', 'east', 'south', 'west'][dirbyte & 0x03];
+        let direction = DIRECTION_ORDER[dirbyte & 0x03];
         tile.direction = direction;
     },
     encode(tile) {
@@ -472,7 +483,7 @@ const TILE_ENCODING = {
                     tile.memory = modifier - 0x1e;
                 }
                 else {
-                    tile.direction = ['north', 'east', 'south', 'west'][modifier & 0x03];
+                    tile.direction = DIRECTION_ORDER[modifier & 0x03];
                     let type = modifier >> 2;
                     if (type < 6) {
                         tile.gate_type = ['not', 'and', 'or', 'xor', 'latch-cw', 'nand'][type];
@@ -1088,9 +1099,11 @@ export function parse_level(buf, number = 1) {
         else if (type === 'REPL' || type === 'PRPL') {
             // "Replay", i.e. demo solution
             if (type === 'PRPL') {
+                // TODO is even this necessary though
                 bytes = decompress(bytes);
             }
-            level.demo = new CC2Demo(bytes);
+            level._replay_data = bytes;
+            level._replay_decoder = decode_replay;
         }
         else if (type === 'RDNY') {
         }
@@ -1421,6 +1434,25 @@ export function synthesize_level(stored_level) {
     }
     else {
         c2m.add_section('MAP ', map_bytes);
+    }
+
+    // Add the replay, if any
+    if (stored_level.has_replay) {
+        let replay_bytes;
+        if (stored_level._replay_data && stored_level._replay_decoder === decode_replay) {
+            replay_bytes = stored_level._replay_data;
+        }
+        else {
+            replay_bytes = encode_replay(stored_level.replay, stored_level);
+        }
+
+        let compressed_replay = compress(replay_bytes);
+        if (compressed_replay) {
+            c2m.add_section('PRPL', compressed_replay);
+        }
+        else {
+            c2m.add_section('REPL', replay_bytes);
+        }
     }
 
     c2m.add_section('END ', '');

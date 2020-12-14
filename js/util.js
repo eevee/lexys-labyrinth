@@ -162,6 +162,18 @@ export function bytestring_to_buffer(bytestring) {
     return Uint8Array.from(bytestring, c => c.charCodeAt(0)).buffer;
 }
 
+export function b64encode(value) {
+    if (value instanceof ArrayBuffer || value instanceof Uint8Array) {
+        value = string_from_buffer_ascii(value);
+    }
+    // Make URL-safe and strip trailing padding
+    return btoa(value).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
+}
+
+export function b64decode(data) {
+    return bytestring_to_buffer(atob(data.replace(/-/g, '+').replace(/_/g, '/')));
+}
+
 export function format_duration(seconds, places = 0) {
     let mins = Math.floor(seconds / 60);
     let secs = seconds % 60;
