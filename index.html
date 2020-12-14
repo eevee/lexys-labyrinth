@@ -236,14 +236,19 @@
             -->
             <div class="-replay-columns">
                 <div id="player-debug-input"></div>
-                <div class="-buttons"></div>
+                <div class="-replay-status">
+                    <!-- This should be a fixed height and is always showing one of the following -->
+                    <div class="-none">No replay in progress</div>
+                    <div class="-playback">
+                        <progress max="0" value="0"></progress>
+                        <output>100%</output>
+                        <span>0 tics (0:00s)</span>
+                        <button disabled>Relinquish control</button>
+                    </div>
+                    <div class="-recording">Recording...</div>
+                </div>
             </div>
-            <p id="player-debug-replay-playback">
-                <progress max="0" value="0"></progress>
-                <output>100%</output>
-                of
-                <span>0 tics (0:00s)</span>
-            </p>
+            <!-- js inserts a bunch of stuff here -->
 
             <h3>Misc</h3>
             <p>Viewport size:

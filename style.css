@@ -69,6 +69,12 @@ button.button-big {
     margin: 0.5em 0;
     padding: 1em;
 }
+button.--button-glow-ok {
+    background: hsl(225, 100%, 50%);
+}
+button.--button-glow {
+    transition: background-color 0.5s ease-out;
+}
 h1, h2, h3, h4, h5, h6 {
     font-weight: normal;
     margin: 0;
@@ -576,7 +582,6 @@ button.level-pack-button p {
         "level      bonus"      min-content
         "level      message"    1fr
         "level      inventory"  min-content
-        "level      actions"    min-content
         /* Need explicit min-content to force the hint to wrap */
         / min-content min-content
     ;
@@ -789,7 +794,6 @@ dl.score-chart .-sum {
     color: white;
 }
 #player .actions {
-    grid-area: actions;
     display: flex;
     gap: 0.5em;
 }
@@ -858,7 +862,7 @@ dl.score-chart .-sum {
     display: flex;
 }
 #player-debug {
-    flex: 0 0 max-content;
+    flex: none;
     align-self: center;
     display: none;
     /* FIXME this blows out the height instead of scrolling and i cannot figure out how to make it
@@ -886,6 +890,11 @@ dl.score-chart .-sum {
 }
 #player-debug > * + h3 {
     margin-top: 0.5em;
+}
+#player-debug hr {
+    border: none;
+    margin: 0.25em 10%;
+    border-bottom: 1px solid #404040;
 }
 #player-debug table.-time-controls {
     border-collapse: collapse;
@@ -934,7 +943,7 @@ dl.score-chart .-sum {
     gap: 0.25em;
 }
 #player-debug .-buttons button {
-    flex: 1 0 max-content;
+    flex: auto;
 }
 
 #player-debug .-replay-columns {
@@ -962,23 +971,70 @@ dl.score-chart .-sum {
 #player-debug-input > svg.--held {
     fill: white;
 }
-#player-debug-replay-playback {
-    display: none;
-    gap: 0.25em;
-}
-#player.--replay #player-debug-replay-playback {
+#player-debug > .-replay-available {
     display: flex;
+    gap: 0.5em;
 }
-#player-debug-replay-playback progress {
+#player-debug > .-replay-available > h4 {
+    flex: 1 0 0;
+}
+#player-debug > .-replay-available > p {
+    flex: 2 0 0;
+    margin: 0;
+}
+#player-debug .-replay-status {
     flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 4em;
 }
-#player-debug-replay-playback output {
-    width: 3em;
-    width: 5ch;
+#player-debug .-replay-status > .-none {
+}
+#player.--replay-playback #player-debug .-replay-status > .-none,
+#player.--replay-recording #player-debug .-replay-status > .-none {
+    display: none;
+}
+#player-debug .-replay-status > .-playback {
+    flex: 1;
+    display: none;
+    grid:
+        "duration   percent"    1em
+        "progress   progress"   0.5em
+        "button     button"     2em
+        / 3fr 1fr
+    ;
+    gap: 0.25em;
+    align-items: center;
+}
+#player.--replay-playback #player-debug .-replay-status > .-playback {
+    display: grid;
+}
+#player-debug .-replay-status > .-playback > progress {
+    grid-area: progress;
+    height: 100%;
+}
+#player-debug .-replay-status > .-playback > output {
+    grid-area: percent;
+    min-width: 0;
     text-align: right;
 }
-#player-debug-replay-playback span {
-    flex: none;
+#player-debug .-replay-status > .-playback > span {
+    grid-area: duration;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#player-debug .-replay-status > .-playback > button {
+    grid-area: button;
+}
+#player-debug .-replay-status > .-recording {
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+#player.--replay-recording #player-debug .-replay-status > .-recording {
+    display: flex;
 }
 
 
@@ -999,7 +1055,6 @@ dl.score-chart .-sum {
             "chips      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
             "time       inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
             "bonus      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "actions    actions"   min-content
             /* FIXME ideally the first column would be 1fr so the hearts/time have space, but that
              * allows hints to grow to the entire width of the window, which incredibly sucks.  i
              * don't know how to get around this except by giving the grid a fixed width, which i
