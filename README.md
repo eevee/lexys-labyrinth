@@ -45,4 +45,4 @@ Give it a try, I guess!  [https://c.eev.ee/lexys-labyrinth/](https://c.eev.ee/le
 - [Tile World](https://wiki.bitbusters.club/Tile_World) for being an incredible reference on Lynx mechanics
 - Everyone who contributed music — see [`js/soundtrack.js`](js/soundtrack.js) for a list!
 
-Not associated with or blessed by Chuck Somerville, Niffler, or AOP.
+Not associated with or blessed by Chuck Sommerville, Niffler, or AOP.

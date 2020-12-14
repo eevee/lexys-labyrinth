@@ -853,7 +853,7 @@ class Player extends PrimaryView {
                 navigator.clipboard.writeText(REPLAY_PREFIX + util.b64encode(data));
                 flash_button(ev.target);
             }),
-            // TODO download?
+            // TODO download?  as what?
         ];
         extra_replay_elements.push(mk('div.-buttons', ...row1));
         extra_replay_elements.push(mk('div.-buttons', ...row2));
@@ -1941,9 +1941,9 @@ const ABOUT_HTML = `
     <li>The lovingly maintained <a href="https://bitbusters.club/">Bit Busters Club</a>, its incredibly detailed <a href="https://wiki.bitbusters.club/Main_Page">wiki</a>, and its <a href="https://discord.gg/Xd4dUY9">Discord</a> full of welcoming and patient folks who've been more than happy to playtest this thing and answer all kinds of arcane questions about Chip's Challenge mechanics.</li>
     <li><a href="https://tw2.bitbusters.club/">Tile World</a>, the original Chip's Challenge 1 emulator whose source code was indispensable.</li>
     <li>Everyone who contributed to the soundtrack, without whom there would still only be one song.</li>
-    <li>Chuck Somerville, for creating the original game!</li>
+    <li>Chuck Sommerville, for creating the original game!</li>
 </ul>
-<p>Not affiliated with, endorsed by, aided by, or done with the permission of Chuck Somerville, Niffler Inc., or Alpha Omega Productions.</p>
+<p>Not affiliated with, endorsed by, aided by, or done with the permission of Chuck Sommerville, Niffler Inc., or Alpha Omega Productions.</p>
 `;
 class AboutOverlay extends DialogOverlay {
     constructor(conductor) {
