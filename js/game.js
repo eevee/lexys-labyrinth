@@ -548,6 +548,17 @@ export class Level {
 
         this.sfx.set_player_position(this.player.cell);
 
+        // CC2 wiring runs every frame, not every tic, so we need to do it three times, but dealing
+        // with it is delicate.  We want the result of a button press to draw, but not last longer
+        // than intended, so we only want one update between the end of the cooldown pass and the
+        // end of the tic.  That means the other two have to go here.  When a level starts, there
+        // are only two wiring updates before everything gets its first chance to move, so we skip
+        // the very first one here.
+        if (this.tic_counter !== 0) {
+            this.update_wiring();
+        }
+        this.update_wiring();
+
         // FIRST PASS: actors tick their cooldowns, finish their movement, and possibly step on
         // cells they were moving into.  This has a few advantages: it makes rendering interpolation
         // much easier, and doing it as a separate pass from /starting/ movement (unlike Lynx)
@@ -608,6 +619,9 @@ export class Level {
                 this.attempt_teleport(actor);
             }
         }
+
+        // Here's the third.
+        this.update_wiring();
     }
 
     finish_tic(p1_input) {
@@ -679,14 +693,6 @@ export class Level {
         if (this.player.movement_cooldown > 0) {
             this.remember_player_move(this.player.direction);
         }
-
-        // Handle wiring, now that a bunch of buttons may have been pressed.  Do it three times,
-        // because CC2 runs it once per frame, not once per tic
-        // FIXME not sure this is close enough to emulate cc2; might need one after cooldown pass,
-        // then two more here??
-        this.update_wiring();
-        this.update_wiring();
-        this.update_wiring();
 
         // Strip out any destroyed actors from the acting order
         // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
