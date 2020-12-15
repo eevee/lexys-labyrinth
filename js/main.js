@@ -2421,10 +2421,10 @@ class Conductor {
         });
 
         // Bind the secret debug button: the icon in the lower left
-        document.querySelector('#header-icon').addEventListener('auxclick', ev => {
-            if (ev.button === 1 && ! this.player.debug.enabled) {
+        document.querySelector('#header-icon').addEventListener('click', ev => {
+            if (! this.player.debug.enabled) {
                 new ConfirmOverlay(this,
-                    "Enable debug mode in the player?  This will give you lots of toys to play with, " +
+                    "Enable debug mode?  This will give you lots of toys to play with, " +
                     "but disable all saving of scores until you reload the page!",
                     () => {
                         this.player.setup_debug();
