@@ -564,27 +564,34 @@ export class Level {
             if (! actor.cell)
                 continue;
 
-            if (actor.movement_cooldown > 0 && actor.cooldown_delay_tic !== this.tic_counter) {
-                this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
+            if (actor.movement_cooldown <= 0)
+                continue;
 
+            if (actor.cooldown_delay_hack) {
+                // See the extensive comment in attempt_out_of_turn_step
+                actor.cooldown_delay_hack += 1;
+                continue;
+            }
+
+            this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
+
+            if (actor.movement_cooldown <= 0) {
+                if (actor.type.ttl) {
+                    // This is an animation that just finished, so destroy it
+                    this.remove_tile(actor);
+                    continue;
+                }
+
+                if (! this.compat.tiles_react_instantly) {
+                    this.step_on_cell(actor, actor.cell);
+                }
+                // Erase any trace of being in mid-movement, however:
+                // - This has to happen after stepping on cells, because some effects care about
+                // the cell we're arriving from
+                // - Don't do it if stepping on the cell caused us to move again
                 if (actor.movement_cooldown <= 0) {
-                    if (actor.type.ttl) {
-                        // This is an animation that just finished, so destroy it
-                        this.remove_tile(actor);
-                        continue;
-                    }
-
-                    if (! this.compat.tiles_react_instantly) {
-                        this.step_on_cell(actor, actor.cell);
-                    }
-                    // Erase any trace of being in mid-movement, however:
-                    // - This has to happen after stepping on cells, because some effects care about
-                    // the cell we're arriving from
-                    // - Don't do it if stepping on the cell caused us to move again
-                    if (actor.movement_cooldown <= 0) {
-                        this._set_tile_prop(actor, 'previous_cell', null);
-                        this._set_tile_prop(actor, 'movement_speed', null);
-                    }
+                    this._set_tile_prop(actor, 'previous_cell', null);
+                    this._set_tile_prop(actor, 'movement_speed', null);
                 }
             }
         }
@@ -687,6 +694,9 @@ export class Level {
         let p = 0;
         for (let i = 0, l = this.actors.length; i < l; i++) {
             let actor = this.actors[i];
+            // While we're here, delete this guy
+            delete actor.cooldown_delay_hack;
+
             if (actor.cell) {
                 if (p !== i) {
                     this.actors[p] = actor;
@@ -1077,10 +1087,30 @@ export class Level {
         return true;
     }
 
-    // FIXME delete this
     attempt_out_of_turn_step(actor, direction) {
         if (this.attempt_step(actor, direction)) {
-            this._set_tile_prop(actor, 'cooldown_delay_tic', this.tic_counter);
+            // Here's the problem.
+            // In CC2, cooldown is measured in frames, not tics, and it decrements every frame, not
+            // every tic.  You usually don't notice because actors can only initiate moves every
+            // three frames (= 1 tic), so the vast majority of the game is tic-aligned.
+            // This is where it leaks.  If actor X's cooldown causes them to press a button which
+            // then initiates an out-of-turn move (i.e. the forced move from a clone or trap
+            // ejection) for actor Y, and actor Y comes later in the actor order, then actor Y will
+            // decrement its cooldown during that same cooldown phase, putting it /between/ tics.
+            // If I copy this behavior and decrement by an entire tic, then actor Y will stay a full
+            // tic ahead indefinitely, whereas in CC2 it would only be a frame ahead and would
+            // eventually have to wait a frame before it could move again.  If I ignore this
+            // behavior wholesale and don't let actor Y decrement at all, then a player being
+            // ejected from a trap could still have her tail bitten.  So here's the compromise: I
+            // set this turn-local flag on actor Y; then if they do have a cooldown later, it's
+            // ignored BUT the flag is incremented; and then if the flag is 2, the actor is exempt
+            // from tail-biting.  (I am reasonably confident that tail-biting is the only possible
+            // side effect here, since actor Y has left the cell even if they haven't visibly moved
+            // yet, and tail-biting is the sole effect that looks "back in time".)
+            // XXX that's still not perfect; if actor X is tic-misaligned, like if there's a chain
+            // of 3 or more actors cloning directly onto red buttons for other cloners, then this
+            // cannot possibly work
+            actor.cooldown_delay_hack = 1;
             return true;
         }
         else {
@@ -1141,7 +1171,9 @@ export class Level {
         // TODO the rules in lynx might be slightly different?
         if (actor.type.is_monster && goal_cell === this.player.previous_cell &&
             // Player has decided to leave their cell, but hasn't actually taken a step yet
-            this.player.movement_cooldown === this.player.movement_speed)
+            this.player.movement_cooldown === this.player.movement_speed &&
+            // See the extensive comment in attempt_out_of_turn_step
+            this.player.cooldown_delay_hack !== 2)
         {
             this.fail(actor.type.name);
         }
