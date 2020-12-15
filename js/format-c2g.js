@@ -1050,7 +1050,7 @@ export function parse_level(buf, number = 1) {
                     }
                     else if (name instanceof Array) {
                         // Custom floors and walls are one of several options, chosen by modifier
-                        name = name[modifier];
+                        name = name[modifier % name.length];
                     }
 
                     let type = TILE_TYPES[name];
