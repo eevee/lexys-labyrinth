@@ -680,6 +680,11 @@ export class Level {
             let old_cell = actor.cell;
             let success = this.attempt_step(actor, actor.decision);
 
+            if (! success && actor.slide_mode === 'ice') {
+                this._handle_slide_bonk(actor);
+                success = this.attempt_step(actor, actor.decision);
+            }
+
             // Track whether the player is blocked, for visual effect
             if (actor === this.player && actor.decision && ! success) {
                 this.sfx.play_once('blocked');
@@ -870,6 +875,8 @@ export class Level {
             if (actor.slide_mode === 'force' && ! open) {
                 actor.decision = actor.direction;
                 this._set_tile_prop(actor, 'last_move_was_force', true);
+                // Be sure to invoke this hack if we're standing on an RFF
+                this._handle_slide_bonk(actor);
             }
             else {
                 // Otherwise this is 100% a conscious move so we lose our override power next tic
@@ -910,7 +917,8 @@ export class Level {
         let direction_preference;
         if (actor.slide_mode) {
             // Actors can't make voluntary moves while sliding; they just, ah, slide.
-            direction_preference = [actor.direction];
+            actor.decision = actor.direction;
+            return;
         }
         else if (actor.cell.some(tile => tile.type.traps && tile.type.traps(tile, actor))) {
             // An actor in a cloner or a closed trap can't turn
@@ -951,15 +959,6 @@ export class Level {
             if (i === direction_preference.length - 1) {
                 actor.decision = direction;
             }
-        }
-
-        if (actor.slide_mode && all_blocked) {
-            this._handle_slide_bonk(actor);
-        }
-
-        // Non-players move instantly while sliding, without waiting for the movement pass
-        if (actor.slide_mode) {
-            this.attempt_step(actor, actor.direction);
         }
     }
 
