@@ -1843,7 +1843,7 @@ const TILE_TYPES = {
         movement_parity: 2,
         decide_movement(me, level) {
             let preference = pursue_player(me, level);
-            if (level.player.type.name === 'player2') {
+            if (preference && level.player.type.name === 'player2') {
                 // Run away from Cerise
                 for (let [i, direction] of preference.entries()) {
                     preference[i] = DIRECTIONS[direction].opposite;

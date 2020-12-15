@@ -355,7 +355,10 @@ const TILE_ENCODING = {
         name: 'bomb',
         has_next: true,
     },
-    //0x41: Open trap (unused in main levels) : 
+    0x41: {
+        // FIXME cc2lp1 uses this, i don't know what it actually does
+        error: "Open trap is not yet implemented!",
+    },
     0x42: {
         name: 'trap',
     },
