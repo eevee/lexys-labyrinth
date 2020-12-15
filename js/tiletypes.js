@@ -892,6 +892,18 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
         },
+        on_bump(me, level, other) {
+            // Fireballs melt ice blocks on regular floor
+            // XXX what if i'm in motion?
+            if (other.type.name === 'fireball') {
+                let terrain = me.cell.get_terrain();
+                if (terrain.type.name === 'floor') {
+                    level.remove_tile(me);
+                    level.transmute_tile(terrain, 'water');
+                    // FIXME splash?
+                }
+            }
+        },
     },
     frame_block: {
         // TODO directional, obviously

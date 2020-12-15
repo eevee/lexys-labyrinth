@@ -1025,6 +1025,7 @@ export class Level {
 
                     // Bump tiles that we're even attempting to move into; this mostly reveals
                     // invisible walls, blue floors, etc.
+                    // XXX how to guarantee this only happens once...
                     if (tile.type.on_bump) {
                         tile.type.on_bump(tile, this, actor);
                     }
