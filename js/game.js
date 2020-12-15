@@ -631,7 +631,7 @@ export class Level {
                 continue;
 
             if (actor.just_stepped_on_teleporter) {
-                this.attempt_teleport(actor);
+                this.attempt_teleport(actor, actor === this.player ? p1_input : null);
             }
         }
 
@@ -678,6 +678,11 @@ export class Level {
                 continue;
 
             // Check for special player actions, which can only happen when not moving
+            // FIXME if you press a key while moving it should happen as soon as you stop (assuming
+            // the key is still held down)
+            // FIXME cc2 seems to rely on key repeat for this; the above is true, but also, if you
+            // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
+            // release the rest rapid-fire.  absurd
             if (actor === this.player) {
                 let new_input = p1_input & ~this.previous_input;
                 if (new_input & INPUT_BITS.cycle) {
@@ -768,13 +773,8 @@ export class Level {
         this.commit();
     }
 
-    make_player_decision(actor, input) {
-        // Only reset the player's is_pushing between movement, so it lasts for the whole push
-        this._set_tile_prop(actor, 'is_pushing', false);
-
-        // TODO player in a cloner can't move (but player in a trap can still turn)
-
-        // Extract directions from the input mask
+    _extract_player_directions(input) {
+        // Extract directions from an input mask
         let dir1 = null, dir2 = null;
         if (((input & INPUT_BITS['up']) && (input & INPUT_BITS['down'])) ||
             ((input & INPUT_BITS['left']) && (input & INPUT_BITS['right'])))
@@ -795,15 +795,21 @@ export class Level {
                 }
             }
         }
+        return [dir1, dir2];
+    }
 
+    make_player_decision(actor, input) {
+        // Only reset the player's is_pushing between movement, so it lasts for the whole push
+        this._set_tile_prop(actor, 'is_pushing', false);
+
+        // TODO player in a cloner can't move (but player in a trap can still turn)
+
+        let [dir1, dir2] = this._extract_player_directions(input);
         let try_direction = (direction, push_mode) => {
             direction = actor.cell.redirect_exit(actor, direction);
-            let dest_cell = this.get_neighboring_cell(actor.cell, direction);
-            return (dest_cell &&
-                ! actor.cell.blocks_leaving(actor, direction) &&
-                // FIXME if the player steps into a monster cell here, they die instantly!  but only
-                // if the cell doesn't block them??
-                ! dest_cell.blocks_entering(actor, direction, this, push_mode));
+            // FIXME if the player steps into a monster cell here, they die instantly!  but only
+            // if the cell doesn't block them??
+            return this.check_movement(actor, actor.cell, direction, push_mode);
         };
 
         // The player is unusual in several ways.
@@ -957,7 +963,7 @@ export class Level {
 
             direction = actor.cell.redirect_exit(actor, direction);
 
-            if (this.is_move_allowed(actor, direction, 'trace')) {
+            if (this.check_movement(actor, actor.cell, direction, 'trace')) {
                 // We found a good direction!  Stop here
                 actor.decision = direction;
                 all_blocked = false;
@@ -999,10 +1005,10 @@ export class Level {
     }
 
     // FIXME make this interact with railroads correctly and use it for players and in attempt_step
-    is_move_allowed(actor, direction, push_mode) {
-        let dest_cell = this.get_neighboring_cell(actor.cell, direction);
+    check_movement(actor, orig_cell, direction, push_mode) {
+        let dest_cell = this.get_neighboring_cell(orig_cell, direction);
         return (dest_cell &&
-            ! actor.cell.blocks_leaving(actor, direction) &&
+            ! orig_cell.blocks_leaving(actor, direction) &&
             ! dest_cell.blocks_entering(actor, direction, this, push_mode));
     }
 
@@ -1263,70 +1269,82 @@ export class Level {
         }
     }
 
-    attempt_teleport(actor) {
+    attempt_teleport(actor, input) {
         let teleporter = actor.just_stepped_on_teleporter;
         actor.just_stepped_on_teleporter = null;
 
-        // Handle teleporting, now that the dust has cleared
-        // FIXME something funny happening here, your input isn't ignored while walking out of it?
+        let push_mode = actor === this.player ? 'move' : 'trace';
         let original_direction = actor.direction;
         let success = false;
-        for (let dest of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
+        let dest, direction;
+        for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
             // FIXME should check collision?
             if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
                 continue;
 
-            // Physically move the actor to the new teleporter
             // XXX lynx treats this as a slide and does it in a pass in the main loop
-            // XXX not especially undo-efficient
-            // FIXME the new aggressive move checker could help here!
-            this.remove_tile(actor);
-            this.add_tile(actor, dest.cell);
 
-            // FIXME teleport overrides...  also allow block slapping...  seems like horizontal
-            // wins...
-
-            // Red and green teleporters attempt to spit you out in every direction before
-            // giving up on a destination (but not if you return to the original).
-            // Note that we use actor.direction here (rather than original_direction) because
-            // green teleporters modify it in teleport_dest_order, to randomize the exit
-            // direction
-            let direction = actor.direction;
-            let num_directions = 1;
-            if (teleporter.type.teleport_try_all_directions && dest !== teleporter) {
-                num_directions = 4;
-            }
             // FIXME bleugh hardcode
             if (dest === teleporter && teleporter.type.name === 'teleport_yellow') {
                 break;
             }
-            for (let i = 0; i < num_directions; i++) {
-                if (this.attempt_out_of_turn_step(actor, direction)) {
-                    success = true;
-                    // Sound plays from the origin cell simply because that's where the sfx player
-                    // thinks the player is currently; position isn't updated til next turn
-                    this.sfx.play_once('teleport', teleporter.cell);
-                    break;
-                }
-                else {
-                    direction = DIRECTIONS[direction].right;
-                }
-            }
-
-            if (success) {
+            if (this.check_movement(actor, dest.cell, direction, push_mode)) {
+                success = true;
+                // Sound plays from the origin cell simply because that's where the sfx player
+                // thinks the player is currently; position isn't updated til next turn
+                this.sfx.play_once('teleport', teleporter.cell);
                 break;
-            }
-            else if (num_directions === 4) {
-                // Restore our original facing before continuing
-                // (For red teleports, we try every possible destination in our original
-                // movement direction, so this is correct.  For green teleports, we only try one
-                // destination and then fall back to walking through the source in our original
-                // movement direction, so this is still correct.)
-                this.set_actor_direction(actor, original_direction);
             }
         }
 
+        if (success) {
+            if (teleporter.type.teleport_allow_override && actor === this.player) {
+                // Red and yellow teleporters allow players to override the exit direction.  This
+                // can only happen after we've found a suitable destination.  As with normal player
+                // decisions, we aggressively check each direction first (meaning we might bump the
+                // same cell twice here!), and then figure out what to do afterwards.
+                // Note that it's possible to bump a direction multiple times during this process,
+                // and also possible to perform a three-way block slap: the direction she leaves,
+                // the other direction she was holding, and the original exit direction we found.
+                let [dir1, dir2] = this._extract_player_directions(input);
+                let open1 = false, open2 = false;
+                if (dir1) {
+                    open1 = this.check_movement(actor, dest.cell, dir1, push_mode);
+                }
+                if (dir2) {
+                    open2 = this.check_movement(actor, dest.cell, dir2, push_mode);
+                }
+
+                // If the player didn't even try to override, do nothing
+                if (! dir1 && ! dir2) {
+                }
+                // If only one direction is available, whether because she only held one direction
+                // or because one of them was blocked, use that one
+                else if ((open1 && ! open2) || (dir1 && ! dir2)) {
+                    direction = dir1;
+                }
+                else if (! open1 && open2) {
+                    direction = dir2;
+                }
+                // Otherwise, we have a tie.  If either direction is the exit we found (which
+                // can only happen if both are open), prefer that one...
+                else if (dir1 === direction || dir2 === direction) {
+                }
+                // ...otherwise, prefer the horizontal one.
+                else if (dir1 === 'west' || dir1 === 'east') {
+                    direction = dir1;
+                }
+                else {
+                    direction = dir2;
+                }
+            }
+
+            // Now physically move the actor and have them take a turn
+            this.remove_tile(actor);
+            this.add_tile(actor, dest.cell);
+            this.attempt_out_of_turn_step(actor, direction);
+        }
         if (! success && actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
             // Super duper special yellow teleporter behavior: you pick it the fuck up
             // FIXME not if there's only one in the level?

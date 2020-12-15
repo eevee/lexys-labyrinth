@@ -1,4 +1,4 @@
-import { COLLISION, DIRECTIONS, DRAW_LAYERS } from './defs.js';
+import { COLLISION, DIRECTIONS, DIRECTION_ORDER, DRAW_LAYERS } from './defs.js';
 import { random_choice } from './util.js';
 
 function activate_me(me, level) {
@@ -1141,12 +1141,15 @@ const TILE_TYPES = {
     teleport_blue: {
         draw_layer: DRAW_LAYERS.terrain,
         wire_propagation_mode: 'all',
-        teleport_dest_order(me, level, other) {
+        *teleport_dest_order(me, level, other) {
+            let exit_direction = other.direction;
             if (! me.wire_directions) {
                 // TODO cc2 has a bug where, once it wraps around to the bottom right, it seems to
                 // forget that it was ever looking for an unwired teleport and will just grab the
                 // first one it sees
-                return level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true);
+                for (let dest of level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true)) {
+                    yield [dest, exit_direction];
+                }
             }
 
             // Wired blue teleports form a network, which means we have to walk all wires from this
@@ -1225,13 +1228,14 @@ const TILE_TYPES = {
                 ) % level_size);
             }
             found.sort((a, b) => dest_indices.get(b) - dest_indices.get(a));
-            return found;
+            for (let dest of found) {
+                yield [dest, exit_direction];
+            }
         },
     },
     teleport_red: {
         draw_layer: DRAW_LAYERS.terrain,
         wire_propagation_mode: 'none',
-        teleport_try_all_directions: true,
         teleport_allow_override: true,
         _is_active(me) {
             return ! (me.wire_directions && (me.cell.powered_edges & me.wire_directions) === 0);
@@ -1243,13 +1247,21 @@ const TILE_TYPES = {
             // has the bizarre behavior of NOT considering a red teleporter wired if none of its
             // wires are directly connected to another neighboring wire.
             // FIXME implement that, merge current code with is_cell_wired
-            if (! this._is_active(me)) {
-                yield me;
-                return;
+            let iterable;
+            if (this._is_active(me)) {
+                iterable = level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
             }
-            for (let tile of level.iter_tiles_in_reading_order(me.cell, 'teleport_red')) {
+            else {
+                iterable = [me];
+            }
+            let exit_direction = other.direction;
+            for (let tile of iterable) {
                 if (tile === me || this._is_active(tile)) {
-                    yield tile;
+                    // Red teleporters allow exiting in any direction, searching clockwise
+                    yield [tile, exit_direction];
+                    yield [tile, DIRECTIONS[exit_direction].right];
+                    yield [tile, DIRECTIONS[exit_direction].opposite];
+                    yield [tile, DIRECTIONS[exit_direction].left];
                 }
             }
         },
@@ -1262,28 +1274,38 @@ const TILE_TYPES = {
     },
     teleport_green: {
         draw_layer: DRAW_LAYERS.terrain,
-        teleport_try_all_directions: true,
         teleport_dest_order(me, level, other) {
             let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
             if (all.length <= 1) {
                 // If this is the only teleporter, just walk out the other side — and, crucially, do
                 // NOT advance the PRNG
-                return [me];
+                return [[me, other.direction]];
             }
             // Note the iterator starts on the /next/ teleporter, so there's an implicit +1 here.
             // The -1 is to avoid spitting us back out of the same teleporter, which will be last in
             // the list
             let target = all[level.prng() % (all.length - 1)];
-            // Also set the actor's (initial) exit direction
-            level.set_actor_direction(other, ['north', 'east', 'south', 'west'][level.prng() % 4]);
-            return [target, me];
+            // Also pick the actor's exit direction
+            let exit_direction = DIRECTION_ORDER[level.prng() % 4];
+            return [
+                // Green teleporters allow exiting in any direction, similar to red, but only on the
+                // one they found; if that fails, you walk straight across the one you entered
+                [target, exit_direction],
+                [target, DIRECTIONS[exit_direction].right],
+                [target, DIRECTIONS[exit_direction].opposite],
+                [target, DIRECTIONS[exit_direction].left],
+                [me, other.direction],
+            ];
         },
     },
     teleport_yellow: {
         draw_layer: DRAW_LAYERS.terrain,
         teleport_allow_override: true,
-        teleport_dest_order(me, level, other) {
-            return level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true);
+        *teleport_dest_order(me, level, other) {
+            let exit_direction = other.direction;
+            for (let dest of level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true)) {
+                yield [dest, exit_direction];
+            }
         },
     },
     // Flame jet rules:
@@ -1363,7 +1385,7 @@ const TILE_TYPES = {
             for (let i = level.actors.length - 1; i >= 0; i--) {
                 let actor = level.actors[i];
                 // TODO generify somehow??
-                if (actor.type.name === 'tank_yellow' && level.is_move_allowed(actor, other.direction, 'trace')) {
+                if (actor.type.name === 'tank_yellow' && level.check_movement(actor, actor.cell, other.direction, 'trace')) {
                     unblocked_tanks.push(actor);
                 }
             }
