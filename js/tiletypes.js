@@ -822,12 +822,12 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (! other.type.is_real_player)
-                return;
             if (level.take_tool_from_actor(other, 'bribe')) {
                 // TODO bribe sound
                 return;
             }
+            if (! other.type.is_real_player)
+                return;
 
             let lost = level.take_all_tools_from_actor(other);
             if (level.bonus_points > 0) {
@@ -843,13 +843,12 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
-            if (! other.type.is_real_player)
-                return;
-
             if (level.take_tool_from_actor(other, 'bribe')) {
                 // TODO bribe sound
                 return;
             }
+            if (! other.type.is_real_player)
+                return;
 
             let lost = level.take_all_keys_from_actor(other);
             if (level.bonus_points > 0) {
