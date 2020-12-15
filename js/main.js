@@ -327,7 +327,7 @@ class Player extends PrimaryView {
             else {
                 if (this.turn_mode === 2) {
                     // Finish up the tic with dummy input
-                    this.level.finish_tic({primary: null, secondary: null});
+                    this.level.finish_tic(0);
                     this.advance_by(1);
                 }
                 this.turn_mode = 0;
@@ -442,7 +442,6 @@ class Player extends PrimaryView {
         this.player_used_move = false;
         let key_target = document.body;
         this.previous_input = new Set;  // actions that were held last tic
-        this.previous_action = null;  // last direction we were moving, if any
         this.using_touch = false;  // true if using touch controls
         this.current_keys = new Set;  // keys that are currently held
         this.current_keys_new = new Set; // keys that were pressed since input was last read
@@ -638,7 +637,7 @@ class Player extends PrimaryView {
     // Link up the debug panel and enable debug features
     // (note that this might be called /before/ setup!)
     setup_debug() {
-        this.root.classList.add('--debug');
+        document.body.classList.add('--debug');
         let debug_el = this.root.querySelector('#player-debug');
         this.debug = {
             enabled: true,
@@ -1069,30 +1068,26 @@ class Player extends PrimaryView {
     get_input() {
         let input;
         if (this.debug && this.debug.replay && ! this.debug.replay_recording) {
-            let mask = this.debug.replay.get(this.level.tic_counter);
-            input = new Set(Object.entries(INPUT_BITS).filter(([action, bit]) => mask & bit).map(([action, bit]) => action));
+            input = this.debug.replay.get(this.level.tic_counter);
         }
         else {
-            // Convert input keys to actions.  This is only done now
-            // because there might be multiple keys bound to one
-            // action, and it still counts as pressed as long as at
-            // least one key is held
-            input = new Set;
+            // Convert input keys to actions
+            input = 0;
             for (let key of this.current_keys) {
-                input.add(this.key_mapping[key]);
+                input |= INPUT_BITS[this.key_mapping[key]];
             }
             for (let key of this.current_keys_new) {
-                input.add(this.key_mapping[key]);
+                input |= INPUT_BITS[this.key_mapping[key]];
             }
             this.current_keys_new.clear();
             for (let action of Object.values(this.current_touches)) {
-                input.add(action);
+                input |= INPUT_BITS[action];
             }
         }
 
         if (this.debug.enabled) {
             for (let [action, el] of Object.entries(this.debug.input_els)) {
-                el.classList.toggle('--held', input.has(action));
+                el.classList.toggle('--held', (input & INPUT_BITS[action]) !== 0);
             }
         }
 
@@ -1101,62 +1096,18 @@ class Player extends PrimaryView {
 
     advance_by(tics) {
         for (let i = 0; i < tics; i++) {
+            // FIXME turn-based mode should be disabled during a replay
             let input = this.get_input();
+            // Extract the fake 'wait' bit, if any
+            let wait = input & INPUT_BITS['wait'];
+            input &= ~wait;
 
             if (this.debug && this.debug.replay && this.debug.replay_recording) {
-                let input_mask = 0;
-                for (let [action, bit] of Object.entries(INPUT_BITS)) {
-                    if (input.has(action)) {
-                        input_mask |= bit;
-                    }
-                }
-                this.debug.replay.set(this.level.tic_counter, input_mask);
+                this.debug.replay.set(this.level.tic_counter, input);
             }
 
-            // Replica of CC2 input handling, based on experimentation
-            let primary_action = null, secondary_action = null;
-            let current_action = DIRECTIONS[this.level.player.direction].action;
-            if ((input.has('up') && input.has('down')) || (input.has('left') && input.has('right'))) {
-                // If opposing keys are ever held, stop moving and forget our state
-                primary_action = null;
-                secondary_action = null;
-            }
-            else if (input.has(current_action)) {
-                // If we're already holding in the same direction we're facing, that wins
-                primary_action = current_action;
-                // Any other key we're holding is secondary; remember, there can't be two opposing
-                // keys held, because we just checked for that, so at most one of these qualifies
-                for (let action of ['down', 'left', 'right', 'up']) {
-                    if (action !== primary_action && input.has(action)) {
-                        secondary_action = action;
-                        break;
-                    }
-                }
-            }
-            else {
-                // Check for other keys, horizontal first
-                for (let action of ['left', 'right', 'up', 'down']) {
-                    if (! input.has(action))
-                        continue;
-
-                    if (primary_action === null) {
-                        primary_action = action;
-                    }
-                    else {
-                        secondary_action = action;
-                        break;
-                    }
-                }
-            }
-
-            let player_actions = {
-                primary: primary_action ? ACTION_DIRECTIONS[primary_action] : null,
-                secondary: secondary_action ? ACTION_DIRECTIONS[secondary_action] : null,
-                cycle: input.has('cycle') && ! this.previous_input.has('cycle'),
-                drop: input.has('drop') && ! this.previous_input.has('drop'),
-                swap: input.has('swap') && ! this.previous_input.has('swap'),
-            }
-
+            // FIXME cycle/drop/swap depend on this but that's currently broken; should Level handle
+            // it?  probably
             this.previous_input = input;
 
             this.sfx_player.advance_tic();
@@ -1167,14 +1118,14 @@ class Player extends PrimaryView {
                 this.level.aid = Math.max(1, this.level.aid);
             }
 
-            let has_input = input.has('wait') || Object.values(player_actions).some(x => x);
+            let has_input = wait || input;
             // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
             if (this.turn_mode === 2) {
                 if (has_input) {
                     // Finish the current tic, then continue as usual.  This means the end of the
                     // tic doesn't count against the number of tics to advance -- because it already
                     // did, the first time we tried it
-                    this.level.finish_tic(player_actions);
+                    this.level.finish_tic(input);
                     this.turn_mode = 1;
                 }
                 else {
@@ -1183,14 +1134,14 @@ class Player extends PrimaryView {
             }
 
             // We should now be at the start of a tic
-            this.level.begin_tic(player_actions);
+            this.level.begin_tic(input);
             if (this.turn_mode > 0 && this.level.can_accept_input() && ! has_input) {
                 // If we're in turn-based mode and could provide input here, but don't have any,
                 // then wait until we do
                 this.turn_mode = 2;
             }
             else {
-                this.level.finish_tic(player_actions);
+                this.level.finish_tic(input);
             }
 
             if (this.level.state !== 'playing') {
@@ -2110,6 +2061,180 @@ class OptionsOverlay extends DialogOverlay {
     }
 }
 
+class PackTestDialog extends DialogOverlay {
+    constructor(conductor) {
+        super(conductor);
+        this.root.classList.add('packtest-dialog');
+        this.set_title("full pack test");
+        this.button = mk('button', {type: 'button'}, "Begin test");
+        this.button.addEventListener('click', async ev => {
+            if (this._handle) {
+                this._handle.cancel = true;
+                this._handle = null;
+                ev.target.textContent = "Start";
+            }
+            else {
+                this._handle = {cancel: false};
+                ev.target.textContent = "Abort";
+                await this.run(this._handle);
+                this._handle = null;
+                ev.target.textContent = "Start";
+            }
+        });
+
+        this.results_summary = mk('ol.packtest-summary.packtest-colorcoded');
+        for (let i = 0; i < this.conductor.stored_game.level_metadata.length; i++) {
+            this.results_summary.append(mk('li'));
+        }
+
+        this.current_status = mk('p', "Ready");
+
+        this.results = mk('ol.packtest-results.packtest-colorcoded');
+        this.results.addEventListener('click', ev => {
+            let li = ev.target.closest('li');
+            if (! li)
+                return;
+            let index = li.getAttribute('data-index');
+            if (index === undefined)
+                return;
+            this.close();
+            this.conductor.change_level(index);
+        });
+
+        this.main.append(
+            mk('p', "This will run the replay for every level in the current pack, as fast as possible, and report the results."),
+            mk('p', mk('strong', "This is an intensive process and may lag your browser!"), "  Mostly intended for testing LL itself."),
+            mk('p', "Note that currently, only C2Ms with embedded replays are supported."),
+            mk('p', "(Results will be saved until you change packs.)"),
+            mk('hr'),
+            this.results_summary,
+            mk('div.packtest-row', this.current_status, this.button),
+            this.results,
+        );
+
+        this.add_button("close", () => {
+            this.close();
+        });
+
+        this.renderer = new CanvasRenderer(this.conductor.tileset, 16);
+    }
+
+    async run(handle) {
+        this.results.textContent = '';
+        let pack = this.conductor.stored_game;
+        let dummy_sfx = {
+            set_player_position() {},
+            play() {},
+            play_once() {},
+        };
+        let num_levels = pack.level_metadata.length;
+        let num_passed = 0;
+        let total_tics = 0;
+        let t0 = performance.now();
+        let last_pause = t0;
+        for (let i = 0; i < num_levels; i++) {
+            let stored_level = pack.load_level(i);
+            let status_li = this.results_summary.childNodes[i];
+            let record_result = (token, title, comment, include_canvas) => {
+                status_li.setAttribute('data-status', token);
+                status_li.setAttribute('title', title);
+                let li = mk(
+                    'li', {'data-status': token, 'data-index': i},
+                    `#${i + 1} ${stored_level.title}: `,
+                    comment);
+                if (include_canvas) {
+                    let canvas = mk('canvas', {
+                        width: this.renderer.canvas.width,
+                        height: this.renderer.canvas.height,
+                    });
+                    this.renderer.set_level(level);
+                    this.renderer.draw();
+                    canvas.getContext('2d').drawImage(this.renderer.canvas, 0, 0, canvas.width, canvas.height);
+                    li.append(canvas);
+                }
+                this.results.append(li);
+
+                total_tics += level.tic_counter;
+            };
+            if (! stored_level.has_replay) {
+                record_result('no-replay', "N/A", "No replay available");
+                continue;
+            }
+
+            this.current_status.textContent = `Testing level ${i + 1}/${num_levels} ${stored_level.title}...`;
+
+            // TODO compat options here??
+            let replay = stored_level.replay;
+            let level = new Level(stored_level, {});
+            level.sfx = dummy_sfx;
+            level.force_floor_direction = replay.initial_force_floor_direction;
+            level._blob_modifier = replay.blob_seed;
+
+            try {
+                while (true) {
+                    let input = replay.get(level.tic_counter);
+                    level.advance_tic(input);
+
+                    if (level.state === 'success') {
+                        // TODO warn if exit early?
+                        record_result(
+                            'success', "Won",
+                            `Exited successfully after ${util.format_duration(level.tic_counter / TICS_PER_SECOND)} (delta ${level.tic_counter - replay.duration})`);
+                        num_passed += 1;
+                        break;
+                    }
+                    else if (level.state === 'failure') {
+                        record_result(
+                            'failure', "Lost",
+                            `Died at ${util.format_duration(level.tic_counter / TICS_PER_SECOND)} (tic ${level.tic_counter}/${replay.duration}, ${Math.floor(level.tic_counter / replay.duration * 100)}%)`,
+                            true);
+                        break;
+                    }
+                    else if (level.tic_counter >= replay.duration + 200) {
+                        record_result(
+                            'short', "Out of input",
+                            `Replay completed without exiting; ran for ${util.format_duration(replay.duration / TICS_PER_SECOND)}, gave up after 10 more seconds`,
+                            true);
+                        break;
+                    }
+
+                    if (level.tic_counter % 20 === 1) {
+                        if (handle.cancel) {
+                            record_result(
+                                'interrupted', "Interrupted",
+                                "Interrupted");
+                            this.current_status.textContent = `Interrupted on level ${i + 1}/${num_levels}; ${num_passed} passed`;
+                            return;
+                        }
+
+                        // Don't run for more than 50ms at a time, to avoid janking the browser...
+                        // TOO much.  I mean, we still want it to reflow the stuff we've added, but
+                        // we also want to be pretty aggressive so this finishes quickly
+                        let now = performance.now();
+                        if (now - last_pause > 50) {
+                            // TODO measure the impact this has
+                            last_pause = now;
+                            await util.sleep(5);
+                        }
+                    }
+                }
+            }
+            catch (e) {
+                console.error(e);
+                record_result(
+                    'error', "Error",
+                    "Replay failed due to internal error (see console for traceback): ${e}");
+            }
+        }
+
+        let final_status = `Finished!  Simulated ${util.format_duration(total_tics / TICS_PER_SECOND)} of play time in ${util.format_duration((performance.now() - t0) / 1000)}; ${num_passed}/${num_levels} levels passed`;
+        if (num_passed === num_levels) {
+            final_status += "!  Congratulations!  🎆";
+        }
+        this.current_status.textContent = final_status;
+    }
+}
+
 // List of levels, used in the player
 class LevelBrowserOverlay extends DialogOverlay {
     constructor(conductor) {
@@ -2271,6 +2396,12 @@ class Conductor {
             this.current.open_level_browser();
             ev.target.blur();
         });
+        document.querySelector('#main-test-pack').addEventListener('click', ev => {
+            if (! this._pack_test_dialog) {
+                this._pack_test_dialog = new PackTestDialog(this);
+            }
+            this._pack_test_dialog.open();
+        });
         document.querySelector('#main-change-pack').addEventListener('click', ev => {
             // TODO confirm
             this.switch_to_splash();
@@ -2336,6 +2467,7 @@ class Conductor {
 
     load_game(stored_game, identifier = null) {
         this.stored_game = stored_game;
+        this._pack_test_dialog = null;
 
         this._pack_identifier = identifier;
         this.current_pack_savefile = null;

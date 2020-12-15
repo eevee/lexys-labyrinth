@@ -1,4 +1,4 @@
-import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
+import { DIRECTIONS, DIRECTION_ORDER, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
 import TILE_TYPES from './tiletypes.js';
 
 export class Tile {
@@ -390,6 +390,7 @@ export class Level {
             }
         }
         // TODO complain if no player
+        // FIXME this is not how multiple players works
         this.player = this.players[0];
         this.player_index = 0;
         // Used for doppelgangers
@@ -518,18 +519,18 @@ export class Level {
     }
 
     // Move the game state forwards by one tic.
-    // FIXME i have absolutely definitely broken turn-based mode
-    advance_tic(p1_actions) {
+    // Input is a bit mask of INPUT_BITS.
+    advance_tic(p1_input) {
         if (this.state !== 'playing') {
             console.warn(`Level.advance_tic() called when state is ${this.state}`);
             return;
         }
 
-        this.begin_tic(p1_actions);
-        this.finish_tic(p1_actions);
+        this.begin_tic(p1_input);
+        this.finish_tic(p1_input);
     }
 
-    begin_tic(p1_actions) {
+    begin_tic(p1_input) {
         // Store some current level state in the undo entry.  (These will often not be modified, but
         // they only take a few bytes each so that's fine.)
         for (let key of [
@@ -602,7 +603,7 @@ export class Level {
         }
     }
 
-    finish_tic(p1_actions) {
+    finish_tic(p1_input) {
         // SECOND PASS: actors decide their upcoming movement simultaneously
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
@@ -618,7 +619,7 @@ export class Level {
                 continue;
 
             if (actor === this.player) {
-                this.make_player_decision(actor, p1_actions);
+                this.make_player_decision(actor, p1_input);
             }
             else {
                 this.make_actor_decision(actor);
@@ -638,13 +639,13 @@ export class Level {
 
             // Check for special player actions, which can only happen when not moving
             if (actor === this.player) {
-                if (p1_actions.cycle) {
+                if (p1_input & INPUT_BITS.cycle) {
                     this.cycle_inventory(this.player);
                 }
-                if (p1_actions.drop) {
+                if (p1_input & INPUT_BITS.drop) {
                     this.drop_item(this.player);
                 }
-                if (p1_actions.swap) {
+                if (p1_input & INPUT_BITS.swap) {
                     // This is delayed until the end of the tic to avoid screwing up anything
                     // checking this.player
                     swap_player1 = true;
@@ -674,6 +675,8 @@ export class Level {
 
         // Handle wiring, now that a bunch of buttons may have been pressed.  Do it three times,
         // because CC2 runs it once per frame, not once per tic
+        // FIXME not sure this is close enough to emulate cc2; might need one after cooldown pass,
+        // then two more here??
         this.update_wiring();
         this.update_wiring();
         this.update_wiring();
@@ -728,81 +731,140 @@ export class Level {
 
         // TODO player in a cloner can't move (but player in a trap can still turn)
 
-        // The player is unusual in several ways.
-        // - Only the current player can override a force floor (and only if their last move was an
-        //   involuntary force floor slide, perhaps before some number of ice slides).
-        // - The player "block slaps", a phenomenon where they physically attempt to make both of
-        //   their desired movements, having an impact on the world if appropriate, before deciding
-        //   which of them to use
-        let direction_preference = [];
-        if (actor.slide_mode && ! (
-            actor.slide_mode === 'force' &&
-            input.primary !== null && actor.last_move_was_force))
+        // Extract directions from the input mask
+        let dir1 = null, dir2 = null;
+        if (((input & INPUT_BITS['up']) && (input & INPUT_BITS['down'])) ||
+            ((input & INPUT_BITS['left']) && (input & INPUT_BITS['right'])))
         {
-            direction_preference.push(actor.direction);
-
-            if (actor.slide_mode === 'force') {
-                this._set_tile_prop(actor, 'last_move_was_force', true);
-            }
+            // If two opposing directions are held at the same time, all input is ignored, so we
+            // can't end up with more than 2 directions
         }
         else {
-            // FIXME this isn't right; if primary is blocked, they move secondary, but they also
-            // ignore railroad redirection until next tic
-            this.remember_player_move(input.primary);
-
-            if (input.primary) {
-                // FIXME something is wrong with direction preferences!  if you hold both keys
-                // in a corner, no matter which you pressed first, cc2 always tries vert first
-                // and horiz last (so you're pushing horizontally)!
-                // FIXME starting to think the game should just pass all the held keys down
-                // here; i have to repeat this check because the "step" phase may have changed
-                // our direction
-                // XXX if this is a slide override, and the override is into a wall, the slide
-                // direction becomes primary again; i think "slide bonk" happens to cover this at
-                // the moment, is that cromulent?
-                let d1 = input.primary, d2 = input.secondary;
-                if (d2 && d2 === actor.direction) {
-                    [d1, d2] = [d2, d1];
+            for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
+                if (input & INPUT_BITS[dirinfo.action]) {
+                    if (dir1 === null) {
+                        dir1 = direction;
+                    }
+                    else {
+                        dir2 = direction;
+                        break;
+                    }
                 }
-                direction_preference.push(d1);
-                if (d2) {
-                    direction_preference.push(d2);
-                }
-                this._set_tile_prop(actor, 'last_move_was_force', false);
             }
         }
 
-        if (direction_preference.length === 0)
-            return;
-
-        // Note that we do this even if only one direction is requested, meaning that we get a
-        // chance to push blocks before anything else has moved!
-        // TODO TW's lynx source has one exception to that rule: if there are two directions,
-        // and neither one is our current facing, then we only check the horizontal one!
-        let directions_ok = direction_preference.map(direction => {
+        let try_direction = (direction, push_mode) => {
             direction = actor.cell.redirect_exit(actor, direction);
             let dest_cell = this.get_neighboring_cell(actor.cell, direction);
             return (dest_cell &&
                 ! actor.cell.blocks_leaving(actor, direction) &&
                 // FIXME if the player steps into a monster cell here, they die instantly!  but only
                 // if the cell doesn't block them??
-                ! dest_cell.blocks_entering(actor, direction, this, 'move'));
-        });
+                ! dest_cell.blocks_entering(actor, direction, this, push_mode));
+        };
 
-        if (directions_ok.length === 1) {
-            actor.decision = direction_preference[0];
+        // The player is unusual in several ways.
+        // - Only the current player can override a force floor (and only if their last move was an
+        //   involuntary force floor slide, perhaps before some number of ice slides).
+        // - The player "block slaps", a phenomenon where they physically attempt to make both of
+        //   their desired movements, having an impact on the world if appropriate, before deciding
+        //   which of them to use.
+        // - These two properties combine in a subtle way.  If we're on a force floor sliding right
+        //   under a row of blue walls, then if we hold up, we will bump every wall along the way.
+        //   If we hold up /and right/, we will only bump every other wall.  That is, if we're on a
+        //   force floor and attempt to override but /fail/, it's not held against us -- but if we
+        //   succeed, even if overriding in the same direction we're already moving, that does count
+        //   as an override.
+        let xxx_overriding = false;
+        if (actor.slide_mode && ! (
+            actor.slide_mode === 'force' &&
+            dir1 !== null && actor.last_move_was_force))
+        {
+            // This is a forced move, in which case we don't even check it
+            actor.decision = actor.direction;
+
+            if (actor.slide_mode === 'force') {
+                this._set_tile_prop(actor, 'last_move_was_force', true);
+            }
+            else if (actor.slide_mode === 'ice') {
+                // A sliding player that bonks into a wall still needs to turn around, but in this
+                // case they do NOT start pushing blocks early
+                if (! try_direction(actor.direction, 'trace')) {
+                    this._handle_slide_bonk(actor);
+                }
+            }
         }
-        else if (! directions_ok[0] && directions_ok[1]) {
-            // Only turn if we're blocked in our current direction AND free in the other one
-            actor.decision = direction_preference[1];
+        else if (dir1 === null) {
+            // Not attempting to move, so do nothing
         }
         else {
-            actor.decision = direction_preference[0];
+            // At this point, we have exactly 1 or 2 directions, and deciding between them requires
+            // checking which ones are blocked.  Note that we do this even if only one direction is
+            // requested, meaning that we get to push blocks before anything else has moved!
+            let open;
+            if (dir2 === null) {
+                // Only one direction is held, but for consistency, "check" it anyway
+                open = try_direction(dir1, 'move');
+                actor.decision = dir1;
+            }
+            else {
+                // We have two directions.  If one of them is our current facing, we prefer that
+                // one, UNLESS it's blocked AND the other isn't
+                if (dir1 === actor.direction || dir2 === actor.direction) {
+                    let other_direction = dir1 === actor.direction ? dir2 : dir1;
+                    let curr_open = try_direction(actor.direction, 'move');
+                    let other_open = try_direction(other_direction, 'move');
+                    if (! curr_open && other_open) {
+                        actor.decision = other_direction;
+                        open = true;
+                    }
+                    else {
+                        actor.decision = actor.direction;
+                        open = curr_open;
+                    }
+                }
+                else {
+                    // Neither direction is the way we're moving, so try both and prefer horizontal
+                    // FIXME i'm told cc2 prefers orthogonal actually, but need to check on that
+                    // FIXME lynx only checks horizontal, what about cc2?  it must check both
+                    // because of the behavior where pushing into a corner always pushes horizontal
+                    let open1 = try_direction(dir1, 'move');
+                    let open2 = try_direction(dir2, 'move');
+                    if (open1 && ! open2) {
+                        actor.decision = dir1;
+                        open = true;
+                    }
+                    else if (! open1 && open2) {
+                        actor.decision = dir2;
+                        open = true;
+                    }
+                    else if (dir1 === 'east' || dir1 === 'west') {
+                        actor.decision = dir1;
+                        open = open1;
+                    }
+                    else {
+                        actor.decision = dir2;
+                        open = open2;
+                    }
+                }
+            }
+
+            // If we're overriding a force floor but the direction we're moving in is blocked, the
+            // force floor takes priority (and we've already bumped the wall(s))
+            if (actor.slide_mode === 'force' && ! open) {
+                actor.decision = actor.direction;
+                this._set_tile_prop(actor, 'last_move_was_force', true);
+            }
+            else {
+                // Otherwise this is 100% a conscious move so we lose our override power next tic
+                this._set_tile_prop(actor, 'last_move_was_force', false);
+            }
         }
 
-        if (actor.slide_mode && ! directions_ok[0]) {
-            this._handle_slide_bonk(actor);
-        }
+        // Remember our choice for the sake of doppelgangers
+        // FIXME still a bit unclear on how they handle secondary direction, but i'm not sure that's
+        // even a real concept in lynx, so maybe this is right??
+        this.remember_player_move(actor.decision);
     }
 
     make_actor_decision(actor) {

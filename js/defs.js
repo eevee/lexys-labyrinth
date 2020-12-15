@@ -49,6 +49,8 @@ export const INPUT_BITS = {
     up:     0x10,
     swap:   0x20,
     cycle:  0x40,
+    // Not real input; used to force advancement for turn-based mode
+    wait:   0x8000,
 };
 
 // TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)

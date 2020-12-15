@@ -104,6 +104,12 @@ export function handle_drop(element, options) {
     });
 }
 
+export function sleep(t) {
+    return new Promise(res => {
+        setTimeout(res, t);
+    });
+}
+
 export function promise_event(element, success_event, failure_event) {
     let resolve, reject;
     let promise = new Promise((res, rej) => {

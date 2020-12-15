@@ -165,9 +165,9 @@ svg.svg-icon {
     display: flex;
     flex-direction: column;
 
-    min-width: 33%;
-    max-width: 75%;
-    max-height: 75%;
+    min-width: 33vw;
+    max-width: 75vw;
+    max-height: 75vh;
     border: 1px solid black;
     color: black;
     background: #f4f4f4;
@@ -195,6 +195,7 @@ svg.svg-icon {
     display: none;
 }
 .dialog > section {
+    flex: auto;
     overflow: auto;
     padding: 1em;
 }
@@ -545,6 +546,76 @@ button.level-pack-button p {
     color: #c0c0c0;
 }
 
+/* "Bulk test" button, only available in debug mode */
+#main-test-pack {
+    display: none;
+}
+body.--debug #main-test-pack {
+    display: initial;
+}
+.packtest-dialog {
+    width: 75vw;
+    height: 75vh;
+}
+ol.packtest-summary {
+    display: flex;
+    align-items: stretch;
+    height: 1em;
+    border: 1px solid #606060;
+}
+ol.packtest-summary > li {
+    /* Give a meaty flex-basis; the dialog has a max-width so it won't blow out, and these will
+     * simply shrink if necessary */
+    flex: 1 1 1em;
+    background: white;
+}
+.packtest-row {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+    margin: 0.5em 0;
+}
+.packtest-row > p {
+    flex: 9;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.packtest-row > button {
+    flex: 1;
+}
+.packtest-results {
+    margin-bottom: 1em;
+}
+.packtest-results > li {
+    padding: 0.25em;
+    margin: 0.25em 0;
+}
+.packtest-results > li > canvas {
+    display: block;
+    margin: 0.5em auto;
+}
+ol.packtest-colorcoded > li[data-status=no-replay] {
+    background: hsl(0, 0%, 25%);
+}
+ol.packtest-colorcoded > li[data-status=running] {
+    background: hsl(30, 100%, 75%);
+}
+ol.packtest-colorcoded > li[data-status=success] {
+    background: hsl(120, 60%, 75%);
+}
+ol.packtest-colorcoded > li[data-status=failure] {
+    background: hsl(0, 60%, 60%);
+}
+ol.packtest-colorcoded > li[data-status=short] {
+    background: hsl(330, 60%, 75%);
+}
+ol.packtest-colorcoded > li[data-status=error] {
+    background: black;
+}
+
+
 /**************************************************************************************************/
 /* Player */
 
@@ -626,7 +697,7 @@ button.level-pack-button p {
     text-shadow: 0 2px 1px black;
 }
 /* Allow clicking through the overlay in debug mode */
-#player.--debug .overlay-message {
+body.--debug .overlay-message {
     pointer-events: none;
 }
 #player .overlay-message p {
@@ -858,7 +929,7 @@ dl.score-chart .-sum {
 }
 
 /* Debug stuff */
-#player.--debug #player-debug {
+body.--debug #player-debug {
     display: flex;
 }
 #player-debug {
