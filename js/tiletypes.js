@@ -607,6 +607,12 @@ const TILE_TYPES = {
             else if (other.type.is_real_player) {
                 level.fail('burned');
             }
+            else if (other.type.name === 'ghost') {
+                if (other.has_item('fire_boots')) {
+                    // ?????
+                    level.transmute_tile(me, 'floor');
+                }
+            }
             else {
                 level.remove_tile(other);
             }
@@ -614,7 +620,11 @@ const TILE_TYPES = {
     },
     water: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.ghost,
+        blocks(me, level, other) {
+            // Water blocks ghosts...  unless they have flippers
+            if (other.type.name === 'ghost' && ! other.has_item('flippers'))
+                return true;
+        },
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
             level.sfx.play_once('splash', me.cell);
