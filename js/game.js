@@ -52,11 +52,18 @@ export class Tile {
         // Extremely awkward special case: items don't block monsters if the cell also contains an
         // item modifier (i.e. "no" sign) or a real player
         // TODO would love to get this outta here
+        // FIXME i think this can be removed if monster/player interaction stops being a literal
+        // collision and starts being a result of even attempting to move
         if (this.type.is_item &&
             this.cell.some(tile => tile.type.item_modifier || tile.type.is_real_player))
             return false;
 
         if (this.type.blocks_collision & other.type.collision_mask)
+            return true;
+
+        // FIXME bowling ball isn't affected by helmet?  also not sure bowling ball is stopped by
+        // helmet?
+        if (this.has_item('helmet') || (this.type.is_actor && other.has_item('helmet')))
             return true;
 
         // FIXME get this out of here
@@ -902,14 +909,6 @@ export class Level {
     }
 
     make_actor_decision(actor) {
-        // Teeth can only move the first 4 of every 8 tics, and mimics only the first 4 of every
-        // 16, though "first" can be adjusted
-        if (actor.slide_mode === null && actor.type.movement_parity &&
-            (this.tic_counter + this.step_parity) % (actor.type.movement_parity * 4) >= 4)
-        {
-            return;
-        }
-
         // Compat flag for blue tanks
         if (this.compat.sliding_tanks_ignore_button &&
             actor.slide_mode && actor.pending_reverse)

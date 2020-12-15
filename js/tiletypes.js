@@ -92,6 +92,11 @@ function player_visual_state(me) {
 
 // Logic for chasing after the player (or running away); shared by both teeth and mimics
 function pursue_player(me, level) {
+    // Teeth can only move the first 4 of every 8 tics, and mimics only the first 4 of every 16,
+    // though "first" can be adjusted
+    if ((level.tic_counter + level.step_parity) % (me.type.movement_parity * 4) >= 4)
+        return null;
+
     let player = level.player;
     // CC2 behavior (not Lynx (TODO compat?)): pursue the player's apparent position, not just the
     // cell they're in
@@ -1857,7 +1862,7 @@ const TILE_TYPES = {
         movement_parity: 2,
         decide_movement(me, level) {
             let preference = pursue_player(me, level);
-            if (level.player.type.name === 'player') {
+            if (preference && level.player.type.name === 'player') {
                 // Run away from Lexy
                 for (let [i, direction] of preference.entries()) {
                     preference[i] = DIRECTIONS[direction].opposite;
@@ -1932,6 +1937,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all_but_player,
         can_reveal_walls: true,
         movement_speed: 4,
+        movement_parity: 4,
         on_ready(me, level) {
             me.current_emulatee = 0;
             me.attempted_moves = 0;
@@ -1946,8 +1952,17 @@ const TILE_TYPES = {
             me.attempted_moves += 1;
             let emulatee = me.type._emulatees[me.current_emulatee];
             let preference = TILE_TYPES[emulatee].decide_movement(me, level);
+            // Rig up the preference so a failure counts as two moves
+            if (preference) {
+                let last = preference.pop();
+                preference.push(function() {
+                    // FIXME still not right, this'll happen if the last preference works
+                    me.attempted_moves += 1;
+                    return typeof last === 'function' ? last() : last;
+                });
+            }
             // TODO need to rig this so a failure counts as two moves
-            // TODO obeys step while emulating teeth (gah, i guess move that in here too)
+            // FIXME obeys step while emulating teeth (gah, i guess move that in here too)
             return preference;
         },
         visual_state(me) {
