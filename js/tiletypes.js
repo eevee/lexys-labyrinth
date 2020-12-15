@@ -154,7 +154,7 @@ const TILE_TYPES = {
     wall: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
-        on_bump(me, level, other) {
+        on_bumped(me, level, other) {
             if (other.has_item('foil')) {
                 level.transmute_tile(me, 'steel');
             }
@@ -179,7 +179,7 @@ const TILE_TYPES = {
     wall_invisible: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
-        on_bump(me, level, other) {
+        on_bumped(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.spawn_animation(me.cell, 'wall_invisible_revealed');
             }
@@ -188,7 +188,7 @@ const TILE_TYPES = {
     wall_appearing: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
-        on_bump(me, level, other) {
+        on_bumped(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'wall');
             }
@@ -257,7 +257,7 @@ const TILE_TYPES = {
                 me.type = TILE_TYPES['popwall'];
             }
         },
-        on_bump(me, level, other) {
+        on_bumped(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'wall');
             }
@@ -266,7 +266,7 @@ const TILE_TYPES = {
     fake_floor: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_bump(me, level, other) {
+        on_bumped(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'floor');
             }
@@ -902,7 +902,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
         },
-        on_bump(me, level, other) {
+        on_bumped(me, level, other) {
             // Fireballs melt ice blocks on regular floor
             // XXX what if i'm in motion?
             if (other.type.name === 'fireball') {
@@ -2159,15 +2159,19 @@ const TILE_TYPES = {
         // FIXME do i start moving immediately when dropped, or next turn?
         movement_speed: 4,
         decide_movement(me, level) {
-            return [
-                me.direction,
-                function() {
-                    // FIXME lol this is incredibly stupid but i have no way to react when /i/ hit
-                    // something /else/ yet
-                    level.transmute_tile(me, 'explosion');
-                    return me.direction;
-                },
-            ];
+            return [me.direction];
+        },
+        // FIXME feel like this should be on_blocked?
+        on_bump(me, level, other) {
+            if (other.type.is_actor) {
+                level.transmute_tile(me, 'explosion');
+                level.transmute_tile(other, 'explosion');
+                return false;
+            }
+            else if (other.blocks(me, me.direction, level)) {
+                level.transmute_tile(me, 'explosion');
+                return false;
+            }
         },
     },
     xray_eye: {

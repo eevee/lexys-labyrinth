@@ -233,8 +233,13 @@ export class Cell extends Array {
             if (push_mode === 'ignore')
                 continue;
 
-            if (push_mode === 'move' && tile.type.on_bump) {
-                tile.type.on_bump(tile, level, actor);
+            if (push_mode === 'move') {
+                if (actor.type.on_bump) {
+                    actor.type.on_bump(actor, level, tile);
+                }
+                if (tile.type.on_bumped) {
+                    tile.type.on_bumped(tile, level, actor);
+                }
             }
 
             // Collect pushables for later, so we don't inadvertently push through a wall
@@ -1057,8 +1062,12 @@ export class Level {
                     // Bump tiles that we're even attempting to move into; this mostly reveals
                     // invisible walls, blue floors, etc.
                     // XXX how to guarantee this only happens once...
-                    if (tile.type.on_bump) {
-                        tile.type.on_bump(tile, this, actor);
+                    if (actor.type.on_bump) {
+                        if (actor.type.on_bump(actor, this, tile) === false)
+                            return;
+                    }
+                    if (tile.type.on_bumped) {
+                        tile.type.on_bumped(tile, this, actor);
                     }
                 }
 
