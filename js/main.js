@@ -2098,7 +2098,7 @@ class PackTestDialog extends DialogOverlay {
             if (index === undefined)
                 return;
             this.close();
-            this.conductor.change_level(index);
+            this.conductor.change_level(parseInt(index, 10));
         });
 
         this.main.append(

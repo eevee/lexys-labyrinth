@@ -59,8 +59,10 @@ export class Tile {
         if (this.type.blocks_collision & other.type.collision_mask)
             return true;
 
+        // FIXME get this out of here
         if (this.type.thin_walls &&
-            this.type.thin_walls.has(DIRECTIONS[direction].opposite))
+            this.type.thin_walls.has(DIRECTIONS[direction].opposite) &&
+            other.type.name !== 'ghost')
             return true;
 
         if (this.type.blocks)

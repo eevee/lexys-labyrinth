@@ -40,7 +40,7 @@ function on_ready_force_floor(me, level) {
 }
 
 function blocks_leaving_thin_walls(me, actor, direction) {
-    return me.type.thin_walls.has(direction);
+    return me.type.thin_walls.has(direction) && actor.type.name !== 'ghost';
 }
 
 function player_visual_state(me) {
@@ -2276,6 +2276,7 @@ const TILE_TYPES = {
         is_player: true,
         is_monster: true,
         collision_mask: COLLISION.player1,
+        // FIXME these fuckers should block each OTHER though
         blocks_collision: COLLISION.all_but_player,
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
