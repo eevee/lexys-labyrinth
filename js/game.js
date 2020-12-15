@@ -943,11 +943,7 @@ export class Level {
 
             direction = actor.cell.redirect_exit(actor, direction);
 
-            let dest_cell = this.get_neighboring_cell(actor.cell, direction);
-            if (dest_cell &&
-                ! actor.cell.blocks_leaving(actor, direction) &&
-                ! dest_cell.blocks_entering(actor, direction, this, actor === this.player ? 'move' : 'trace'))
-            {
+            if (this.is_move_allowed(actor, direction, 'trace')) {
                 // We found a good direction!  Stop here
                 actor.decision = direction;
                 all_blocked = false;
@@ -986,6 +982,14 @@ export class Level {
             }
             actor.decision = actor.direction;
         }
+    }
+
+    // FIXME make this interact with railroads correctly and use it for players and in attempt_step
+    is_move_allowed(actor, direction, push_mode) {
+        let dest_cell = this.get_neighboring_cell(actor.cell, direction);
+        return (dest_cell &&
+            ! actor.cell.blocks_leaving(actor, direction) &&
+            ! dest_cell.blocks_entering(actor, direction, this, push_mode));
     }
 
     // Try to move the given actor one tile in the given direction and update their cooldown.

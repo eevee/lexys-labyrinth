@@ -1339,13 +1339,21 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
 
-            // Move all yellow tanks one tile in the direction of the pressing actor
+            // Move all yellow tanks one tile in the direction of the pressing actor.  But pretend
+            // it's simultaneous, so one in front will block one behind as usual.
+            // XXX this feels really weird, i'm wondering if cc2 does some other weird thing like
+            // not move any actor out of its cell until its first cooldown tick??
+            // FIXME not sure this interacts with railroads correctly
+            let unblocked_tanks = [];
             for (let i = level.actors.length - 1; i >= 0; i--) {
                 let actor = level.actors[i];
                 // TODO generify somehow??
-                if (actor.type.name === 'tank_yellow') {
-                    level.attempt_out_of_turn_step(actor, other.direction);
+                if (actor.type.name === 'tank_yellow' && level.is_move_allowed(actor, other.direction, 'trace')) {
+                    unblocked_tanks.push(actor);
                 }
+            }
+            for (let actor of unblocked_tanks) {
+                level.attempt_out_of_turn_step(actor, other.direction);
             }
         },
         on_depart(me, level, other) {
