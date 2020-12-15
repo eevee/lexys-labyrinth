@@ -419,7 +419,7 @@ const TILE_ENCODING = {
                     tile.track_switch = null;
                 }
                 // Initial actor facing is in the highest nybble
-                tile.entered_direction = (mask >> 12) & 0x03;
+                tile.entered_direction = DIRECTION_ORDER[(mask >> 12) & 0x03];
             },
             encode(tile) {
                 let ret = tile.tracks & 0x3f;
