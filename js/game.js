@@ -654,6 +654,10 @@ export class Level {
             if (! actor.cell)
                 continue;
 
+            if (actor.type.on_tic) {
+                actor.type.on_tic(actor, this);
+            }
+
             // Check this again, since an earlier pass may have caused us to start moving
             if (actor.movement_cooldown > 0)
                 continue;
@@ -1354,7 +1358,19 @@ export class Level {
                 this.transmute_tile(terrain, 'teleport_yellow');
             }
             else {
-                this.add_tile(new Tile(TILE_TYPES[name]), actor.cell);
+                let type = TILE_TYPES[name];
+                if (type.on_drop) {
+                    name = type.on_drop(this, actor);
+                    if (name) {
+                        type = TILE_TYPES[name];
+                    }
+                }
+                let tile = new Tile(type);
+                if (type.is_actor) {
+                    tile.direction = actor.direction;
+                    this.add_actor(tile);
+                }
+                this.add_tile(tile, actor.cell);
             }
 
             actor.toolbelt.shift();
@@ -1540,6 +1556,15 @@ export class Level {
 
     is_point_within_bounds(x, y) {
         return (x >= 0 && x < this.width && y >= 0 && y < this.height);
+    }
+
+    cell(x, y) {
+        if (this.is_point_within_bounds(x, y)) {
+            return this.cells[y][x];
+        }
+        else {
+            return null;
+        }
     }
 
     get_neighboring_cell(cell, direction) {

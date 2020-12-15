@@ -131,8 +131,9 @@ export const CC2_TILESET_LAYOUT = {
     canopy: [14, 3],
     // canopy xray
 
-    // TODO lit
     dynamite: [0, 4],
+    // FIXME lit frames
+    dynamite_lit: [0, 4],
     bomb: [5, 4],
     green_bomb: [6, 4],
     // TODO bomb fuse tile, ugh
@@ -349,7 +350,8 @@ export const CC2_TILESET_LAYOUT = {
         south: [[1, 17], [0, 17]],
         west: [[5, 17], [4, 17]],
     },
-    bowling_ball: [6, 17],  // TODO also +18 when rolling
+    bowling_ball: [6, 17],
+    rolling_ball: [[6, 17], [7, 17]],
     tank_yellow: {
         north: [[8, 17], [9, 17]],
         east: [[10, 17], [11, 17]],

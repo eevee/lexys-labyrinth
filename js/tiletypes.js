@@ -2036,14 +2036,129 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        // FIXME does a thing when dropped, but that isn't implemented at all yet
+        on_drop(level, owner) {
+            // FIXME not if the cell has a no sign
+            if (! owner.type.is_real_player) {
+                // Only players can activate dynamite
+                return;
+            }
+            return 'dynamite_lit';
+        },
+    },
+    dynamite_lit: {
+        draw_layer: DRAW_LAYERS.item,
+        is_actor: true,
+        // FIXME collision?
+        // FIXME kills player on touch
+        // FIXME inherits a copy of player's inventory!
+        // FIXME holds down buttons, so needs an on_arrive
+        // FIXME speaking of buttons, destroyed actors should on_depart
+        on_tic(me, level) {
+            // FIXME When Chip or Melinda leaves a tile with a time bomb and no no sign on it, the
+            // time bomb will count down for about 4.3 seconds before exploding; it does not matter
+            // whether the player dropped the item (e.g. if the player teleported)????
+            if (me.slide_mode || me.movement_cooldown)
+                return;
+            if (me.timer === undefined) {
+                me.timer = 86;  // FIXME??  wiki just says about 4.3 seconds what
+                return;
+            }
+
+            me.timer -= 1;
+            if (me.timer > 0)
+                return;
+
+            // Kaboom!  Blow up a 5x5 square
+            level.sfx.play_once('bomb', me.cell);
+            let x = me.cell.x, y = me.cell.y;
+            for (let dx = -2; dx <= 2; dx++) {
+                for (let dy = -2; dy <= 2; dy++) {
+                    // Exclude the far corners
+                    if (Math.abs(dx) + Math.abs(dy) >= 4)
+                        continue;
+
+                    let cell = level.cell(x + dx, y + dy);
+                    if (! cell)
+                        continue;
+
+                    let tiles = Array.from(cell);
+                    tiles.sort((a, b) => b.type.draw_layer - a.type.draw_layer);
+                    let actor, terrain, removed_anything;
+                    for (let tile of tiles) {
+                        if (tile.type.name === 'canopy') {
+                            // Canopy protects everything else
+                            break;
+                        }
+                        if (tile.type.is_actor) {
+                            actor = tile;
+                        }
+
+                        if (tile.type.draw_layer === 0) {
+                            // Terrain gets transmuted afterwards
+                            terrain = tile;
+                        }
+                        else {
+                            // Everything else is destroyed
+                            level.remove_tile(tile);
+                            removed_anything = true;
+                        }
+                    }
+
+                    if (actor) {
+                        // Actors protect terrain, but floor becomes fire
+                        if (terrain && terrain.type.name === 'floor' && terrain.wire_directions === 0 && terrain.wire_tunnel_directions === 0) {
+                            if (actor.type.name === 'ice_block') {
+                                level.transmute_tile(terrain, 'water');
+                            }
+                            else {
+                                level.transmute_tile(terrain, 'fire');
+                            }
+                        }
+                    }
+                    else if (terrain) {
+                        // Anything other than these babies gets blown up and turned into floor
+                        if (!(
+                            terrain.type.name === 'steel' || terrain.type.name === 'socket' || terrain.type.name === 'logic_gate' || terrain.type.name === 'floor'))
+                        {
+                            level.transmute_tile(terrain, 'floor');
+                            removed_anything = true;
+                        }
+                    }
+
+                    if (removed_anything) {
+                        level.spawn_animation(cell, 'explosion');
+                    }
+                }
+            }
+        },
     },
     bowling_ball: {
-        // TODO not implemented, rolls when dropped, has an inventory, yadda yadda
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        on_drop(level, owner) {
+            return 'rolling_ball';
+        },
+    },
+    rolling_ball: {
+        draw_layer: DRAW_LAYERS.actor,
+        is_actor: true,
+        has_inventory: true,
+        // FIXME collision...?
+        // FIXME do i start moving immediately when dropped, or next turn?
+        movement_speed: 4,
+        decide_movement(me, level) {
+            return [
+                me.direction,
+                function() {
+                    // FIXME lol this is incredibly stupid but i have no way to react when /i/ hit
+                    // something /else/ yet
+                    level.transmute_tile(me, 'explosion');
+                    return me.direction;
+                },
+            ];
+        },
     },
     xray_eye: {
         // TODO not implemented
