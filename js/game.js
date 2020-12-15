@@ -956,8 +956,14 @@ export class Level {
         if (actor.slide_mode && all_blocked) {
             this._handle_slide_bonk(actor);
         }
+
+        // Non-players move instantly while sliding, without waiting for the movement pass
+        if (actor.slide_mode) {
+            this.attempt_step(actor, actor.direction);
+        }
     }
 
+    // FIXME can probably clean this up a decent bit now
     _handle_slide_bonk(actor) {
         if (actor.slide_mode === 'ice') {
             // Actors on ice turn around when they hit something
