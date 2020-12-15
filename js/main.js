@@ -441,7 +441,6 @@ class Player extends PrimaryView {
         this.next_player_move = null;
         this.player_used_move = false;
         let key_target = document.body;
-        this.previous_input = new Set;  // actions that were held last tic
         this.using_touch = false;  // true if using touch controls
         this.current_keys = new Set;  // keys that are currently held
         this.current_keys_new = new Set; // keys that were pressed since input was last read
@@ -1105,10 +1104,6 @@ class Player extends PrimaryView {
             if (this.debug && this.debug.replay && this.debug.replay_recording) {
                 this.debug.replay.set(this.level.tic_counter, input);
             }
-
-            // FIXME cycle/drop/swap depend on this but that's currently broken; should Level handle
-            // it?  probably
-            this.previous_input = input;
 
             this.sfx_player.advance_tic();
 

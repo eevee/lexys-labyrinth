@@ -318,6 +318,7 @@ export class Level {
 
         this.cells = [];
         this.player = null;
+        this.previous_input = 0;
         this.actors = [];
         this.chips_remaining = this.stored_level.chips_required;
         this.bonus_points = 0;
@@ -678,13 +679,14 @@ export class Level {
 
             // Check for special player actions, which can only happen when not moving
             if (actor === this.player) {
-                if (p1_input & INPUT_BITS.cycle) {
+                let new_input = p1_input & ~this.previous_input;
+                if (new_input & INPUT_BITS.cycle) {
                     this.cycle_inventory(this.player);
                 }
-                if (p1_input & INPUT_BITS.drop) {
+                if (new_input & INPUT_BITS.drop) {
                     this.drop_item(this.player);
                 }
-                if (p1_input & INPUT_BITS.swap) {
+                if (new_input & INPUT_BITS.swap) {
                     // This is delayed until the end of the tic to avoid screwing up anything
                     // checking this.player
                     swap_player1 = true;
@@ -746,6 +748,8 @@ export class Level {
             this.player_index %= this.players.length;
             this.player = this.players[this.player_index];
         }
+
+        this.previous_input = p1_input;
 
         // Advance the clock
         // TODO i suspect cc2 does this at the beginning of the tic, but even if you've won?  if you
