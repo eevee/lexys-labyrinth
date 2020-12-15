@@ -604,7 +604,7 @@ const TILE_TYPES = {
                 level.remove_tile(other);
                 level.transmute_tile(me, 'water');
             }
-            else if (other.type.is_player) {
+            else if (other.type.is_real_player) {
                 level.fail('burned');
             }
             else {
@@ -630,7 +630,7 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'ice');
             }
-            else if (other.type.is_player) {
+            else if (other.type.is_real_player) {
                 level.fail('drowned');
             }
             else {
@@ -780,7 +780,7 @@ const TILE_TYPES = {
             else if (other.type.name === 'ghost' || other.type.name === 'blob') {
                 // No effect
             }
-            else if (other.type.is_player) {
+            else if (other.type.is_real_player) {
                 level.fail('slimed');
             }
             else {
@@ -799,7 +799,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             level.remove_tile(me);
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.fail('exploded');
             }
             else {
@@ -818,7 +818,7 @@ const TILE_TYPES = {
             }
 
             let lost = level.take_all_tools_from_actor(other);
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 if (level.bonus_points > 0) {
                     lost = true;
                 }
@@ -839,7 +839,7 @@ const TILE_TYPES = {
             }
 
             let lost = level.take_all_keys_from_actor(other);
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 if (level.bonus_points > 0) {
                     lost = true;
                 }
@@ -964,7 +964,7 @@ const TILE_TYPES = {
         is_required_chip: true,
         on_arrive(me, level, other) {
             level.remove_tile(me);
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.fail('exploded');
             }
             else {
@@ -1305,7 +1305,7 @@ const TILE_TYPES = {
             // Note that blocks, fireballs, and anything with fire boots are immune
             // TODO would be neat if this understood "ignores anything with fire immunity" but that
             // might be a bit too high-level for this game
-            if (other.type.is_player) {
+            if (other.type.is_real_player) {
                 level.fail('burned');
             }
             else {
