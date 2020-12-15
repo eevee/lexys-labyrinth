@@ -2133,16 +2133,16 @@ class PackTestDialog extends DialogOverlay {
         let t0 = performance.now();
         let last_pause = t0;
         for (let i = 0; i < num_levels; i++) {
-            let stored_level = pack.load_level(i);
+            let stored_level, level;
             let status_li = this.results_summary.childNodes[i];
             let record_result = (token, title, comment, include_canvas) => {
                 status_li.setAttribute('data-status', token);
                 status_li.setAttribute('title', title);
                 let li = mk(
                     'li', {'data-status': token, 'data-index': i},
-                    `#${i + 1} ${stored_level.title}: `,
+                    `#${i + 1} ${stored_level ? stored_level.title : "???"}: `,
                     comment);
-                if (include_canvas) {
+                if (include_canvas && level) {
                     let canvas = mk('canvas', {
                         width: this.renderer.canvas.width,
                         height: this.renderer.canvas.height,
@@ -2154,23 +2154,27 @@ class PackTestDialog extends DialogOverlay {
                 }
                 this.results.append(li);
 
-                total_tics += level.tic_counter;
+                if (level) {
+                    total_tics += level.tic_counter;
+                }
             };
-            if (! stored_level.has_replay) {
-                record_result('no-replay', "N/A", "No replay available");
-                continue;
-            }
-
-            this.current_status.textContent = `Testing level ${i + 1}/${num_levels} ${stored_level.title}...`;
-
-            // TODO compat options here??
-            let replay = stored_level.replay;
-            let level = new Level(stored_level, {});
-            level.sfx = dummy_sfx;
-            level.force_floor_direction = replay.initial_force_floor_direction;
-            level._blob_modifier = replay.blob_seed;
 
             try {
+                stored_level = pack.load_level(i);
+                if (! stored_level.has_replay) {
+                    record_result('no-replay', "N/A", "No replay available");
+                    continue;
+                }
+
+                this.current_status.textContent = `Testing level ${i + 1}/${num_levels} ${stored_level.title}...`;
+
+                // TODO compat options here??
+                let replay = stored_level.replay;
+                level = new Level(stored_level, {});
+                level.sfx = dummy_sfx;
+                level.force_floor_direction = replay.initial_force_floor_direction;
+                level._blob_modifier = replay.blob_seed;
+
                 while (true) {
                     let input = replay.get(level.tic_counter);
                     level.advance_tic(input);
