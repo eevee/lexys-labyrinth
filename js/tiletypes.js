@@ -2058,8 +2058,9 @@ const TILE_TYPES = {
     dynamite_lit: {
         draw_layer: DRAW_LAYERS.item,
         is_actor: true,
-        // FIXME collision?
-        // FIXME kills player on touch
+        is_monster: true,
+        // FIXME ???????
+        collision_mask: COLLISION.block_cc2,
         // FIXME inherits a copy of player's inventory!
         // FIXME holds down buttons, so needs an on_arrive
         // FIXME speaking of buttons, destroyed actors should on_depart
@@ -2155,14 +2156,18 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         has_inventory: true,
-        // FIXME collision...?
+        // FIXME ???????
+        collision_mask: COLLISION.block_cc2,
         // FIXME do i start moving immediately when dropped, or next turn?
         movement_speed: 4,
         decide_movement(me, level) {
             return [me.direction];
         },
         // FIXME feel like this should be on_blocked?
+        // FIXME specific case for player!
         on_bump(me, level, other) {
+            if (me.slide_mode)
+                return;
             if (other.type.is_actor) {
                 level.transmute_tile(me, 'explosion');
                 level.transmute_tile(other, 'explosion');

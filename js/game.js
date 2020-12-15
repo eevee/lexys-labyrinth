@@ -1270,14 +1270,19 @@ export class Level {
         let success = false;
         for (let dest of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
+            // FIXME should check collision?
             if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
                 continue;
 
             // Physically move the actor to the new teleporter
             // XXX lynx treats this as a slide and does it in a pass in the main loop
             // XXX not especially undo-efficient
+            // FIXME the new aggressive move checker could help here!
             this.remove_tile(actor);
             this.add_tile(actor, dest.cell);
+
+            // FIXME teleport overrides...  also allow block slapping...  seems like horizontal
+            // wins...
 
             // Red and green teleporters attempt to spit you out in every direction before
             // giving up on a destination (but not if you return to the original).
