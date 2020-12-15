@@ -682,7 +682,7 @@ class WireOperation extends DrawOperation {
         for (let [qx, qy] of walk_grid(
             this.gx1f * 4, this.gy1f * 4, gxf * 4, gyf * 4,
             // See comment in iter_touched_cells
-            -1, -1, this.editor.stored_level.size_x * 2, this.editor.stored_level.size_y * 2))
+            -1, -1, this.editor.stored_level.size_x * 4, this.editor.stored_level.size_y * 4))
         {
             if (prevqx === null || prevqy === null) {
                 prevqx = qx;
