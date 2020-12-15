@@ -564,7 +564,7 @@ export class Level {
             if (! actor.cell)
                 continue;
 
-            if (actor.movement_cooldown > 0) {
+            if (actor.movement_cooldown > 0 && actor.cooldown_delay_tic !== this.tic_counter) {
                 this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
 
                 if (actor.movement_cooldown <= 0) {
@@ -1078,7 +1078,13 @@ export class Level {
 
     // FIXME delete this
     attempt_out_of_turn_step(actor, direction) {
-        return this.attempt_step(actor, direction);
+        if (this.attempt_step(actor, direction)) {
+            this._set_tile_prop(actor, 'cooldown_delay_tic', this.tic_counter);
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
     // Move the given actor to the given position and perform any appropriate
