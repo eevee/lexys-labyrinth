@@ -318,7 +318,7 @@ export class Level {
 
         this.cells = [];
         this.player = null;
-        this.previous_input = 0;
+        this.p1_previous_still_input = 0;
         this.actors = [];
         this.chips_remaining = this.stored_level.chips_required;
         this.bonus_points = 0;
@@ -684,7 +684,7 @@ export class Level {
             // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
             // release the rest rapid-fire.  absurd
             if (actor === this.player) {
-                let new_input = p1_input & ~this.previous_input;
+                let new_input = p1_input & ~this.p1_previous_still_input;
                 if (new_input & INPUT_BITS.cycle) {
                     this.cycle_inventory(this.player);
                 }
@@ -696,6 +696,7 @@ export class Level {
                     // checking this.player
                     swap_player1 = true;
                 }
+                this.p1_previous_still_input = p1_input;
             }
 
             if (! actor.decision)
@@ -753,8 +754,6 @@ export class Level {
             this.player_index %= this.players.length;
             this.player = this.players[this.player_index];
         }
-
-        this.previous_input = p1_input;
 
         // Advance the clock
         // TODO i suspect cc2 does this at the beginning of the tic, but even if you've won?  if you
