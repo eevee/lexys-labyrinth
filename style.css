@@ -613,6 +613,7 @@ ol.packtest-colorcoded > li[data-status=short] {
 }
 ol.packtest-colorcoded > li[data-status=error] {
     background: black;
+    color: white;
 }
 .packtest-dialog .grade-A {
     color: hsl(120, 60%, 45%);

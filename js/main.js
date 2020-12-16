@@ -2222,7 +2222,7 @@ class PackTestDialog extends DialogOverlay {
                 console.error(e);
                 record_result(
                     'error', "Error",
-                    "Replay failed due to internal error (see console for traceback): ${e}");
+                    `Replay failed due to internal error (see console for traceback): ${e}`);
             }
         }
 
