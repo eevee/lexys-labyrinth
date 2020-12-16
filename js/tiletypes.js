@@ -2357,8 +2357,14 @@ const TILE_TYPES = {
         is_player: true,
         is_monster: true,
         collision_mask: COLLISION.player1,
-        // FIXME these fuckers should block each OTHER though
         blocks_collision: COLLISION.all_but_player,
+        // FIXME i think if i make monsters and players block each other than this is
+        // unnecessary (but double check cc2 #144 the village)
+        blocks(me, level, other) {
+            if (other.type.is_player) {
+                return true;
+            }
+        },
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
@@ -2388,6 +2394,11 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.player2,
         blocks_collision: COLLISION.all_but_player,
+        blocks(me, level, other) {
+            if (other.type.is_player) {
+                return true;
+            }
+        },
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
@@ -2509,7 +2520,8 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid & ~COLLISION.rover,
         on_arrive(me, level, other) {
-            if (other.type.is_player) {
+            // FIXME multiple players
+            if (other.type.is_real_player) {
                 level.win();
             }
         },
