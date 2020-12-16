@@ -1158,7 +1158,13 @@ export class Tileset {
                 this._draw_fourway_tile_power(tile, tile.wire_directions, blit);
 
                 // Then draw the wired tile on top of it all
-                coords = drawspec.wired;
+                if (tile.wire_directions === 0x0f && drawspec.wired_cross) {
+                    // FIXME oopsydaisy, order matters for the cross part
+                    coords = drawspec.wired_cross;
+                }
+                else {
+                    coords = drawspec.wired;
+                }
             }
             else {
                 // There's no wiring here, so just draw the base and then draw the wired part on top
