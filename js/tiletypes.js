@@ -1693,23 +1693,37 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
         get_emitting_edges(me, level) {
+            // TODO this is inconsistent with the pink/black buttons, but cc2 has a single-frame
+            // delay here!
+            if (me.is_first_frame) {
+                level._set_tile_prop(me, 'is_first_frame', false);
+                return me.wire_directions;
+            }
             return 0;
         },
         on_arrive(me, level, other) {
             // TODO distinct sfx?  more clicky?
             level.sfx.play_once('button-press', me.cell);
             level.transmute_tile(me, 'light_switch_on');
+            level._set_tile_prop(me, 'is_first_frame', true);
         },
     },
     light_switch_on: {
         draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
         get_emitting_edges(me, level) {
+            // TODO this is inconsistent with the pink/black buttons, but cc2 has a single-frame
+            // delay here!
+            if (me.is_first_frame) {
+                level._set_tile_prop(me, 'is_first_frame', false);
+                return 0;
+            }
             return me.wire_directions;
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
             level.transmute_tile(me, 'light_switch_off');
+            level._set_tile_prop(me, 'is_first_frame', true);
         },
     },
     // LL tile: circuit block, overrides the wiring on the floor below (if any)
