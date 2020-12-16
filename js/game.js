@@ -640,6 +640,16 @@ export class Level {
     }
 
     finish_tic(p1_input) {
+        // After cooldowns but before the decision phase, remember the player's /current/ direction,
+        // which may be affected by sliding.  This will affect the behavior of doppelgangers earlier
+        // in the actor order than the player.
+        if (this.player.movement_cooldown > 0) {
+            this.remember_player_move(this.player.direction);
+        }
+        else {
+            this.remember_player_move(this.player.decision);
+        }
+
         // SECOND PASS: actors decide their upcoming movement simultaneously
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
@@ -716,13 +726,6 @@ export class Level {
                 this.sfx.play_once('blocked');
                 actor.is_blocked = true;
             }
-        }
-
-        // In the event that the player is sliding (and thus not deliberately moving) or has
-        // stopped, remember their current movement direction here, too.
-        // This is hokey, and doing it here is even hokier, but it seems to match CC2 behavior.
-        if (this.player.movement_cooldown > 0) {
-            this.remember_player_move(this.player.direction);
         }
 
         // Strip out any destroyed actors from the acting order
