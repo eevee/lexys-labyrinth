@@ -781,7 +781,7 @@ const TILE_TYPES = {
         // TODO ms: this is random, and an acting wall to monsters (!)
         // TODO lynx/cc2 check this at decision time, which may affect ordering
         on_arrive(me, level, other) {
-            level.set_actor_direction(other, level.get_force_floor_direction());
+            //level.set_actor_direction(other, level.get_force_floor_direction());
         },
     },
     slime: {
@@ -2496,7 +2496,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 16,
         // If anything else even begins to step on an animation, it's erased
         // FIXME possibly erased too fast; cc2 shows it briefly?  could i get away with on_arrive here?
         on_approach(me, level, other) {
@@ -2508,7 +2508,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 16,
         on_approach(me, level, other) {
             level.remove_tile(me);
         },
@@ -2520,7 +2520,7 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: 0,
         // determined experimentally
-        ttl: 12,
+        ttl: 36,
     },
     // Custom VFX (identical function, but different aesthetic)
     splash_slime: {
@@ -2528,7 +2528,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 16,
         on_approach(me, level, other) {
             level.remove_tile(me);
         },

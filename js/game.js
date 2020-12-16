@@ -557,23 +557,91 @@ export class Level {
             this.pending_undo.level_props[key] = this[key];
         }
 
+        this.p1_input = p1_input;
+
         // Used for various tic-local effects; don't need to be undoable
         // TODO maybe this should be undone anyway so rewind looks better?
         this.player.is_blocked = false;
 
         this.sfx.set_player_position(this.player.cell);
 
-        // CC2 wiring runs every frame, not every tic, so we need to do it three times, but dealing
-        // with it is delicate.  We want the result of a button press to draw, but not last longer
-        // than intended, so we only want one update between the end of the cooldown pass and the
-        // end of the tic.  That means the other two have to go here.  When a level starts, there
-        // are only two wiring updates before everything gets its first chance to move, so we skip
-        // the very first one here.
-        if (this.tic_counter !== 0) {
-            this.update_wiring();
+        this._do_decision_pass(false);
+        this._do_action_pass();
+        this._do_cooldown_pass();
+        this.update_wiring();
+        this._do_decision_pass(false);
+        this._do_action_pass();
+        this._do_cooldown_pass();
+        this.update_wiring();
+    }
+
+    finish_tic(p1_input) {
+        this.p1_input = p1_input;
+        this._do_decision_pass(true);
+
+        // In the event that the player is sliding (and thus not deliberately moving) or has
+        // stopped, remember their current movement direction here, too.
+        // This is hokey, and doing it here is even hokier, but it seems to match CC2 behavior.
+        if (this.player.movement_cooldown > 0) {
+            this.remember_player_move(this.player.direction);
         }
+
+        this._do_action_pass();
+        this._do_cooldown_pass();
         this.update_wiring();
 
+        // Strip out any destroyed actors from the acting order
+        // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
+        // necessary, either; maybe only do it every few tics?
+        let p = 0;
+        for (let i = 0, l = this.actors.length; i < l; i++) {
+            let actor = this.actors[i];
+            // While we're here, delete this guy
+            delete actor.cooldown_delay_hack;
+
+            if (actor.cell) {
+                if (p !== i) {
+                    this.actors[p] = actor;
+                }
+                p++;
+            }
+            else {
+                let local_p = p;
+                this.pending_undo.push(() => this.actors.splice(local_p, 0, actor));
+            }
+        }
+        this.actors.length = p;
+
+        // Possibly switch players
+        // FIXME not correct
+        /*
+        if (swap_player1) {
+            this.player_index += 1;
+            this.player_index %= this.players.length;
+            this.player = this.players[this.player_index];
+        }
+        */
+
+        this.previous_input = this.p1_input;
+
+        // Advance the clock
+        // TODO i suspect cc2 does this at the beginning of the tic, but even if you've won?  if you
+        // step on a penalty + exit you win, but you see the clock flicker 1 for a single frame
+        this.tic_counter += 1;
+        if (this.time_remaining !== null && ! this.timer_paused) {
+            this.time_remaining -= 1;
+            if (this.time_remaining <= 0) {
+                this.fail('time');
+            }
+            else if (this.time_remaining % 20 === 0 && this.time_remaining < 30 * 20) {
+                this.sfx.play_once('tick');
+            }
+        }
+
+        this.commit();
+    }
+
+    _do_cooldown_pass() {
         // FIRST PASS: actors tick their cooldowns, finish their movement, and possibly step on
         // cells they were moving into.  This has a few advantages: it makes rendering interpolation
         // much easier, and doing it as a separate pass from /starting/ movement (unlike Lynx)
@@ -631,146 +699,9 @@ export class Level {
                 continue;
 
             if (actor.just_stepped_on_teleporter) {
-                this.attempt_teleport(actor, actor === this.player ? p1_input : null);
+                this.attempt_teleport(actor, actor === this.player ? this.p1_input : null);
             }
         }
-
-        // Here's the third.
-        this.update_wiring();
-    }
-
-    finish_tic(p1_input) {
-        // SECOND PASS: actors decide their upcoming movement simultaneously
-        for (let i = this.actors.length - 1; i >= 0; i--) {
-            let actor = this.actors[i];
-
-            // Clear any old decisions ASAP.  Note that this prop is only used internally within a
-            // single tic, so it doesn't need to be undoable
-            actor.decision = null;
-
-            if (! actor.cell)
-                continue;
-
-            if (actor.movement_cooldown > 0)
-                continue;
-
-            if (actor === this.player) {
-                this.make_player_decision(actor, p1_input);
-            }
-            else {
-                this.make_actor_decision(actor);
-            }
-        }
-
-        // THIRD PASS: everyone actually moves
-        let swap_player1 = false;
-        for (let i = this.actors.length - 1; i >= 0; i--) {
-            let actor = this.actors[i];
-            if (! actor.cell)
-                continue;
-
-            if (actor.type.on_tic) {
-                actor.type.on_tic(actor, this);
-            }
-
-            // Check this again, since an earlier pass may have caused us to start moving
-            if (actor.movement_cooldown > 0)
-                continue;
-
-            // Check for special player actions, which can only happen when not moving
-            // FIXME if you press a key while moving it should happen as soon as you stop (assuming
-            // the key is still held down)
-            // FIXME cc2 seems to rely on key repeat for this; the above is true, but also, if you
-            // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
-            // release the rest rapid-fire.  absurd
-            if (actor === this.player) {
-                let new_input = p1_input & ~this.previous_input;
-                if (new_input & INPUT_BITS.cycle) {
-                    this.cycle_inventory(this.player);
-                }
-                if (new_input & INPUT_BITS.drop) {
-                    this.drop_item(this.player);
-                }
-                if (new_input & INPUT_BITS.swap) {
-                    // This is delayed until the end of the tic to avoid screwing up anything
-                    // checking this.player
-                    swap_player1 = true;
-                }
-            }
-
-            if (! actor.decision)
-                continue;
-
-            // Actor is allowed to move, so do so
-            let old_cell = actor.cell;
-            let success = this.attempt_step(actor, actor.decision);
-
-            if (! success && actor.slide_mode === 'ice') {
-                this._handle_slide_bonk(actor);
-                success = this.attempt_step(actor, actor.decision);
-            }
-
-            // Track whether the player is blocked, for visual effect
-            if (actor === this.player && actor.decision && ! success) {
-                this.sfx.play_once('blocked');
-                actor.is_blocked = true;
-            }
-        }
-
-        // In the event that the player is sliding (and thus not deliberately moving) or has
-        // stopped, remember their current movement direction here, too.
-        // This is hokey, and doing it here is even hokier, but it seems to match CC2 behavior.
-        if (this.player.movement_cooldown > 0) {
-            this.remember_player_move(this.player.direction);
-        }
-
-        // Strip out any destroyed actors from the acting order
-        // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
-        // necessary, either; maybe only do it every few tics?
-        let p = 0;
-        for (let i = 0, l = this.actors.length; i < l; i++) {
-            let actor = this.actors[i];
-            // While we're here, delete this guy
-            delete actor.cooldown_delay_hack;
-
-            if (actor.cell) {
-                if (p !== i) {
-                    this.actors[p] = actor;
-                }
-                p++;
-            }
-            else {
-                let local_p = p;
-                this.pending_undo.push(() => this.actors.splice(local_p, 0, actor));
-            }
-        }
-        this.actors.length = p;
-
-        // Possibly switch players
-        // FIXME not correct
-        if (swap_player1) {
-            this.player_index += 1;
-            this.player_index %= this.players.length;
-            this.player = this.players[this.player_index];
-        }
-
-        this.previous_input = p1_input;
-
-        // Advance the clock
-        // TODO i suspect cc2 does this at the beginning of the tic, but even if you've won?  if you
-        // step on a penalty + exit you win, but you see the clock flicker 1 for a single frame
-        this.tic_counter += 1;
-        if (this.time_remaining !== null && ! this.timer_paused) {
-            this.time_remaining -= 1;
-            if (this.time_remaining <= 0) {
-                this.fail('time');
-            }
-            else if (this.time_remaining % 20 === 0 && this.time_remaining < 30 * 20) {
-                this.sfx.play_once('tick');
-            }
-        }
-
-        this.commit();
     }
 
     _extract_player_directions(input) {
@@ -834,6 +765,15 @@ export class Level {
 
             if (actor.slide_mode === 'force') {
                 this._set_tile_prop(actor, 'last_move_was_force', true);
+                if (! try_direction(actor.direction, 'move') && actor.cell.get_terrain().type.name === 'force_floor_all') {
+                    for (let i = 0; i < 3; i++) {
+                        let direction = this.get_force_floor_direction();
+                        if (try_direction(direction, 'move') || i === 2) {
+                            actor.decision = direction;
+                            break;
+                        }
+                    }
+                }
             }
             else if (actor.slide_mode === 'ice') {
                 // A sliding player that bonks into a wall still needs to turn around, but in this
@@ -901,10 +841,22 @@ export class Level {
             // If we're overriding a force floor but the direction we're moving in is blocked, the
             // force floor takes priority (and we've already bumped the wall(s))
             if (actor.slide_mode === 'force' && ! open) {
-                actor.decision = actor.direction;
                 this._set_tile_prop(actor, 'last_move_was_force', true);
                 // Be sure to invoke this hack if we're standing on an RFF
-                this._handle_slide_bonk(actor);
+
+                if (actor.cell.get_terrain().type.name === 'force_floor_all') {
+                    for (let i = 0; i < 3; i++) {
+                        let direction = this.get_force_floor_direction();
+                        if (try_direction(direction, 'move') || i === 2) {
+                            actor.decision = direction;
+                            break;
+                        }
+                    }
+                }
+                else {
+                    actor.decision = actor.direction;
+                    this._handle_slide_bonk(actor);
+                }
             }
             else {
                 // Otherwise this is 100% a conscious move so we lose our override power next tic
@@ -977,6 +929,262 @@ export class Level {
             }
         }
     }
+
+    _do_decision_pass(tic_aligned) {
+        // SECOND PASS: actors decide their upcoming movement simultaneously
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+
+            // Clear any old decisions ASAP.  Note that this prop is only used internally within a
+            // single tic, so it doesn't need to be undoable
+            actor.decision = null;
+
+            if (! actor.cell)
+                continue;
+
+            if (actor.movement_cooldown > 0)
+                continue;
+
+            if (! tic_aligned && ! actor.slide_mode)
+                continue;
+
+            if (actor.slide_mode && actor.cell.get_terrain().type.name === 'force_floor_all') {
+                this.set_actor_direction(actor, this.get_force_floor_direction());
+            }
+            if (actor === this.player) {
+                this.make_player_decision(actor, this.p1_input);
+            }
+            else {
+                this.make_actor_decision(actor);
+            }
+        }
+    }
+
+    _do_action_pass() {
+        // THIRD PASS: everyone actually moves
+        let swap_player1 = false;
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+            if (! actor.cell)
+                continue;
+
+            if (actor.type.on_tic) {
+                actor.type.on_tic(actor, this);
+            }
+
+            // Check this again, since an earlier pass may have caused us to start moving
+            if (actor.movement_cooldown > 0)
+                continue;
+
+            // Check for special player actions, which can only happen when not moving
+            // FIXME if you press a key while moving it should happen as soon as you stop (assuming
+            // the key is still held down)
+            // FIXME cc2 seems to rely on key repeat for this; the above is true, but also, if you
+            // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
+            // release the rest rapid-fire.  absurd
+            if (actor === this.player) {
+                let new_input = this.p1_input & ~this.previous_input;
+                if (new_input & INPUT_BITS.cycle) {
+                    this.cycle_inventory(this.player);
+                }
+                if (new_input & INPUT_BITS.drop) {
+                    this.drop_item(this.player);
+                }
+                if (new_input & INPUT_BITS.swap) {
+                    // This is delayed until the end of the tic to avoid screwing up anything
+                    // checking this.player
+                    swap_player1 = true;
+                }
+            }
+
+            if (! actor.decision)
+                continue;
+
+            // Actor is allowed to move, so do so
+            let old_cell = actor.cell;
+            let success = this.attempt_step(actor, actor.decision);
+
+            if (! success && actor.slide_mode === 'ice') {
+                this._handle_slide_bonk(actor);
+                success = this.attempt_step(actor, actor.decision);
+            }
+
+            // Track whether the player is blocked, for visual effect
+            if (actor === this.player && actor.decision && ! success) {
+                this.sfx.play_once('blocked');
+                actor.is_blocked = true;
+            }
+        }
+    }
+
+    _do_cooldown_pass() {
+        // FIRST PASS: actors tick their cooldowns, finish their movement, and possibly step on
+        // cells they were moving into.  This has a few advantages: it makes rendering interpolation
+        // much easier, and doing it as a separate pass from /starting/ movement (unlike Lynx)
+        // improves the illusion that everything is happening simultaneously.
+        // Note that, as far as I can tell, CC2 actually runs this pass every /frame/.  We do not!
+        // Also Note that we iterate in reverse order, DESPITE keeping dead actors around with null
+        // cells, to match the Lynx and CC2 behavior.  This is actually important in some cases;
+        // check out the start of CCLP3 #54, where the gliders will eat the blue key immediately if
+        // they act in forward order!  (More subtly, even the decision pass does things like
+        // advance the RNG, so for replay compatibility it needs to be in reverse order too.)
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+            // Actors with no cell were destroyed
+            if (! actor.cell)
+                continue;
+
+            if (actor.movement_cooldown <= 0)
+                continue;
+
+            if (actor.cooldown_delay_hack) {
+                // See the extensive comment in attempt_out_of_turn_step
+                actor.cooldown_delay_hack += 1;
+                continue;
+            }
+
+            this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
+
+            if (actor.movement_cooldown <= 0) {
+                if (actor.type.ttl) {
+                    // This is an animation that just finished, so destroy it
+                    this.remove_tile(actor);
+                    continue;
+                }
+
+                if (! this.compat.tiles_react_instantly) {
+                    this.step_on_cell(actor, actor.cell);
+                }
+                // Erase any trace of being in mid-movement, however:
+                // - This has to happen after stepping on cells, because some effects care about
+                // the cell we're arriving from
+                // - Don't do it if stepping on the cell caused us to move again
+                if (actor.movement_cooldown <= 0) {
+                    this._set_tile_prop(actor, 'previous_cell', null);
+                    this._set_tile_prop(actor, 'movement_speed', null);
+                }
+            }
+        }
+
+        // Mini extra pass: deal with teleporting separately.  Otherwise, actors may have been in
+        // the way of the teleporter but finished moving away during the above loop; this is
+        // particularly bad when it happens with a block you're pushing.
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+            if (! actor.cell)
+                continue;
+
+            if (actor.just_stepped_on_teleporter) {
+                this.attempt_teleport(actor, actor === this.player ? this.p1_input : null);
+            }
+        }
+    }
+
+    _do_turn_phase(allow_decision) {
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+
+            // Clear any old decisions ASAP.  Note that this prop is only used internally within a
+            // single tic, so it doesn't need to be undoable
+            actor.decision = null;
+
+            if (! actor.cell)
+                continue;
+
+            if (actor.movement_cooldown <= 0 && (allow_decision || actor.slide_mode)) {
+                if (actor === this.player) {
+                    this.make_player_decision(actor, this.p1_input);
+                }
+                else {
+                    this.make_actor_decision(actor);
+                }
+            }
+
+            this.take_actor_turn(actor);
+        }
+    }
+
+    take_actor_turn(actor) {
+        let success = false;
+
+        if (! actor.cell)
+            return;
+
+        // FIXME obviously this becomes on_frame
+        if (actor.type.on_tic) {
+            actor.type.on_tic(actor, this);
+        }
+
+        // Check this again, since an earlier pass may have caused us to start moving
+        if (actor.movement_cooldown <= 0) {
+
+            // Check for special player actions, which can only happen when not moving
+            // FIXME if you press a key while moving it should happen as soon as you stop (assuming
+            // the key is still held down)
+            // FIXME cc2 seems to rely on key repeat for this; the above is true, but also, if you
+            // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
+            // release the rest rapid-fire.  absurd
+            if (actor === this.player) {
+                let new_input = this.p1_input & ~this.previous_input;
+                if (new_input & INPUT_BITS.cycle) {
+                    this.cycle_inventory(this.player);
+                }
+                if (new_input & INPUT_BITS.drop) {
+                    this.drop_item(this.player);
+                }
+                if (new_input & INPUT_BITS.swap) {
+                    // This is delayed until the end of the tic to avoid screwing up anything
+                    // checking this.player
+                    swap_player1 = true;
+                }
+            }
+
+            if (actor.decision) {
+                // Actor is allowed to move, so do so
+                let old_cell = actor.cell;
+                success = this.attempt_step(actor, actor.decision);
+
+                if (! success && actor.slide_mode === 'ice') {
+                    this._handle_slide_bonk(actor);
+                    success = this.attempt_step(actor, actor.decision);
+                }
+
+                // Track whether the player is blocked, for visual effect
+                if (actor === this.player && actor.decision && ! success) {
+                    this.sfx.play_once('blocked');
+                    actor.is_blocked = true;
+                }
+            }
+        }
+
+        if (actor.movement_cooldown > 0) {
+
+            this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - 1));
+
+            if (actor.movement_cooldown <= 0) {
+                if (actor.type.ttl) {
+                    // This is an animation that just finished, so destroy it
+                    this.remove_tile(actor);
+                    return;
+                }
+
+                if (! this.compat.tiles_react_instantly) {
+                    this.step_on_cell(actor, actor.cell);
+                }
+                // Erase any trace of being in mid-movement, however:
+                // - This has to happen after stepping on cells, because some effects care about
+                // the cell we're arriving from
+                // - Don't do it if stepping on the cell caused us to move again
+                if (actor.movement_cooldown <= 0) {
+                    this._set_tile_prop(actor, 'previous_cell', null);
+                    this._set_tile_prop(actor, 'movement_speed', null);
+                }
+            }
+        }
+
+        return success;
+    }
+
 
     // FIXME can probably clean this up a decent bit now
     _handle_slide_bonk(actor) {
@@ -1119,14 +1327,16 @@ export class Level {
         }
 
         this._set_tile_prop(actor, 'previous_cell', actor.cell);
-        this._set_tile_prop(actor, 'movement_cooldown', speed);
-        this._set_tile_prop(actor, 'movement_speed', speed);
+        this._set_tile_prop(actor, 'movement_cooldown', speed * 3);
+        this._set_tile_prop(actor, 'movement_speed', speed * 3);
         this.move_to(actor, goal_cell, speed);
 
         return true;
     }
 
     attempt_out_of_turn_step(actor, direction) {
+        actor.decision = direction;
+        return this.take_actor_turn(actor);
         if (this.attempt_step(actor, direction)) {
             // Here's the problem.
             // In CC2, cooldown is measured in frames, not tics, and it decrements every frame, not
@@ -1149,7 +1359,7 @@ export class Level {
             // XXX that's still not perfect; if actor X is tic-misaligned, like if there's a chain
             // of 3 or more actors cloning directly onto red buttons for other cloners, then this
             // cannot possibly work
-            actor.cooldown_delay_hack = 1;
+            //actor.cooldown_delay_hack = 1;
             return true;
         }
         else {
