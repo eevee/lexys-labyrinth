@@ -1021,7 +1021,7 @@ const TILE_TYPES = {
         traps(me, actor) {
             return ! actor._clone_release;
         },
-        activate(me, level) {
+        activate(me, level, aggressive = false) {
             let actor = me.cell.get_actor();
             if (! actor)
                 return;
@@ -1029,27 +1029,33 @@ const TILE_TYPES = {
             // Copy this stuff in case the movement changes it
             // TODO should anything else be preserved?
             let type = actor.type;
+            let original_direction = actor.direction;
             let direction = actor.direction;
 
             // Unstick and try to move the actor; if it's blocked, abort the clone.
             // This temporary flag tells us to let it leave; it doesn't need to be undoable, since
             // it doesn't persist for more than a tic
             actor._clone_release = true;
-            if (level.attempt_out_of_turn_step(actor, direction)) {
-                // FIXME add this underneath, just above the cloner, so the new actor is on top
-                let new_template = new actor.constructor(type, direction);
-                // TODO maybe make a type method for this
-                if (type.name === 'frame_block') {
-                    new_template.arrows = new Set(actor.arrows);
+            // Wire activation allows the cloner to try every direction, searching clockwise
+            for (let i = 0; i < (aggressive ? 4 : 1); i++) {
+                if (level.attempt_out_of_turn_step(actor, direction)) {
+                    // FIXME add this underneath, just above the cloner, so the new actor is on top
+                    let new_template = new actor.constructor(type, original_direction);
+                    // TODO maybe make a type method for this
+                    if (type.name === 'frame_block') {
+                        new_template.arrows = new Set(actor.arrows);
+                    }
+                    level.add_tile(new_template, me.cell);
+                    level.add_actor(new_template);
+                    break;
                 }
-                level.add_tile(new_template, me.cell);
-                level.add_actor(new_template);
+                direction = DIRECTIONS[direction].right;
             }
             delete actor._clone_release;
         },
         // Also clones on rising pulse or gray button
         on_power(me, level) {
-            me.type.activate(me, level);
+            me.type.activate(me, level, true);
         },
         on_gray_button(me, level) {
             me.type.activate(me, level);
