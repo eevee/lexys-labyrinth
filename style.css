@@ -614,6 +614,26 @@ ol.packtest-colorcoded > li[data-status=short] {
 ol.packtest-colorcoded > li[data-status=error] {
     background: black;
 }
+.packtest-dialog .grade-A {
+    color: hsl(120, 60%, 45%);
+    font-weight: bold;
+}
+.packtest-dialog .grade-B {
+    color: hsl(210, 60%, 45%);
+    font-weight: bold;
+}
+.packtest-dialog .grade-C {
+    color: hsl(270, 60%, 45%);
+    font-weight: bold;
+}
+.packtest-dialog .grade-D {
+    color: hsl(36, 60%, 60%);
+    font-weight: bold;
+}
+.packtest-dialog .grade-F {
+    color: hsl(0, 60%, 60%);
+    font-weight: bold;
+}
 
 
 /**************************************************************************************************/

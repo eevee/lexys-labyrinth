@@ -2226,11 +2226,41 @@ class PackTestDialog extends DialogOverlay {
             }
         }
 
+        let grades = [
+            [100, "A+", "grade-A"],
+            [93,  "A",  "grade-A"],
+            [90,  "A-", "grade-A"],
+            [87,  "B+", "grade-B"],
+            [83,  "B",  "grade-B"],
+            [80,  "B-", "grade-B"],
+            [77,  "C+", "grade-C"],
+            [73,  "C",  "grade-C"],
+            [70,  "C-", "grade-C"],
+            [60,  "D",  "grade-D"],
+            [50,  "D-", "grade-D"],
+            [0,   "F",  "grade-F"],
+        ];
+
+        let gradeText = "NaN";
+        let gradeClass = "";
+        let pass_percentage = Math.floor(num_passed / num_levels * 100.0);
+        for (let i = 0; i < grades.length; i++) {
+            if (pass_percentage >= grades[i][0]) {
+                let _pct;
+                [_pct, gradeText, gradeClass] = grades[i];
+                break;
+            }
+        }
+
         let final_status = `Finished!  Simulated ${util.format_duration(total_tics / TICS_PER_SECOND)} of play time in ${util.format_duration((performance.now() - t0) / 1000)}; ${num_passed}/${num_levels} levels passed`;
         if (num_passed === num_levels) {
             final_status += "!  Congratulations!  🎆";
+        } else {
+            final_status += '.';
         }
+        final_status += "  Grade: ";
         this.current_status.textContent = final_status;
+        this.current_status.appendChild(mk("span", {"class": gradeClass}, gradeText));
     }
 }
 
