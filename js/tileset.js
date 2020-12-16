@@ -980,7 +980,6 @@ export class Tileset {
         blit(...unpowered_coords);
         if (tile && tile.cell) {
             // What goes on top varies a bit...
-            // FIXME implement for NOT and counter!
             let r = this.layout['#wire-width'] / 2;
             if (tile.gate_type === 'not' || tile.gate_type === 'counter') {
                 this._draw_fourway_tile_power(tile, 0x0f, blit);
@@ -993,11 +992,13 @@ export class Tileset {
                 }
                 if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].right].bit) {
                     // Right input, which includes the middle
+                    // This actually covers the entire lower right corner, for bent inputs.
                     let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0.5 - r, 1, 1);
                     blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
                 }
                 if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].left].bit) {
                     // Left input, which does not include the middle
+                    // This actually covers the entire lower left corner, for bent inputs.
                     let [x0, y0, x1, y1] = this._rotate(tile.direction, 0, 0.5 - r, 0.5 - r, 1);
                     blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
                 }
