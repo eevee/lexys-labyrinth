@@ -1950,7 +1950,6 @@ const TILE_TYPES = {
         decide_movement: pursue_player,
     },
     rover: {
-        // TODO this guy is a nightmare
         // TODO pushes blocks apparently??
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
@@ -1958,8 +1957,8 @@ const TILE_TYPES = {
         collision_mask: COLLISION.rover,
         blocks_collision: COLLISION.all_but_player,
         can_reveal_walls: true,
-        movement_speed: 4,
-        movement_parity: 4,
+        movement_speed: 8,
+        movement_parity: 2,
         on_ready(me, level) {
             me.current_emulatee = 0;
             me.attempted_moves = 0;
@@ -1971,16 +1970,27 @@ const TILE_TYPES = {
                 level._set_tile_prop(me, 'current_emulatee', (me.current_emulatee + 1) % me.type._emulatees.length);
             }
 
-            me.attempted_moves += 1;
+            level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
             let emulatee = me.type._emulatees[me.current_emulatee];
             let preference = TILE_TYPES[emulatee].decide_movement(me, level);
             // Rig up the preference so a failure counts as two moves
             if (preference) {
-                let last = preference.pop();
+                let last_direction = preference[preference.length - 1];
+                if (typeof last_direction === 'function') {
+                    // This is tricky!  We want this function to only be called ONCE max, since the
+                    // walker uses it to carefully tune the PRNG, so replace it with one that lazily
+                    // overwrites 'last_direction'
+                    preference.pop();
+                    let lazy = last_direction;
+                    preference.push(function() {
+                        last_direction = lazy();
+                        return last_direction;
+                    });
+                }
                 preference.push(function() {
-                    // FIXME still not right, this'll happen if the last preference works
                     me.attempted_moves += 1;
-                    return typeof last === 'function' ? last() : last;
+                    level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
+                    return last_direction;
                 });
             }
             // TODO need to rig this so a failure counts as two moves
