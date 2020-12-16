@@ -830,7 +830,7 @@ dl.score-chart .-sum {
 }
 #player.--bonus-visible .bonus {
     visibility: initial;
-    display: initial;
+    display: flex;
 }
 
 .message {
