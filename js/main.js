@@ -2175,10 +2175,19 @@ class PackTestDialog extends DialogOverlay {
                     level.advance_tic(input);
 
                     if (level.state === 'success') {
-                        // TODO warn if exit early?
-                        record_result(
-                            'success', "Won",
-                            `Exited successfully after ${util.format_duration(level.tic_counter / TICS_PER_SECOND)} (delta ${level.tic_counter - replay.duration})`);
+                        if (level.tic_counter < replay.duration - 10) {
+                            // Early exit is dubious (e.g. this happened sometimes before multiple
+                            // players were implemented correctly)
+                            record_result(
+                                'early', "Won early",
+                                `Exited early after ${util.format_duration(level.tic_counter / TICS_PER_SECOND)} with ${util.format_duration((replay.duration - level.tic_counter) / TICS_PER_SECOND)} left in the replay`,
+                                true);
+                        }
+                        else {
+                            record_result(
+                                'success', "Won",
+                                `Exited successfully after ${util.format_duration(level.tic_counter / TICS_PER_SECOND)} (delta ${level.tic_counter - replay.duration})`);
+                        }
                         num_passed += 1;
                         break;
                     }

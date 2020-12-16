@@ -605,6 +605,9 @@ ol.packtest-colorcoded > li[data-status=running] {
 ol.packtest-colorcoded > li[data-status=success] {
     background: hsl(120, 60%, 75%);
 }
+ol.packtest-colorcoded > li[data-status=early] {
+    background: hsl(75, 60%, 75%);
+}
 ol.packtest-colorcoded > li[data-status=failure] {
     background: hsl(0, 60%, 60%);
 }
