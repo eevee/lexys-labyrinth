@@ -151,7 +151,7 @@ export class Cell extends Array {
     get_wired_tile() {
         let ret = null;
         for (let tile of this) {
-            if (tile.wire_directions || tile.wire_tunnel_directions) {
+            if ((tile.wire_directions || tile.wire_tunnel_directions) && ! tile.movement_cooldown) {
                 ret = tile;
                 // Don't break; we want the topmost tile!
             }
@@ -1430,7 +1430,6 @@ export class Level {
         // - make this undoable  :(
         // - blue tele, red tele, and pink button have different connections
         // - would like to reuse the walk for blue teles
-        // - currently doesn't notice when circuit block moves sometimes
 
         // Gather every tile that's emitting power.  Along the way, check whether any of them have
         // changed since last tic, so we can skip this work entirely if none did
@@ -1453,11 +1452,11 @@ export class Level {
             if (! actor.cell)
                 continue;
             // Only count when they're on a floor tile AND not in transit!
-            let emitting = 0;
+            let emitting = null;
             if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
                 let wired_tile = actor.cell.get_wired_tile();
-                if (wired_tile && wired_tile.type.name === 'floor') {
-                    emitting = true;
+                if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor')) {
+                    emitting = wired_tile.wire_directions;
                     neighbors.push([actor.cell, wired_tile.wire_directions]);
                 }
             }
@@ -1531,7 +1530,6 @@ export class Level {
                 let opposite_bit = DIRECTIONS[dirinfo.opposite].bit;
                 if (wire && (wire.wire_tunnel_directions & dirinfo.bit)) {
                     // Search in the given direction until we find a matching tunnel
-                    // FIXME these act like nested parens!
                     let x = cell.x;
                     let y = cell.y;
                     let nesting = 0;
@@ -1543,9 +1541,19 @@ export class Level {
 
                         let candidate = this.cells[y][x];
                         neighbor_wire = candidate.get_wired_tile();
-                        if (neighbor_wire && ((neighbor_wire.wire_tunnel_directions ?? 0) & opposite_bit)) {
-                            neighbor = candidate;
-                            break;
+                        if (neighbor_wire) {
+                            if ((neighbor_wire.wire_tunnel_directions ?? 0) & opposite_bit) {
+                                if (nesting === 0) {
+                                    neighbor = candidate;
+                                    break;
+                                }
+                                else {
+                                    nesting -= 1;
+                                }
+                            }
+                            if ((neighbor_wire.wire_tunnel_directions ?? 0) & dirinfo.bit) {
+                                nesting += 1;
+                            }
                         }
                     }
                 }

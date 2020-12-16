@@ -982,20 +982,25 @@ export class Tileset {
             // What goes on top varies a bit...
             // FIXME implement for NOT and counter!
             let r = this.layout['#wire-width'] / 2;
-            if (tile.cell.powered_edges & DIRECTIONS[tile.direction].bit) {
-                // Output (on top)
-                let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0, 0.5 + r, 0.5);
-                blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+            if (tile.gate_type === 'not' || tile.gate_type === 'counter') {
+                this._draw_fourway_tile_power(tile, 0x0f, blit);
             }
-            if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].right].bit) {
-                // Right input, which includes the middle
-                let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0.5 - r, 1, 1);
-                blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
-            }
-            if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].left].bit) {
-                // Left input, which does not include the middle
-                let [x0, y0, x1, y1] = this._rotate(tile.direction, 0, 0.5 - r, 0.5 - r, 1);
-                blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+            else {
+                if (tile.cell.powered_edges & DIRECTIONS[tile.direction].bit) {
+                    // Output (on top)
+                    let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0, 0.5 + r, 0.5);
+                    blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+                }
+                if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].right].bit) {
+                    // Right input, which includes the middle
+                    let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0.5 - r, 1, 1);
+                    blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+                }
+                if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].left].bit) {
+                    // Left input, which does not include the middle
+                    let [x0, y0, x1, y1] = this._rotate(tile.direction, 0, 0.5 - r, 0.5 - r, 1);
+                    blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+                }
             }
         }
 
@@ -1006,6 +1011,42 @@ export class Tileset {
         if (tile.gate_type === 'counter') {
             blit(0, 3, tile.memory * 0.75, 0, 0.75, 1, 0.125, 0);
         }
+    }
+
+    _draw_fourway_tile_power(tile, wires, blit) {
+        // Draw the unpowered tile underneath, if any edge is unpowered (and in fact if /none/ of it
+        // is powered then we're done here)
+        let powered = (tile.cell ? tile.cell.powered_edges : 0) & wires;
+        if (! tile.cell || powered !== tile.wire_directions) {
+            this._draw_fourway_power_underlay(this.layout['#unpowered'], wires, blit);
+            if (! tile.cell || powered === 0)
+                return;
+        }
+
+        this._draw_fourway_power_underlay(this.layout['#powered'], powered, blit);
+    }
+
+    _draw_fourway_power_underlay(drawspec, bits, blit) {
+        // Draw the part as a single rectangle, initially just a small dot in the center, but
+        // extending out to any edge that has a bit present
+        let wire_radius = this.layout['#wire-width'] / 2;
+        let x0 = 0.5 - wire_radius;
+        let x1 = 0.5 + wire_radius;
+        let y0 = 0.5 - wire_radius;
+        let y1 = 0.5 + wire_radius;
+        if (bits & DIRECTIONS['north'].bit) {
+            y0 = 0;
+        }
+        if (bits & DIRECTIONS['east'].bit) {
+            x1 = 1;
+        }
+        if (bits & DIRECTIONS['south'].bit) {
+            y1 = 1;
+        }
+        if (bits & DIRECTIONS['west'].bit) {
+            x0 = 0;
+        }
+        blit(drawspec[0], drawspec[1], x0, y0, x1 - x0, y1 - y0);
     }
 
     _draw_railroad(drawspec, tile, tic, blit) {
@@ -1107,48 +1148,13 @@ export class Tileset {
         else if (drawspec.wired) {
             // This /should/ match CC2's draw order exactly, based on experimentation
             let wire_radius = this.layout['#wire-width'] / 2;
-            if (tile && tile.wire_directions === 0x0f) {
-                // This is a wired tile with crossing wires, which acts a little differently
+            // TODO circuit block with a lightning bolt is always powered
+            // TODO circuit block in motion doesn't inherit cell's power
+            if (tile && tile.wire_directions) {
                 // Draw the base tile
                 blit(drawspec.base[0], drawspec.base[1]);
 
-                // Draw the two wires as separate rectangles, NS then EW
-                let wire_inset = 0.5 - wire_radius;
-                let wire_coords_ns = this.layout[
-                    tile.cell && tile.cell.powered_edges & DIRECTIONS['north'].bit ? '#powered' : '#unpowered'];
-                let wire_coords_ew = this.layout[
-                    tile.cell && tile.cell.powered_edges & DIRECTIONS['east'].bit ? '#powered' : '#unpowered'];
-                blit(wire_coords_ns[0], wire_coords_ns[1], wire_inset, 0, wire_radius * 2, 1);
-                blit(wire_coords_ew[0], wire_coords_ew[1], 0, wire_inset, 1, wire_radius * 2);
-
-                // Draw the cross tile on top
-                coords = drawspec.wired_cross ?? drawspec.wired;
-            }
-            else if (tile && tile.wire_directions) {
-                // Draw the base tile
-                blit(drawspec.base[0], drawspec.base[1]);
-
-                // FIXME some tiles don't have active wiring on all sides...
-                // Draw the wire part as a single rectangle, initially just a small dot in the
-                // center, but extending out to any edge that has a wire present
-                let x0 = 0.5 - wire_radius;
-                let x1 = 0.5 + wire_radius;
-                let y0 = 0.5 - wire_radius;
-                let y1 = 0.5 + wire_radius;
-                if (tile.wire_directions & DIRECTIONS['north'].bit) {
-                    y0 = 0;
-                }
-                if (tile.wire_directions & DIRECTIONS['east'].bit) {
-                    x1 = 1;
-                }
-                if (tile.wire_directions & DIRECTIONS['south'].bit) {
-                    y1 = 1;
-                }
-                if (tile.wire_directions & DIRECTIONS['west'].bit) {
-                    x0 = 0;
-                }
-                let wire_coords = this.layout[tile.cell && tile.cell.powered_edges ? '#powered' : '#unpowered'];
-                blit(wire_coords[0], wire_coords[1], x0, y0, x1 - x0, y1 - y0);
+                this._draw_fourway_tile_power(tile, tile.wire_directions, blit);
 
                 // Then draw the wired tile on top of it all
                 coords = drawspec.wired;

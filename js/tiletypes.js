@@ -1528,7 +1528,6 @@ const TILE_TYPES = {
         },
     },
     button_black: {
-        // TODO not implemented
         draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
         get_emitting_edges(me, level) {
@@ -1539,6 +1538,12 @@ const TILE_TYPES = {
             else {
                 return 0;
             }
+        },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
         },
     },
     button_gray: {
