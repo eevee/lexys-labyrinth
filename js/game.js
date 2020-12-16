@@ -1181,7 +1181,6 @@ export class Level {
 
         let original_cell = actor.cell;
         this.remove_tile(actor);
-        this.make_slide(actor, null);
         this.add_tile(actor, goal_cell);
 
         // Announce we're leaving, for the handful of tiles that care about it
@@ -1211,10 +1210,6 @@ export class Level {
                 this.fail('squished');
             }
 
-            if (tile.type.slide_mode && ! actor.ignores(tile.type.name)) {
-                this.make_slide(actor, tile.type.slide_mode);
-            }
-
             if (actor === this.player && tile.type.is_hint) {
                 this.hint_shown = tile.hint_text ?? this.stored_level.hint;
             }
@@ -1237,6 +1232,8 @@ export class Level {
         }
 
         // Announce we're approaching
+        // Clear the slide here since slide mode is important for knowing our speed
+        this.make_slide(actor, null);
         for (let tile of Array.from(actor.cell)) {
             if (tile === actor)
                 continue;
@@ -1245,6 +1242,9 @@ export class Level {
 
             if (tile.type.on_approach) {
                 tile.type.on_approach(tile, this, actor);
+            }
+            if (tile.type.slide_mode) {
+                this.make_slide(actor, tile.type.slide_mode);
             }
         }
 
@@ -1255,6 +1255,9 @@ export class Level {
 
     // Step on every tile in a cell we just arrived in
     step_on_cell(actor, cell) {
+        // Also reset slide here, since slide mode is differently important for forced moves
+        this.make_slide(actor, null);
+
         // Step on topmost things first -- notably, it's safe to step on water with flippers on top
         for (let tile of Array.from(cell).reverse()) {
             if (tile === actor)
@@ -1280,6 +1283,9 @@ export class Level {
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
+            }
+            if (tile.type.slide_mode) {
+                this.make_slide(actor, tile.type.slide_mode);
             }
         }
     }
