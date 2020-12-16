@@ -318,7 +318,8 @@ export class Level {
 
         this.cells = [];
         this.player = null;
-        this.p1_previous_still_input = 0;
+        this.p1_input = 0;
+        this.p1_released = 0xff;
         this.actors = [];
         this.chips_remaining = this.stored_level.chips_required;
         this.bonus_points = 0;
@@ -556,6 +557,8 @@ export class Level {
         ]) {
             this.pending_undo.level_props[key] = this[key];
         }
+        this.p1_input = p1_input;
+        this.p1_released |= ~p1_input;  // Action keys released since we last checked them
 
         // Used for various tic-local effects; don't need to be undoable
         // TODO maybe this should be undone anyway so rewind looks better?
@@ -631,7 +634,7 @@ export class Level {
                 continue;
 
             if (actor.just_stepped_on_teleporter) {
-                this.attempt_teleport(actor, actor === this.player ? p1_input : null);
+                this.attempt_teleport(actor);
             }
         }
 
@@ -639,7 +642,7 @@ export class Level {
         this.update_wiring();
     }
 
-    finish_tic(p1_input) {
+    finish_tic() {
         // After cooldowns but before the decision phase, remember the player's /current/ direction,
         // which may be affected by sliding.  This will affect the behavior of doppelgangers earlier
         // in the actor order than the player.
@@ -665,7 +668,7 @@ export class Level {
                 continue;
 
             if (actor === this.player) {
-                this.make_player_decision(actor, p1_input);
+                this.make_player_decision(actor, this.p1_input);
             }
             else {
                 this.make_actor_decision(actor);
@@ -694,7 +697,7 @@ export class Level {
             // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
             // release the rest rapid-fire.  absurd
             if (actor === this.player) {
-                let new_input = p1_input & ~this.p1_previous_still_input;
+                let new_input = this.p1_input & this.p1_released;
                 if (new_input & INPUT_BITS.cycle) {
                     this.cycle_inventory(this.player);
                 }
@@ -706,7 +709,7 @@ export class Level {
                     // checking this.player
                     swap_player1 = true;
                 }
-                this.p1_previous_still_input = p1_input;
+                this.p1_released = ~this.p1_input;
             }
 
             if (! actor.decision)
@@ -1309,7 +1312,7 @@ export class Level {
                 // Note that it's possible to bump a direction multiple times during this process,
                 // and also possible to perform a three-way block slap: the direction she leaves,
                 // the other direction she was holding, and the original exit direction we found.
-                let [dir1, dir2] = this._extract_player_directions(input);
+                let [dir1, dir2] = this._extract_player_directions(this.p1_input);
                 let open1 = false, open2 = false;
                 if (dir1) {
                     open1 = this.check_movement(actor, dest.cell, dir1, push_mode);
