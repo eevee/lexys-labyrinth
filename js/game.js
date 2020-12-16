@@ -1514,7 +1514,7 @@ export class Level {
                 let opposite_bit = DIRECTIONS[dirinfo.opposite].bit;
                 if (wire && (wire.wire_tunnel_directions & dirinfo.bit)) {
                     // Search in the given direction until we find a matching tunnel
-                    // FIXME these act like nested parens!
+                    // These act like nested parens!
                     let x = cell.x;
                     let y = cell.y;
                     let nesting = 0;
@@ -1526,9 +1526,17 @@ export class Level {
 
                         let candidate = this.cells[y][x];
                         neighbor_wire = candidate.get_wired_tile();
-                        if (neighbor_wire && ((neighbor_wire.wire_tunnel_directions ?? 0) & opposite_bit)) {
-                            neighbor = candidate;
-                            break;
+                        if (neighbor_wire && neighbor_wire.wire_tunnel_directions) {
+                            if (neighbor_wire.wire_tunnel_directions & opposite_bit) {
+                                if (nesting <= 0) {
+                                    neighbor = candidate;
+                                    break;
+                                }
+                                nesting --;
+                            }
+                            if (neighbor_wire.wire_tunnel_directions & dirinfo.bit) {
+                                nesting ++;
+                            }
                         }
                     }
                 }
