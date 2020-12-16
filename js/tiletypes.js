@@ -1861,12 +1861,7 @@ const TILE_TYPES = {
         },
         movement_speed: 4,
         decide_movement(me, level) {
-            if (level.yellow_tank_decision) {
-                return [level.yellow_tank_decision];
-            }
-            else {
-                return null;
-            }
+            return [level.yellow_tank_decision, null];
         }
     },
     blob: {

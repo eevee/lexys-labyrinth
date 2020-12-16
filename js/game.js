@@ -966,6 +966,11 @@ export class Level {
             return;
         let all_blocked = true;
         for (let [i, direction] of direction_preference.entries()) {
+            if (direction === null) {
+                // This actor is giving up!  Alas.
+                actor.decision = direction;
+                break;
+            }
             if (typeof direction === 'function') {
                 // Lazy direction calculation (used for walkers)
                 direction = direction();
