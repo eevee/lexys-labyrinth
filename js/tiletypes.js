@@ -592,7 +592,7 @@ const TILE_TYPES = {
     // Terrain
     dirt: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         blocks(me, level, other) {
             return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
         },
@@ -605,7 +605,7 @@ const TILE_TYPES = {
     },
     gravel: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.monster_solid,
+        blocks_collision: COLLISION.monster_solid & ~COLLISION.rover,
         blocks(me, level, other) {
             return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
         },
@@ -932,10 +932,6 @@ const TILE_TYPES = {
         },
     },
     frame_block: {
-        // TODO directional, obviously
-        // TODO floor in water
-        // TODO destroyed in slime
-        // TODO rotate on train tracks
         draw_layer: DRAW_LAYERS.actor,
         collision_mask: COLLISION.block_cc2,
         blocks_collision: COLLISION.all,
@@ -951,6 +947,9 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             frame_block: true,
+        },
+        on_clone(me, original) {
+            me.arrows = new Set(original.arrows);
         },
     },
     green_floor: {
@@ -1053,8 +1052,8 @@ const TILE_TYPES = {
                     // FIXME add this underneath, just above the cloner, so the new actor is on top
                     let new_template = new actor.constructor(type, original_direction);
                     // TODO maybe make a type method for this
-                    if (type.name === 'frame_block') {
-                        new_template.arrows = new Set(actor.arrows);
+                    if (type.on_clone) {
+                        type.on_clone(new_template, actor);
                     }
                     level.add_tile(new_template, me.cell);
                     level.add_actor(new_template);
@@ -1991,18 +1990,22 @@ const TILE_TYPES = {
             me.current_emulatee = 0;
             me.attempted_moves = 0;
         },
+        on_clone(me, original) {
+            me.current_emulatee = 0;
+            me.attempted_moves = 0;
+        },
         _emulatees: ['teeth', 'glider', 'bug', 'ball', 'teeth_timid', 'fireball', 'paramecium', 'walker'],
         decide_movement(me, level) {
             if (me.attempted_moves >= 32) {
-                level._set_tile_prop(me, 'attempted_moves', me.attempted_moves - 32);
+                level._set_tile_prop(me, 'attempted_moves', me.attempted_moves - 32);  // XXX unsure if this is 0 or -32
                 level._set_tile_prop(me, 'current_emulatee', (me.current_emulatee + 1) % me.type._emulatees.length);
             }
 
-            level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
             let emulatee = me.type._emulatees[me.current_emulatee];
             let preference = TILE_TYPES[emulatee].decide_movement(me, level);
             // Rig up the preference so a failure counts as two moves
             if (preference) {
+                level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
                 let last_direction = preference[preference.length - 1];
                 if (typeof last_direction === 'function') {
                     // This is tricky!  We want this function to only be called ONCE max, since the
@@ -2016,13 +2019,10 @@ const TILE_TYPES = {
                     });
                 }
                 preference.push(function() {
-                    me.attempted_moves += 1;
                     level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
                     return last_direction;
                 });
             }
-            // TODO need to rig this so a failure counts as two moves
-            // FIXME obeys step while emulating teeth (gah, i guess move that in here too)
             return preference;
         },
         visual_state(me) {
