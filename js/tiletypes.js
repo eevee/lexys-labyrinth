@@ -534,6 +534,8 @@ const TILE_TYPES = {
     door_red: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             // TODO not quite sure if this one is right; there are complex interactions with monsters, e.g. most monsters can eat blue keys but can't actually use them
             return ! (other.type.has_inventory && other.has_item('key_red'));
         },
@@ -547,6 +549,8 @@ const TILE_TYPES = {
     door_blue: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             return ! (other.type.has_inventory && other.has_item('key_blue'));
         },
         on_arrive(me, level, other) {
@@ -559,6 +563,8 @@ const TILE_TYPES = {
     door_yellow: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             return ! (other.type.has_inventory && other.has_item('key_yellow'));
         },
         on_arrive(me, level, other) {
@@ -571,6 +577,8 @@ const TILE_TYPES = {
     door_green: {
         draw_layer: DRAW_LAYERS.terrain,
         blocks(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             return ! (other.type.has_inventory && other.has_item('key_green'));
         },
         on_arrive(me, level, other) {
@@ -589,6 +597,9 @@ const TILE_TYPES = {
             return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
         },
         on_arrive(me, level, other) {
+            // Bizarre interaction
+            if (other.type.name === 'ghost' && ! other.has_item('hiking_boots'))
+                return;
             level.transmute_tile(me, 'floor');
         },
     },
@@ -1381,23 +1392,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
-
-            // Move all yellow tanks one tile in the direction of the pressing actor.  But pretend
-            // it's simultaneous, so one in front will block one behind as usual.
-            // XXX this feels really weird, i'm wondering if cc2 does some other weird thing like
-            // not move any actor out of its cell until its first cooldown tick??
-            // FIXME not sure this interacts with railroads correctly
-            let unblocked_tanks = [];
-            for (let i = level.actors.length - 1; i >= 0; i--) {
-                let actor = level.actors[i];
-                // TODO generify somehow??
-                if (actor.type.name === 'tank_yellow' && level.check_movement(actor, actor.cell, other.direction, 'trace')) {
-                    unblocked_tanks.push(actor);
-                }
-            }
-            for (let actor of unblocked_tanks) {
-                level.attempt_out_of_turn_step(actor, other.direction);
-            }
+            level.yellow_tank_decision = other.direction;
         },
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
@@ -1866,6 +1861,14 @@ const TILE_TYPES = {
             circuit_block: true,
         },
         movement_speed: 4,
+        decide_movement(me, level) {
+            if (level.yellow_tank_decision) {
+                return [level.yellow_tank_decision];
+            }
+            else {
+                return null;
+            }
+        }
     },
     blob: {
         draw_layer: DRAW_LAYERS.actor,

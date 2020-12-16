@@ -325,6 +325,8 @@ export class Level {
         this.bonus_points = 0;
         this.aid = 0;
 
+        this.yellow_tank_decision = null;
+
         // Time
         if (this.stored_level.time_limit === 0) {
             this.time_remaining = null;
@@ -674,6 +676,9 @@ export class Level {
                 this.make_actor_decision(actor);
             }
         }
+
+        // This only persists for a single decision phase
+        this.yellow_tank_decision = null;
 
         // THIRD PASS: everyone actually moves
         let swap_player1 = false;
