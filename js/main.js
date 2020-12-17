@@ -2701,6 +2701,12 @@ async function main() {
     let conductor = new Conductor(tileset);
     window._conductor = conductor;
 
+    // Allow putting us in debug mode automatically if we're in development
+    if (local && query.has('debug')) {
+        conductor.player.setup_debug();
+        document.querySelector('#header-icon').src = 'icon-debug.png';
+    }
+
     // Pick a level (set)
     // TODO error handling  :(
     let path = query.get('setpath');
