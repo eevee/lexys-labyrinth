@@ -52,8 +52,6 @@ export class Tile {
         // Extremely awkward special case: items don't block monsters if the cell also contains an
         // item modifier (i.e. "no" sign) or a real player
         // TODO would love to get this outta here
-        // FIXME i think this can be removed if monster/player interaction stops being a literal
-        // collision and starts being a result of even attempting to move
         if (this.type.is_item &&
             this.cell.some(tile => tile.type.item_modifier || tile.type.is_real_player))
             return false;
@@ -104,7 +102,7 @@ export class Tile {
         direction = tile.cell.redirect_exit(tile, direction);
         // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
         // which would fail, but it would still change the block's direction
-        return ! tile.cell.blocks_leaving(tile, direction);
+        return tile.cell.try_leaving(tile, direction);
     }
 
     // Inventory stuff
@@ -195,57 +193,55 @@ export class Cell extends Array {
         return this.some(tile => tile.name === name);
     }
 
-    blocks_leaving(actor, direction) {
+    try_leaving(actor, direction) {
         for (let tile of this) {
             if (tile === actor)
                 continue;
 
             if (tile.type.traps && tile.type.traps(tile, actor))
-                return true;
+                return false;
 
             if (tile.type.blocks_leaving && tile.type.blocks_leaving(tile, actor, direction))
-                return true;
+                return false;
         }
-        return false;
+        return true;
     }
 
-    // Check if this actor can move this direction into this cell.  May have side effects, depending
-    // on the value of push_mode:
-    // - null: Default.  Treat pushable objects as blocking.
-    // - 'ignore': Treat pushable objects as nonblocking.
-    // - 'trace': Don't try to move pushable objects, but do check whether they could be pushed,
-    //   recursively if necessary.
-    // - 'move': Attempt to move pushable objects out of the way immediately.
-    blocks_entering(actor, direction, level, push_mode = null) {
+    // Check if this actor can move this direction into this cell.  Returns true on success.  May
+    // have side effects, depending on the value of push_mode:
+    // - null: Default.  Do not impact game state.  Treat pushable objects as blocking.
+    // - 'bump': Fire bump triggers.  Don't move pushable objects, but do check whether they /could/
+    //   be pushed, recursively if necessary.
+    // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
+    try_entering(actor, direction, level, push_mode = null) {
         let pushable_tiles = [];
         let blocked = false;
-        for (let tile of this) {
+        // (Note that here, and anywhere else that has any chance of altering the cell's contents,
+        // we iterate over a copy of the cell to insulate ourselves from tiles appearing or
+        // disappearing mid-iteration.)
+        for (let tile of Array.from(this)) {
+            // TODO check ignores here?
+            if (actor.type.on_bump) {
+                actor.type.on_bump(actor, level, tile, direction);
+            }
+            if (tile.type.on_bumped) {
+                tile.type.on_bumped(tile, level, actor);
+            }
+
             if (! tile.blocks(actor, direction, level))
                 continue;
 
             if (push_mode === null)
-                return true;
+                return false;
 
             if (! actor.can_push(tile, direction)) {
-                if (push_mode === 'move') {
-                    // Track this instead of returning immediately, because 'move' mode also bumps
+                if (push_mode === 'push') {
+                    // Track this instead of returning immediately, because 'push' mode also bumps
                     // every tile in the cell
                     blocked = true;
                 }
                 else {
-                    return true;
-                }
-            }
-
-            if (push_mode === 'ignore')
-                continue;
-
-            if (push_mode === 'move') {
-                if (actor.type.on_bump) {
-                    actor.type.on_bump(actor, level, tile);
-                }
-                if (tile.type.on_bumped) {
-                    tile.type.on_bumped(tile, level, actor);
+                    return false;
                 }
             }
 
@@ -254,27 +250,37 @@ export class Cell extends Array {
         }
 
         if (blocked)
-            return true;
+            return false;
 
         // If we got this far, all that's left is to deal with pushables
         if (pushable_tiles.length > 0) {
             let neighbor_cell = level.get_neighboring_cell(this, direction);
             if (! neighbor_cell)
-                return true;
+                return false;
 
             for (let tile of pushable_tiles) {
-                if (push_mode === 'trace') {
-                    if (neighbor_cell.blocks_entering(tile, direction, level, push_mode))
-                        return true;
+                if (push_mode === 'bump') {
+                    // FIXME and leaving!
+                    if (! neighbor_cell.try_entering(tile, direction, level, push_mode))
+                        return false;
                 }
-                else if (push_mode === 'move') {
-                    if (! level.attempt_step(tile, direction))
-                        return true;
+                else if (push_mode === 'push') {
+                    if (actor === this.player) {
+                        this._set_tile_prop(actor, 'is_pushing', true);
+                    }
+                    if (! level.attempt_out_of_turn_step(tile, direction)) {
+                        if (tile.slide_mode !== null && tile.movement_cooldown !== 0) {
+                            // If the push failed and the obstacle is in the middle of a slide,
+                            // remember this as the next move it'll make
+                            level._set_tile_prop(tile, 'pending_push', direction);
+                        }
+                        return false;
+                    }
                 }
             }
         }
 
-        return false;
+        return true;
     }
 
     // Special railroad ability: change the direction we attempt to leave
@@ -729,6 +735,10 @@ export class Level {
                 success = this.attempt_step(actor, actor.decision);
             }
 
+            if (! success && actor.type.on_blocked) {
+                actor.type.on_blocked(actor, this, actor.decision);
+            }
+
             // Track whether the player is blocked, for visual effect
             if (actor === this.player && actor.decision && ! success) {
                 this.sfx.play_once('blocked');
@@ -848,7 +858,7 @@ export class Level {
             else if (actor.slide_mode === 'ice') {
                 // A sliding player that bonks into a wall still needs to turn around, but in this
                 // case they do NOT start pushing blocks early
-                if (! try_direction(actor.direction, 'trace')) {
+                if (! try_direction(actor.direction, 'bump')) {
                     this._handle_slide_bonk(actor);
                 }
             }
@@ -863,7 +873,7 @@ export class Level {
             let open;
             if (dir2 === null) {
                 // Only one direction is held, but for consistency, "check" it anyway
-                open = try_direction(dir1, 'move');
+                open = try_direction(dir1, 'push');
                 actor.decision = dir1;
             }
             else {
@@ -871,8 +881,8 @@ export class Level {
                 // one, UNLESS it's blocked AND the other isn't
                 if (dir1 === actor.direction || dir2 === actor.direction) {
                     let other_direction = dir1 === actor.direction ? dir2 : dir1;
-                    let curr_open = try_direction(actor.direction, 'move');
-                    let other_open = try_direction(other_direction, 'move');
+                    let curr_open = try_direction(actor.direction, 'push');
+                    let other_open = try_direction(other_direction, 'push');
                     if (! curr_open && other_open) {
                         actor.decision = other_direction;
                         open = true;
@@ -887,8 +897,8 @@ export class Level {
                     // FIXME i'm told cc2 prefers orthogonal actually, but need to check on that
                     // FIXME lynx only checks horizontal, what about cc2?  it must check both
                     // because of the behavior where pushing into a corner always pushes horizontal
-                    let open1 = try_direction(dir1, 'move');
-                    let open2 = try_direction(dir2, 'move');
+                    let open1 = try_direction(dir1, 'push');
+                    let open2 = try_direction(dir2, 'push');
                     if (open1 && ! open2) {
                         actor.decision = dir1;
                         open = true;
@@ -978,7 +988,7 @@ export class Level {
 
             direction = actor.cell.redirect_exit(actor, direction);
 
-            if (this.check_movement(actor, actor.cell, direction, 'trace')) {
+            if (this.check_movement(actor, actor.cell, direction, 'bump')) {
                 // We found a good direction!  Stop here
                 actor.decision = direction;
                 all_blocked = false;
@@ -1023,8 +1033,8 @@ export class Level {
     check_movement(actor, orig_cell, direction, push_mode) {
         let dest_cell = this.get_neighboring_cell(orig_cell, direction);
         return (dest_cell &&
-            ! orig_cell.blocks_leaving(actor, direction) &&
-            ! dest_cell.blocks_entering(actor, direction, this, push_mode));
+            orig_cell.try_leaving(actor, direction) &&
+            dest_cell.try_entering(actor, direction, this, push_mode));
     }
 
     // Try to move the given actor one tile in the given direction and update their cooldown.
@@ -1043,90 +1053,82 @@ export class Level {
 
         let move = DIRECTIONS[direction].movement;
         let goal_cell = this.get_neighboring_cell(actor.cell, direction);
+        if (! goal_cell)
+            return false;
 
-        // TODO this could be a lot simpler if i could early-return!  should ice bumping be
-        // somewhere else?
-        let blocked;
-        if (goal_cell) {
-            // Only bother touching the goal cell if we're not already trapped in this one
-            if (actor.cell.blocks_leaving(actor, direction)) {
-                blocked = true;
+        // Only bother touching the goal cell if we're not already trapped in this one
+        if (! actor.cell.try_leaving(actor, direction))
+            return false;
+
+        if (! goal_cell.try_entering(actor, direction, this, 'push'))
+            return false;
+
+        // FIXME this feels clunky
+        let terrain = goal_cell.get_terrain();
+        if (terrain && terrain.type.slide_mode && ! actor.ignores(terrain.type.name)) {
+            double_speed = true;
+        }
+
+            // FIXME this can probably reuse try_entering now
+            // Try to move into the cell.  This is usually a simple check of whether we can
+            // enter it (similar to Cell.try_entering), but if the only thing blocking us is
+            // a pushable object, we have to do two more passes: one to push anything pushable,
+            // then one to check whether we're blocked again.
+            /*
+            let blocked_by_pushable = false;
+            for (let tile of goal_cell) {
+                if (tile.blocks(actor, direction, this)) {
+                    if (actor.can_push(tile, direction)) {
+                        blocked_by_pushable = true;
+                    }
+                    else {
+                        blocked = true;
+                        // Don't break here, because we might still want to bump other tiles
+                    }
+                }
+
+                if (actor.ignores(tile.type.name))
+                    continue;
+
+                if (tile.type.slide_mode) {
+                    double_speed = true;
+                }
+
+                // Bump tiles that we're even attempting to move into; this mostly reveals
+                // invisible walls, blue floors, etc.
+                // XXX how to guarantee this only happens once...
+                if (actor.type.on_bump) {
+                    if (actor.type.on_bump(actor, this, tile) === false)
+                        return;
+                }
+                if (tile.type.on_bumped) {
+                    tile.type.on_bumped(tile, this, actor);
+                }
             }
 
-            // (Note that here, and anywhere else that has any chance of
-            // altering the cell's contents, we iterate over a copy of the cell
-            // to insulate ourselves from tiles appearing or disappearing
-            // mid-iteration.)
-            // FIXME actually, this prevents flicking!
-            if (! blocked) {
-                // FIXME this can probably reuse blocks_entering now
-                // Try to move into the cell.  This is usually a simple check of whether we can
-                // enter it (similar to Cell.blocks_entering), but if the only thing blocking us is
-                // a pushable object, we have to do two more passes: one to push anything pushable,
-                // then one to check whether we're blocked again.
-                let blocked_by_pushable = false;
-                for (let tile of goal_cell) {
-                    if (tile.blocks(actor, direction, this)) {
-                        if (actor.can_push(tile, direction)) {
-                            blocked_by_pushable = true;
-                        }
-                        else {
-                            blocked = true;
-                            // Don't break here, because we might still want to bump other tiles
-                        }
-                    }
-
-                    if (actor.ignores(tile.type.name))
+            // If the only thing blocking us can be pushed, give that a shot
+            if (! blocked && blocked_by_pushable) {
+                // This time make a copy, since we're modifying the contents of the cell
+                for (let tile of Array.from(goal_cell)) {
+                    if (! actor.can_push(tile, direction))
                         continue;
 
-                    if (tile.type.slide_mode) {
-                        double_speed = true;
+                    if (! this.attempt_out_of_turn_step(tile, direction) &&
+                        tile.slide_mode !== null && tile.movement_cooldown !== 0)
+                    {
+                        // If the push failed and the obstacle is in the middle of a slide,
+                        // remember this as the next move it'll make
+                        this._set_tile_prop(tile, 'pending_push', direction);
                     }
-
-                    // Bump tiles that we're even attempting to move into; this mostly reveals
-                    // invisible walls, blue floors, etc.
-                    // XXX how to guarantee this only happens once...
-                    if (actor.type.on_bump) {
-                        if (actor.type.on_bump(actor, this, tile) === false)
-                            return;
-                    }
-                    if (tile.type.on_bumped) {
-                        tile.type.on_bumped(tile, this, actor);
+                    if (actor === this.player) {
+                        this._set_tile_prop(actor, 'is_pushing', true);
                     }
                 }
 
-                // If the only thing blocking us can be pushed, give that a shot
-                if (! blocked && blocked_by_pushable) {
-                    // This time make a copy, since we're modifying the contents of the cell
-                    for (let tile of Array.from(goal_cell)) {
-                        if (! actor.can_push(tile, direction))
-                            continue;
-
-                        if (! this.attempt_out_of_turn_step(tile, direction) &&
-                            tile.slide_mode !== null && tile.movement_cooldown !== 0)
-                        {
-                            // If the push failed and the obstacle is in the middle of a slide,
-                            // remember this as the next move it'll make
-                            this._set_tile_prop(tile, 'pending_push', direction);
-                        }
-                        if (actor === this.player) {
-                            this._set_tile_prop(actor, 'is_pushing', true);
-                        }
-                    }
-
-                    // Now check if we're still blocked
-                    blocked = goal_cell.blocks_entering(actor, direction, this);
-                }
+                // Now check if we're still blocked
+                blocked = goal_cell.try_entering(actor, direction, this);
             }
-        }
-        else {
-            // Hit the edge
-            blocked = true;
-        }
-
-        if (blocked) {
-            return false;
-        }
+            */
 
         // We're clear!
         if (double_speed || actor.has_item('speed_boots')) {
@@ -1200,31 +1202,10 @@ export class Level {
             this.hint_shown = null;
         }
         for (let tile of goal_cell) {
-            if (actor.type.is_real_player && tile.type.is_monster) {
-                this.fail(tile.type.name);
-            }
-            else if (actor.type.is_monster && tile.type.is_real_player) {
-                this.fail(actor.type.name);
-            }
-            else if (actor.type.is_block && tile.type.is_real_player) {
-                this.fail('squished');
-            }
-
+            // FIXME this could go in on_approach now
             if (actor === this.player && tile.type.is_hint) {
                 this.hint_shown = tile.hint_text ?? this.stored_level.hint;
             }
-        }
-
-        // If we're stepping directly on the player, that kills them too; the player and a monster
-        // must be at least 5 tics apart
-        // TODO the rules in lynx might be slightly different?
-        if (actor.type.is_monster && goal_cell === this.player.previous_cell &&
-            // Player has decided to leave their cell, but hasn't actually taken a step yet
-            this.player.movement_cooldown === this.player.movement_speed &&
-            // See the extensive comment in attempt_out_of_turn_step
-            this.player.cooldown_delay_hack !== 2)
-        {
-            this.fail(actor.type.name);
         }
 
         if (actor === this.player && goal_cell[0].type.name === 'floor') {
@@ -1240,12 +1221,43 @@ export class Level {
             if (actor.ignores(tile.type.name))
                 continue;
 
+            // Possibly kill a player
+            if (actor.has_item('helmet') || tile.has_item('helmet')) {
+                // Helmet disables this, do nothing
+            }
+            else if (actor.type.is_real_player && tile.type.is_monster) {
+                this.fail(tile.type.name);
+            }
+            else if (actor.type.is_monster && tile.type.is_real_player) {
+                this.fail(actor.type.name);
+            }
+            else if (actor.type.is_block && tile.type.is_real_player) {
+                // Note that blocks squish players if they move for ANY reason, even if pushed by
+                // another player!
+                this.fail('squished');
+            }
+
             if (tile.type.on_approach) {
                 tile.type.on_approach(tile, this, actor);
             }
             if (tile.type.slide_mode) {
                 this.make_slide(actor, tile.type.slide_mode);
             }
+        }
+
+        // If we're a monster stepping on the player's tail, that also kills her immediately; the
+        // player and a monster must be strictly more than 4 tics apart
+        // FIXME this only works for the /current/ player but presumably applies to all of them,
+        // though i'm having trouble coming up with a test
+        // TODO the rules in lynx might be slightly different?
+        if (actor.type.is_monster && goal_cell === this.player.previous_cell &&
+            // Player has decided to leave their cell, but hasn't actually taken a step yet
+            this.player.movement_cooldown === this.player.movement_speed &&
+            ! actor.has_item('helmet') && ! this.player.has_item('helmet') &&
+            // See the extensive comment in attempt_out_of_turn_step
+            this.player.cooldown_delay_hack !== 2)
+        {
+            this.fail(actor.type.name);
         }
 
         if (this.compat.tiles_react_instantly) {
@@ -1294,7 +1306,7 @@ export class Level {
         let teleporter = actor.just_stepped_on_teleporter;
         actor.just_stepped_on_teleporter = null;
 
-        let push_mode = actor === this.player ? 'move' : 'trace';
+        let push_mode = actor === this.player ? 'push' : 'bump';
         let original_direction = actor.direction;
         let success = false;
         let dest, direction;

@@ -1128,7 +1128,7 @@ export function parse_level(buf, number = 1) {
             }
         }
         else {
-            console.warn(`Unrecognized section type '${type}' at offset ${bytes.byteOffset}`);
+            console.warn(`Unrecognized section type '${type}' at offset ${bytes.byteOffset}`, view);
             // TODO save it, persist when editing level
         }
     }

@@ -27,7 +27,7 @@ function on_ready_force_floor(me, level) {
     let neighbor = level.get_neighboring_cell(me.cell, actor.direction);
     if (! neighbor)
         return;
-    if (! neighbor.blocks_entering(actor, actor.direction, level, 'trace'))
+    if (neighbor.try_entering(actor, actor.direction, level))
         return;
     let item = me.cell.get_item();
     if (! item)
@@ -975,7 +975,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_chip: true,
         is_required_chip: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.collect_chip();
@@ -1991,34 +1991,14 @@ const TILE_TYPES = {
         },
         _emulatees: ['teeth', 'glider', 'bug', 'ball', 'teeth_timid', 'fireball', 'paramecium', 'walker'],
         decide_movement(me, level) {
+            level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
             if (me.attempted_moves >= 32) {
-                level._set_tile_prop(me, 'attempted_moves', me.attempted_moves - 32);  // XXX unsure if this is 0 or -32
+                level._set_tile_prop(me, 'attempted_moves', 0);
                 level._set_tile_prop(me, 'current_emulatee', (me.current_emulatee + 1) % me.type._emulatees.length);
             }
 
             let emulatee = me.type._emulatees[me.current_emulatee];
-            let preference = TILE_TYPES[emulatee].decide_movement(me, level);
-            // Rig up the preference so a failure counts as two moves
-            if (preference) {
-                level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
-                let last_direction = preference[preference.length - 1];
-                if (typeof last_direction === 'function') {
-                    // This is tricky!  We want this function to only be called ONCE max, since the
-                    // walker uses it to carefully tune the PRNG, so replace it with one that lazily
-                    // overwrites 'last_direction'
-                    preference.pop();
-                    let lazy = last_direction;
-                    preference.push(function() {
-                        last_direction = lazy();
-                        return last_direction;
-                    });
-                }
-                preference.push(function() {
-                    level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
-                    return last_direction;
-                });
-            }
-            return preference;
+            return TILE_TYPES[emulatee].decide_movement(me, level);
         },
         visual_state(me) {
             if (me && me.current_emulatee !== undefined) {
@@ -2226,6 +2206,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         has_inventory: true,
+        can_reveal_walls: true,
         // FIXME ???????
         collision_mask: COLLISION.block_cc2,
         // FIXME do i start moving immediately when dropped, or next turn?
@@ -2233,20 +2214,22 @@ const TILE_TYPES = {
         decide_movement(me, level) {
             return [me.direction];
         },
-        // FIXME feel like this should be on_blocked?
-        // FIXME specific case for player!
-        on_bump(me, level, other) {
+        on_blocked(me, level, direction) {
             if (me.slide_mode)
                 return;
-            if (other.type.is_actor) {
-                level.transmute_tile(me, 'explosion');
-                level.transmute_tile(other, 'explosion');
-                return false;
+            let cell = level.get_neighboring_cell(me.cell, direction);
+            if (cell) {
+                let other = cell.get_actor();
+                if (other) {
+                    if (other.is_real_player) {
+                        level.fail(me.type.name);
+                    }
+                    else {
+                        level.transmute_tile(other, 'explosion');
+                    }
+                }
             }
-            else if (other.blocks(me, me.direction, level)) {
-                level.transmute_tile(me, 'explosion');
-                return false;
-            }
+            level.transmute_tile(me, 'explosion');
         },
     },
     xray_eye: {
@@ -2424,7 +2407,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_chip: true,
         is_required_chip: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.collect_chip();
@@ -2435,7 +2418,7 @@ const TILE_TYPES = {
     chip_extra: {
         draw_layer: DRAW_LAYERS.item,
         is_chip: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.collect_chip();
