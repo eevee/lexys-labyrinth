@@ -567,6 +567,7 @@ export class Level {
         }
         this.p1_input = p1_input;
         this.p1_released |= ~p1_input;  // Action keys released since we last checked them
+        this.swap_player1 = false;
 
         // Used for various tic-local effects; don't need to be undoable
         // TODO maybe this should be undone anyway so rewind looks better?
@@ -687,7 +688,6 @@ export class Level {
         this.yellow_tank_decision = null;
 
         // THIRD PASS: everyone actually moves
-        let swap_player1 = false;
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
             if (! actor.cell)
@@ -700,28 +700,6 @@ export class Level {
             // Check this again, since an earlier pass may have caused us to start moving
             if (actor.movement_cooldown > 0)
                 continue;
-
-            // Check for special player actions, which can only happen when not moving
-            // FIXME if you press a key while moving it should happen as soon as you stop (assuming
-            // the key is still held down)
-            // FIXME cc2 seems to rely on key repeat for this; the above is true, but also, if you
-            // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
-            // release the rest rapid-fire.  absurd
-            if (actor === this.player) {
-                let new_input = this.p1_input & this.p1_released;
-                if (new_input & INPUT_BITS.cycle) {
-                    this.cycle_inventory(this.player);
-                }
-                if (new_input & INPUT_BITS.drop) {
-                    this.drop_item(this.player);
-                }
-                if (new_input & INPUT_BITS.swap) {
-                    // This is delayed until the end of the tic to avoid screwing up anything
-                    // checking this.player
-                    swap_player1 = true;
-                }
-                this.p1_released = ~this.p1_input;
-            }
 
             if (! actor.decision)
                 continue;
@@ -770,7 +748,7 @@ export class Level {
 
         // Possibly switch players
         // FIXME not correct
-        if (swap_player1) {
+        if (this.swap_player1) {
             this.player_index += 1;
             this.player_index %= this.players.length;
             this.player = this.players[this.player_index];
@@ -844,11 +822,32 @@ export class Level {
         //   force floor and attempt to override but /fail/, it's not held against us -- but if we
         //   succeed, even if overriding in the same direction we're already moving, that does count
         //   as an override.
-        let xxx_overriding = false;
-        if (actor.slide_mode && ! (
-            actor.slide_mode === 'force' &&
-            dir1 !== null && actor.last_move_was_force))
-        {
+        let may_move = (! actor.slide_mode || (actor.slide_mode === 'force' && actor.last_move_was_force));
+
+        // Check for special player actions, which can only happen when allowed to move
+        // FIXME if you press a key while moving it should happen as soon as you stop (assuming
+        // the key is still held down)
+        // FIXME cc2 seems to rely on key repeat for this; the above is true, but also, if you
+        // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
+        // release the rest rapid-fire.  absurd
+        // FIXME i am not actually sure this goes here
+        if (may_move) {
+            let new_input = input & this.p1_released;
+            if (new_input & INPUT_BITS.cycle) {
+                this.cycle_inventory(this.player);
+            }
+            if (new_input & INPUT_BITS.drop) {
+                this.drop_item(this.player);
+            }
+            if (new_input & INPUT_BITS.swap) {
+                // This is delayed until the end of the tic to avoid screwing up anything
+                // checking this.player
+                this.swap_player1 = true;
+            }
+            this.p1_released = ~input;
+        }
+
+        if (actor.slide_mode && ! (may_move && dir1)) {
             // This is a forced move, in which case we don't even check it
             actor.decision = actor.direction;
 
