@@ -1140,8 +1140,16 @@ const TILE_TYPES = {
             teeth_timid: 'teeth',
         },
         _blob_mogrifications: ['ball', 'walker', 'fireball', 'glider', 'paramecium', 'bug', 'tank_blue', 'teeth', 'teeth_timid'],
-        // TODO can be wired, in which case only works when powered; other minor concerns, see wiki
+        on_ready(me, level) {
+            me.is_powered = false;
+        },
         on_arrive(me, level, other) {
+            // Note: Transmogrifiers technically contain wires the way teleports do, and CC2 uses
+            // the presence and poweredness of those wires to determine whether the transmogrifier
+            // should appear to be on or off, but the /functionality/ is controlled entirely by
+            // whether an adjoining cell carries current to our edge, like a railroad or cloner
+            if (level.is_cell_wired(me.cell) && ! me.is_powered)
+                return;
             let name = other.type.name;
             if (me.type._mogrifications[name]) {
                 level.transmute_tile(other, me.type._mogrifications[name]);
@@ -1151,6 +1159,12 @@ const TILE_TYPES = {
                 let options = me.type._blob_mogrifications;
                 level.transmute_tile(other, options[Math.floor(Math.random() * options.length)]);
             }
+        },
+        on_power(me, level) {
+            level._set_tile_prop(me, 'is_powered', true);
+        },
+        on_depower(me, level) {
+            level._set_tile_prop(me, 'is_powered', false);
         },
     },
     // FIXME blue teleporters transmit current 4 ways.  red don't transmit it at all
