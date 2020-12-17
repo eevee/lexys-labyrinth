@@ -1346,6 +1346,11 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         activate(me, level) {
             level.transmute_tile(me, 'flame_jet_on');
+            // If there's anything on us already, nuke it
+            let actor = me.cell.get_actor();
+            if (actor) {
+                me.type._kill(me, level, actor);
+            }
         },
         on_gray_button(me, level) {
             me.type.activate(me, level);
@@ -1366,10 +1371,10 @@ const TILE_TYPES = {
             me.type.activate(me, level);
         },
         // Kill anything that shows up
-        // FIXME every tic, also kills every actor in the cell (mostly matters if you step on with
-        // fire boots and then drop them)
-        on_arrive(me, level, other) {
-            // Note that blocks, fireballs, and anything with fire boots are immune
+        // FIXME every tic, also kills every actor in the cell (mostly matters if something steps on
+        // with fire boots and then drops them, which is unlike fire)
+        _kill(me, level, other) {
+            // Note that (dirt?) blocks, fireballs, and anything with fire boots are immune
             // TODO would be neat if this understood "ignores anything with fire immunity" but that
             // might be a bit too high-level for this game
             if (other.type.is_real_player) {
@@ -1379,6 +1384,9 @@ const TILE_TYPES = {
                 // TODO should this play a sound?
                 level.transmute_tile(other, 'explosion');
             }
+        },
+        on_arrive(me, level, other) {
+            this._kill(me, level, other);
         },
     },
     // Buttons
