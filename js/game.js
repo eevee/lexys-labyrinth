@@ -1079,67 +1079,6 @@ export class Level {
             double_speed = true;
         }
 
-            // FIXME this can probably reuse try_entering now
-            // Try to move into the cell.  This is usually a simple check of whether we can
-            // enter it (similar to Cell.try_entering), but if the only thing blocking us is
-            // a pushable object, we have to do two more passes: one to push anything pushable,
-            // then one to check whether we're blocked again.
-            /*
-            let blocked_by_pushable = false;
-            for (let tile of goal_cell) {
-                if (tile.blocks(actor, direction, this)) {
-                    if (actor.can_push(tile, direction)) {
-                        blocked_by_pushable = true;
-                    }
-                    else {
-                        blocked = true;
-                        // Don't break here, because we might still want to bump other tiles
-                    }
-                }
-
-                if (actor.ignores(tile.type.name))
-                    continue;
-
-                if (tile.type.slide_mode) {
-                    double_speed = true;
-                }
-
-                // Bump tiles that we're even attempting to move into; this mostly reveals
-                // invisible walls, blue floors, etc.
-                // XXX how to guarantee this only happens once...
-                if (actor.type.on_bump) {
-                    if (actor.type.on_bump(actor, this, tile) === false)
-                        return;
-                }
-                if (tile.type.on_bumped) {
-                    tile.type.on_bumped(tile, this, actor);
-                }
-            }
-
-            // If the only thing blocking us can be pushed, give that a shot
-            if (! blocked && blocked_by_pushable) {
-                // This time make a copy, since we're modifying the contents of the cell
-                for (let tile of Array.from(goal_cell)) {
-                    if (! actor.can_push(tile, direction))
-                        continue;
-
-                    if (! this.attempt_out_of_turn_step(tile, direction) &&
-                        tile.slide_mode !== null && tile.movement_cooldown !== 0)
-                    {
-                        // If the push failed and the obstacle is in the middle of a slide,
-                        // remember this as the next move it'll make
-                        this._set_tile_prop(tile, 'pending_push', direction);
-                    }
-                    if (actor === this.player) {
-                        this._set_tile_prop(actor, 'is_pushing', true);
-                    }
-                }
-
-                // Now check if we're still blocked
-                blocked = goal_cell.try_entering(actor, direction, this);
-            }
-            */
-
         // We're clear!
         if (double_speed || actor.has_item('speed_boots')) {
             speed /= 2;
