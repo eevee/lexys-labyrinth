@@ -1336,7 +1336,7 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'flame_jet_on');
             // If there's anything on us already, nuke it
             let actor = me.cell.get_actor();
-            if (actor) {
+            if (actor && ! actor.movement_cooldown) {
                 me.type._kill(me, level, actor);
             }
         },
