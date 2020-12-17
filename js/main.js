@@ -2130,13 +2130,17 @@ class PackTestDialog extends DialogOverlay {
         for (let i = 0; i < num_levels; i++) {
             let stored_level, level;
             let status_li = this.results_summary.childNodes[i];
-            let record_result = (token, title, comment, include_canvas) => {
+            let record_result = (token, short_status, comment, include_canvas) => {
+                let level_title = stored_level ? stored_level.title : "???";
                 status_li.setAttribute('data-status', token);
-                status_li.setAttribute('title', title);
+                status_li.setAttribute('title', `${short_status} (#${i + 1} ${level_title})`);
                 let li = mk(
                     'li', {'data-status': token, 'data-index': i},
-                    `#${i + 1} ${stored_level ? stored_level.title : "???"}: `,
+                    `#${i + 1} ${level_title}: `,
                     comment);
+                status_li.onclick = () => {
+                    li.scrollIntoView();
+                };
                 if (include_canvas && level) {
                     let canvas = mk('canvas', {
                         width: this.renderer.canvas.width,
