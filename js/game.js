@@ -1043,7 +1043,18 @@ export class Level {
         if (actor.movement_cooldown > 0)
             return false;
 
-        direction = actor.cell.redirect_exit(actor, direction);
+        let redirected_direction = actor.cell.redirect_exit(actor, direction);
+        if (direction !== redirected_direction) {
+            // Some tiles (ahem, frame blocks) rotate when their attempted direction is redirected
+            if (actor.type.on_rotate) {
+                let turn = ['right', 'left', 'opposite'].filter(t => {
+                    return DIRECTIONS[direction][t] === redirected_direction;
+                })[0];
+                actor.type.on_rotate(actor, this, turn);
+            }
+
+            direction = redirected_direction;
+        }
         this.set_actor_direction(actor, direction);
 
         // Record our speed, and halve it below if we're stepping onto a sliding tile

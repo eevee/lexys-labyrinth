@@ -466,26 +466,6 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'entered_direction', other.direction);
         },
         on_depart(me, level, other) {
-            if (other.type.name === 'frame_block') {
-                // Directional blocks are rotated when they leave
-                // FIXME this isn't right, they rotate by the difference between their attempted
-                // move and their redirected move
-                if (other.direction === DIRECTIONS[me.entered_direction].right) {
-                    let new_arrows = new Set;
-                    for (let arrow of other.arrows) {
-                        new_arrows.add(DIRECTIONS[arrow].right);
-                    }
-                    level._set_tile_prop(other, 'arrows', new_arrows);
-                }
-                else if (other.direction === DIRECTIONS[me.entered_direction].left) {
-                    let new_arrows = new Set;
-                    for (let arrow of other.arrows) {
-                        new_arrows.add(DIRECTIONS[arrow].left);
-                    }
-                    level._set_tile_prop(other, 'arrows', new_arrows);
-                }
-            }
-
             if (! level.is_cell_wired(me.cell)) {
                 me.type._switch_track(me, level);
             }
@@ -950,6 +930,14 @@ const TILE_TYPES = {
         },
         on_clone(me, original) {
             me.arrows = new Set(original.arrows);
+        },
+        on_rotate(me, level, turn) {
+            // We rotate when turned on railroads
+            let new_arrows = new Set;
+            for (let arrow of me.arrows) {
+                new_arrows.add(DIRECTIONS[arrow][turn]);
+            }
+            level._set_tile_prop(me, 'arrows', new_arrows);
         },
     },
     green_floor: {
