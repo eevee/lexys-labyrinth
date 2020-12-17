@@ -1412,21 +1412,19 @@ const TILE_TYPES = {
         do_button(level) {
             // Swap green floors and walls
             // TODO could probably make this more compact for undo purposes
-            for (let row of level.cells) {
-                for (let cell of row) {
-                    for (let tile of cell) {
-                        if (tile.type.name === 'green_floor') {
-                            level.transmute_tile(tile, 'green_wall');
-                        }
-                        else if (tile.type.name === 'green_wall') {
-                            level.transmute_tile(tile, 'green_floor');
-                        }
-                        else if (tile.type.name === 'green_chip') {
-                            level.transmute_tile(tile, 'green_bomb');
-                        }
-                        else if (tile.type.name === 'green_bomb') {
-                            level.transmute_tile(tile, 'green_chip');
-                        }
+            for (let cell of level.linear_cells) {
+                for (let tile of cell) {
+                    if (tile.type.name === 'green_floor') {
+                        level.transmute_tile(tile, 'green_wall');
+                    }
+                    else if (tile.type.name === 'green_wall') {
+                        level.transmute_tile(tile, 'green_floor');
+                    }
+                    else if (tile.type.name === 'green_chip') {
+                        level.transmute_tile(tile, 'green_bomb');
+                    }
+                    else if (tile.type.name === 'green_bomb') {
+                        level.transmute_tile(tile, 'green_chip');
                     }
                 }
             }
@@ -1558,7 +1556,7 @@ const TILE_TYPES = {
 
             for (let x = Math.max(0, me.cell.x - 2); x <= Math.min(level.width - 1, me.cell.x + 2); x++) {
                 for (let y = Math.max(0, me.cell.y - 2); y <= Math.min(level.height - 1, me.cell.y + 2); y++) {
-                    let cell = level.cells[y][x];
+                    let cell = level.cell(x, y);
                     // TODO wait is this right
                     if (cell === me.cell)
                         continue;

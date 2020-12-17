@@ -1,4 +1,5 @@
 import { DIRECTIONS, DIRECTION_ORDER, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
+import { LevelInterface } from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 
 export class Tile {
@@ -301,8 +302,9 @@ Cell.prototype.powered_edges = 0;
 // sitting completely idle, undo consumes about 2 MB every five seconds, so this shouldn't go beyond
 // 12 MB for any remotely reasonable level.
 const UNDO_BUFFER_SIZE = TICS_PER_SECOND * 30;
-export class Level {
+export class Level extends LevelInterface {
     constructor(stored_level, compat = {}) {
+        super();
         this.stored_level = stored_level;
         this.restart(compat);
     }
@@ -322,7 +324,7 @@ export class Level {
         this.size_x = this.stored_level.size_x;
         this.size_y = this.stored_level.size_y;
 
-        this.cells = [];
+        this.linear_cells = [];
         this.player = null;
         this.p1_input = 0;
         this.p1_released = 0xff;
@@ -380,10 +382,10 @@ export class Level {
         // - if an actor is in the cell, set the trap to open and unstick everything in it
         for (let y = 0; y < this.height; y++) {
             let row = [];
-            this.cells.push(row);
             for (let x = 0; x < this.width; x++) {
                 let cell = new Cell(x, y);
                 row.push(cell);
+                this.linear_cells.push(cell);
 
                 let stored_cell = this.stored_level.linear_cells[n];
                 n++;
@@ -444,7 +446,7 @@ export class Level {
                 }
                 if (target_cell_n && target_cell_n < this.width * this.height) {
                     let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
-                    for (let tile of this.cells[ty][tx]) {
+                    for (let tile of this.cell(tx, ty)) {
                         if (goals === tile.type.name) {
                             connectable.connection = tile;
                             break;
@@ -483,15 +485,13 @@ export class Level {
         }
 
         // Finally, let all tiles do any custom init behavior
-        for (let row of this.cells) {
-            for (let cell of row) {
-                for (let tile of cell) {
-                    if (tile.type.on_ready) {
-                        tile.type.on_ready(tile, this);
-                    }
-                    if (cell === this.player.cell && tile.type.is_hint) {
-                        this.hint_shown = tile.hint_text ?? this.stored_level.hint;
-                    }
+        for (let cell of this.linear_cells) {
+            for (let tile of cell) {
+                if (tile.type.on_ready) {
+                    tile.type.on_ready(tile, this);
+                }
+                if (cell === this.player.cell && tile.type.is_hint) {
+                    this.hint_shown = tile.hint_text ?? this.stored_level.hint;
                 }
             }
         }
@@ -1453,13 +1453,9 @@ export class Level {
             return;
 
         // Turn off power to every cell
-        // TODO wonder if i need a linear cell list, or even a flat list of all tiles (that sounds
-        // like hell to keep updated though)
-        for (let row of this.cells) {
-            for (let cell of row) {
-                cell.prev_powered_edges = cell.powered_edges;
-                cell.powered_edges = 0;
-            }
+        for (let cell of this.linear_cells) {
+            cell.prev_powered_edges = cell.powered_edges;
+            cell.powered_edges = 0;
         }
 
         // Iterate over emitters and flood-fill outwards one edge at a time
@@ -1519,10 +1515,9 @@ export class Level {
                     while (true) {
                         x += dirinfo.movement[0];
                         y += dirinfo.movement[1];
-                        if (! this.is_point_within_bounds(x, y))
+                        let candidate = this.cell(x, y);
+                        if (! candidate)
                             break;
-
-                        let candidate = this.cells[y][x];
                         neighbor_wire = candidate.get_wired_tile();
                         if (neighbor_wire) {
                             if ((neighbor_wire.wire_tunnel_directions ?? 0) & opposite_bit) {
@@ -1559,14 +1554,12 @@ export class Level {
         }
 
         // Inform any affected cells of power changes
-        for (let row of this.cells) {
-            for (let cell of row) {
-                if ((cell.prev_powered_edges === 0) !== (cell.powered_edges === 0)) {
-                    let method = cell.powered_edges ? 'on_power' : 'on_depower';
-                    for (let tile of cell) {
-                        if (tile.type[method]) {
-                            tile.type[method](tile, this);
-                        }
+        for (let cell of this.linear_cells) {
+            if ((cell.prev_powered_edges === 0) !== (cell.powered_edges === 0)) {
+                let method = cell.powered_edges ? 'on_power' : 'on_depower';
+                for (let tile of cell) {
+                    if (tile.type[method]) {
+                        tile.type[method](tile, this);
                     }
                 }
             }
@@ -1581,53 +1574,30 @@ export class Level {
     // -------------------------------------------------------------------------
     // Board inspection
 
-    is_point_within_bounds(x, y) {
-        return (x >= 0 && x < this.width && y >= 0 && y < this.height);
-    }
-
-    cell(x, y) {
-        if (this.is_point_within_bounds(x, y)) {
-            return this.cells[y][x];
-        }
-        else {
-            return null;
-        }
-    }
-
     get_neighboring_cell(cell, direction) {
         let move = DIRECTIONS[direction].movement;
         let goal_x = cell.x + move[0];
         let goal_y = cell.y + move[1];
-        if (this.is_point_within_bounds(goal_x, goal_y)) {
-            return this.cells[goal_y][goal_x];
-        }
-        else {
-            return null;
-        }
+        return this.cell(cell.x + move[0], cell.y + move[1]);
     }
 
     // Iterates over the grid in (reverse?) reading order and yields all tiles with the given name.
     // The starting cell is iterated last.
     *iter_tiles_in_reading_order(start_cell, name, reverse = false) {
-        let x = start_cell.x;
-        let y = start_cell.y;
+        let i = this.coords_to_scalar(start_cell.x, start_cell.y);
         while (true) {
             if (reverse) {
-                x -= 1;
-                if (x < 0) {
-                    x = this.width - 1;
-                    y = (y - 1 + this.height) % this.height;
+                i -= 1;
+                if (i < 0) {
+                    i += this.size_x * this.size_y;
                 }
             }
             else {
-                x += 1;
-                if (x >= this.width) {
-                    x = 0;
-                    y = (y + 1) % this.height;
-                }
+                i += 1;
+                i %= this.size_x * this.size_y;
             }
 
-            let cell = this.cells[y][x];
+            let cell = this.linear_cells[i];
             for (let tile of cell) {
                 if (tile.type.name === name) {
                     yield tile;
@@ -1649,8 +1619,9 @@ export class Level {
             let sy = start_cell.y;
             for (let direction of [[-1, -1], [-1, 1], [1, 1], [1, -1]]) {
                 for (let i = 0; i < dist; i++) {
-                    if (this.is_point_within_bounds(sx, sy)) {
-                        yield this.cells[sy][sx];
+                    let cell = this.cell(sx, sy);
+                    if (cell) {
+                        yield cell;
                     }
                     sx += direction[0];
                     sy += direction[1];

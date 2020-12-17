@@ -243,7 +243,6 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
         let index = this.awaiting_renders.shift();
         let element = this.list.childNodes[index];
         let stored_level = this.conductor.stored_game.load_level(index);
-        this.conductor.editor._xxx_update_stored_level_cells(stored_level);
         this.renderer.set_level(stored_level);
         this.renderer.set_viewport_size(stored_level.size_x, stored_level.size_y);
         this.renderer.draw();
@@ -1851,25 +1850,10 @@ export class Editor extends PrimaryView {
     load_game(stored_game) {
     }
 
-    _xxx_update_stored_level_cells(stored_level) {
-        // XXX need this for renderer compat, not used otherwise, PLEASE delete
-        stored_level.cells = [];
-        let row;
-        for (let [i, cell] of stored_level.linear_cells.entries()) {
-            if (i % stored_level.size_x === 0) {
-                row = [];
-                stored_level.cells.push(row);
-            }
-            row.push(cell);
-        }
-    }
-
     load_level(stored_level) {
         // TODO support a game too i guess
         this.stored_level = stored_level;
         this.update_viewport_size();
-
-        this._xxx_update_stored_level_cells(this.stored_level);
 
         // Load connections
         this.connections_g.textContent = '';
@@ -2100,7 +2084,6 @@ export class Editor extends PrimaryView {
         this.stored_level.linear_cells = new_cells;
         this.stored_level.size_x = size_x;
         this.stored_level.size_y = size_y;
-        this._xxx_update_stored_level_cells(this.stored_level);
         this.update_viewport_size();
         this.renderer.draw();
     }

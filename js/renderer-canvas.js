@@ -147,7 +147,7 @@ export class CanvasRenderer {
         for (let layer = 0; layer < DRAW_LAYERS.MAX; layer++) {
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
-                    for (let tile of this.level.cells[y][x]) {
+                    for (let tile of this.level.cell(x, y)) {
                         if (tile.type.draw_layer !== layer)
                             continue;
 
@@ -185,11 +185,11 @@ export class CanvasRenderer {
             }
         }
 
-        if (this.show_actor_bboxes && ! this.level.linear_cells) {  // FIXME dumb hack so this doesn't happen in editor
+        if (this.show_actor_bboxes && this.level.constructor.name === 'Level') {  // FIXME dumb hack so this doesn't happen in editor
             this.ctx.fillStyle = '#f004';
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
-                    let actor = this.level.cells[y][x].get_actor();
+                    let actor = this.level.cell(x, y).get_actor();
                     if (! actor)
                         continue;
                     let [vx, vy] = actor.visual_position(tic_offset);

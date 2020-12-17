@@ -48,8 +48,37 @@ export class Replay {
     }
 }
 
-export class StoredLevel {
+// Small shared helper methods for navigating a StoredLevel or Level
+export class LevelInterface {
+    // Expected attributes:
+    // .size_x
+    // .size_y
+    // .linear_cells
+    scalar_to_coords(n) {
+        return [n % this.size_x, Math.floor(n / this.size_x)];
+    }
+
+    coords_to_scalar(x, y) {
+        return x + y * this.size_x;
+    }
+
+    is_point_within_bounds(x, y) {
+        return (x >= 0 && x < this.size_x && y >= 0 && y < this.size_y);
+    }
+
+    cell(x, y) {
+        if (this.is_point_within_bounds(x, y)) {
+            return this.linear_cells[this.coords_to_scalar(x, y)];
+        }
+        else {
+            return null;
+        }
+    }
+}
+
+export class StoredLevel extends LevelInterface {
     constructor(number) {
+        super();
         // TODO still not sure this belongs here
         this.number = number;  // one-based
         this.title = '';
@@ -86,14 +115,6 @@ export class StoredLevel {
 
         // New LL feature: custom camera regions, as lists of {x, y, width, height}
         this.camera_regions = [];
-    }
-
-    scalar_to_coords(n) {
-        return [n % this.size_x, Math.floor(n / this.size_x)];
-    }
-
-    coords_to_scalar(x, y) {
-        return x + y * this.size_x;
     }
 
     check() {

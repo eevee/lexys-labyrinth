@@ -411,7 +411,7 @@ class Player extends PrimaryView {
                 return;
 
             let [x, y] = this.renderer.cell_coords_from_event(ev);
-            this.level.move_to(this.level.player, this.level.cells[y][x], 1);
+            this.level.move_to(this.level.player, this.level.cell(x, y), 1);
             // TODO this behaves a bit weirdly when paused (doesn't redraw even with a force), i
             // think because we're still claiming a speed of 1 so time has to pass before the move
             // actually "happens"
