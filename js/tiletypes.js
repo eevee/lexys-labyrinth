@@ -466,7 +466,7 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'entered_direction', other.direction);
         },
         on_depart(me, level, other) {
-            if (! level.is_cell_wired(me.cell)) {
+            if (! level.is_tile_wired(me, false)) {
                 me.type._switch_track(me, level);
             }
         },
@@ -1104,6 +1104,8 @@ const TILE_TYPES = {
     },
     transmogrifier: {
         draw_layer: DRAW_LAYERS.terrain,
+        // C2M technically supports wires in transmogrifiers, but they don't do anything
+        wire_propagation_mode: 'none',
         _mogrifications: {
             player: 'player2',
             player2: 'player',
@@ -1128,15 +1130,12 @@ const TILE_TYPES = {
             teeth_timid: 'teeth',
         },
         _blob_mogrifications: ['ball', 'walker', 'fireball', 'glider', 'paramecium', 'bug', 'tank_blue', 'teeth', 'teeth_timid'],
-        on_ready(me, level) {
-            me.is_powered = false;
-        },
         on_arrive(me, level, other) {
             // Note: Transmogrifiers technically contain wires the way teleports do, and CC2 uses
             // the presence and poweredness of those wires to determine whether the transmogrifier
             // should appear to be on or off, but the /functionality/ is controlled entirely by
             // whether an adjoining cell carries current to our edge, like a railroad or cloner
-            if (level.is_cell_wired(me.cell) && ! me.is_powered)
+            if (level.is_tile_wired(me, false) && ! me.powered_edges)
                 return;
             let name = other.type.name;
             if (me.type._mogrifications[name]) {
@@ -1149,30 +1148,33 @@ const TILE_TYPES = {
             }
         },
         on_power(me, level) {
-            level._set_tile_prop(me, 'is_powered', true);
-        },
-        on_depower(me, level) {
-            level._set_tile_prop(me, 'is_powered', false);
+            // No need to do anything, we just need this here as a signal that our .powered_edges
+            // needs to be updated
         },
     },
-    // FIXME blue teleporters transmit current 4 ways.  red don't transmit it at all
     teleport_blue: {
         draw_layer: DRAW_LAYERS.terrain,
         wire_propagation_mode: 'all',
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;
+            // Note that unlike other tiles that care about whether they're wired, a blue teleporter
+            // considers itself part of a network if it contains any wires at all, regardless of
+            // whether they connect to anything
             if (! me.wire_directions) {
                 // TODO cc2 has a bug where, once it wraps around to the bottom right, it seems to
                 // forget that it was ever looking for an unwired teleport and will just grab the
                 // first one it sees
                 for (let dest of level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true)) {
-                    yield [dest, exit_direction];
+                    if (! dest.wire_directions) {
+                        yield [dest, exit_direction];
+                    }
                 }
+                return;
             }
 
-            // Wired blue teleports form a network, which means we have to walk all wires from this
-            // point, collect a list of all possible blue teleports, and then sort them so we can
-            // try them in the right order.
+            // Wired blue teleports form an isolated network, so we have to walk the circuit we're
+            // on, collect a list of all possible blue teleports, and then sort them so we can try
+            // them in the right order.
             // Complicating this somewhat, logic gates act as diodes: we can walk through a logic
             // gate if we're connected to one of its inputs AND its output is enabled, but we can't
             // walk "backwards" through it.
@@ -1185,66 +1187,45 @@ const TILE_TYPES = {
             // behavior is not and will never be emulated.  No level in CC2 or even CC2LP1 uses blue
             // teleporters wired into logic gates, so even the ordering is not interesting imo.)
             // Anyway, let's do a breadth-first search for teleporters.
-            let seeds = [me.cell];
-            let found = [];
-            let seen = new Set;
-            while (seeds.length > 0) {
-                let next_seeds = [];
-                for (let cell of seeds) {
-                    if (seen.has(cell))
-                        continue;
-                    seen.add(cell);
+            let walked_circuits = new Set;
+            let candidate_teleporters = new Set;
+            let circuits = me.circuits;
+            for (let i = 0; i < circuits.length; i++) {
+                let circuit = circuits[i];
+                if (! circuit || walked_circuits.has(circuit))
+                    continue;
+                walked_circuits.add(circuit);
 
-                    let wired = cell.get_wired_tile();
-                    if (! wired || wired.wire_directions === 0)
-                        continue;
-
-                    // Check for a blue teleporter
-                    let dest;
-                    for (let tile of cell) {
-                        if (tile.type.name === 'teleport_blue') {
-                            found.push(tile);
-                            break;
+                for (let [tile, edges] of circuit.tiles.entries()) {
+                    if (tile.type === me.type) {
+                        candidate_teleporters.add(tile);
+                    }
+                    else if (tile.type.name === 'logic_gate' && ! circuit.inputs.get(tile)) {
+                        // This logic gate is functioning as an output, so walk through it and also
+                        // trace any circuits that treat it as an input (as long as those circuits
+                        // are currently powered)
+                        for (let subcircuit of tile.circuits) {
+                            if (subcircuit && subcircuit.is_powered && subcircuit.inputs.get(tile)) {
+                                circuits.push(subcircuit);
+                            }
                         }
                     }
-
-                    // Search our neighbors
-                    for (let direction of Object.keys(DIRECTIONS)) {
-                        if (! (wired.wire_directions & DIRECTIONS[direction].bit))
-                            continue;
-                        let neighbor = level.get_neighboring_cell(cell, direction);
-                        if (! neighbor || seen.has(neighbor))
-                            continue;
-                        let neighbor_wired = neighbor.get_wired_tile();
-                        if (! neighbor_wired)
-                            continue;
-                        if (! (neighbor_wired.wire_directions & DIRECTIONS[DIRECTIONS[direction].opposite].bit))
-                            continue;
-
-                        // TODO check for logic gate
-                        // TODO need to know the direction we came in so we can get the right ones
-                        // going out!
-                        // FIXME this needs to understand crossings, and both this and basic wiring
-                        // need to understand how blue/red teleports convey current
-
-                        next_seeds.push(neighbor);
-                    }
                 }
-                seeds = next_seeds;
             }
 
-            // Now that we have a list of candidate exits, sort it in reverse reading order,
+            // Now that we have a set of candidate destinations, sort it in reverse reading order,
             // starting from ourselves.  Easiest way to do this is to make a map of cell indices,
             // shifted so that we're at zero, then sort in reverse
             let dest_indices = new Map;
             let our_index = me.cell.x + me.cell.y * level.size_x;
             let level_size = level.size_x * level.size_y;
-            for (let dest of found) {
+            for (let dest of candidate_teleporters) {
                 dest_indices.set(dest, (
                     (dest.cell.x + dest.cell.y * level.size_x)
                     - our_index + level_size
                 ) % level_size);
             }
+            let found = Array.from(candidate_teleporters);
             found.sort((a, b) => dest_indices.get(b) - dest_indices.get(a));
             for (let dest of found) {
                 yield [dest, exit_direction];
@@ -1255,8 +1236,11 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         wire_propagation_mode: 'none',
         teleport_allow_override: true,
-        _is_active(me) {
-            return ! (me.wire_directions && (me.cell.powered_edges & me.wire_directions) === 0);
+        _is_active(me, level) {
+            // FIXME must be connected to something that can convey current: a wire, a switch, a
+            // blue teleporter, etc; NOT nothing, a wall, a transmogrifier, a force floor, etc.
+            // this is also how blue teleporters, transmogrifiers, and railroads work!
+            return me.powered_edges || ! level.is_tile_wired(me);
         },
         *teleport_dest_order(me, level, other) {
             // Wired red teleporters can be turned off, which disconnects them from every other red
@@ -1264,9 +1248,8 @@ const TILE_TYPES = {
             // A red teleporter is considered wired only if it has wires itself.  However, CC2 also
             // has the bizarre behavior of NOT considering a red teleporter wired if none of its
             // wires are directly connected to another neighboring wire.
-            // FIXME implement that, merge current code with is_cell_wired
             let iterable;
-            if (this._is_active(me)) {
+            if (this._is_active(me, level)) {
                 iterable = level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
             }
             else {
@@ -1274,7 +1257,7 @@ const TILE_TYPES = {
             }
             let exit_direction = other.direction;
             for (let tile of iterable) {
-                if (tile === me || this._is_active(tile)) {
+                if (tile === me || this._is_active(tile, level)) {
                     // Red teleporters allow exiting in any direction, searching clockwise
                     yield [tile, exit_direction];
                     yield [tile, DIRECTIONS[exit_direction].right];
@@ -1283,7 +1266,7 @@ const TILE_TYPES = {
                 }
             }
         },
-        // TODO inactive ones don't animate
+        // TODO inactive ones don't animate; transmogrifiers too
         /*
         visual_state(me) {
             return this._is_active(me) ? 'active' : 'inactive';
@@ -1615,10 +1598,10 @@ const TILE_TYPES = {
                 let cxn = me.gate_def[i];
                 let dirinfo = DIRECTIONS[dir];
                 if (cxn === 'in0') {
-                    input0 = (me.cell.powered_edges & dirinfo.bit) !== 0;
+                    input0 = (me.powered_edges & dirinfo.bit) !== 0;
                 }
                 else if (cxn === 'in1') {
-                    input1 = (me.cell.powered_edges & dirinfo.bit) !== 0;
+                    input1 = (me.powered_edges & dirinfo.bit) !== 0;
                 }
                 else if (cxn === 'out0') {
                     outbit0 = dirinfo.bit;

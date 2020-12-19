@@ -1,3 +1,4 @@
+import * as algorithms from './algorithms.js';
 import { DIRECTIONS, DIRECTION_ORDER, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
 import { LevelInterface } from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
@@ -117,6 +118,9 @@ export class Tile {
     }
 }
 Tile.prototype.emitting_edges = 0;
+Tile.prototype.powered_edges = 0;
+Tile.prototype.wire_directions = 0;
+Tile.prototype.wire_tunnel_directions = 0;
 
 export class Cell extends Array {
     constructor(x, y) {
@@ -294,8 +298,6 @@ export class Cell extends Array {
         return direction;
     }
 }
-Cell.prototype.prev_powered_edges = 0;
-Cell.prototype.powered_edges = 0;
 
 // The undo stack is implemented with a ring buffer, and this is its size.  One entry per tic.
 // Based on Chrome measurements made against the pathological level CCLP4 #40 (Periodic Lasers) and
@@ -376,7 +378,6 @@ export class Level extends LevelInterface {
 
         let n = 0;
         let connectables = [];
-        this.power_sources = [];
         this.players = [];
         // FIXME handle traps correctly:
         // - if an actor is in the cell, set the trap to open and unstick everything in it
@@ -395,10 +396,6 @@ export class Level extends LevelInterface {
                     if (tile.type.is_hint) {
                         // Copy over the tile-specific hint, if any
                         tile.hint_text = template_tile.hint_text ?? null;
-                    }
-
-                    if (tile.type.is_power_source) {
-                        this.power_sources.push(tile);
                     }
 
                     if (tile.type.is_real_player) {
@@ -483,6 +480,111 @@ export class Level extends LevelInterface {
                 break;
             }
         }
+
+        // Build circuits out of connected wires
+        // TODO document this idea
+        this.circuits = [];
+        this.power_sources = [];
+        let wired_outputs = new Set;
+        this.wired_outputs = [];
+        let add_to_edge_map = (map, item, edges) => {
+            map.set(item, (map.get(item) ?? 0) | edges);
+        };
+        for (let cell of this.linear_cells) {
+            // We're interested in static circuitry, which means terrain
+            let terrain = cell.get_terrain();
+            if (! terrain)  // ?!
+                continue;
+
+            if (terrain.type.is_power_source) {
+                this.power_sources.push(terrain);
+            }
+
+            let wire_directions = terrain.wire_directions;
+            if (! wire_directions && ! terrain.wire_tunnel_directions) {
+                // No wires, not interesting...  unless it's a logic gate, which defines its own
+                // wires!  We only care about outgoing ones here, on the off chance that they point
+                // directly into a non-wired tile, in which case a wire scan won't find them
+                if (terrain.type.name === 'logic_gate') {
+                    let dir = terrain.direction;
+                    let cxns = terrain.type._gate_types[terrain.gate_type];
+                    for (let i = 0; i < 4; i++) {
+                        let cxn = cxns[i];
+                        if (cxn && cxn.match(/^out/)) {
+                            wire_directions |= DIRECTIONS[dir].bit;
+                        }
+                        dir = DIRECTIONS[dir].right;
+                    }
+                }
+                else {
+                    continue;
+                }
+            }
+
+            for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
+                if (! ((wire_directions | terrain.wire_tunnel_directions) & dirinfo.bit))
+                    continue;
+
+                if (terrain.circuits && terrain.circuits[dirinfo.index])
+                    continue;
+
+                let circuit = {
+                    is_powered: false,
+                    tiles: new Map,
+                    inputs: new Map,
+                };
+                this.circuits.push(circuit);
+                // At last, a wired cell edge we have not yet handled.  Floodfill from here
+                algorithms.trace_floor_circuit(
+                    this, terrain.cell, direction,
+                    // Wire handling
+                    (tile, edges) => {
+                        if (! tile.circuits) {
+                            tile.circuits = [null, null, null, null];
+                        }
+                        for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
+                            if (edges & dirinfo.bit) {
+                                tile.circuits[dirinfo.index] = circuit;
+                            }
+                        }
+                        add_to_edge_map(circuit.tiles, tile, edges);
+
+                        if (tile.type.is_power_source) {
+                            // TODO could just do this in a pass afterwards
+                            add_to_edge_map(circuit.inputs, tile, edges);
+                        }
+                    },
+                    // Dead end handling (potentially logic gates, etc.)
+                    (cell, edge) => {
+                        for (let tile of cell) {
+                            if (tile.type.name === 'logic_gate') {
+                                // Logic gates are the one non-wired tile that get attached to circuits,
+                                // mostly so blue teleporters can follow them
+                                if (! tile.circuits) {
+                                    tile.circuits = [null, null, null, null];
+                                }
+                                tile.circuits[DIRECTIONS[edge].index] = circuit;
+
+                                let wire = tile.type._gate_types[tile.gate_type][
+                                    (DIRECTIONS[edge].index - DIRECTIONS[tile.direction].index + 4) % 4];
+                                if (! wire)
+                                    return;
+                                add_to_edge_map(circuit.tiles, tile, DIRECTIONS[edge].bit);
+                                if (wire.match(/^out/)) {
+                                    add_to_edge_map(circuit.inputs, tile, DIRECTIONS[edge].bit);
+                                }
+                            }
+                            else if (tile.type.on_power) {
+                                add_to_edge_map(circuit.tiles, tile, DIRECTIONS[edge].bit);
+                                wired_outputs.add(tile);
+                            }
+                        }
+                    },
+                );
+            }
+        }
+        this.wired_outputs = Array.from(wired_outputs);
+        this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
 
         // Finally, let all tiles do any custom init behavior
         for (let cell of this.linear_cells) {
@@ -569,9 +671,8 @@ export class Level extends LevelInterface {
         this.p1_released |= ~p1_input;  // Action keys released since we last checked them
         this.swap_player1 = false;
 
-        // Used for various tic-local effects; don't need to be undoable
-        // TODO maybe this should be undone anyway so rewind looks better?
-        this.player.is_blocked = false;
+        // This effect only lasts one tic, after which we can move again
+        this._set_tile_prop(this.player, 'is_blocked', false);
 
         this.sfx.set_player_position(this.player.cell);
 
@@ -720,7 +821,7 @@ export class Level extends LevelInterface {
             // Track whether the player is blocked, for visual effect
             if (actor === this.player && actor.decision && ! success) {
                 this.sfx.play_once('blocked');
-                actor.is_blocked = true;
+                this._set_tile_prop(actor, 'is_blocked', true);
             }
         }
 
@@ -1397,178 +1498,130 @@ export class Level extends LevelInterface {
         }
     }
 
-    // Update the state of all wired tiles in the game.
-    // XXX need to be clear on the order of events here.  say everything starts out unpowered.
-    // then:
-    // 1. you step on a pink button, which flags itself as going to be powered next frame
-    // 2. this pass happens.  every unpowered-but-wired cell is inspected.  if a powered one is
-    // found, floodfill from there
-    // FIXME can probably skip this if we know there are no wires at all, like in a CCL, or just an
-    // unwired map
-    // FIXME this feels inefficient.  most of the time none of the inputs have changed so none of
-    // this needs to happen at all
-    // FIXME none of this is currently undoable
     update_wiring() {
-        // FIXME:
-        // - make this undoable  :(
-        // - blue tele, red tele, and pink button have different connections
-        // - would like to reuse the walk for blue teles
+        if (this.circuits.length === 0)
+            return;
 
-        // Gather every tile that's emitting power.  Along the way, check whether any of them have
-        // changed since last tic, so we can skip this work entirely if none did
-        let neighbors = [];
+        // Prepare a big slab of undo.  The only thing we directly change here (aside from
+        // emitting_edges, a normal tile property) is Tile.powered_edges, which tends to change for
+        // large numbers of tiles at a time, so store it all in one map and undo it in one shot.
+        let powered_edges_changes = new Map;
+        let _set_edges = (tile, new_edges) => {
+            if (powered_edges_changes.has(tile)) {
+                if (powered_edges_changes.get(tile) === new_edges) {
+                    powered_edges_changes.delete(tile);
+                }
+            }
+            else {
+                powered_edges_changes.set(tile, tile.powered_edges);
+            }
+            tile.powered_edges = new_edges;
+        };
+        let power_edges = (tile, edges) => {
+            let new_edges = tile.powered_edges | edges;
+            _set_edges(tile, new_edges);
+        };
+        let depower_edges = (tile, edges) => {
+            let new_edges = tile.powered_edges & ~edges;
+            _set_edges(tile, new_edges);
+        };
+
+        // Update the state of any tiles that can generate power.  If none of them changed since
+        // last wiring update, stop here.  First, static power sources.
         let any_changed = false;
         for (let tile of this.power_sources) {
             if (! tile.cell)
                 continue;
             let emitting = tile.type.get_emitting_edges(tile, this);
-            if (emitting) {
-                neighbors.push([tile.cell, emitting]);
-            }
             if (emitting !== tile.emitting_edges) {
                 any_changed = true;
-                tile.emitting_edges = emitting;
+                this._set_tile_prop(tile, 'emitting_edges', emitting);
             }
         }
-        // Also check actors, since any of them might be holding a lightning bolt (argh)
+        // Next, actors who are standing still, on floor, and holding a lightning bolt
+        let externally_powered_circuits = new Set;
         for (let actor of this.actors) {
             if (! actor.cell)
                 continue;
-            // Only count when they're on a floor tile AND not in transit!
-            let emitting = null;
+            let emitting = 0;
             if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
                 let wired_tile = actor.cell.get_wired_tile();
                 if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor')) {
                     emitting = wired_tile.wire_directions;
-                    neighbors.push([actor.cell, wired_tile.wire_directions]);
+                    for (let circuit of wired_tile.circuits) {
+                        if (circuit) {
+                            externally_powered_circuits.add(circuit);
+                        }
+                    }
                 }
             }
             if (emitting !== actor.emitting_edges) {
                 any_changed = true;
-                actor.emitting_edges = emitting;
+                this._set_tile_prop(actor, 'emitting_edges', emitting);
             }
         }
-        // If none changed, we're done
+
         if (! any_changed)
             return;
 
-        // Turn off power to every cell
-        for (let cell of this.linear_cells) {
-            cell.prev_powered_edges = cell.powered_edges;
-            cell.powered_edges = 0;
+        for (let tile of this.wired_outputs) {
+            // This is only used within this function, no need to undo
+            // TODO if this can overlap with power_sources then this is too late?
+            tile._prev_powered_edges = tile.powered_edges;
         }
 
-        // Iterate over emitters and flood-fill outwards one edge at a time
-        // propagated it via flood-fill through neighboring wires
-        while (neighbors.length > 0) {
-            let [cell, source_direction] = neighbors.shift();
-            let wire = cell.get_wired_tile();
+        // Now go through every circuit, compute whether it's powered, and if that changed, inform
+        // its outputs
+        let circuit_changes = new Map;
+        for (let circuit of this.circuits) {
+            let is_powered = false;
 
-            // Power this cell
-            if (typeof(source_direction) === 'number') {
-                // This cell is emitting power itself, and the source direction is actually a
-                // bitmask of directions
-                cell.powered_edges = source_direction;
+            if (externally_powered_circuits.has(circuit)) {
+                is_powered = true;
             }
             else {
-                let bit = DIRECTIONS[source_direction].bit;
-                if (wire === null || (wire.wire_directions & bit) === 0) {
-                    // No wire on this side, so the power doesn't actually propagate, but it DOES
-                    // stay on this edge (so if this is e.g. a purple tile, it'll be powered)
-                    cell.powered_edges |= bit;
-                    continue;
-                }
-
-                // Common case: power entering a wired edge and propagating outwards.  There are a
-                // couple special cases:
-                if (wire.type.wire_propagation_mode === 'none') {
-                    // This tile type has wires, but none of them connect to each other
-                    cell.powered_edges |= bit;
-                    continue;
-                }
-                else if (wire.wire_directions === 0x0f && wire.type.wire_propagation_mode !== 'all') {
-                    // If all four wires are present, they don't actually make a four-way
-                    // connection, but two straight wires that don't connect to each other (with the
-                    // exception of blue teleporters)
-                    cell.powered_edges |= bit;
-                    cell.powered_edges |= DIRECTIONS[DIRECTIONS[source_direction].opposite].bit;
-                }
-                else {
-                    cell.powered_edges = wire.wire_directions;
+                for (let [input_tile, edges] of circuit.inputs.entries()) {
+                    if (input_tile.emitting_edges & edges) {
+                        is_powered = true;
+                        break;
+                    }
                 }
             }
 
-            // Propagate current to neighbors
-            for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
-                if (direction === source_direction)
-                    continue;
-                if ((cell.powered_edges & dirinfo.bit) === 0)
-                    continue;
+            let was_powered = circuit.is_powered;
+            if (is_powered === was_powered)
+                continue;
 
-                let neighbor, neighbor_wire;
-                let opposite_bit = DIRECTIONS[dirinfo.opposite].bit;
-                if (wire && (wire.wire_tunnel_directions & dirinfo.bit)) {
-                    // Search in the given direction until we find a matching tunnel
-                    let x = cell.x;
-                    let y = cell.y;
-                    let nesting = 0;
-                    while (true) {
-                        x += dirinfo.movement[0];
-                        y += dirinfo.movement[1];
-                        let candidate = this.cell(x, y);
-                        if (! candidate)
-                            break;
-                        neighbor_wire = candidate.get_wired_tile();
-                        if (neighbor_wire) {
-                            if ((neighbor_wire.wire_tunnel_directions ?? 0) & opposite_bit) {
-                                if (nesting === 0) {
-                                    neighbor = candidate;
-                                    break;
-                                }
-                                else {
-                                    nesting -= 1;
-                                }
-                            }
-                            if ((neighbor_wire.wire_tunnel_directions ?? 0) & dirinfo.bit) {
-                                nesting += 1;
-                            }
-                        }
-                    }
+            circuit.is_powered = is_powered;
+            circuit_changes.set(circuit, was_powered);
+
+            for (let [tile, edges] of circuit.tiles.entries()) {
+                if (is_powered) {
+                    power_edges(tile, edges);
                 }
                 else {
-                    // No tunnel; this is easy
-                    neighbor = this.get_neighboring_cell(cell, direction);
-                    if (neighbor) {
-                        neighbor_wire = neighbor.get_wired_tile();
-                    }
-                }
-
-                if (neighbor && (neighbor.powered_edges & opposite_bit) === 0 &&
-                    // Unwired tiles are OK; they might be something activated by power.
-                    // Wired tiles that do NOT connect to us are ignored.
-                    (! neighbor_wire || neighbor_wire.wire_directions & opposite_bit))
-                {
-                    neighbors.push([neighbor, dirinfo.opposite]);
+                    depower_edges(tile, edges);
                 }
             }
         }
 
-        // Inform any affected cells of power changes
-        for (let cell of this.linear_cells) {
-            if ((cell.prev_powered_edges === 0) !== (cell.powered_edges === 0)) {
-                let method = cell.powered_edges ? 'on_power' : 'on_depower';
-                for (let tile of cell) {
-                    if (tile.type[method]) {
-                        tile.type[method](tile, this);
-                    }
-                }
+        for (let tile of this.wired_outputs) {
+            if (tile.powered_edges && ! tile._prev_powered_edges && tile.type.on_power) {
+                tile.type.on_power(tile, this);
+            }
+            else if (! tile.powered_edges && tile._prev_powered_edges && tile.type.on_depower) {
+                tile.type.on_depower(tile, this);
             }
         }
-    }
 
-    // Performs a depth-first search for connected wires and wire objects, extending out from the
-    // given starting cell
-    *follow_circuit(cell) {
+        this.pending_undo.push(() => {
+            for (let [tile, edges] of powered_edges_changes.entries()) {
+                tile.powered_edges = edges;
+            }
+            for (let [circuit, is_powered] of circuit_changes.entries()) {
+                circuit.is_powered = is_powered;
+            }
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -1630,9 +1683,14 @@ export class Level extends LevelInterface {
         }
     }
 
-    is_cell_wired(cell) {
-        for (let direction of Object.keys(DIRECTIONS)) {
-            let neighbor = this.get_neighboring_cell(cell, direction);
+    // FIXME require_stub should really just care whether we ourselves /can/ contain wire, and also
+    // we should check that on our neighbor
+    is_tile_wired(tile, require_stub = true) {
+        for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
+            if (require_stub && (tile.wire_directions & dirinfo.bit) === 0)
+                continue;
+
+            let neighbor = this.get_neighboring_cell(tile.cell, direction);
             if (! neighbor)
                 continue;
 
@@ -1640,7 +1698,11 @@ export class Level extends LevelInterface {
             if (! wired)
                 continue;
 
-            if (wired.wire_directions & DIRECTIONS[DIRECTIONS[direction].opposite].bit)
+            if (wired.type.wire_propagation_mode === 'none' && ! wired.type.is_power_source)
+                // Being next to e.g. a red teleporter doesn't count (but pink button is ok)
+                continue;
+
+            if (wired.wire_directions & dirinfo.opposite_bit)
                 return true;
         }
         return false;

@@ -985,18 +985,18 @@ export class Tileset {
                 this._draw_fourway_tile_power(tile, 0x0f, blit);
             }
             else {
-                if (tile.cell.powered_edges & DIRECTIONS[tile.direction].bit) {
+                if (tile.powered_edges & DIRECTIONS[tile.direction].bit) {
                     // Output (on top)
                     let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0, 0.5 + r, 0.5);
                     blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
                 }
-                if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].right].bit) {
+                if (tile.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].right].bit) {
                     // Right input, which includes the middle
                     // This actually covers the entire lower right corner, for bent inputs.
                     let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0.5 - r, 1, 1);
                     blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
                 }
-                if (tile.cell.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].left].bit) {
+                if (tile.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].left].bit) {
                     // Left input, which does not include the middle
                     // This actually covers the entire lower left corner, for bent inputs.
                     let [x0, y0, x1, y1] = this._rotate(tile.direction, 0, 0.5 - r, 0.5 - r, 1);
@@ -1017,7 +1017,7 @@ export class Tileset {
     _draw_fourway_tile_power(tile, wires, blit) {
         // Draw the unpowered tile underneath, if any edge is unpowered (and in fact if /none/ of it
         // is powered then we're done here)
-        let powered = (tile.cell ? tile.cell.powered_edges : 0) & wires;
+        let powered = (tile.cell ? tile.powered_edges : 0) & wires;
         if (! tile.cell || powered !== tile.wire_directions) {
             this._draw_fourway_power_underlay(this.layout['#unpowered'], wires, blit);
             if (! tile.cell || powered === 0)
