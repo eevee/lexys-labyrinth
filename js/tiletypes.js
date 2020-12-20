@@ -1030,7 +1030,6 @@ const TILE_TYPES = {
             // Copy this stuff in case the movement changes it
             // TODO should anything else be preserved?
             let type = actor.type;
-            let original_direction = actor.direction;
             let direction = actor.direction;
 
             // Unstick and try to move the actor; if it's blocked, abort the clone.
@@ -1041,7 +1040,7 @@ const TILE_TYPES = {
             for (let i = 0; i < (aggressive ? 4 : 1); i++) {
                 if (level.attempt_out_of_turn_step(actor, direction)) {
                     // FIXME add this underneath, just above the cloner, so the new actor is on top
-                    let new_template = new actor.constructor(type, original_direction);
+                    let new_template = new actor.constructor(type, direction);
                     // TODO maybe make a type method for this
                     if (type.on_clone) {
                         type.on_clone(new_template, actor);
