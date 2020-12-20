@@ -79,7 +79,7 @@ export function encode_replay(replay, stored_level = null) {
         }
 
         let input = replay.inputs[i];
-        if (input !== prev_input || count >= 252) {
+        if (input !== prev_input || count >= 252 - 2) {
             out[p] = count;
             out[p + 1] = input;
             p += 2;
@@ -91,6 +91,8 @@ export function encode_replay(replay, stored_level = null) {
         }
     }
     out[p] = 0xff;
+    p += 1;
+    out[p] = 0x00;
     p += 1;
     out = out.subarray(0, p);
     // TODO stick it on the level if given?
@@ -1301,7 +1303,9 @@ class C2M {
 
 export function synthesize_level(stored_level) {
     let c2m = new C2M;
-    c2m.add_section('CC2M', '133');
+    c2m.add_section('CC2M', '7');  // latest version
+    // TODO add in a VERS (editor version) section?  some other indication LL produced it?  not for
+    // url sharing though, should make that as small as possible
 
     if (stored_level.title) {
         c2m.add_section('TITL', stored_level.title);

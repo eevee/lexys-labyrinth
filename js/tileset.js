@@ -171,7 +171,7 @@ export const CC2_TILESET_LAYOUT = {
     suction_boots: [3, 6],
     hiking_boots: [4, 6],
     lightning_bolt: [5, 6],
-    // weird translucent spiral
+    // FIXME draw the current player background...  more external state for the renderer though...
     // TODO dopps can push but i don't think they have any other visuals
     doppelganger1: {
         base: [7, 6],
@@ -467,6 +467,8 @@ export const CC2_TILESET_LAYOUT = {
         exploded: [1, 5],
         failed: [1, 5],
     },
+    // Do a quick spin I guess??
+    player1_exit: [[0, 22], [8, 22], [0, 23], [8, 23]],
     bogus_player_win: {
         overlay: [0, 23],
         base: 'exit',
@@ -591,6 +593,7 @@ export const CC2_TILESET_LAYOUT = {
         exploded: [1, 5],
         failed: [1, 5],
     },
+    player2_exit: [[0, 27], [8, 27], [0, 28], [8, 28]],
     fire: [
         [12, 29],
         [13, 29],
@@ -879,6 +882,8 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
 
     // Custom VFX
     splash_slime: [[0, 38], [1, 38], [2, 38], [3, 38]],
+    player1_exit: [[8, 38], [9, 38], [10, 38], [11, 38]],
+    player2_exit: [[12, 38], [13, 38], [14, 38], [15, 38]],
 });
 
 export class Tileset {

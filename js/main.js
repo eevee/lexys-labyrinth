@@ -1266,7 +1266,7 @@ class Player extends PrimaryView {
         this.cycle_button.disabled = ! (
             this.state === 'playing' && ! this.level.stored_level.use_cc1_boots &&
             this.level.player.toolbelt && this.level.player.toolbelt.length > 1);
-        this.swap_button.disabled = ! (this.state === 'playing' && this.level.players.length > 1);
+        this.swap_button.disabled = ! (this.state === 'playing' && this.level.remaining_players > 1);
 
         // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;

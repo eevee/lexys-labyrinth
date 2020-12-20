@@ -48,6 +48,8 @@ function player_visual_state(me) {
         return 'normal';
     }
 
+    // FIXME fail reason gets attached to the wrong player if there's a swap at the same time as a
+    // player gets hit
     if (me.fail_reason === 'drowned') {
         return 'drowned';
     }
@@ -68,6 +70,7 @@ function player_visual_state(me) {
     }
     else if (me.cell && (me.previous_cell || me.cell).some(t => t.type.name === 'water')) {
         // CC2 shows a swimming pose while still in water, or moving away from water
+        // FIXME this also shows in some cases when we don't have flippers, e.g. when starting in water
         return 'swimming';
     }
     else if (me.slide_mode === 'ice') {
@@ -2492,9 +2495,12 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid & ~COLLISION.rover,
         on_arrive(me, level, other) {
-            // FIXME multiple players
             if (other.type.is_real_player) {
-                level.win();
+                level.remaining_players -= 1;
+                if (level.remaining_players > 0) {
+                    level.swap_player1 = true;
+                    level.transmute_tile(other, other.type.name === 'player' ? 'player1_exit' : 'player2_exit');
+                }
             }
         },
     },
@@ -2541,6 +2547,20 @@ const TILE_TYPES = {
         on_approach(me, level, other) {
             level.remove_tile(me);
         },
+    },
+    // New VFX (not in CC2, so they don't block to avoid altering gameplay)
+    // TODO would like these to play faster but the first frame is often skipped due to other bugs
+    player1_exit: {
+        draw_layer: DRAW_LAYERS.actor,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 8,
+    },
+    player2_exit: {
+        draw_layer: DRAW_LAYERS.actor,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 8,
     },
 
     // Invalid tiles that appear in some CCL levels because community level

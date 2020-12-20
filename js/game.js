@@ -378,7 +378,7 @@ export class Level extends LevelInterface {
 
         let n = 0;
         let connectables = [];
-        this.players = [];
+        this.remaining_players = 0;
         // FIXME handle traps correctly:
         // - if an actor is in the cell, set the trap to open and unstick everything in it
         for (let y = 0; y < this.height; y++) {
@@ -399,7 +399,10 @@ export class Level extends LevelInterface {
                     }
 
                     if (tile.type.is_real_player) {
-                        this.players.push(tile);
+                        this.remaining_players += 1;
+                        if (this.player === null) {
+                            this.player = tile;
+                        }
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);
@@ -413,9 +416,6 @@ export class Level extends LevelInterface {
             }
         }
         // TODO complain if no player
-        // FIXME this is not how multiple players works
-        this.player = this.players[0];
-        this.player_index = 0;
         // Used for doppelgangers
         this.player1_move = null;
         this.player2_move = null;
@@ -663,7 +663,7 @@ export class Level extends LevelInterface {
                 '_rng1', '_rng2', '_blob_modifier', 'force_floor_direction',
                 'tic_counter', 'time_remaining', 'timer_paused',
                 'chips_remaining', 'bonus_points', 'hint_shown', 'state',
-                'player1_move', 'player2_move',
+                'player1_move', 'player2_move', 'remaining_players', 'player',
         ]) {
             this.pending_undo.level_props[key] = this[key];
         }
@@ -848,11 +848,39 @@ export class Level extends LevelInterface {
         this.actors.length = p;
 
         // Possibly switch players
-        // FIXME not correct
+        // FIXME cc2 has very poor interactions between this feature and cloners; come up with some
+        // better rules as a default
         if (this.swap_player1) {
-            this.player_index += 1;
-            this.player_index %= this.players.length;
-            this.player = this.players[this.player_index];
+            // Reset the set of keys released since last tic
+            this.p1_released = 0xff;
+
+            // Iterate backwards over the actor list looking for a viable next player to control
+            let i0 = this.actors.indexOf(this.player);
+            if (i0 < 0) {
+                i0 = 0;
+            }
+            let i = i0;
+            while (true) {
+                i -= 1;
+                if (i < 0) {
+                    i += this.actors.length;
+                }
+                if (i === i0)
+                    break;
+
+                let actor = this.actors[i];
+                if (! actor.cell)
+                    continue;
+
+                if (actor.type.is_real_player) {
+                    this.player = actor;
+                    break;
+                }
+            }
+        }
+
+        if (this.remaining_players <= 0) {
+            this.win();
         }
 
         // Advance the clock
@@ -901,6 +929,12 @@ export class Level extends LevelInterface {
         // Only reset the player's is_pushing between movement, so it lasts for the whole push
         this._set_tile_prop(actor, 'is_pushing', false);
 
+        // If the game has already been won (or lost), don't bother with a move; it'll misalign the
+        // player from their actual position and not accomplish anything gameplay-wise.
+        // (Note this is only necessary because our update order is inverted from CC2.)
+        if (this.state !== 'playing')
+            return null;
+
         // TODO player in a cloner can't move (but player in a trap can still turn)
 
         let [dir1, dir2] = this._extract_player_directions(input);
@@ -940,7 +974,7 @@ export class Level extends LevelInterface {
             if (new_input & INPUT_BITS.drop) {
                 this.drop_item(this.player);
             }
-            if (new_input & INPUT_BITS.swap) {
+            if ((new_input & INPUT_BITS.swap) && this.remaining_players > 1) {
                 // This is delayed until the end of the tic to avoid screwing up anything
                 // checking this.player
                 this.swap_player1 = true;
@@ -1905,6 +1939,8 @@ export class Level extends LevelInterface {
         // Co-opt movement_cooldown/speed for these despite that they aren't moving, since they're
         // also used to animate everything else.  Decrement the cooldown immediately, to match the
         // normal actor behavior of decrementing one's own cooldown at the end of one's turn
+        // FIXME this replicates cc2 behavior, but it also means the animation is actually visible
+        // for one less tic than expected
         this._set_tile_prop(tile, 'movement_speed', tile.type.ttl);
         this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl - 1);
         cell._add(tile);
