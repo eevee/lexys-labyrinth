@@ -817,6 +817,13 @@ export class Level extends LevelInterface {
                 this._handle_slide_bonk(actor);
                 success = this.attempt_step(actor, actor.decision);
             }
+            // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
+            // FIXME and if they have cleats, they get stuck instead (?!)
+            else if (actor.type.name === 'ghost' && actor.cell.get_terrain().type.slide_mode === 'ice')
+            {
+                actor.decision = DIRECTIONS[actor.decision].opposite;
+                success = this.attempt_step(actor, actor.decision);
+            }
 
             // Track whether the player is blocked, for visual effect
             if (actor === this.player && actor.decision && ! success) {

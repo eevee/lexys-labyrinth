@@ -1946,11 +1946,16 @@ const TILE_TYPES = {
         collision_mask: COLLISION.ghost,
         blocks_collision: COLLISION.all_but_player,
         has_inventory: true,
+        ignores: new Set(['bomb', 'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
         movement_speed: 4,
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
         decide_movement(me, level) {
             // turn left: preserve current direction; if that doesn't work, turn left, then right,
             // then back the way we came (same as glider)
+            // TODO weird cc2 quirk: ghosts can't turn on ice, and FIXME they stop if they have cleats
+            if (me.cell.get_terrain().type.slide_mode === 'ice') {
+                return [me.direction];
+            }
             let d = DIRECTIONS[me.direction];
             return [me.direction, d.left, d.right, d.opposite];
         },
@@ -2099,13 +2104,12 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        on_drop(level, owner) {
-            // FIXME not if the cell has a no sign
-            if (! owner.type.is_real_player) {
-                // Only players can activate dynamite
-                return;
+        on_depart(me, level, other) {
+            if (other.type.is_real_player && ! me.cell.get_item_mod()) {
+                level._set_tile_prop(me, 'timer', 85);  // FIXME??  wiki just says about 4.3 seconds what
+                level.transmute_tile(me, 'dynamite_lit');
+                level.add_actor(me);
             }
-            return 'dynamite_lit';
         },
     },
     dynamite_lit: {
@@ -2114,21 +2118,19 @@ const TILE_TYPES = {
         is_monster: true,
         // FIXME ???????
         collision_mask: COLLISION.block_cc2,
+        blocks_collision: COLLISION.all_but_player,
         // FIXME inherits a copy of player's inventory!
         // FIXME holds down buttons, so needs an on_arrive
         // FIXME speaking of buttons, destroyed actors should on_depart
+        // FIXME wait couldn't this just be a decide_movement?
         on_tic(me, level) {
             // FIXME When Chip or Melinda leaves a tile with a time bomb and no no sign on it, the
             // time bomb will count down for about 4.3 seconds before exploding; it does not matter
             // whether the player dropped the item (e.g. if the player teleported)????
             if (me.slide_mode || me.movement_cooldown)
                 return;
-            if (me.timer === undefined) {
-                me.timer = 86;  // FIXME??  wiki just says about 4.3 seconds what
-                return;
-            }
 
-            me.timer -= 1;
+            level._set_tile_prop(me, 'timer', me.timer - 1);
             if (me.timer > 0)
                 return;
 
