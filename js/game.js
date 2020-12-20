@@ -1563,13 +1563,15 @@ export class Level extends LevelInterface {
         // large numbers of tiles at a time, so store it all in one map and undo it in one shot.
         let powered_edges_changes = new Map;
         let _set_edges = (tile, new_edges) => {
-            if (powered_edges_changes.has(tile)) {
-                if (powered_edges_changes.get(tile) === new_edges) {
-                    powered_edges_changes.delete(tile);
+            if (this.undo_enabled) {
+                if (powered_edges_changes.has(tile)) {
+                    if (powered_edges_changes.get(tile) === new_edges) {
+                        powered_edges_changes.delete(tile);
+                    }
                 }
-            }
-            else {
-                powered_edges_changes.set(tile, tile.powered_edges);
+                else {
+                    powered_edges_changes.set(tile, tile.powered_edges);
+                }
             }
             tile.powered_edges = new_edges;
         };
@@ -1649,7 +1651,9 @@ export class Level extends LevelInterface {
                 continue;
 
             circuit.is_powered = is_powered;
-            circuit_changes.set(circuit, was_powered);
+            if (this.undo_enabled) {
+                circuit_changes.set(circuit, was_powered);
+            }
 
             for (let [tile, edges] of circuit.tiles.entries()) {
                 if (is_powered) {
