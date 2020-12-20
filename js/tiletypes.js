@@ -1945,7 +1945,11 @@ const TILE_TYPES = {
         collision_mask: COLLISION.ghost,
         blocks_collision: COLLISION.all_but_player,
         has_inventory: true,
-        ignores: new Set(['bomb', 'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        ignores: new Set([
+            'bomb',
+            'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
+            'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
+        ]),
         movement_speed: 4,
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
         decide_movement(me, level) {
