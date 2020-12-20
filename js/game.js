@@ -812,10 +812,6 @@ export class Level extends LevelInterface {
             let old_cell = actor.cell;
             let success = this.attempt_step(actor, actor.decision);
 
-            if (! success && actor.type.on_blocked) {
-                actor.type.on_blocked(actor, this, actor.decision);
-            }
-
             if (! success && actor.slide_mode === 'ice') {
                 this._handle_slide_bonk(actor);
                 success = this.attempt_step(actor, actor.decision);
@@ -1220,18 +1216,15 @@ export class Level extends LevelInterface {
         let double_speed = false;
 
         let move = DIRECTIONS[direction].movement;
-        let goal_cell = this.get_neighboring_cell(actor.cell, direction);
-        if (! goal_cell)
+        if (! this.check_movement(actor, actor.cell, direction, 'push')) {
+            if (actor.type.on_blocked) {
+                actor.type.on_blocked(actor, this, direction);
+            }
             return false;
-
-        // Only bother touching the goal cell if we're not already trapped in this one
-        if (! actor.cell.try_leaving(actor, direction))
-            return false;
-
-        if (! goal_cell.try_entering(actor, direction, this, 'push'))
-            return false;
+        }
 
         // FIXME this feels clunky
+        let goal_cell = this.get_neighboring_cell(actor.cell, direction);
         let terrain = goal_cell.get_terrain();
         if (terrain && terrain.type.slide_mode && ! actor.ignores(terrain.type.name)) {
             double_speed = true;
@@ -1543,11 +1536,11 @@ export class Level extends LevelInterface {
                     }
                 }
                 let tile = new Tile(type);
-                if (type.is_actor) {
-                    tile.direction = actor.direction;
-                    this.add_actor(tile);
-                }
                 this.add_tile(tile, actor.cell);
+                if (type.is_actor) {
+                    this.add_actor(tile);
+                    this.attempt_out_of_turn_step(tile, actor.direction);
+                }
             }
 
             actor.toolbelt.shift();
