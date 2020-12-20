@@ -2202,6 +2202,7 @@ const TILE_TYPES = {
         has_inventory: true,
         can_reveal_walls: true,
         // FIXME ???????
+        // FIXME we need to hit the player also
         collision_mask: COLLISION.block_cc2,
         // FIXME do i start moving immediately when dropped, or next turn?
         movement_speed: 4,
@@ -2209,11 +2210,10 @@ const TILE_TYPES = {
             return [me.direction];
         },
         on_blocked(me, level, direction) {
-            if (me.slide_mode)
-                return;
             let cell = level.get_neighboring_cell(me.cell, direction);
+            let other;
             if (cell) {
-                let other = cell.get_actor();
+                other = cell.get_actor();
                 if (other) {
                     if (other.is_real_player) {
                         level.fail(me.type.name);
@@ -2223,7 +2223,13 @@ const TILE_TYPES = {
                     }
                 }
             }
+            if (me.slide_mode && ! other) {
+                // Sliding bowling balls don't blow up if they hit a regular wall
+                return;
+            }
             level.transmute_tile(me, 'explosion');
+            // Remove our slide mode so we don't attempt to bounce if on ice
+            level.make_slide(me, null);
         },
     },
     xray_eye: {

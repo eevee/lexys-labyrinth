@@ -809,13 +809,13 @@ export class Level extends LevelInterface {
             let old_cell = actor.cell;
             let success = this.attempt_step(actor, actor.decision);
 
+            if (! success && actor.type.on_blocked) {
+                actor.type.on_blocked(actor, this, actor.decision);
+            }
+
             if (! success && actor.slide_mode === 'ice') {
                 this._handle_slide_bonk(actor);
                 success = this.attempt_step(actor, actor.decision);
-            }
-
-            if (! success && actor.type.on_blocked) {
-                actor.type.on_blocked(actor, this, actor.decision);
             }
 
             // Track whether the player is blocked, for visual effect
