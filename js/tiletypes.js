@@ -1970,11 +1970,19 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         is_monster: true,
+        has_inventory: true,
         collision_mask: COLLISION.rover,
         blocks_collision: COLLISION.all_but_player,
         can_reveal_walls: true,
         movement_speed: 8,
         movement_parity: 2,
+        // FIXME basically everyone has this same set of objects listed?
+        pushes: {
+            dirt_block: true,
+            ice_block: true,
+            frame_block: true,
+            circuit_block: true,
+        },
         on_ready(me, level) {
             me.current_emulatee = 0;
             me.attempted_moves = 0;
@@ -2033,13 +2041,14 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_key: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        // FIXME ok this is ghastly
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     key_green: {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_key: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     // Boots
     // TODO note: ms allows blocks to pass over tools
@@ -2047,14 +2056,14 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
     },
     suction_boots: {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         item_ignores: new Set([
             'force_floor_n',
             'force_floor_s',
@@ -2067,21 +2076,21 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         item_ignores: new Set(['fire', 'flame_jet_on']),
     },
     flippers: {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         item_ignores: new Set(['water']),
     },
     hiking_boots: {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         // FIXME uhh these "ignore" that dirt and gravel block us, but they don't ignore the on_arrive, so, uhhhh
     },
     // Other tools
@@ -2089,7 +2098,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_drop(level, owner) {
             // FIXME not if the cell has a no sign
             if (! owner.type.is_real_player) {
@@ -2191,7 +2200,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_drop(level, owner) {
             return 'rolling_ball';
         },
@@ -2237,54 +2246,54 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     helmet: {
         // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     railroad_sign: {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     foil: {
         // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     lightning_bolt: {
         // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     speed_boots: {
         // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     bribe: {
         // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     hook: {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
 
     // Progression
