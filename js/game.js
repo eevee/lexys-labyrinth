@@ -270,8 +270,8 @@ export class Cell extends Array {
                         return false;
                 }
                 else if (push_mode === 'push') {
-                    if (actor === this.player) {
-                        this._set_tile_prop(actor, 'is_pushing', true);
+                    if (actor === level.player) {
+                        level._set_tile_prop(actor, 'is_pushing', true);
                     }
                     if (! level.attempt_out_of_turn_step(tile, direction)) {
                         if (tile.slide_mode !== null && tile.movement_cooldown !== 0) {
@@ -731,6 +731,9 @@ export class Level extends LevelInterface {
                 if (actor.movement_cooldown <= 0) {
                     this._set_tile_prop(actor, 'previous_cell', null);
                     this._set_tile_prop(actor, 'movement_speed', null);
+                    if (actor.is_pulled) {
+                        this._set_tile_prop(actor, 'is_pulled', false);
+                    }
                 }
             }
         }
@@ -1170,12 +1173,25 @@ export class Level extends LevelInterface {
         }
     }
 
-    // FIXME make this interact with railroads correctly and use it for players and in attempt_step
     check_movement(actor, orig_cell, direction, push_mode) {
         let dest_cell = this.get_neighboring_cell(orig_cell, direction);
-        return (dest_cell &&
+        let success = (dest_cell &&
             orig_cell.try_leaving(actor, direction) &&
             dest_cell.try_entering(actor, direction, this, push_mode));
+        if (success && push_mode === 'push' && actor.has_item('hook')) {
+            let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
+            if (behind_cell) {
+                let behind_actor = behind_cell.get_actor();
+                // FIXME something else happens during cooldown i think
+                if (behind_actor && ! behind_actor.movement_cooldown) {
+                    this._set_tile_prop(behind_actor, 'is_pulled', true);
+                    this.attempt_out_of_turn_step(behind_actor, direction);
+                }
+                // TODO ok this is a bit tricky.  the pull has to happen after we confirm we /can/
+                // move, but not after we actually start moving, because there's hook slapping...
+            }
+        }
+        return success;
     }
 
     // Try to move the given actor one tile in the given direction and update their cooldown.
@@ -1322,9 +1338,9 @@ export class Level extends LevelInterface {
             else if (actor.type.is_monster && tile.type.is_real_player) {
                 this.fail(actor.type.name);
             }
-            else if (actor.type.is_block && tile.type.is_real_player) {
+            else if (actor.type.is_block && tile.type.is_real_player && ! actor.is_pulled) {
                 // Note that blocks squish players if they move for ANY reason, even if pushed by
-                // another player!
+                // another player!  The only exception is being pulled
                 this.fail('squished');
             }
 

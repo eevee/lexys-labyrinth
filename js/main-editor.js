@@ -1171,6 +1171,7 @@ const EDITOR_PALETTE = [{
         'xray_eye', 'helmet', 'foil', 'lightning_bolt',
         'bowling_ball', 'dynamite', 'no_sign', 'gift_bow',
         'score_10', 'score_100', 'score_1000', 'score_2x',
+        'hook',
     ],
 }, {
     title: "Creatures",
