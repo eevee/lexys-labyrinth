@@ -375,6 +375,10 @@ export class Level extends LevelInterface {
         }
         this.undo_buffer_index = 0;
         this.pending_undo = this.create_undo_entry();
+        // If undo_enabled is false, we won't create any undo entries.
+        // Undo is only disabled during bulk testing, where a) there's no
+        // possibility of needing to undo and b) the overhead is noticable.
+        this.undo_enabled = true;
 
         let n = 0;
         let connectables = [];
@@ -657,15 +661,17 @@ export class Level extends LevelInterface {
     }
 
     begin_tic(p1_input) {
-        // Store some current level state in the undo entry.  (These will often not be modified, but
-        // they only take a few bytes each so that's fine.)
-        for (let key of [
-                '_rng1', '_rng2', '_blob_modifier', 'force_floor_direction',
-                'tic_counter', 'time_remaining', 'timer_paused',
-                'chips_remaining', 'bonus_points', 'hint_shown', 'state',
-                'player1_move', 'player2_move', 'remaining_players', 'player',
-        ]) {
-            this.pending_undo.level_props[key] = this[key];
+        if (this.undo_enabled) {
+            // Store some current level state in the undo entry.  (These will often not be modified, but
+            // they only take a few bytes each so that's fine.)
+            for (let key of [
+                    '_rng1', '_rng2', '_blob_modifier', 'force_floor_direction',
+                    'tic_counter', 'time_remaining', 'timer_paused',
+                    'chips_remaining', 'bonus_points', 'hint_shown', 'state',
+                    'player1_move', 'player2_move', 'remaining_players', 'player',
+            ]) {
+                this.pending_undo.level_props[key] = this[key];
+            }
         }
         this.p1_input = p1_input;
         this.p1_released |= ~p1_input;  // Action keys released since we last checked them
@@ -848,7 +854,7 @@ export class Level extends LevelInterface {
             }
             else {
                 let local_p = p;
-                this.pending_undo.push(() => this.actors.splice(local_p, 0, actor));
+                this._push_pending_undo(() => this.actors.splice(local_p, 0, actor));
             }
         }
         this.actors.length = p;
@@ -1506,7 +1512,7 @@ export class Level extends LevelInterface {
         // Cycle leftwards, i.e., the oldest item moves to the end of the list
         if (actor.toolbelt && actor.toolbelt.length > 1) {
             actor.toolbelt.push(actor.toolbelt.shift());
-            this.pending_undo.push(() => actor.toolbelt.unshift(actor.toolbelt.pop()));
+            this._push_pending_undo(() => actor.toolbelt.unshift(actor.toolbelt.pop()));
         }
     }
 
@@ -1544,7 +1550,7 @@ export class Level extends LevelInterface {
             }
 
             actor.toolbelt.shift();
-            this.pending_undo.push(() => actor.toolbelt.unshift(name));
+            this._push_pending_undo(() => actor.toolbelt.unshift(name));
         }
     }
 
@@ -1664,7 +1670,7 @@ export class Level extends LevelInterface {
             }
         }
 
-        this.pending_undo.push(() => {
+        this._push_pending_undo(() => {
             for (let [tile, edges] of powered_edges_changes.entries()) {
                 tile.powered_edges = edges;
             }
@@ -1778,6 +1784,9 @@ export class Level extends LevelInterface {
     }
 
     commit() {
+        if (! this.undo_enabled) {
+            return;
+        }
         this.undo_buffer[this.undo_buffer_index] = this.pending_undo;
         this.pending_undo = this.create_undo_entry();
 
@@ -1821,12 +1830,22 @@ export class Level extends LevelInterface {
         }
     }
 
+    _push_pending_undo(thunk) {
+        if (this.undo_enabled) {
+            this.pending_undo.push(thunk)
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Level alteration methods.  EVERYTHING that changes the state of a level,
     // including the state of a single tile, should do it through one of these
     // for undo/rewind purposes
 
     _set_tile_prop(tile, key, val) {
+        if (! this.undo_enabled) {
+            tile[key] = val;
+            return;
+        }
         if (tile[key] === val)
             return;
 
@@ -1887,7 +1906,7 @@ export class Level extends LevelInterface {
             this.sfx.play_once('lose');
         }
 
-        this.pending_undo.push(() => {
+        this._push_pending_undo(() => {
             this.fail_reason = null;
             this.player.fail_reason = null;
         });
@@ -1936,17 +1955,17 @@ export class Level extends LevelInterface {
     remove_tile(tile) {
         let cell = tile.cell;
         let index = cell._remove(tile);
-        this.pending_undo.push(() => cell._add(tile, index));
+        this._push_pending_undo(() => cell._add(tile, index));
     }
 
     add_tile(tile, cell, index = null) {
         cell._add(tile, index);
-        this.pending_undo.push(() => cell._remove(tile));
+        this._push_pending_undo(() => cell._remove(tile));
     }
 
     add_actor(actor) {
         this.actors.push(actor);
-        this.pending_undo.push(() => this.actors.pop());
+        this._push_pending_undo(() => this.actors.pop());
     }
 
     spawn_animation(cell, name) {
@@ -1961,7 +1980,7 @@ export class Level extends LevelInterface {
         this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl - 1);
         cell._add(tile);
         this.actors.push(tile);
-        this.pending_undo.push(() => {
+        this._push_pending_undo(() => {
             this.actors.pop();
             cell._remove(tile);
         });
@@ -1969,7 +1988,7 @@ export class Level extends LevelInterface {
 
     transmute_tile(tile, name) {
         let current = tile.type.name;
-        this.pending_undo.push(() => tile.type = TILE_TYPES[current]);
+        this._push_pending_undo(() => tile.type = TILE_TYPES[current]);
         tile.type = TILE_TYPES[name];
 
         // For transmuting into an animation, set up the timer immediately
@@ -2018,7 +2037,7 @@ export class Level extends LevelInterface {
                 actor.keyring = {};
             }
             actor.keyring[name] = (actor.keyring[name] ?? 0) + 1;
-            this.pending_undo.push(() => actor.keyring[name] -= 1);
+            this._push_pending_undo(() => actor.keyring[name] -= 1);
         }
         else {
             // tool, presumably
@@ -2026,7 +2045,7 @@ export class Level extends LevelInterface {
                 actor.toolbelt = [];
             }
             actor.toolbelt.push(name);
-            this.pending_undo.push(() => actor.toolbelt.pop());
+            this._push_pending_undo(() => actor.toolbelt.pop());
 
             // Nothing can hold more than four items
             if (actor.toolbelt.length > 4) {
@@ -2043,7 +2062,7 @@ export class Level extends LevelInterface {
                 return true;
             }
 
-            this.pending_undo.push(() => actor.keyring[name] += 1);
+            this._push_pending_undo(() => actor.keyring[name] += 1);
             actor.keyring[name] -= 1;
             return true;
         }
@@ -2056,7 +2075,7 @@ export class Level extends LevelInterface {
             let index = actor.toolbelt.indexOf(name);
             if (index >= 0) {
                 actor.toolbelt.splice(index, 1);
-                this.pending_undo.push(() => actor.toolbelt.splice(index, 0, name));
+                this._push_pending_undo(() => actor.toolbelt.splice(index, 0, name));
                 return true;
             }
         }
@@ -2067,7 +2086,7 @@ export class Level extends LevelInterface {
     take_all_keys_from_actor(actor) {
         if (actor.keyring && Object.values(actor.keyring).some(n => n > 0)) {
             let keyring = actor.keyring;
-            this.pending_undo.push(() => actor.keyring = keyring);
+            this._push_pending_undo(() => actor.keyring = keyring);
             actor.keyring = {};
             return true;
         }
@@ -2076,7 +2095,7 @@ export class Level extends LevelInterface {
     take_all_tools_from_actor(actor) {
         if (actor.toolbelt && actor.toolbelt.length > 0) {
             let toolbelt = actor.toolbelt;
-            this.pending_undo.push(() => actor.toolbelt = toolbelt);
+            this._push_pending_undo(() => actor.toolbelt = toolbelt);
             actor.toolbelt = [];
             return true;
         }

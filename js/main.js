@@ -2173,6 +2173,7 @@ class PackTestDialog extends DialogOverlay {
                 level.sfx = dummy_sfx;
                 level.force_floor_direction = replay.initial_force_floor_direction;
                 level._blob_modifier = replay.blob_seed;
+                level.undo_enabled = false; // slight performance boost
 
                 while (true) {
                     let input = replay.get(level.tic_counter);
