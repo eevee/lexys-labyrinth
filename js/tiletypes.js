@@ -600,7 +600,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.monster_solid & ~COLLISION.fireball,
         on_arrive(me, level, other) {
             if (other.type.name === 'ice_block') {
-                level.remove_tile(other);
+                level.transmute_tile(other, 'explosion');
                 level.transmute_tile(me, 'water');
             }
             else if (other.type.is_real_player) {
