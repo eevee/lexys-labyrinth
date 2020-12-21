@@ -1500,8 +1500,10 @@ export class Level extends LevelInterface {
     remember_player_move(direction) {
         if (this.player.type.name === 'player') {
             this.player1_move = direction;
+            this.player2_move = null;
         }
         else {
+            this.player1_move = null;
             this.player2_move = direction;
         }
     }
