@@ -135,12 +135,6 @@ const TILE_TYPES = {
     // Floors and walls
     floor: {
         draw_layer: DRAW_LAYERS.terrain,
-        on_arrive(me, level, other) {
-            if (other.type.name === 'blob' && other.previous_cell && other.previous_cell.has('slime')) {
-                // Blobs spread slime onto floor
-                level.transmute_tile(me, 'slime');
-            }
-        },
     },
     floor_letter: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -321,8 +315,12 @@ const TILE_TYPES = {
     },
     canopy: {
         draw_layer: DRAW_LAYERS.overlay,
-        // TODO augh, blobs will specifically not move from one canopy to another
         blocks_collision: COLLISION.bug | COLLISION.rover,
+        blocks(me, level, other, direction) {
+            // Blobs will specifically not move from one canopy to another
+            if (other.type.name === 'blob' && other.cell.has('canopy'))
+                return true;
+        },
     },
 
     // Swivel doors
@@ -611,12 +609,6 @@ const TILE_TYPES = {
             }
             else if (other.type.is_real_player) {
                 level.fail('burned');
-            }
-            else if (other.type.name === 'ghost') {
-                if (other.has_item('fire_boots')) {
-                    // ?????
-                    level.transmute_tile(me, 'floor');
-                }
             }
             else {
                 level.remove_tile(other);
@@ -1873,7 +1865,19 @@ const TILE_TYPES = {
         decide_movement(me, level) {
             // move completely at random
             let modifier = level.get_blob_modifier();
-            return [['north', 'east', 'south', 'west'][(level.prng() + modifier) % 4]];
+            return [DIRECTION_ORDER[(level.prng() + modifier) % 4]];
+        },
+        on_step_on(me, level, cell) {
+            let terrain = cell.get_terrain();
+            if (! terrain)
+                return;
+
+            if (terrain.type.name === 'floor') {
+                // Blobs spread slime onto floor
+                if (me.previous_cell && me.previous_cell.has('slime')) {
+                    level.transmute_tile(terrain, 'slime');
+                }
+            }
         },
     },
     teeth: {
@@ -1967,6 +1971,18 @@ const TILE_TYPES = {
             }
             let d = DIRECTIONS[me.direction];
             return [me.direction, d.left, d.right, d.opposite];
+        },
+        on_step_on(me, level, cell) {
+            let terrain = cell.get_terrain();
+            if (! terrain)
+                return;
+
+            if (terrain.type.name === 'fire') {
+                // Ghosts with fire boots erase fire
+                if (me.has_item('fire_boots')) {
+                    level.transmute_tile(terrain, 'floor');
+                }
+            }
         },
     },
     floor_mimic: {
