@@ -977,18 +977,21 @@ export class Level extends LevelInterface {
         // FIXME cc2 seems to rely on key repeat for this; if you have four bowling balls and hold
         // Q, you'll throw the first, wait a second or so, then release the rest rapid-fire.  absurd
         let new_input = input & this.p1_released;
+        this.p1_released = 0xff;
         if (new_input & INPUT_BITS.cycle) {
             this.cycle_inventory(this.player);
+            this.p1_released &= ~INPUT_BITS.cycle;
         }
         if ((new_input & INPUT_BITS.drop) && may_move) {
             this.drop_item(this.player);
+            this.p1_released &= ~INPUT_BITS.drop;
         }
         if ((new_input & INPUT_BITS.swap) && this.remaining_players > 1) {
             // This is delayed until the end of the tic to avoid screwing up anything
             // checking this.player
             this.swap_player1 = true;
+            this.p1_released &= ~INPUT_BITS.swap;
         }
-        this.p1_released = ~input;
 
         if (actor.slide_mode && ! (may_move && dir1)) {
             // This is a forced move, in which case we don't even check it
