@@ -1173,6 +1173,14 @@ class Player extends PrimaryView {
             dt = 10;
         }
 
+        // Set the new timeout FIRST, so the time it takes to update the game doesn't count against
+        // the framerate
+        if (this.state === 'rewinding') {
+            // Rewind faster than normal time
+            dt *= 0.5;
+        }
+        this._advance_handle = window.setTimeout(this._advance_bound, dt);
+
         if (this.state === 'playing') {
             this.advance_by(num_advances);
         }
@@ -1189,12 +1197,6 @@ class Player extends PrimaryView {
             // TODO detect if we hit the start of the level (rather than just running the undo
             // buffer dry) and change to 'waiting' instead?
         }
-
-        if (this.state === 'rewinding') {
-            // Rewind faster than normal time
-            dt *= 0.5;
-        }
-        this._advance_handle = window.setTimeout(this._advance_bound, dt);
     }
 
     undo() {
