@@ -971,28 +971,24 @@ export class Level extends LevelInterface {
         //   as an override.
         let may_move = (! actor.slide_mode || (actor.slide_mode === 'force' && actor.last_move_was_force));
 
-        // Check for special player actions, which can only happen when allowed to move
-        // FIXME if you press a key while moving it should happen as soon as you stop (assuming
-        // the key is still held down)
-        // FIXME cc2 seems to rely on key repeat for this; the above is true, but also, if you
-        // have four bowling balls and hold Q, you'll throw the first, wait a second or so, then
-        // release the rest rapid-fire.  absurd
-        // FIXME i am not actually sure this goes here
-        if (may_move) {
-            let new_input = input & this.p1_released;
-            if (new_input & INPUT_BITS.cycle) {
-                this.cycle_inventory(this.player);
-            }
-            if (new_input & INPUT_BITS.drop) {
-                this.drop_item(this.player);
-            }
-            if ((new_input & INPUT_BITS.swap) && this.remaining_players > 1) {
-                // This is delayed until the end of the tic to avoid screwing up anything
-                // checking this.player
-                this.swap_player1 = true;
-            }
-            this.p1_released = ~input;
+        // Check for special player actions, which can only happen at decision time.  Dropping can
+        // only be done when the player is allowed to make a move (i.e. override), but the other two
+        // can be done freely while sliding.
+        // FIXME cc2 seems to rely on key repeat for this; if you have four bowling balls and hold
+        // Q, you'll throw the first, wait a second or so, then release the rest rapid-fire.  absurd
+        let new_input = input & this.p1_released;
+        if (new_input & INPUT_BITS.cycle) {
+            this.cycle_inventory(this.player);
         }
+        if ((new_input & INPUT_BITS.drop) && may_move) {
+            this.drop_item(this.player);
+        }
+        if ((new_input & INPUT_BITS.swap) && this.remaining_players > 1) {
+            // This is delayed until the end of the tic to avoid screwing up anything
+            // checking this.player
+            this.swap_player1 = true;
+        }
+        this.p1_released = ~input;
 
         if (actor.slide_mode && ! (may_move && dir1)) {
             // This is a forced move, in which case we don't even check it
