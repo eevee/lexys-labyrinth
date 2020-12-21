@@ -815,19 +815,24 @@ export class Level extends LevelInterface {
                 continue;
 
             // Actor is allowed to move, so do so
-            let old_cell = actor.cell;
             let success = this.attempt_step(actor, actor.decision);
 
-            if (! success && actor.slide_mode === 'ice') {
-                this._handle_slide_bonk(actor);
-                success = this.attempt_step(actor, actor.decision);
-            }
-            // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
-            // FIXME and if they have cleats, they get stuck instead (?!)
-            else if (actor.type.name === 'ghost' && actor.cell.get_terrain().type.slide_mode === 'ice')
-            {
-                actor.decision = DIRECTIONS[actor.decision].opposite;
-                success = this.attempt_step(actor, actor.decision);
+            // FIXME not convinced that ice bonking should actually go here.  in cc2 it appears to
+            // happen every frame, fwiw, but i'm not sure if that includes frames with forced moves
+            // (though i guess that's impossible)
+            if (! success) {
+                let terrain = actor.cell.get_terrain();
+                if (terrain.type.slide_mode === 'ice' && (! actor.ignores(terrain.type.name) ||
+                    // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
+                    // FIXME and if they have cleats, they get stuck instead (?!)
+                    (actor.type.name === 'ghost' && actor.cell.get_terrain().type.slide_mode === 'ice')))
+                {
+                    // Bonk on ice: turn the actor around, consult the tile in case it's an ice
+                    // corner, and try again
+                    actor.direction = DIRECTIONS[actor.decision].opposite;
+                    actor.decision = terrain.type.get_slide_direction(terrain, this, actor);
+                    success = this.attempt_step(actor, actor.decision);
+                }
             }
 
             // Track whether the player is blocked, for visual effect
@@ -949,7 +954,6 @@ export class Level extends LevelInterface {
 
         // TODO player in a cloner can't move (but player in a trap can still turn)
 
-        let [dir1, dir2] = this._extract_player_directions(input);
         let try_direction = (direction, push_mode) => {
             direction = actor.cell.redirect_exit(actor, direction);
             // FIXME if the player steps into a monster cell here, they die instantly!  but only
@@ -969,7 +973,13 @@ export class Level extends LevelInterface {
         //   force floor and attempt to override but /fail/, it's not held against us -- but if we
         //   succeed, even if overriding in the same direction we're already moving, that does count
         //   as an override.
+        let terrain = actor.cell.get_terrain();
+        let forced_decision;
+        if (actor.slide_mode) {
+            forced_decision = terrain.type.get_slide_direction(terrain, this, actor);
+        }
         let may_move = (! actor.slide_mode || (actor.slide_mode === 'force' && actor.last_move_was_force));
+        let [dir1, dir2] = this._extract_player_directions(input);
 
         // Check for special player actions, which can only happen at decision time.  Dropping can
         // only be done when the player is allowed to make a move (i.e. override), but the other two
@@ -994,18 +1004,11 @@ export class Level extends LevelInterface {
         }
 
         if (actor.slide_mode && ! (may_move && dir1)) {
-            // This is a forced move, in which case we don't even check it
-            actor.decision = actor.direction;
+            // This is a forced move and we're not overriding it, so we're done
+            actor.decision = forced_decision;
 
             if (actor.slide_mode === 'force') {
                 this._set_tile_prop(actor, 'last_move_was_force', true);
-            }
-            else if (actor.slide_mode === 'ice') {
-                // A sliding player that bonks into a wall still needs to turn around, but in this
-                // case they do NOT start pushing blocks early
-                if (! try_direction(actor.direction, 'bump')) {
-                    this._handle_slide_bonk(actor);
-                }
             }
         }
         else if (dir1 === null) {
@@ -1023,17 +1026,20 @@ export class Level extends LevelInterface {
             }
             else {
                 // We have two directions.  If one of them is our current facing, we prefer that
-                // one, UNLESS it's blocked AND the other isn't
-                if (dir1 === actor.direction || dir2 === actor.direction) {
-                    let other_direction = dir1 === actor.direction ? dir2 : dir1;
-                    let curr_open = try_direction(actor.direction, 'push');
+                // one, UNLESS it's blocked AND the other isn't.
+                // Note that if this is an override, then the forced direction is still used to
+                // interpret our input!
+                let facing = forced_decision ?? actor.direction;
+                if (dir1 === facing || dir2 === facing) {
+                    let other_direction = dir1 === facing ? dir2 : dir1;
+                    let curr_open = try_direction(facing, 'push');
                     let other_open = try_direction(other_direction, 'push');
                     if (! curr_open && other_open) {
                         actor.decision = other_direction;
                         open = true;
                     }
                     else {
-                        actor.decision = actor.direction;
+                        actor.decision = facing;
                         open = curr_open;
                     }
                 }
@@ -1065,11 +1071,9 @@ export class Level extends LevelInterface {
 
             // If we're overriding a force floor but the direction we're moving in is blocked, the
             // force floor takes priority (and we've already bumped the wall(s))
-            if (actor.slide_mode === 'force' && ! open) {
-                actor.decision = actor.direction;
+            if (actor.slide_mode && ! open) {
                 this._set_tile_prop(actor, 'last_move_was_force', true);
-                // Be sure to invoke this hack if we're standing on an RFF
-                this._handle_slide_bonk(actor);
+                actor.decision = forced_decision;
             }
             else {
                 // Otherwise this is 100% a conscious move so we lose our override power next tic
@@ -1100,19 +1104,24 @@ export class Level extends LevelInterface {
         }
 
         let direction_preference;
-        if (actor.slide_mode) {
+        let terrain = actor.cell.get_terrain();
+        if (actor.slide_mode ||
+            // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
+            // FIXME and if they have cleats, they get stuck instead (?!)
+            (actor.type.name === 'ghost' && terrain.type.slide_mode === 'ice'))
+        {
             // Actors can't make voluntary moves while sliding; they just, ah, slide.
-            actor.decision = actor.direction;
+            actor.decision = terrain.type.get_slide_direction(terrain, this, actor);
             return;
         }
-        else if (actor.cell.some(tile => tile.type.traps && tile.type.traps(tile, actor))) {
+        if (actor.cell.some(tile => tile.type.traps && tile.type.traps(tile, actor))) {
             // An actor in a cloner or a closed trap can't turn
             // TODO because of this, if a tank is trapped when a blue button is pressed, then
             // when released, it will make one move out of the trap and /then/ turn around and
             // go back into the trap.  this is consistent with CC2 but not ms/lynx
             return;
         }
-        else if (actor.type.decide_movement) {
+        if (actor.type.decide_movement) {
             direction_preference = actor.type.decide_movement(actor, this);
         }
 
@@ -1145,32 +1154,6 @@ export class Level extends LevelInterface {
             if (i === direction_preference.length - 1) {
                 actor.decision = direction;
             }
-        }
-    }
-
-    // FIXME can probably clean this up a decent bit now
-    _handle_slide_bonk(actor) {
-        if (actor.slide_mode === 'ice') {
-            // Actors on ice turn around when they hit something
-            actor.decision = DIRECTIONS[actor.direction].opposite;
-            this.set_actor_direction(actor, actor.decision);
-        }
-        if (actor.slide_mode !== null) {
-            // Somewhat clumsy hack: if an actor is sliding and hits something, step on the
-            // relevant tile again.  This fixes two problems: if it was on an ice corner then it
-            // needs to turn a second time even though it didn't move; and if it was a player
-            // overriding a force floor into a wall, then their direction needs to be set back
-            // to the force floor direction.
-            // (For random force floors, this does still match CC2 behavior: after an override,
-            // CC2 will try to force you in the /next/ RFF direction.)
-            // FIXME now overriding into a wall doesn't show you facing that way at all!  lynx
-            // only changes your direction at decision time by examining the floor tile...
-            for (let tile of actor.cell) {
-                if (tile.type.slide_mode === actor.slide_mode && tile.type.on_arrive) {
-                    tile.type.on_arrive(tile, this, actor);
-                }
-            }
-            actor.decision = actor.direction;
         }
     }
 
