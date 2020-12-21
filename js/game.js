@@ -195,7 +195,7 @@ export class Cell extends Array {
     }
 
     has(name) {
-        return this.some(tile => tile.name === name);
+        return this.some(tile => tile.type.name === name);
     }
 
     try_leaving(actor, direction) {
