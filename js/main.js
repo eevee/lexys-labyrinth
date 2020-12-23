@@ -1006,6 +1006,12 @@ class Player extends PrimaryView {
                 ret[key] = value;
             }
         }
+
+        // XXX do not commit this
+        /*
+        ret.use_lynx_loop = true;
+        ret.emulate_60fps = true;
+        */
         return ret;
     }
 
@@ -2171,7 +2177,12 @@ class PackTestDialog extends DialogOverlay {
 
                 // TODO compat options here??
                 let replay = stored_level.replay;
-                level = new Level(stored_level, {});
+                level = new Level(stored_level, {
+                    /*
+                    use_lynx_loop: true,
+                    emulate_60fps: true,
+                    */
+                });
                 level.sfx = dummy_sfx;
                 level.force_floor_direction = replay.initial_force_floor_direction;
                 level._blob_modifier = replay.blob_seed;

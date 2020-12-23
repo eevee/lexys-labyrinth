@@ -2242,7 +2242,22 @@ const TILE_TYPES = {
         decide_movement(me, level) {
             return [me.direction];
         },
+        on_bumped(me, level, other) {
+            // Blow up anything that runs into us...  unless we're on a cloner
+            // FIXME there are other cases where this won't be right; this shouldn't happen if the
+            // cell blocks the actor, but i don't have a callback for that?
+            if (me.cell.has('cloner'))
+                return;
+            if (other.type.is_real_player) {
+                level.fail(me.type.name);
+            }
+            else {
+                level.transmute_tile(other, 'explosion');
+            }
+            level.transmute_tile(me, 'explosion');
+        },
         on_blocked(me, level, direction) {
+            // Blow up anything we run into
             let cell = level.get_neighboring_cell(me.cell, direction);
             let other;
             if (cell) {
@@ -2392,8 +2407,13 @@ const TILE_TYPES = {
             key_green: true,
         },
         decide_movement(me, level) {
-            if (level.player1_move) {
-                return [level.player1_move];
+            if (level.player.type.name === 'player') {
+                if (level.player.movement_cooldown || level.player.is_blocked) {
+                    return [level.player.direction];
+                }
+                else {
+                    return [level.player.decision];
+                }
             }
             else {
                 return null;
@@ -2427,8 +2447,13 @@ const TILE_TYPES = {
             key_yellow: true,
         },
         decide_movement(me, level) {
-            if (level.player2_move) {
-                return [level.player2_move];
+            if (level.player.type.name === 'player2') {
+                if (level.player.movement_cooldown || level.player.is_blocked) {
+                    return [level.player.direction];
+                }
+                else {
+                    return [level.player.decision];
+                }
             }
             else {
                 return null;
@@ -2550,7 +2575,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 16,
         // If anything else even begins to step on an animation, it's erased
         // FIXME possibly erased too fast; cc2 shows it briefly?  could i get away with on_arrive here?
         on_approach(me, level, other) {
@@ -2562,7 +2587,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 16,
         on_approach(me, level, other) {
             level.remove_tile(me);
         },
@@ -2574,7 +2599,7 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: 0,
         // determined experimentally
-        ttl: 12,
+        ttl: 36,
     },
     // Custom VFX (identical function, but different aesthetic)
     splash_slime: {
@@ -2582,7 +2607,7 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.player,
-        ttl: 6,
+        ttl: 16,
         on_approach(me, level, other) {
             level.remove_tile(me);
         },
@@ -2593,13 +2618,13 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         collision_mask: 0,
-        ttl: 8,
+        ttl: 8 * 3,
     },
     player2_exit: {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         collision_mask: 0,
-        ttl: 8,
+        ttl: 8 * 3,
     },
 
     // Invalid tiles that appear in some CCL levels because community level
