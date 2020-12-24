@@ -31,6 +31,8 @@ function on_ready_force_floor(me, level) {
     let item = me.cell.get_item();
     if (! item)
         return;
+    if (item.type.name === 'key_red')
+        return;
     if (level.attempt_take(actor, item) && actor.ignores(me.type.name)) {
         // If they just picked up suction boots, they're no longer sliding
         // TODO this feels hacky, shouldn't the slide mode be erased some other way?
