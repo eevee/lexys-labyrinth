@@ -1668,21 +1668,25 @@ const BUILTIN_LEVEL_PACKS = [{
     ident: 'cclp1',
     title: "Chip's Challenge Level Pack 1",
     desc: "Designed and recommended for new players, starting with gentle introductory levels.  A prequel to the other packs.",
+    url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1',
 }, {
     path: 'levels/CCLP4.ccl',
     ident: 'cclp4',
     title: "Chip's Challenge Level Pack 4",
     desc: "Moderately difficult, but not unfair.",
+    url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_4',
 }, {
     path: 'levels/CCLXP2.ccl',
     ident: 'cclxp2',
     title: "Chip's Challenge Level Pack 2-X",
     desc: "The first community pack released, tricky and rough around the edges.",
+    url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_2_(Lynx)',
 }, {
     path: 'levels/CCLP3.ccl',
     ident: 'cclp3',
     title: "Chip's Challenge Level Pack 3",
     desc: "A tough challenge, by and for veteran players.",
+    url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_3',
 /*
  * TODO: this is tricky.  it's a massive hodgepodge of levels mostly made by individual people...
 }, {
@@ -1786,34 +1790,22 @@ class Splash extends PrimaryView {
         super(conductor, document.body.querySelector('main#splash'));
 
         // Populate the list of available level packs
-        let pack_list = document.querySelector('#splash-stock-levels');
+        let stock_pack_list = mk('ul.played-pack-list');
+        document.querySelector('#splash-stock-levels').append(stock_pack_list);
+        this.played_pack_elements = {};
+        let stock_pack_idents = new Set;
         for (let packdef of BUILTIN_LEVEL_PACKS) {
-            let score;
-            let packinfo = conductor.stash.packs[packdef.ident];
-            if (packinfo && packinfo.total_score !== undefined) {
-                if (packinfo.total_score === null) {
-                    // Whoops, some NaNs got in here  :(
-                    score = "computing...";
-                }
-                else {
-                    // TODO tack on a star if the game is "beaten"?  what's that mean?  every level
-                    // beaten i guess?
-                    score = packinfo.total_score.toLocaleString();
-                }
-            }
-            else {
-                score = "unplayed";
-            }
+            stock_pack_idents.add(packdef.ident);
+            stock_pack_list.append(this._create_pack_element(packdef.ident, packdef));
+        }
 
-            let button = mk('button.button-big.level-pack-button',
-                mk('h3', packdef.title),
-                mk('p', packdef.desc),
-                mk('span.-score', score),
-            );
-            button.addEventListener('click', ev => {
-                this.conductor.fetch_pack(packdef.path, packdef.title);
-            });
-            pack_list.append(button);
+        // Populate the list of other packs you've played
+        let custom_pack_list = mk('ul.played-pack-list');
+        this.root.querySelector('#splash-upload-levels').append(custom_pack_list);
+        for (let [ident, packinfo] of Object.entries(this.conductor.stash.packs)) {
+            if (stock_pack_idents.has(ident))
+                continue;
+            custom_pack_list.append(this._create_pack_element(ident));
         }
 
         // File loading: allow providing either a single file, multiple files, OR an entire
@@ -1897,6 +1889,86 @@ class Splash extends PrimaryView {
                 this.conductor.editor.load_editor_pack(key);
             });
             editor_list.append(button);
+        }
+    }
+
+    _create_pack_element(ident, packdef = null) {
+        let title = packdef ? packdef.title : ident;
+        let button = mk('button.button-big.level-pack-button', {type: 'button'},
+            mk('h3', title));
+        if (packdef) {
+            button.addEventListener('click', ev => {
+                this.conductor.fetch_pack(packdef.path, packdef.title);
+            });
+        }
+        else {
+            button.disabled = true;
+        }
+
+        let li = mk('li.--unplayed', {'data-ident': ident}, button);
+        let forget_button = mk('button.-forget', {type: 'button'}, "Forget");
+        forget_button.addEventListener('click', ev => {
+            new ConfirmOverlay(this.conductor, `Clear all your progress for ${title}?  This can't be undone.`, () => {
+                delete this.conductor.stash.packs[ident];
+                localStorage.removeItem(STORAGE_PACK_PREFIX + ident);
+                this.conductor.save_stash();
+                if (packdef) {
+                    this.update_pack_score(ident);
+                }
+                else {
+                    li.remove();
+                }
+            }).open();
+        });
+        if (packdef) {
+            li.append(mk('p', packdef.desc, "  ", mk('a', {href: packdef.url}, "More...")));
+        }
+        li.append(mk('div.-progress',
+            mk('span.-score'),
+            mk('span.-time'),
+            mk('span.-levels'),
+            forget_button,
+        ));
+        this.played_pack_elements[ident] = li;
+
+        this.update_pack_score(ident);
+        return li;
+    }
+
+    update_pack_score(ident) {
+        let li = this.played_pack_elements[ident];
+        let packinfo = this.conductor.stash.packs[ident];
+        li.classList.toggle('--unplayed', ! packinfo);
+        if (! packinfo)
+            return;
+
+        let progress = li.querySelector('.-progress');
+
+        let score;
+        if (packinfo.total_score === null) {
+            // Whoops, some NaNs got in here  :(
+            score = "computing...";
+        }
+        else {
+            // TODO tack on a star if the game is "beaten"?  what's that mean?  every level
+            // beaten i guess?
+            score = packinfo.total_score.toLocaleString();
+        }
+        progress.querySelector('.-score').textContent = score;
+
+        // This stuff isn't available in old saves
+        if (packinfo.total_levels === undefined) {
+            progress.querySelector('.-time').textContent = "";
+            progress.querySelector('.-levels').textContent = "";
+        }
+        else {
+            // TODO not used: total_abstime, aidless_levels
+            progress.querySelector('.-time').textContent = util.format_duration(packinfo.total_time);
+            let levels = `${packinfo.cleared_levels}/${packinfo.total_levels}`;
+            if (packinfo.cleared_levels === packinfo.total_levels) {
+                levels += '★';
+            }
+            progress.querySelector('.-levels').textContent = levels;
         }
     }
 
@@ -2570,6 +2642,9 @@ class LevelBrowserOverlay extends DialogOverlay {
                 // the levels upfront though, which i currently do but want to stop doing
             );
 
+            if (i === this.conductor.level_index) {
+                tr.classList.add('--current');
+            }
             // TODO sigh, does not actually indicate visited in C2G world
             if (i >= savefile.highest_level) {
                 tr.classList.add('--unvisited');
@@ -2592,20 +2667,41 @@ class LevelBrowserOverlay extends DialogOverlay {
             }
         });
 
+        this.tbody = tbody;
+
         this.add_button("nevermind", ev => {
             this.close();
         });
+    }
+
+    open() {
+        super.open();
+        this.tbody.childNodes[this.conductor.level_index].scrollIntoView({block: 'center'});
     }
 }
 
 // Central dispatcher of what we're doing and what we've got loaded
 // We store several kinds of things in localStorage:
 // Main storage:
-//   packs
+//   packs:
+//     total_score
+//     total_time
+//     total_levels
+//     cleared_levels
+//     aidless_levels
 //   options
 //   compat: (either a ruleset string or an object of individual flags)
 const STORAGE_KEY = "Lexy's Labyrinth";
-// Records for playing a pack
+// Records for a pack that has been played
+//   total_score
+//   highest_level
+//   current_level
+//   scorecards: []?
+//     time
+//     abstime
+//     bonus
+//     score
+//     aid
 const STORAGE_PACK_PREFIX = "Lexy's Labyrinth: ";
 // Metadata for an edited pack
 // - list of the levels they own and basic metadata like name
@@ -2766,11 +2862,34 @@ class Conductor {
         if (identifier !== null) {
             // TODO again, enforce something about the shape here
             this.current_pack_savefile = JSON.parse(window.localStorage.getItem(STORAGE_PACK_PREFIX + identifier));
+            let changed = false;
             if (this.current_pack_savefile && this.current_pack_savefile.total_score === null) {
                 // Fix some NaNs that slipped in
                 this.current_pack_savefile.total_score = this.current_pack_savefile.scorecards
                     .map(scorecard => scorecard ? scorecard.score : 0)
                     .reduce((a, b) => a + b, 0);
+                changed = true;
+            }
+            if (this.current_pack_savefile && this.current_pack_savefile.cleared_levels === undefined) {
+                // Populate some more recently added fields
+                this.current_pack_savefile.total_levels = stored_game.level_metadata.length;
+                this.current_pack_savefile.total_time = 0;
+                this.current_pack_savefile.total_abstime = 0;
+                this.current_pack_savefile.cleared_levels = 0;
+                this.current_pack_savefile.aidless_levels = 0;
+                for (let scorecard of this.current_pack_savefile.scorecards) {
+                    if (! scorecard)
+                        continue;
+                    this.current_pack_savefile.total_time += scorecard.time;
+                    this.current_pack_savefile.total_abstime += scorecard.abstime;
+                    this.current_pack_savefile.cleared_levels += 1;
+                    if (scorecard.aid === 0) {
+                        this.current_pack_savefile.aidless_levels += 1;
+                    }
+                }
+                changed = true;
+            }
+            if (changed) {
                 this.save_savefile();
             }
         }
@@ -2787,7 +2906,7 @@ class Conductor {
         this.player.load_game(stored_game);
         this.editor.load_game(stored_game);
 
-        return this.change_level(0);
+        return this.change_level((this.current_pack_savefile.current_level ?? 1) - 1);
     }
 
     change_level(level_index) {
@@ -2846,18 +2965,25 @@ class Conductor {
         if (! this._pack_identifier)
             return;
 
+        // Don't save if there's nothing to save
+        if (! this.current_pack_savefile.cleared_levels && this.current_pack_savefile.current_level === 1)
+            return;
+
         window.localStorage.setItem(STORAGE_PACK_PREFIX + this._pack_identifier, JSON.stringify(this.current_pack_savefile));
 
-        // Also remember the total score in the stash, if it changed, so we can read it without
-        // having to parse every single one of these things
+        // Also remember some stats in the stash, if it changed, so we can read it without having to
+        // parse every single one of these things
         let packinfo = this.stash.packs[this._pack_identifier];
-        if (! packinfo || packinfo.total_score !== this.current_pack_savefile.total_score) {
-            if (! packinfo) {
-                packinfo = {};
-                this.stash.packs[this._pack_identifier] = packinfo;
+        if (! packinfo) {
+            packinfo = {};
+            this.stash.packs[this._pack_identifier] = packinfo;
+        }
+        let keys = ['total_score', 'total_time', 'total_abstime', 'total_levels', 'cleared_levels', 'aidless_levels'];
+        if (keys.some(key => packinfo[key] !== this.current_pack_savefile[key])) {
+            for (let key of keys) {
+                packinfo[key] = this.current_pack_savefile[key];
             }
-            packinfo.total_score = this.current_pack_savefile.total_score;
-            this.save_stash();
+            this.splash.update_pack_score(this._pack_identifier);
         }
     }
 

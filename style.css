@@ -20,6 +20,7 @@ body {
     --button-bg-color: hsl(225, 10%, 25%);
     --button-bg-hover-color: hsl(225, 15%, 30%);
     --generic-bg-hover-on-white: hsl(225, 60%, 85%);
+    --generic-bg-selected-on-white: hsl(225, 60%, 90%);
 }
 
 /* Generic element styling */
@@ -290,6 +291,9 @@ table.level-browser td.-time {
 table.level-browser td.-score {
     text-align: right;
 }
+table.level-browser tr.--current {
+    background: var(--generic-bg-selected-on-white);
+}
 table.level-browser tr.--unvisited {
     color: #606060;
     font-style: italic;
@@ -302,7 +306,7 @@ table.level-browser tbody tr {
     cursor: pointer;
 }
 table.level-browser tbody tr:hover {
-    background: var(--generic-hover-bg-on-white);
+    background: var(--generic-bg-hover-on-white);
 }
 table.level-browser tbody tr:nth-child(10n) td {
     border-bottom: 2px solid hsl(225, 20%, 80%);
@@ -316,7 +320,7 @@ ul.compat-flags > li {
     padding: 0.125em;
 }
 ul.compat-flags > li.-checked {
-    background: hsl(225, 60%, 90%);
+    background: var(--generic-bg-selected-on-white);
 }
 ul.compat-flags > li:hover {
     background: var(--generic-bg-hover-on-white);
@@ -640,6 +644,33 @@ pre.stack-trace {
     }
 }
 
+.played-pack-list {
+
+}
+.played-pack-list > li {
+    margin-bottom: 1em;
+}
+.played-pack-list p {
+    font-size: 0.833em;
+    font-style: italic;
+}
+.played-pack-list .-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    text-align: right;
+}
+.played-pack-list > li.--unplayed .-progress {
+    display: none;
+}
+.played-pack-list .-progress > .-score,
+.played-pack-list .-progress > .-time,
+.played-pack-list .-progress > .-levels {
+    flex: 2;
+}
+.played-pack-list .-progress > button {
+    flex: 1;
+}
 button.level-pack-button {
     display: grid;
     grid:
