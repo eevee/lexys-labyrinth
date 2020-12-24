@@ -610,6 +610,9 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'explosion');
                 level.transmute_tile(me, 'water');
             }
+            else if (other.type.name === 'ghost') {
+                return;
+            }
             else if (other.type.is_real_player) {
                 level.fail('burned');
             }
