@@ -539,8 +539,8 @@ pre.stack-trace {
     grid:
         "header header  header"
         "intro  intro   intro"
-        "links  links   links"
         "stock  upload  yours"
+        "links  upload  yours"
         / 1fr 1fr 1fr
     ;
     gap: 1em;
@@ -637,6 +637,10 @@ pre.stack-trace {
     }
     #splash > header h1 {
         font-size: 2em;
+    }
+    #splash-links {
+        /* Put this last I guess?? */
+        order: 99;
     }
     /* No need to boost the font size here */
     #splash > #splash-intro {
