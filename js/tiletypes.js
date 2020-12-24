@@ -1367,7 +1367,9 @@ const TILE_TYPES = {
             for (let actor of level.actors) {
                 // TODO generify somehow??
                 if (actor.type.name === 'tank_blue') {
-                    level._set_tile_prop(actor, 'pending_reverse', ! actor.pending_reverse);
+                    if (level.compat.cloner_tanks_react_button || ! actor.cell.has('cloner')) {
+                        level._set_tile_prop(actor, 'pending_reverse', ! actor.pending_reverse);
+                    }
                 }
             }
         },

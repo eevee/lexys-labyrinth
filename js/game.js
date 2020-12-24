@@ -293,10 +293,12 @@ export class Cell extends Array {
 
             // In push mode, check one last time for being blocked, in case we e.g. pushed a block
             // off of a recessed wall
-            // TODO deleting this allows spring mining, though i ended up causing it in a more
-            // aggressive form; try deleting this and running the 163 BLOX replay, it happens with
-            // ice blocks near the end
-            if (push_mode === 'push' && this.some(tile => tile.blocks(actor, direction, level)))
+            // TODO unclear if this is the right way to emulate spring mining, but without the check
+            // for a player, it happens /too/ often; try allowing for ann actors and running the 163
+            // BLOX replay, and right at the end ice blocks spring mine each other.  also, the wiki
+            // suggests something about another actor moving away at the same time?
+            if (! (level.compat.emulate_spring_mining && actor.type.is_real_player) &&
+                push_mode === 'push' && this.some(tile => tile.blocks(actor, direction, level)))
                 return false;
         }
 

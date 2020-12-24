@@ -2083,9 +2083,6 @@ const AESTHETIC_OPTIONS = [{
 const OPTIONS_TABS = [{
     name: 'aesthetic',
     label: "Aesthetics",
-}, {
-    name: 'compat',
-    label: "Compatibility",
 }];
 class OptionsOverlay extends DialogOverlay {
     constructor(conductor) {
@@ -2123,15 +2120,6 @@ class OptionsOverlay extends DialogOverlay {
 
         // Aesthetic tab
         this._add_options(this.tab_blocks['aesthetic'], AESTHETIC_OPTIONS);
-
-        // Compat tab
-        this.tab_blocks['compat'].append(
-            mk('p', "Revert to:", mk('button', "Default"), mk('button', "Lynx"), mk('button', "Microsoft"), mk('button', "Steam")),
-            mk('p', "These settings are for compatibility with player-created levels, which sometimes relied on subtle details of the Microsoft or Lynx games and no longer work with the now-canonical Steam rules.  The default is to follow the Steam rules as closely as possible (except for bugs), but make a few small tweaks to keep CCL-format levels working."),
-            mk('p', "Changes won't take effect until you restart the level or change levels."),
-            mk('p', "Please note that Microsoft had a number of subtle but complex bugs that Lexy's Labyrinth cannot ever reasonably emulate.  The Microsoft settings here are best-effort and not intended to be 100% compatible."),
-        );
-        this._add_options(this.tab_blocks['compat'], COMPAT_OPTIONS);
     }
 
     _add_options(root, options) {
@@ -2141,11 +2129,6 @@ class OptionsOverlay extends DialogOverlay {
             let li = mk('li');
             let label = mk('label.option');
             label.append(mk('input', {type: 'checkbox', name: optdef.key}));
-            if (optdef.impls) {
-                for (let impl of optdef.impls) {
-                    label.append(mk('img.compat-icon', {src: `icons/compat-${impl}.png`}));
-                }
-            }
             label.append(mk('span.option-label', optdef.label));
             let help_icon = mk('img.-help', {src: 'icons/help.png'});
             label.append(help_icon);
@@ -2178,7 +2161,7 @@ const COMPAT_RULESETS = [
     ['ms', "Microsoft"],
     ['custom', "Custom"],
 ];
-const COMPAT_OPTIONS = [{
+const COMPAT_FLAGS = [{
     key: 'no_auto_convert_ccl_popwalls',
     label: "Don't fix populated recessed walls in CC1 levels",
     rulesets: new Set(['steam-strict', 'lynx', 'ms']),
@@ -2192,21 +2175,26 @@ const COMPAT_OPTIONS = [{
     // TODO ms?
     rulesets: new Set(['lynx']),
 }, {
+    key: 'cloner_tanks_react_button',
+    label: "Blue tanks on cloners respond to blue buttons",
+    rulesets: new Set(['steam-strict']),
+}, {
     // XXX this is goofy
     key: 'tiles_react_instantly',
     label: "Tiles react instantly",
     rulesets: new Set(['ms']),
 }, {
-    // XXX not implemented
     key: 'emulate_spring_mining',
     label: "Emulate spring mining",
     rulesets: new Set(['steam-strict']),
 }, {
     // XXX not implemented
+    /*
     key: 'emulate_flicking',
     label: "Emulate flicking",
     rulesets: new Set(['ms']),
 }, {
+    */
     key: 'use_lynx_loop',
     label: "Use Lynx-style update loop",
     rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
@@ -2214,11 +2202,6 @@ const COMPAT_OPTIONS = [{
     key: 'emulate_60fps',
     label: "Run at 60 FPS",
     rulesets: new Set(['steam', 'steam-strict']),
-}, {
-    // XXX not implemented
-    key: 'cloner_tanks_react_button',
-    label: "Blue tanks on cloners respond to blue buttons",
-    rulesets: new Set(['steam-strict']),
 }];
 class CompatOverlay extends DialogOverlay {
     constructor(conductor) {
@@ -2251,14 +2234,14 @@ class CompatOverlay extends DialogOverlay {
             if (ruleset === 'custom')
                 return;
 
-            for (let compat of COMPAT_OPTIONS) {
+            for (let compat of COMPAT_FLAGS) {
                 this.set(compat.key, compat.rulesets.has(ruleset));
             }
         });
         this.main.append(button_set);
 
         let list = mk('ul.compat-flags');
-        for (let compat of COMPAT_OPTIONS) {
+        for (let compat of COMPAT_FLAGS) {
             let label = mk('label',
                 mk('input', {type: 'checkbox', name: compat.key}),
                 mk('span.-desc', compat.label),
@@ -2283,8 +2266,8 @@ class CompatOverlay extends DialogOverlay {
         this.main.append(list);
 
         // Populate everything to match the current settings
-        this.root.elements['__ruleset__'].value = this.conductor._compat_ruleset;
-        for (let compat of COMPAT_OPTIONS) {
+        this.root.elements['__ruleset__'].value = this.conductor._compat_ruleset ?? 'custom';
+        for (let compat of COMPAT_FLAGS) {
             this.set(compat.key, !! this.conductor.compat[compat.key]);
         }
 
@@ -2309,7 +2292,7 @@ class CompatOverlay extends DialogOverlay {
 
     save(permanent) {
         let flags = {};
-        for (let compat of COMPAT_OPTIONS) {
+        for (let compat of COMPAT_FLAGS) {
             if (this.root.elements[compat.key].checked) {
                 flags[compat.key] = true;
             }
@@ -2412,7 +2395,7 @@ class PackTestDialog extends DialogOverlay {
         }
         else {
             compat = {};
-            for (let compatdef of COMPAT_OPTIONS) {
+            for (let compatdef of COMPAT_FLAGS) {
                 if (compatdef.rulesets.has(ruleset)) {
                     compat[compatdef.key] = true;
                 }
@@ -2731,7 +2714,7 @@ class Conductor {
         this._compat_ruleset = 'custom';  // Only used by the compat dialog
         if (typeof this.stash.compat === 'string') {
             this._compat_ruleset = this.stash.compat;
-            for (let compat of COMPAT_OPTIONS) {
+            for (let compat of COMPAT_FLAGS) {
                 if (compat.rulesets.has(this.stash.compat)) {
                     this.compat[compat.key] = true;
                 }
@@ -2945,10 +2928,10 @@ class Conductor {
 
     set_compat(ruleset, flags) {
         if (ruleset === 'custom') {
-            this._compat_group = null;
+            this._compat_ruleset = null;
         }
         else {
-            this._compat_group = ruleset;
+            this._compat_ruleset = ruleset;
         }
 
         let label = COMPAT_RULESETS.filter(item => item[0] === ruleset)[0][1];
