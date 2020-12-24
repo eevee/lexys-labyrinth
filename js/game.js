@@ -1254,25 +1254,9 @@ export class Level extends LevelInterface {
 
     check_movement(actor, orig_cell, direction, push_mode) {
         let dest_cell = this.get_neighboring_cell(orig_cell, direction);
-        let success = (dest_cell &&
+        return (dest_cell &&
             orig_cell.try_leaving(actor, direction) &&
             dest_cell.try_entering(actor, direction, this, push_mode));
-        if (success && push_mode === 'push' && actor.has_item('hook')) {
-            let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
-            if (behind_cell) {
-                let behind_actor = behind_cell.get_actor();
-                // FIXME something else happens during cooldown i think
-                if (behind_actor && ! behind_actor.movement_cooldown &&
-                    actor.can_push(behind_actor, direction))
-                {
-                    this._set_tile_prop(behind_actor, 'is_pulled', true);
-                    this.attempt_out_of_turn_step(behind_actor, direction);
-                }
-                // TODO ok this is a bit tricky.  the pull has to happen after we confirm we /can/
-                // move, but not after we actually start moving, because there's hook slapping...
-            }
-        }
-        return success;
     }
 
     // Try to move the given actor one tile in the given direction and update their cooldown.
@@ -1320,10 +1304,28 @@ export class Level extends LevelInterface {
             speed /= 2;
         }
 
-        this._set_tile_prop(actor, 'previous_cell', actor.cell);
+        let orig_cell = actor.cell;
+        this._set_tile_prop(actor, 'previous_cell', orig_cell);
         this._set_tile_prop(actor, 'movement_cooldown', speed * 3);
         this._set_tile_prop(actor, 'movement_speed', speed * 3);
         this.move_to(actor, goal_cell, speed);
+
+        // If we have the hook, pull anything behind us, now that we're out of the way
+        if (actor.has_item('hook')) {
+            let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
+            if (behind_cell) {
+                let behind_actor = behind_cell.get_actor();
+                if (behind_actor && ! behind_actor.movement_cooldown &&
+                    actor.can_push(behind_actor, direction))
+                {
+                    this._set_tile_prop(behind_actor, 'is_pulled', true);
+                    this.attempt_out_of_turn_step(behind_actor, direction);
+                }
+                // TODO this feels like it might be too late, because hook slapping is a thing, but
+                // when this code was in check_movement, it allowed pulling blocks through a swivel
+                // but prevented pulling blocks with a helmet.  how on earth does slapping work??
+            }
+        }
 
         return true;
     }
