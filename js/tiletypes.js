@@ -2207,7 +2207,7 @@ const TILE_TYPES = {
 
                     if (actor) {
                         // Actors protect terrain, but floor becomes fire
-                        if (terrain && terrain.type.name === 'floor' && terrain.wire_directions === 0 && terrain.wire_tunnel_directions === 0) {
+                        if (terrain && terrain.type.name === 'floor') {
                             if (actor.type.name === 'ice_block') {
                                 level.transmute_tile(terrain, 'water');
                             }
