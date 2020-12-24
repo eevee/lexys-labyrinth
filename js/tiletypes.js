@@ -2580,7 +2580,10 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
         collision_mask: 0,
-        blocks_collision: COLLISION.player,
+        // FIXME feel like blocks_collision should be able to handle this and yet
+        blocks(me, level, other, direction) {
+            return other.type.is_real_player;
+        },
         ttl: 16,
         // If anything else even begins to step on an animation, it's erased
         // FIXME possibly erased too fast; cc2 shows it briefly?  could i get away with on_arrive here?
@@ -2592,7 +2595,9 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
         collision_mask: 0,
-        blocks_collision: COLLISION.player,
+        blocks(me, level, other, direction) {
+            return other.type.is_real_player;
+        },
         ttl: 16,
         on_approach(me, level, other) {
             level.remove_tile(me);
@@ -2612,7 +2617,9 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
         collision_mask: 0,
-        blocks_collision: COLLISION.player,
+        blocks(me, level, other, direction) {
+            return other.type.is_real_player;
+        },
         ttl: 16,
         on_approach(me, level, other) {
             level.remove_tile(me);
