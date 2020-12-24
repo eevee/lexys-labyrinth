@@ -782,8 +782,6 @@ const TILE_TYPES = {
     },
     slime: {
         draw_layer: DRAW_LAYERS.terrain,
-        // FIXME kills everything except ghosts, blobs, blocks
-        // FIXME blobs spread slime onto floor tiles, even destroying wiring
         on_arrive(me, level, other) {
             if (other.type.name === 'dirt_block' || other.type.name === 'ice_block') {
                 level.transmute_tile(me, 'floor');
@@ -1085,10 +1083,13 @@ const TILE_TYPES = {
         },
         remove_press(me, level) {
             level._set_tile_prop(me, 'presses', me.presses - 1);
+            if (me._initially_open) {
+                level._set_tile_prop(me, '_initially_open', false);
+            }
         },
         // FIXME also doesn't trap ghosts, is that a special case???
         traps(me, actor) {
-            return ! me.presses;
+            return ! me.presses && ! me._initially_open && actor.type.name !== 'ghost';
         },
         on_power(me, level) {
             // Treat being powered or not as an extra kind of brown button press
@@ -1098,7 +1099,7 @@ const TILE_TYPES = {
             me.type.remove_press(me, level);
         },
         visual_state(me) {
-            if (me && me.presses) {
+            if (me && (me.presses || me._initially_open)) {
                 return 'open';
             }
             else {

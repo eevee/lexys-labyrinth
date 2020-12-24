@@ -358,8 +358,18 @@ const TILE_ENCODING = {
         has_next: true,
     },
     0x41: {
-        // FIXME cc2lp1 uses this, i don't know what it actually does
-        error: "Open trap is not yet implemented!",
+        name: 'trap',
+        // Not actually a modifier, just using this for hax
+        // FIXME round-trip this, maybe expose it in the editor (sigh)
+        modifier: {
+            dummy: true,
+            decode(tile, mod) {
+                tile._initially_open = true;
+            },
+            encode(tile) {
+                return 0;
+            },
+        },
     },
     0x42: {
         name: 'trap',
