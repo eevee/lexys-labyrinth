@@ -2554,7 +2554,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         blocks(me, level, other) {
-            return (level.chips_remaining > 0);
+            return ! (other.type.name === 'ghost' || level.chips_remaining <= 0);
         },
         on_arrive(me, level, other) {
             if (level.chips_remaining === 0) {
