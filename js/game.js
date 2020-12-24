@@ -1262,7 +1262,9 @@ export class Level extends LevelInterface {
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
                 // FIXME something else happens during cooldown i think
-                if (behind_actor && ! behind_actor.movement_cooldown) {
+                if (behind_actor && ! behind_actor.movement_cooldown &&
+                    actor.can_push(behind_actor, direction))
+                {
                     this._set_tile_prop(behind_actor, 'is_pulled', true);
                     this.attempt_out_of_turn_step(behind_actor, direction);
                 }

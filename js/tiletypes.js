@@ -2258,6 +2258,7 @@ const TILE_TYPES = {
             else {
                 level.transmute_tile(other, 'explosion');
             }
+            level.sfx.play_once('bomb', me.cell);
             level.transmute_tile(me, 'explosion');
         },
         on_blocked(me, level, direction) {
@@ -2279,6 +2280,7 @@ const TILE_TYPES = {
                 // Sliding bowling balls don't blow up if they hit a regular wall
                 return;
             }
+            level.sfx.play_once('bomb', me.cell);
             level.transmute_tile(me, 'explosion');
             // Remove our slide mode so we don't attempt to bounce if on ice
             level.make_slide(me, null);
