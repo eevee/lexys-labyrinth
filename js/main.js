@@ -262,16 +262,7 @@ class Player extends PrimaryView {
         };
 
         this.scale = 1;
-
         this.play_speed = 1;
-        this.compat = {
-            popwalls_react_on_arrive: false,
-            auto_convert_ccl_popwalls: true,
-            auto_convert_ccl_blue_walls: true,
-            sliding_tanks_ignore_button: true,
-            tiles_react_instantly: false,
-            allow_flick: false,
-        };
 
         this.root.style.setProperty('--tile-width', `${this.conductor.tileset.size_x}px`);
         this.root.style.setProperty('--tile-height', `${this.conductor.tileset.size_y}px`);
@@ -959,7 +950,7 @@ class Player extends PrimaryView {
         }
         this.conductor.save_savefile();
 
-        this.level = new Level(stored_level, this.gather_compat_options(stored_level));
+        this.level = new Level(stored_level, this.conductor.compat);
         this.level.sfx = this.sfx_player;
         this.renderer.set_level(this.level);
         this.update_viewport_size();
@@ -995,24 +986,8 @@ class Player extends PrimaryView {
     }
 
     restart_level() {
-        this.level.restart(this.gather_compat_options(this.level.stored_level));
+        this.level.restart(this.conductor.compat);
         this._clear_state();
-    }
-
-    gather_compat_options(stored_level) {
-        let ret = {};
-        if (stored_level.use_ccl_compat) {
-            for (let [key, value] of Object.entries(this.compat)) {
-                ret[key] = value;
-            }
-        }
-
-        // XXX do not commit this
-        /*
-        ret.use_lynx_loop = true;
-        ret.emulate_60fps = true;
-        */
-        return ret;
     }
 
     // Call after loading or restarting a level
@@ -1937,42 +1912,6 @@ const AESTHETIC_OPTIONS = [{
     default: true,
     note: "Chip's Challenge typically draws everything in a grid, which looks a bit funny for tall skinny objects like...  the player.  And teeth.  This option draws both of them raised up slightly, so they'll break the grid and add a slight 3D effect.  May not work for all tilesets.",
 }];
-const COMPAT_OPTIONS = [{
-    key: 'popwalls_react_on_arrive',
-    label: "Recessed walls trigger when stepped on",
-    impls: ['lynx', 'ms'],
-    note: "This was the behavior in both versions of CC1, but CC2 changed them to trigger when stepped off of (probably to match the behavior of turtles).  Some CCLP levels depend on the old behavior.  See the next option for a more conservative solution.",
-}, {
-    key: 'auto_convert_ccl_popwalls',
-    label: "Fix loaded recessed walls",
-    impls: ['lynx', 'ms'],
-    note: "This is a more conservative solution to the problem with recessed walls.  It replaces recessed walls with a new tile, \"doubly recessed walls\", only if they begin the level with something on top of them.  This should resolve compatibility issues without changing the behavior of recessed walls.",
-}, {
-    key: 'auto_convert_ccl_blue_walls',
-    label: "Fix loaded blue walls",
-    impls: ['lynx'],
-    note: "Generally, you can only push a block if it's in a space you could otherwise move into, but Tile World Lynx allows pushing blocks off of blue walls.  (Unclear whether this is a Tile World bug, or a Lynx bug that Tile World is replicating.)  The same effect can be achieved in Steam by using a recessed wall instead, so this replaces such walls with recessed walls.  Note that this fix may have unintended side effects in conjunction with the recessed wall compat option.",
-}, {
-    key: 'sliding_tanks_ignore_button',
-    label: "Blue tanks ignore blue buttons while sliding",
-    impls: ['lynx'],
-    note: "In Lynx, due to what is almost certainly a bug, blue tanks would simply not react at all if a blue button were pressed while they were in mid-movement.  Steam fixed this, but it also made blue tanks \"remember\" a button press if they were in the middle of a slide and then turn around once they were finished, and this subtle change broke at least one CCLP level.  (There is no compat option for ignoring a button press while moving normally, as that makes the game worse for no known benefit.)",
-}, {
-    key: 'tiles_react_instantly',
-    label: "Tiles react instantly",
-    impls: ['ms'],
-    note: "CC originally had objects slide smoothly from one tile to another, so most tiles only responded when the movement completed.  In the Microsoft port, though, everything moves instantly (and then waits before moving again), so tiles respond right away.",
-}, {
-    key: 'allow_flick',
-    label: "Allow flicking",
-    impls: ['ms'],
-    note: "Generally, you can only push a block if it's in a space you could otherwise move into.  Due to a bug, the Microsoft port allows pushing blocks that are on top of walls, thin walls, ice corners, etc., and this maneuver is called a \"flick\".",
-}];
-const COMPAT_IMPLS = {
-    lynx: "Lynx, the original version",
-    ms: "Microsoft's Windows port",
-    steam: "The canonical Steam version, but off by default because it's considered a bug",
-};
 const OPTIONS_TABS = [{
     name: 'aesthetic',
     label: "Aesthetics",
@@ -2063,6 +2002,166 @@ class OptionsOverlay extends DialogOverlay {
         this.tab_blocks[this.current_tab].classList.add('--selected');
     }
 }
+const COMPAT_RULESETS = [
+    ['lexy', "Lexy"],
+    ['steam', "Steam/CC2"],
+    ['steam-strict', "Steam/CC2 (strict)"],
+    ['lynx', "Lynx"],
+    ['ms', "Microsoft"],
+    ['custom', "Custom"],
+];
+const COMPAT_OPTIONS = [{
+    key: 'no_auto_convert_ccl_popwalls',
+    label: "Don't fix populated recessed walls in CC1 levels",
+    rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+}, {
+    key: 'no_auto_convert_ccl_blue_walls',
+    label: "Don't fix populated blue walls in CC1 levels",
+    rulesets: new Set(['steam-strict', 'lynx']),
+}, {
+    key: 'sliding_tanks_ignore_button',
+    label: "Blue tanks ignore blue buttons while sliding",
+    // TODO ms?
+    rulesets: new Set(['lynx']),
+}, {
+    // XXX this is goofy
+    key: 'tiles_react_instantly',
+    label: "Tiles react instantly",
+    rulesets: new Set(['ms']),
+}, {
+    // XXX not implemented
+    key: 'emulate_spring_mining',
+    label: "Emulate spring mining",
+    rulesets: new Set(['steam-strict']),
+}, {
+    // XXX not implemented
+    key: 'emulate_flicking',
+    label: "Emulate flicking",
+    rulesets: new Set(['ms']),
+}, {
+    key: 'use_lynx_loop',
+    label: "Use Lynx-style update loop",
+    rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
+}, {
+    key: 'emulate_60fps',
+    label: "Run at 60 FPS",
+    rulesets: new Set(['steam', 'steam-strict']),
+}, {
+    // XXX not implemented
+    key: 'cloner_tanks_react_button',
+    label: "Blue tanks on cloners respond to blue buttons",
+    rulesets: new Set(['steam-strict']),
+}];
+class CompatOverlay extends DialogOverlay {
+    constructor(conductor) {
+        super(conductor);
+        this.set_title("Compatibility");
+        this.root.classList.add('dialog-compat');
+
+        this.main.append(
+            mk('p',
+                "These are more technical settings, and as such are documented in full on ",
+                mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/wiki/Compatibility'}, "the project wiki"),
+                "."),
+            mk('p', "The short version is: Lexy mode is fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for.  Microsoft mode is best-effort and nothing is guaranteed."),
+            mk('p', "Changes won't take effect until you restart the level or change levels."),
+        );
+
+        let button_set = mk('div.radio-faux-button-set');
+        for (let [ruleset, label] of COMPAT_RULESETS) {
+            button_set.append(mk('label',
+                mk('input', {type: 'radio', name: '__ruleset__', value: ruleset}),
+                mk('span.-button',
+                    mk('img.compat-icon', {src: `icons/compat-${ruleset}.png`}),
+                    mk('br'),
+                    label,
+                ),
+            ));
+        }
+        button_set.addEventListener('change', ev => {
+            let ruleset = this.root.elements['__ruleset__'].value;
+            if (ruleset === 'custom')
+                return;
+
+            for (let compat of COMPAT_OPTIONS) {
+                this.set(compat.key, compat.rulesets.has(ruleset));
+            }
+        });
+        this.main.append(button_set);
+
+        let list = mk('ul.compat-flags');
+        for (let compat of COMPAT_OPTIONS) {
+            let label = mk('label',
+                mk('input', {type: 'checkbox', name: compat.key}),
+                mk('span.-desc', compat.label),
+            );
+            for (let [ruleset, _] of COMPAT_RULESETS) {
+                if (ruleset === 'lexy' || ruleset === 'custom')
+                    continue;
+
+                if (compat.rulesets.has(ruleset)) {
+                    label.append(mk('img.compat-icon', {src: `icons/compat-${ruleset}.png`}));
+                }
+                else {
+                    label.append(mk('span.compat-icon-gap'));
+                }
+            }
+            list.append(mk('li', label));
+        }
+        list.addEventListener('change', ev => {
+            this.root.elements['__ruleset__'].value = 'custom';
+            ev.target.closest('li').classList.toggle('-checked', ev.target.checked);
+        });
+        this.main.append(list);
+
+        // Populate everything to match the current settings
+        this.root.elements['__ruleset__'].value = this.conductor._compat_ruleset;
+        for (let compat of COMPAT_OPTIONS) {
+            this.set(compat.key, !! this.conductor.compat[compat.key]);
+        }
+
+        this.add_button("save permanently", () => {
+            this.save();
+            this.remember();
+            this.close();
+        });
+        this.add_button("save for this session only", () => {
+            this.save();
+            this.close();
+        });
+        this.add_button("cancel", () => {
+            this.close();
+        });
+    }
+
+    set(key, value) {
+        this.root.elements[key].checked = value;
+        this.root.elements[key].closest('li').classList.toggle('-checked', value);
+    }
+
+    save(permanent) {
+        let flags = {};
+        for (let compat of COMPAT_OPTIONS) {
+            if (this.root.elements[compat.key].checked) {
+                flags[compat.key] = true;
+            }
+        }
+
+        let ruleset = this.root.elements['__ruleset__'].value;
+        this.conductor.set_compat(ruleset, flags);
+    }
+
+    remember() {
+        let ruleset = this.root.elements['__ruleset__'].value;
+        if (ruleset === 'custom') {
+            this.conductor.stash.compat = Object.extend({}, this.conductor.compat);
+        }
+        else {
+            this.conductor.stash.compat = ruleset;
+        }
+        this.conductor.save_stash();
+    }
+}
 
 class PackTestDialog extends DialogOverlay {
     constructor(conductor) {
@@ -2104,6 +2203,15 @@ class PackTestDialog extends DialogOverlay {
             this.conductor.change_level(parseInt(index, 10));
         });
 
+        let ruleset_dropdown = mk('select', {name: 'ruleset'});
+        for (let [ruleset, label] of COMPAT_RULESETS) {
+            if (ruleset === 'custom') {
+                ruleset_dropdown.append(mk('option', {value: ruleset, selected: 'selected'}, "Current ruleset"));
+            }
+            else {
+                ruleset_dropdown.append(mk('option', {value: ruleset}, label));
+            }
+        }
         this.main.append(
             mk('p', "This will run the replay for every level in the current pack, as fast as possible, and report the results."),
             mk('p', mk('strong', "This is an intensive process and may lag your browser!"), "  Mostly intended for testing LL itself."),
@@ -2111,7 +2219,7 @@ class PackTestDialog extends DialogOverlay {
             mk('p', "(Results will be saved until you change packs.)"),
             mk('hr'),
             this.results_summary,
-            mk('div.packtest-row', this.current_status, this.button),
+            mk('div.packtest-row', this.current_status, ruleset_dropdown, this.button),
             this.results,
         );
 
@@ -2123,13 +2231,31 @@ class PackTestDialog extends DialogOverlay {
     }
 
     async run(handle) {
-        this.results.textContent = '';
         let pack = this.conductor.stored_game;
         let dummy_sfx = {
             set_player_position() {},
             play() {},
             play_once() {},
         };
+        let ruleset = this.root.elements['ruleset'].value;
+        let compat;
+        if (ruleset === 'custom') {
+            compat = this.conductor.compat;
+        }
+        else {
+            compat = {};
+            for (let compatdef of COMPAT_OPTIONS) {
+                if (compatdef.rulesets.has(ruleset)) {
+                    compat[compatdef.key] = true;
+                }
+            }
+        }
+
+        this.results.textContent = '';
+        for (let li of this.results_summary.childNodes) {
+            li.removeAttribute('data-status');
+        }
+
         let num_levels = pack.level_metadata.length;
         let num_passed = 0;
         let total_tics = 0;
@@ -2175,14 +2301,8 @@ class PackTestDialog extends DialogOverlay {
 
                 this.current_status.textContent = `Testing level ${i + 1}/${num_levels} ${stored_level.title}...`;
 
-                // TODO compat options here??
                 let replay = stored_level.replay;
-                level = new Level(stored_level, {
-                    /*
-                    use_lynx_loop: true,
-                    emulate_60fps: true,
-                    */
-                });
+                level = new Level(stored_level, compat);
                 level.sfx = dummy_sfx;
                 level.force_floor_direction = replay.initial_force_floor_direction;
                 level._blob_modifier = replay.blob_seed;
@@ -2387,6 +2507,7 @@ class LevelBrowserOverlay extends DialogOverlay {
 // Main storage:
 //   packs
 //   options
+//   compat: (either a ruleset string or an object of individual flags)
 const STORAGE_KEY = "Lexy's Labyrinth";
 // Records for playing a pack
 const STORAGE_PACK_PREFIX = "Lexy's Labyrinth: ";
@@ -2406,11 +2527,28 @@ class Conductor {
         if (! this.stash.options) {
             this.stash.options = {};
         }
+        if (! this.stash.compat) {
+            this.stash.compat = 'lexy';
+        }
         if (! this.stash.packs) {
             this.stash.packs = {};
         }
         // Handy aliases
         this.options = this.stash.options;
+        this.compat = {};
+        this._compat_ruleset = 'custom';  // Only used by the compat dialog
+        if (typeof this.stash.compat === 'string') {
+            this._compat_ruleset = this.stash.compat;
+            for (let compat of COMPAT_OPTIONS) {
+                if (compat.rulesets.has(this.stash.compat)) {
+                    this.compat[compat.key] = true;
+                }
+            }
+        }
+        else {
+            Object.extend(this.compat, this.stash.compat);
+        }
+        this.set_compat(this._compat_ruleset, this.compat);
 
         this.splash = new Splash(this);
         this.editor = new Editor(this);
@@ -2423,6 +2561,10 @@ class Conductor {
         document.querySelector('#main-options').addEventListener('click', ev => {
             new OptionsOverlay(this).open();
         });
+        document.querySelector('#main-compat').addEventListener('click', ev => {
+            new CompatOverlay(this).open();
+        });
+        document.querySelector('#main-compat output').textContent = this._compat_ruleset ?? 'Custom';
 
         // Bind to the navigation headers, which list the current level pack
         // and level
@@ -2586,6 +2728,20 @@ class Conductor {
         this.nav_choose_level_button.disabled = !this.stored_game;
         this.nav_prev_button.disabled = !this.stored_game || this.level_index <= 0;
         this.nav_next_button.disabled = !this.stored_game || this.level_index >= this.stored_game.level_metadata.length;
+    }
+
+    set_compat(ruleset, flags) {
+        if (ruleset === 'custom') {
+            this._compat_group = null;
+        }
+        else {
+            this._compat_group = ruleset;
+        }
+
+        let label = COMPAT_RULESETS.filter(item => item[0] === ruleset)[0][1];
+        document.querySelector('#main-compat output').textContent = label;
+
+        this.compat = flags;
     }
 
     save_stash() {

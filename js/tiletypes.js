@@ -205,8 +205,9 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_ready(me, level) {
-            if (level.compat.auto_convert_ccl_popwalls &&
-                me.cell.some(tile => tile.type.is_actor))
+            if (! level.compat.no_auto_convert_ccl_popwalls &&
+                level.stored_level.use_ccl_compat &&
+                me.cell.get_actor())
             {
                 // Fix blocks and other actors on top of popwalls by turning them into double
                 // popwalls, which preserves CC2 popwall behavior
@@ -256,8 +257,9 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
         on_ready(me, level) {
-            if (level.compat.auto_convert_ccl_blue_walls &&
-                me.cell.some(tile => tile.type.is_actor))
+            if (! level.compat.no_auto_convert_ccl_blue_walls &&
+                level.stored_level.use_ccl_compat &&
+                me.cell.get_actor())
             {
                 // Blocks can be pushed off of blue walls in TW Lynx, which only works due to a tiny
                 // quirk of the engine that I don't want to replicate, so replace them with popwalls
