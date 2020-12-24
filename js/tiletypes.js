@@ -1261,8 +1261,12 @@ const TILE_TYPES = {
             }
             let exit_direction = other.direction;
             for (let tile of iterable) {
-                if (tile === me || this._is_active(tile, level)) {
-                    // Red teleporters allow exiting in any direction, searching clockwise
+                // Red teleporters allow exiting in any direction, searching clockwise, except for
+                // the teleporter you entered
+                if (tile === me) {
+                    yield [tile, exit_direction];
+                }
+                else if (this._is_active(tile, level)) {
                     yield [tile, exit_direction];
                     yield [tile, DIRECTIONS[exit_direction].right];
                     yield [tile, DIRECTIONS[exit_direction].opposite];
