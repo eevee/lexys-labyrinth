@@ -19,6 +19,7 @@ body {
     --panel-bg-color: hsl(225, 10%, 20%);
     --button-bg-color: hsl(225, 10%, 25%);
     --button-bg-hover-color: hsl(225, 15%, 30%);
+    --generic-bg-hover-on-white: hsl(225, 60%, 85%);
 }
 
 /* Generic element styling */
@@ -31,7 +32,8 @@ input[type=range] {
     margin: 0.125em;
     vertical-align: middle;
 }
-button {
+button,
+.radio-faux-button-set > label > input + span {
     font-size: inherit;
     padding: 0.25em 0.5em;
     font-family: inherit;
@@ -45,12 +47,12 @@ button {
     text-transform: lowercase;
     cursor: pointer;
 }
-button:hover {
+button:hover,
+.radio-faux-button-set > label:hover > input + span {
     background: var(--button-bg-hover-color);
 }
-button:active {
-    box-shadow:
-        inset 0 0 2px 1px hsl(225, 10%, 33%);
+button:active,
+.radio-faux-button-set > label:active > input + span {
     transform: translateY(1px);
     /* Need this for the editor's tool help things and i'm not questioning it */
     z-index: 1;
@@ -141,6 +143,40 @@ svg.svg-icon {
     stroke: none;
     fill: currentColor;
     fill-rule: evenodd;
+}
+
+/* Set of radio buttons in a row, styled like buttons */
+/* (you know, like /actual/ radio buttons) */
+/* Button-esque styling is shared with the button definition above */
+.radio-faux-button-set {
+    display: flex;
+    margin: 0.5em 0;
+}
+.radio-faux-button-set > label {
+    flex: 1;
+}
+.radio-faux-button-set > label > input {
+    display: none;
+}
+.radio-faux-button-set > label > input + span {
+    display: block;
+    border-radius: 0;
+    text-align: center;
+}
+.radio-faux-button-set > label:first-child > input + span {
+    border-top-left-radius: 0.25em;
+    border-bottom-left-radius: 0.25em;
+}
+.radio-faux-button-set > label:last-child > input + span {
+    border-top-right-radius: 0.25em;
+    border-bottom-right-radius: 0.25em;
+}
+.radio-faux-button-set > label > input:checked + span {
+    background: hsl(225, 80%, 50%);
+    box-shadow:
+        inset 0 1px 0 1px hsl(225, 10%, 20%),
+        inset 0 -0em 2em 0.5em hsl(225, 50%, 30%),
+        0 1px 1px hsl(225, 10%, 10%);
 }
 
 /* Overlay styling */
@@ -266,11 +302,41 @@ table.level-browser tbody tr {
     cursor: pointer;
 }
 table.level-browser tbody tr:hover {
-    background: hsl(225, 60%, 85%);
+    background: var(--generic-hover-bg-on-white);
 }
 table.level-browser tbody tr:nth-child(10n) td {
     border-bottom: 2px solid hsl(225, 20%, 80%);
 }
+
+/* Compat dialog */
+.dialog-compat {
+    max-width: 60em;
+}
+ul.compat-flags > li {
+    padding: 0.125em;
+}
+ul.compat-flags > li.-checked {
+    background: hsl(225, 60%, 90%);
+}
+ul.compat-flags > li:hover {
+    background: var(--generic-bg-hover-on-white);
+}
+ul.compat-flags > li > label {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+}
+ul.compat-flags > li > label > span.-desc {
+    flex: 1;
+}
+img.compat-icon,
+.compat-icon-gap {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+}
+
 
 /* Options dialog */
 .dialog-options {
@@ -334,24 +400,6 @@ label.option .option-label {
     }
 }
 
-/* Bits and pieces */
-img.compat-icon {
-    margin: 0 0.25em 0.125em;
-    vertical-align: middle;
-}
-.compat-lynx,
-.compat-ms {
-    font-size: 0.75em;
-    display: inline-block;
-    margin: 0 0.25em;
-    padding: 0.25em;
-    line-height: 1;
-    vertical-align: middle;
-    color: white;
-    background: gray;
-    border-radius: 0.25em;
-}
-
 
 /**************************************************************************************************/
 /* Main page structure */
@@ -382,7 +430,19 @@ body > header > nav {
 body > header button {
     font-size: 0.75em;
 }
+body > header h1 a {
+    color: inherit !important;
+    text-decoration: none !important;
+}
 
+body[data-mode=failed] #header-pack,
+body[data-mode=failed] #header-level,
+body[data-mode=failed] #header-main > nav,
+body[data-mode=loading] #header-pack,
+body[data-mode=loading] #header-level,
+body[data-mode=loading] #header-main > nav {
+    display: none;
+}
 body[data-mode=splash] #header-pack,
 body[data-mode=splash] #header-level {
     display: none;
@@ -390,6 +450,50 @@ body[data-mode=splash] #header-level {
 body[data-mode=editor] #player-edit,
 body[data-mode=player] #editor-play {
     display: none;
+}
+#failed,
+#loading {
+    margin: auto;
+    text-align: center;
+}
+#loading {
+    font-size: 2em;
+}
+.scrolling-sidewalk {
+    height: 32px;
+    width: 50vw;
+    margin: auto;
+    background: url(icons/tool-bg-selected.png) repeat;
+    animation: scrolling-sidewalk linear 0.4s infinite;
+    /*
+    box-shadow:
+        inset 5vw 0 5vw -5vw black,
+        inset -5vw 0 5vw -5vw black;
+    */
+    mask: linear-gradient(to right, transparent 0, #ffffff40 10%, white 20%, white 80%, #ffffff40 90%, transparent 100%);
+}
+.scrolling-sidewalk > img {
+    display: block;
+    margin: auto;
+}
+@keyframes scrolling-sidewalk {
+    0% {
+        background-position: 0px 0px;
+    }
+    100% {
+        background-position: -32px 0px;
+    }
+}
+pre.stack-trace {
+    overflow: auto;
+    width: 90vw;
+    max-width: 50em;
+    padding: 0.5em;
+    margin: 1em auto;
+    white-space: pre;
+    text-align: left;
+    background: hsl(345, 20%, 10%);
+    border: 3px double hsl(345, 75%, 20%);
 }
 
 #header-main {
@@ -424,7 +528,14 @@ body[data-mode=player] #editor-play {
     display: grid;
     grid:
         "header header  header"
+        "intro  stock   upload"
+        "links  stock   yours"
+        / 1fr 1fr 1fr
+    ;
+    grid:
+        "header header  header"
         "intro  intro   intro"
+        "links  links   links"
         "stock  upload  yours"
         / 1fr 1fr 1fr
     ;
@@ -487,6 +598,12 @@ body[data-mode=player] #editor-play {
     grid-area: intro;
     font-size: 20px;
 }
+#splash > #splash-links {
+    grid-area: links;
+}
+#splash > #splash-links ul.normal-list li {
+    margin: 0.5em 0;
+}
 #splash > #splash-stock-levels {
     grid-area: stock;
 }
@@ -516,6 +633,10 @@ body[data-mode=player] #editor-play {
     }
     #splash > header h1 {
         font-size: 2em;
+    }
+    /* No need to boost the font size here */
+    #splash > #splash-intro {
+        font-size: inherit;
     }
 }
 

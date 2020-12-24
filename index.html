@@ -12,7 +12,8 @@
     <meta name="og:description" content="A (work in progress) reimplementation of Chip's Challenge 1 and 2, using entirely free assets.">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 </head>
-<body data-mode="splash">
+<body data-mode="failed">
+    <script>document.body.setAttribute('data-mode', 'loading');</script>
     <svg id="svg-iconsheet">
     <defs>
         <!-- Actions -->
@@ -44,12 +45,11 @@
     </svg>
     <header id="header-main">
         <img id="header-icon" src="icon.png" alt="">
-        <h1>Lexy's Labyrinth</h1>
-        <p>— a game by <a href="https://eev.ee/">eevee</a></p>
+        <h1><a href="https://github.com/eevee/lexys-labyrinth">Lexy's Labyrinth</a></h1>
+        <p>— an <a href="https://github.com/eevee/lexys-labyrinth">open source</a> game by <a href="https://eev.ee/">eevee</a></p>
         <nav>
-            <button id="main-about" type="button">about</button>
-            <button id="main-help" type="button" disabled>help</button>
             <button id="main-options" type="button" disabled>options</button>
+            <button id="main-compat" type="button">compat mode: <output>lexy</output></button>
         </nav>
     </header>
     <header id="header-pack">
@@ -73,16 +73,41 @@
             </button>
         </nav>
     </header>
-    <main id="splash">
+    <main id="failed">
+        <h1>oops!</h1>
+        <p>Sorry, the game was unable to load at all.</p>
+        <p>If you have JavaScript partly or wholly blocked, I salute you!  ...but this is an interactive game and cannot work without it.</p>
+    </main>
+    <main id="loading" hidden>
+        <p>...loading...</p>
+        <div class="scrolling-sidewalk">
+            <img src="loading.gif" alt="Lexy walking">
+        </div>
+    </main>
+    <script>
+        document.querySelector('#failed').setAttribute('hidden', '');
+        document.querySelector('#loading').removeAttribute('hidden');
+    </script>
+    <main id="splash" hidden>
         <div class="drag-overlay"></div>
         <header>
             <h1><img src="og-preview.png" alt="">Lexy's Labyrinth</h1>
             <p>an unapproved Chip's Challenge emulator</p>
         </header>
         <section id="splash-intro">
-            <p><strong>Welcome</strong> to Lexy's Labyrinth, an open source puzzle game that is curiously similar to — but legally distinct from — the Atari classic <a href="https://en.wikipedia.org/wiki/Chip%27s_Challenge">Chip's Challenge</a>!</p>
+            <p><strong>Welcome</strong> to Lexy's Labyrinth, an open source puzzle game that is curiously similar to — but legally distinct from! — the Atari classic <a href="https://en.wikipedia.org/wiki/Chip%27s_Challenge">Chip's Challenge</a>.  It's been lovingly crafted from scratch with completely new art, sounds, and music; it lets you undo your mistakes; and it's the <em>only</em> way to play Chip's Challenge 2 levels on Linux, Mac, or a phone!</p>
             <p>Pick a level pack to get started!  You can also load and play any levels you've got lying around, or brave the level editor and make one of your own.</p>
-            <p>If you're not familiar with the game, read up on <a href="https://github.com/eevee/lexys-labyrinth/wiki/How-To-Play">how to play</a>.  You can also get more technical details or report bugs on <a href="https://github.com/eevee/lexys-labyrinth">GitHub</a>, find out more about Chip's Challenge via the <a href="https://bitbusters.club/">Bit Busters Club</a> fansite, or support this endeavor (and other things I do) on <a href="https://www.patreon.com/eevee">Patreon</a>.</p>
+        </section>
+        <section id="splash-links">
+            <h2>More resources</h2>
+            <ul class="normal-list">
+                <li><a href="https://github.com/eevee/lexys-labyrinth/wiki/How-To-Play">How to play</a></li>
+                <li><a href="https://github.com/eevee/lexys-labyrinth">Source code and project details on GitHub</a></li>
+                <li><a href="https://patreon.com/eevee">Support this project (and others) on my Patreon</a></li>
+                <li><a href="https://bitbusters.club/">Bit Busters Club</a>, a fansite with an extensive <a href="https://wiki.bitbusters.club/Main_Page">wiki</a>, vastly more <a href="https://sets.bitbusters.club/">community levels</a>, speedrun records, and more</li>
+                <li><a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge 1</a> (free) and <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a> ($5) on Steam</li>
+                <li><a href="http://www.niffler.co.uk/">Niffler</a>, the current publisher of Chip's Challenge and its spiritual sequel <a href="https://store.steampowered.com/app/262590/Chucks_Challenge_3D_2020/">Chuck's Challenge 3D</a></li>
+            </ul>
         </section>
 
         <section id="splash-stock-levels">
@@ -91,16 +116,15 @@
         </section>
 
         <section id="splash-upload-levels">
-            <h2>Load other levels</h2>
-            <p>Load and play any levels you have on hand, including the original levels.  Supports CCL/DAT, C2G, and individual C2Ms (though scores aren't saved for those).  Find more on the <a href="https://sets.bitbusters.club/">Bit Busters Club set list</a>.</p>
+            <h2>Other levels</h2>
+            <p>You can load custom levels as well — CCL/DAT, C2G, or individual C2Ms (though scores aren't saved for those).</p>
             <!-- TODO zip files! -->
             <p>You can also drag and drop files or directories into this window.</p>
             <input id="splash-upload-file" type="file" accept=".dat,.ccl,.c2m,.ccs" multiple>
             <input id="splash-upload-dir" type="file" webkitdirectory>
             <button type="button" id="splash-upload-file-button" class="button-big">Load files</button>
             <button type="button" id="splash-upload-dir-button" class="button-big">Load directory</button>
-            <p>If you still have the original Microsoft "BOWEP" game lying around, you can play the Chip's Challenge 1 levels by loading <code>CHIPS.DAT</code>.</p>
-            <p>If you own the Steam versions of <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge 1</a> (<em>free!</em>) or <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a> ($5 last I checked), you can play those too, even on Linux or Mac:</p>
+            <p>To play the original levels, you can load <code>CHIPS.DAT</code> from the ancient Microsoft port, or load the Steam levels as follows:</p>
             <ol class="normal-list">
                 <li>Right-click the game in Steam and choose <em>Properties</em>.  On the <em>Local Files</em> tab, click <em>Browse local files</em>.</li>
                 <li>Open the <code>data</code> folder, then <code>games</code>.</li>

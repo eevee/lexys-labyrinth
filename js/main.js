@@ -1683,6 +1683,102 @@ const BUILTIN_LEVEL_PACKS = [{
     ident: 'cclp3',
     title: "Chip's Challenge Level Pack 3",
     desc: "A tough challenge, by and for veteran players.",
+/*
+ * TODO: this is tricky.  it's a massive hodgepodge of levels mostly made by individual people...
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'jblp1',
+    title: "JBLP1",
+    author: 'jb',
+    desc: "\"Meant to be simple and straightforward in the spirit of the original game, though the difficulty peak is ultimately a bit higher.\"",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Pit of 100 Tiles",
+    author: 'ajmiam',
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "The Other 100 Tiles",
+    author: 'ajmiam',
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "JoshL5",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "JoshL6",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "JoshL7",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Neverstopgaming",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Ultimate Chip 4",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Ultimate Chip 5",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Ultimate Chip 6",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Walls of CCLP 1",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Walls of CCLP 3",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Walls of CCLP 4",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "TS0",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "TS1",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "TS2",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "Chip56",
+    desc: "A tough challenge, by and for veteran players.",
+}, {
+    path: 'levels/CCLP3.ccl',
+    ident: 'cclp3',
+    title: "kidsfair",
+    desc: "A tough challenge, by and for veteran players.",
+    */
 }];
 
 class Splash extends PrimaryView {
@@ -2555,9 +2651,6 @@ class Conductor {
         this.player = new Player(this);
 
         // Bind the header buttons
-        document.querySelector('#main-about').addEventListener('click', ev => {
-            new AboutOverlay(this).open();
-        });
         document.querySelector('#main-options').addEventListener('click', ev => {
             new OptionsOverlay(this).open();
         });
@@ -2633,6 +2726,7 @@ class Conductor {
         });
 
         this.update_nav_buttons();
+        document.querySelector('#loading').setAttribute('hidden', '');
         this.switch_to_splash();
     }
 
@@ -2891,4 +2985,22 @@ async function main() {
     }
 }
 
-main();
+(async () => {
+    try {
+        await main();
+    }
+    catch (e) {
+        let failed = document.getElementById('failed');
+        document.getElementById('loading').setAttribute('hidden', '');
+        failed.removeAttribute('hidden');
+        document.body.setAttribute('data-mode', 'failed');
+
+        failed.appendChild(mk('p',
+            "I did manage to capture this error, which you might be able to ",
+            mk('a', {href: 'https://github.com/eevee/lexys-labyrinth'}, "report somewhere"),
+            ":",
+        ));
+        failed.appendChild(mk('pre.stack-trace', e.toString(), "\n\n", (e.stack ?? "").replace(/^/mg, "  ")));
+        throw e;
+    }
+})();
