@@ -733,7 +733,7 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'force_floor_s');
             let actor = me.cell.get_actor();
             if (actor && actor.movement_cooldown <= 0) {
-                this.on_arrive(me, level, actor);
+                me.type.on_arrive(me, level, actor);
             }
         },
         on_gray_button: activate_me,
@@ -750,7 +750,7 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'force_floor_w');
             let actor = me.cell.get_actor();
             if (actor && actor.movement_cooldown <= 0) {
-                this.on_arrive(me, level, actor);
+                me.type.on_arrive(me, level, actor);
             }
         },
         on_gray_button: activate_me,
@@ -767,7 +767,7 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'force_floor_n');
             let actor = me.cell.get_actor();
             if (actor && actor.movement_cooldown <= 0) {
-                this.on_arrive(me, level, actor);
+                me.type.on_arrive(me, level, actor);
             }
         },
         on_gray_button: activate_me,
@@ -784,7 +784,7 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'force_floor_e');
             let actor = me.cell.get_actor();
             if (actor && actor.movement_cooldown <= 0) {
-                this.on_arrive(me, level, actor);
+                me.type.on_arrive(me, level, actor);
             }
         },
         on_gray_button: activate_me,
