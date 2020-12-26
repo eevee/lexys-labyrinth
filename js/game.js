@@ -878,21 +878,24 @@ export class Level extends LevelInterface {
         // Actor is allowed to move, so do so
         let success = this.attempt_step(actor, direction);
 
-        // FIXME not convinced that ice bonking should actually go here.  in cc2 it appears to
-        // happen every frame, fwiw, but i'm not sure if that includes frames with forced moves
-        // (though i guess that's impossible)
+        // CC2 handles bonking for all kinds of sliding here -- bonking on ice causes an immediate
+        // turnaround, and bonking on an RFF rolls a new direction and tries again
+        // TODO this assumes the slide comes from the terrain, which is always the case atm
         if (! success) {
             let terrain = actor.cell.get_terrain();
-            if (terrain.type.slide_mode === 'ice' && (! actor.ignores(terrain.type.name) ||
+            if (terrain && (
+                (actor.slide_mode && ! actor.ignores(terrain.type.name)) ||
                 // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
                 // FIXME and if they have cleats, they get stuck instead (?!)
-                (actor.type.name === 'ghost' && actor.cell.get_terrain().type.slide_mode === 'ice')))
+                (actor.type.name === 'ghost' && terrain.type.slide_mode === 'ice')))
             {
-                // Bonk on ice: turn the actor around, consult the tile in case it's an ice
-                // corner, and try again
-                actor.direction = DIRECTIONS[direction].opposite;
-                direction = terrain.type.get_slide_direction(terrain, this, actor);
-                success = this.attempt_step(actor, direction);
+                // Turn the actor around (so ice corners bonk correctly), pretend they stepped on
+                // the tile again (so RFFs roll again), and try moving again
+                this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
+                if (terrain.type.on_arrive) {
+                    terrain.type.on_arrive(terrain, this, actor);
+                }
+                success = this.attempt_step(actor, actor.direction);
             }
         }
 
@@ -1083,10 +1086,6 @@ export class Level extends LevelInterface {
         //   succeed, even if overriding in the same direction we're already moving, that does count
         //   as an override.
         let terrain = actor.cell.get_terrain();
-        let forced_decision;
-        if (actor.slide_mode) {
-            forced_decision = terrain.type.get_slide_direction(terrain, this, actor);
-        }
         let may_move = ! forced_only && (! actor.slide_mode || (actor.slide_mode === 'force' && actor.last_move_was_force));
         let [dir1, dir2] = this._extract_player_directions(input);
 
@@ -1116,7 +1115,7 @@ export class Level extends LevelInterface {
 
         if (actor.slide_mode && ! (may_move && dir1)) {
             // This is a forced move and we're not overriding it, so we're done
-            actor.decision = forced_decision;
+            actor.decision = actor.direction;
 
             if (actor.slide_mode === 'force') {
                 this._set_tile_prop(actor, 'last_move_was_force', true);
@@ -1140,17 +1139,16 @@ export class Level extends LevelInterface {
                 // one, UNLESS it's blocked AND the other isn't.
                 // Note that if this is an override, then the forced direction is still used to
                 // interpret our input!
-                let facing = forced_decision ?? actor.direction;
-                if (dir1 === facing || dir2 === facing) {
-                    let other_direction = dir1 === facing ? dir2 : dir1;
-                    let curr_open = try_direction(facing, 'push');
+                if (dir1 === actor.direction || dir2 === actor.direction) {
+                    let other_direction = dir1 === actor.direction ? dir2 : dir1;
+                    let curr_open = try_direction(actor.direction, 'push');
                     let other_open = try_direction(other_direction, 'push');
                     if (! curr_open && other_open) {
                         actor.decision = other_direction;
                         open = true;
                     }
                     else {
-                        actor.decision = facing;
+                        actor.decision = actor.direction;
                         open = curr_open;
                     }
                 }
@@ -1184,7 +1182,7 @@ export class Level extends LevelInterface {
             // force floor takes priority (and we've already bumped the wall(s))
             if (actor.slide_mode && ! open) {
                 this._set_tile_prop(actor, 'last_move_was_force', true);
-                actor.decision = forced_decision;
+                actor.decision = actor.direction;
             }
             else {
                 // Otherwise this is 100% a conscious move so we lose our override power next tic
@@ -1217,7 +1215,7 @@ export class Level extends LevelInterface {
             (actor.type.name === 'ghost' && terrain.type.slide_mode === 'ice'))
         {
             // Actors can't make voluntary moves while sliding; they just, ah, slide.
-            actor.decision = terrain.type.get_slide_direction(terrain, this, actor);
+            actor.decision = actor.direction;
             return;
         }
         if (forced_only)

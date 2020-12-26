@@ -7,6 +7,7 @@ function activate_me(me, level) {
 
 function on_ready_force_floor(me, level) {
     // At the start of the level, if there's an actor on a force floor:
+    // - use on_arrive to set the actor's direction
     // - set the slide_mode (normally done by the main game loop)
     // - item bestowal: if they're being pushed into a wall and standing on an item, pick up the
     //   item, even if they couldn't normally pick items up
@@ -15,6 +16,7 @@ function on_ready_force_floor(me, level) {
     if (! actor)
         return;
 
+    me.type.on_arrive(me, level, actor);
     if (me.type.slide_mode) {
         actor.slide_mode = me.type.slide_mode;
     }
@@ -663,21 +665,19 @@ const TILE_TYPES = {
     ice: {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'ice',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
     },
     ice_sw: {
         draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['south', 'west']),
         slide_mode: 'ice',
         blocks_leaving: blocks_leaving_thin_walls,
-        get_slide_direction(me, level, other) {
-            if (other.direction === 'south')
-                return 'east';
-            if (other.direction === 'west')
-                return 'north';
-            return other.direction;
+        on_arrive(me, level, other) {
+            if (other.direction === 'south') {
+                level.set_actor_direction(other, 'east');
+            }
+            else if (other.direction === 'west') {
+                level.set_actor_direction(other, 'north');
+            }
         },
     },
     ice_nw: {
@@ -685,12 +685,13 @@ const TILE_TYPES = {
         thin_walls: new Set(['north', 'west']),
         slide_mode: 'ice',
         blocks_leaving: blocks_leaving_thin_walls,
-        get_slide_direction(me, level, other) {
-            if (other.direction === 'north')
-                return 'east';
-            if (other.direction === 'west')
-                return 'south';
-            return other.direction;
+        on_arrive(me, level, other) {
+            if (other.direction === 'north') {
+                level.set_actor_direction(other, 'east');
+            }
+            else if (other.direction === 'west') {
+                level.set_actor_direction(other, 'south');
+            }
         },
     },
     ice_ne: {
@@ -698,12 +699,13 @@ const TILE_TYPES = {
         thin_walls: new Set(['north', 'east']),
         slide_mode: 'ice',
         blocks_leaving: blocks_leaving_thin_walls,
-        get_slide_direction(me, level, other) {
-            if (other.direction === 'north')
-                return 'west';
-            if (other.direction === 'east')
-                return 'south';
-            return other.direction;
+        on_arrive(me, level, other) {
+            if (other.direction === 'north') {
+                level.set_actor_direction(other, 'west');
+            }
+            else if (other.direction === 'east') {
+                level.set_actor_direction(other, 'south');
+            }
         },
     },
     ice_se: {
@@ -711,23 +713,28 @@ const TILE_TYPES = {
         thin_walls: new Set(['south', 'east']),
         slide_mode: 'ice',
         blocks_leaving: blocks_leaving_thin_walls,
-        get_slide_direction(me, level, other) {
-            if (other.direction === 'south')
-                return 'west';
-            if (other.direction === 'east')
-                return 'north';
-            return other.direction;
+        on_arrive(me, level, other) {
+            if (other.direction === 'south') {
+                level.set_actor_direction(other, 'west');
+            }
+            else if (other.direction === 'east') {
+                level.set_actor_direction(other, 'north');
+            }
         },
     },
     force_floor_n: {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
-        get_slide_direction(me, level, other) {
-            return 'north';
+        on_arrive(me, level, other) {
+            level.set_actor_direction(other, 'north');
         },
         activate(me, level) {
             level.transmute_tile(me, 'force_floor_s');
+            let actor = me.cell.get_actor();
+            if (actor && actor.movement_cooldown <= 0) {
+                this.on_arrive(me, level, actor);
+            }
         },
         on_gray_button: activate_me,
         on_power: activate_me,
@@ -736,11 +743,15 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
-        get_slide_direction(me, level, other) {
-            return 'east';
+        on_arrive(me, level, other) {
+            level.set_actor_direction(other, 'east');
         },
         activate(me, level) {
             level.transmute_tile(me, 'force_floor_w');
+            let actor = me.cell.get_actor();
+            if (actor && actor.movement_cooldown <= 0) {
+                this.on_arrive(me, level, actor);
+            }
         },
         on_gray_button: activate_me,
         on_power: activate_me,
@@ -749,11 +760,15 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
-        get_slide_direction(me, level, other) {
-            return 'south';
+        on_arrive(me, level, other) {
+            level.set_actor_direction(other, 'south');
         },
         activate(me, level) {
             level.transmute_tile(me, 'force_floor_n');
+            let actor = me.cell.get_actor();
+            if (actor && actor.movement_cooldown <= 0) {
+                this.on_arrive(me, level, actor);
+            }
         },
         on_gray_button: activate_me,
         on_power: activate_me,
@@ -762,11 +777,15 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
-        get_slide_direction(me, level, other) {
-            return 'west';
+        on_arrive(me, level, other) {
+            level.set_actor_direction(other, 'west');
         },
         activate(me, level) {
             level.transmute_tile(me, 'force_floor_e');
+            let actor = me.cell.get_actor();
+            if (actor && actor.movement_cooldown <= 0) {
+                this.on_arrive(me, level, actor);
+            }
         },
         on_gray_button: activate_me,
         on_power: activate_me,
@@ -776,8 +795,8 @@ const TILE_TYPES = {
         slide_mode: 'force',
         on_ready: on_ready_force_floor,
         // TODO ms: this is random, and an acting wall to monsters (!)
-        get_slide_direction(me, level, other) {
-            return level.get_force_floor_direction();
+        on_arrive(me, level, other) {
+            level.set_actor_direction(other, level.get_force_floor_direction());
         },
     },
     slime: {
