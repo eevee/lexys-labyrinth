@@ -915,8 +915,8 @@ export class Tileset {
         if (coords[0] instanceof Array) {
             if (tic !== null) {
                 if (tile && tile.movement_speed) {
-                    // This tile reports its own animation timing (in tics), so trust that, and just
-                    // use the current tic's fraction.
+                    // This tile reports its own animation timing (in frames), so trust that, and
+                    // just use the current tic's fraction.
                     // That said: adjusting animation speed complicates this slightly.  Consider the
                     // player's walk animation, which takes 4 tics to complete, during which time we
                     // cycle through 8 frames.  Playing that at half speed means only half the
@@ -926,7 +926,7 @@ export class Tileset {
                     // first half; if it started on tics 5-8, play the second half.  They could get
                     // out of sync if the player hesitates, but no one will notice that, and this
                     // approach minimizes storing extra state.
-                    let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1) / tile.movement_speed;
+                    let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1 * 3) / tile.movement_speed;
                     // But do NOT do this for explosions or splashes, which have a fixed duration
                     // and only play once
                     if (this.animation_slowdown > 1 && ! tile.type.ttl) {
@@ -934,7 +934,7 @@ export class Tileset {
                         // 1/N of it before the game ends (or loops) the animation.
                         // So increase by [0..N-1] to get it in some other range, then divide by N
                         // to scale back down to [0, 1)
-                        i += Math.floor(tic / tile.movement_speed % this.animation_slowdown);
+                        i += Math.floor(tic * 3 / tile.movement_speed % this.animation_slowdown);
                         i /= this.animation_slowdown;
                     }
                     coords = coords[Math.floor(i * coords.length)];
@@ -1234,8 +1234,8 @@ export class Tileset {
         if (coords[0] instanceof Array) {
             if (tic !== null) {
                 if (tile && tile.movement_speed) {
-                    // This tile reports its own animation timing (in tics), so trust that, and just
-                    // use the current tic's fraction.
+                    // This tile reports its own animation timing (in frames), so trust that, and
+                    // just use the current tic's fraction.
                     // That said: adjusting animation speed complicates this slightly.  Consider the
                     // player's walk animation, which takes 4 tics to complete, during which time we
                     // cycle through 8 frames.  Playing that at half speed means only half the
@@ -1245,7 +1245,7 @@ export class Tileset {
                     // first half; if it started on tics 5-8, play the second half.  They could get
                     // out of sync if the player hesitates, but no one will notice that, and this
                     // approach minimizes storing extra state.
-                    let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1) / tile.movement_speed;
+                    let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1 * 3) / tile.movement_speed;
                     // But do NOT do this for explosions or splashes, which have a fixed duration
                     // and only play once
                     if (this.animation_slowdown > 1 && ! tile.type.ttl) {
@@ -1253,7 +1253,7 @@ export class Tileset {
                         // 1/N of it before the game ends (or loops) the animation.
                         // So increase by [0..N-1] to get it in some other range, then divide by N
                         // to scale back down to [0, 1)
-                        i += Math.floor(tic / tile.movement_speed % this.animation_slowdown);
+                        i += Math.floor(tic * 3 / tile.movement_speed % this.animation_slowdown);
                         i /= this.animation_slowdown;
                     }
                     coords = coords[Math.floor(i * coords.length)];

@@ -40,7 +40,7 @@ export class Tile {
         else {
             // For a movement speed of N, the cooldown is set to N during the tic an actor starts
             // moving, and we interpolate it from there to N - 1 over the course of the duration
-            let p = ((this.movement_speed - this.movement_cooldown) + tic_offset) / this.movement_speed;
+            let p = ((this.movement_speed - this.movement_cooldown) + tic_offset * 3) / this.movement_speed;
             return [
                 (1 - p) * this.previous_cell.x + p * x,
                 (1 - p) * this.previous_cell.y + p * y,
