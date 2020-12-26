@@ -1829,7 +1829,7 @@ export class Level extends LevelInterface {
     // Iterates over the grid in a diamond pattern, spreading out from the given start cell (but not
     // including it).  Only used for connecting orange buttons.
     *iter_cells_in_diamond(start_cell) {
-        let max_search_radius = Math.max(this.size_x, this.size_y);
+        let max_search_radius = Math.max(this.size_x, this.size_y) + 1;
         for (let dist = 1; dist <= max_search_radius; dist++) {
             // Start east and move counterclockwise
             let sx = start_cell.x + dist;
