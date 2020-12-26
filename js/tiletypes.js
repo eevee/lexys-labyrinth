@@ -804,7 +804,7 @@ const TILE_TYPES = {
         on_ready(me, level) {
             // FIXME in cc2 only, actors on a bomb immediately explode, but that's tricky for the
             // player since we can't kill them before the game even starts.  cc2 just murders them
-            // instantly.  maybe we could do that then
+            // instantly.  maybe we could do that then?  or use on_tic, like flame jets?
         },
         on_arrive(me, level, other) {
             level.remove_tile(me);
@@ -1326,11 +1326,8 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         activate(me, level) {
             level.transmute_tile(me, 'flame_jet_on');
-            // If there's anything on us already, nuke it
-            let actor = me.cell.get_actor();
-            if (actor && ! actor.movement_cooldown) {
-                me.type._kill(me, level, actor);
-            }
+            // Do NOT immediately nuke anything on us, or it'd be impossible to push a block off an
+            // adjacent orange button; this is probably why flame jets kill on tics
         },
         on_gray_button(me, level) {
             me.type.activate(me, level);
@@ -1338,6 +1335,9 @@ const TILE_TYPES = {
         on_power(me, level) {
             me.type.activate(me, level);
         },
+        // This is a silly hack to get us flagged as a static tile, so when we're turned on, that
+        // tile's on_tic will still run
+        on_tic() {},
     },
     flame_jet_on: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -1350,23 +1350,20 @@ const TILE_TYPES = {
         on_power(me, level) {
             me.type.activate(me, level);
         },
-        // Kill anything that shows up
-        // FIXME every tic, also kills every actor in the cell (mostly matters if something steps on
-        // with fire boots and then drops them, which is unlike fire)
-        _kill(me, level, other) {
-            // Note that (dirt?) blocks, fireballs, and anything with fire boots are immune
-            // TODO would be neat if this understood "ignores anything with fire immunity" but that
-            // might be a bit too high-level for this game
-            if (other.type.is_real_player) {
-                level.fail('burned');
+        on_tic(me, level) {
+            let actor = me.cell.get_actor();
+            if (actor && actor.movement_cooldown <= 0 && ! actor.ignores(me.type.name)) {
+                // Note that (dirt?) blocks, fireballs, and anything with fire boots are immune
+                // TODO would be neat if this understood "ignores anything with fire immunity" but that
+                // might be a bit too high-level for this game
+                if (actor.type.is_real_player) {
+                    level.fail('burned');
+                }
+                else {
+                    // TODO should this play a sound?
+                    level.transmute_tile(actor, 'explosion');
+                }
             }
-            else {
-                // TODO should this play a sound?
-                level.transmute_tile(other, 'explosion');
-            }
-        },
-        on_arrive(me, level, other) {
-            this._kill(me, level, other);
         },
     },
     // Buttons

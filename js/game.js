@@ -400,8 +400,10 @@ export class Level extends LevelInterface {
         let n = 0;
         let connectables = [];
         this.remaining_players = 0;
-        // FIXME handle traps correctly:
-        // - if an actor is in the cell, set the trap to open and unstick everything in it
+        // Speedup for flame jets, which aren't actors but do a thing every tic
+        // TODO this won't notice if a new tile with an on_tic is created, but that's impossible
+        // atm...  or, at least, it's hacked to still work with flame_jet_off
+        this.static_on_tic_tiles = [];
         for (let y = 0; y < this.height; y++) {
             let row = [];
             for (let x = 0; x < this.width; x++) {
@@ -427,6 +429,9 @@ export class Level extends LevelInterface {
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);
+                    }
+                    else if (tile.type.on_tic) {
+                        this.static_on_tic_tiles.push(tile);
                     }
                     cell._add(tile);
 
@@ -742,9 +747,9 @@ export class Level extends LevelInterface {
         // are only two wiring updates before everything gets its first chance to move, so we skip
         // the very first one here.
         if (this.tic_counter !== 0) {
-            this.update_wiring();
+            this._do_wire_phase();
         }
-        this.update_wiring();
+        this._do_wire_phase();
 
         // Advance everyone's cooldowns
         // Note that we iterate in reverse order, DESPITE keeping dead actors around with null
@@ -775,14 +780,17 @@ export class Level extends LevelInterface {
             }
         }
 
-        this.update_wiring();
+        this._do_wire_phase();
+        // TODO should this also happen three times?
+        this._do_static_phase();
     }
 
     // Lynx-style loop: everyone decides, then everyone moves/cools.
     _begin_tic_lynx() {
         this._do_decision_phase();
         this._do_combined_action_phase(3);
-        this.update_wiring();
+        this._do_wire_phase();
+        this._do_static_phase();
 
         this._do_cleanup_phase();
     }
@@ -792,15 +800,18 @@ export class Level extends LevelInterface {
     _begin_tic_lynx60() {
         this._do_decision_phase(true);
         this._do_combined_action_phase(1, true);
-        this.update_wiring();
+        this._do_wire_phase();
+        this._do_static_phase();
 
         this._do_decision_phase(true);
         this._do_combined_action_phase(1, true);
-        this.update_wiring();
+        this._do_wire_phase();
+        this._do_static_phase();
 
         this._do_decision_phase();
         this._do_combined_action_phase(1);
-        this.update_wiring();
+        this._do_wire_phase();
+        this._do_static_phase();
 
         this._do_cleanup_phase();
     }
@@ -1648,7 +1659,7 @@ export class Level extends LevelInterface {
         }
     }
 
-    update_wiring() {
+    _do_wire_phase() {
         if (this.circuits.length === 0)
             return;
 
@@ -1776,6 +1787,13 @@ export class Level extends LevelInterface {
                 circuit.is_powered = is_powered;
             }
         });
+    }
+
+    // Some non-actor tiles still want to act every tic.  Note that this should happen AFTER wiring.
+    _do_static_phase() {
+        for (let tile of this.static_on_tic_tiles) {
+            tile.type.on_tic(tile, this);
+        }
     }
 
     // -------------------------------------------------------------------------
