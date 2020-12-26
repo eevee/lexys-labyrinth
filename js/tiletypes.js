@@ -1087,9 +1087,11 @@ const TILE_TYPES = {
             me.presses = (me.presses ?? 0) + 1;
         },
         // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
-        add_press(me, level) {
+        add_press(me, level, is_wire = false) {
             level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
-            if (me.presses === 1) {
+            // TODO weird cc2 case that may or may not be a bug: actors aren't ejected if the trap
+            // opened because of wiring
+            if (me.presses === 1 && ! is_wire) {
                 // Free everything on us, if we went from 0 to 1 presses (i.e. closed to open)
                 for (let tile of Array.from(me.cell)) {
                     if (tile.type.is_actor) {
@@ -1112,7 +1114,7 @@ const TILE_TYPES = {
         },
         on_power(me, level) {
             // Treat being powered or not as an extra kind of brown button press
-            me.type.add_press(me, level);
+            me.type.add_press(me, level, true);
         },
         on_depower(me, level) {
             me.type.remove_press(me, level);
