@@ -2504,14 +2504,13 @@ class PackTestDialog extends DialogOverlay {
                             return;
                         }
 
-                        // Don't run for more than 50ms at a time, to avoid janking the browser...
+                        // Don't run for more than 100ms at a time, to avoid janking the browser...
                         // TOO much.  I mean, we still want it to reflow the stuff we've added, but
                         // we also want to be pretty aggressive so this finishes quickly
                         let now = performance.now();
-                        if (now - last_pause > 50) {
-                            // TODO measure the impact this has
+                        if (now - last_pause > 100) {
+                            await util.sleep(4);
                             last_pause = now;
-                            await util.sleep(5);
                         }
                     }
                 }
