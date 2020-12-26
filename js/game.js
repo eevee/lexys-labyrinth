@@ -884,6 +884,7 @@ export class Level extends LevelInterface {
         if (! success) {
             let terrain = actor.cell.get_terrain();
             if (terrain && (
+                (terrain.type.slide_mode === 'ice' || terrain.type.name === 'force_floor_all') &&
                 (actor.slide_mode && ! actor.ignores(terrain.type.name)) ||
                 // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
                 // FIXME and if they have cleats, they get stuck instead (?!)
