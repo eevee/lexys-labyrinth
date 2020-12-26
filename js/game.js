@@ -1475,13 +1475,6 @@ export class Level extends LevelInterface {
         // Also reset slide here, since slide mode is differently important for forced moves
         this.make_slide(actor, null);
 
-        // Let the actor perform any weird behavior of its own; note that this does NOT respect
-        // 'ignores' since it passes the whole cell in, which is good because ghosts use this to
-        // stamp out fire and dirt
-        if (actor.type.on_step_on) {
-            actor.type.on_step_on(actor, this, cell);
-        }
-
         // Step on topmost things first -- notably, it's safe to step on water with flippers on top
         for (let tile of Array.from(cell).reverse()) {
             if (tile === actor)

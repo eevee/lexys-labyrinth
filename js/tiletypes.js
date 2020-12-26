@@ -138,6 +138,14 @@ const TILE_TYPES = {
     // Floors and walls
     floor: {
         draw_layer: DRAW_LAYERS.terrain,
+        on_arrive(me, level, other) {
+            if (other.type.name === 'blob') {
+                // Blobs spread slime onto floor
+                if (me.previous_cell && me.previous_cell.has('slime')) {
+                    level.transmute_tile(me, 'slime');
+                }
+            }
+        },
     },
     floor_letter: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -608,12 +616,18 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.monster_solid & ~COLLISION.fireball,
         on_arrive(me, level, other) {
-            if (other.type.name === 'ice_block') {
+            if (other.type.name === 'ghost') {
+                // Ghosts with fire boots erase fire, otherwise are unaffected
+                if (other.has_item('fire_boots')) {
+                    level.transmute_tile(me, 'floor');
+                }
+            }
+            else if (other.has_item('fire_boots')) {
+                return;
+            }
+            else if (other.type.name === 'ice_block') {
                 level.transmute_tile(other, 'explosion');
                 level.transmute_tile(me, 'water');
-            }
-            else if (other.type.name === 'ghost') {
-                return;
             }
             else if (other.type.is_real_player) {
                 level.fail('burned');
@@ -1896,18 +1910,6 @@ const TILE_TYPES = {
             let modifier = level.get_blob_modifier();
             return [DIRECTION_ORDER[(level.prng() + modifier) % 4]];
         },
-        on_step_on(me, level, cell) {
-            let terrain = cell.get_terrain();
-            if (! terrain)
-                return;
-
-            if (terrain.type.name === 'floor') {
-                // Blobs spread slime onto floor
-                if (me.previous_cell && me.previous_cell.has('slime')) {
-                    level.transmute_tile(terrain, 'slime');
-                }
-            }
-        },
     },
     teeth: {
         draw_layer: DRAW_LAYERS.actor,
@@ -2000,18 +2002,6 @@ const TILE_TYPES = {
             }
             let d = DIRECTIONS[me.direction];
             return [me.direction, d.left, d.right, d.opposite];
-        },
-        on_step_on(me, level, cell) {
-            let terrain = cell.get_terrain();
-            if (! terrain)
-                return;
-
-            if (terrain.type.name === 'fire') {
-                // Ghosts with fire boots erase fire
-                if (me.has_item('fire_boots')) {
-                    level.transmute_tile(terrain, 'floor');
-                }
-            }
         },
     },
     floor_mimic: {
@@ -2136,7 +2126,9 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        item_ignores: new Set(['fire', 'flame_jet_on']),
+        // Note that these do NOT ignore fire because of the ghost interaction
+        // XXX starting to wonder if this is even useful really
+        item_ignores: new Set(['flame_jet_on']),
     },
     flippers: {
         draw_layer: DRAW_LAYERS.item,
