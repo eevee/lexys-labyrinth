@@ -1246,6 +1246,9 @@ export class Tileset {
                     // out of sync if the player hesitates, but no one will notice that, and this
                     // approach minimizes storing extra state.
                     let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1 * 3) / tile.movement_speed;
+                    // FIXME hack for cc2 mode, the only place we can see a cooldown of 0 which
+                    // makes i be 1
+                    i = Math.min(0.999, i);
                     // But do NOT do this for explosions or splashes, which have a fixed duration
                     // and only play once
                     if (this.animation_slowdown > 1 && ! tile.type.ttl) {
