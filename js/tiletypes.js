@@ -679,11 +679,13 @@ const TILE_TYPES = {
     ice: {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'ice',
+        speed_factor: 2,
     },
     ice_sw: {
         draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['south', 'west']),
         slide_mode: 'ice',
+        speed_factor: 2,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
@@ -698,6 +700,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['north', 'west']),
         slide_mode: 'ice',
+        speed_factor: 2,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
@@ -712,6 +715,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['north', 'east']),
         slide_mode: 'ice',
+        speed_factor: 2,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             if (other.direction === 'north') {
@@ -726,6 +730,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         thin_walls: new Set(['south', 'east']),
         slide_mode: 'ice',
+        speed_factor: 2,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             if (other.direction === 'south') {
@@ -739,6 +744,7 @@ const TILE_TYPES = {
     force_floor_n: {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
+        speed_factor: 2,
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'north');
@@ -756,6 +762,7 @@ const TILE_TYPES = {
     force_floor_e: {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
+        speed_factor: 2,
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'east');
@@ -773,6 +780,7 @@ const TILE_TYPES = {
     force_floor_s: {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
+        speed_factor: 2,
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'south');
@@ -790,6 +798,7 @@ const TILE_TYPES = {
     force_floor_w: {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
+        speed_factor: 2,
         on_ready: on_ready_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'west');
@@ -807,6 +816,7 @@ const TILE_TYPES = {
     force_floor_all: {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
+        speed_factor: 2,
         on_ready: on_ready_force_floor,
         // TODO ms: this is random, and an acting wall to monsters (!)
         on_arrive(me, level, other) {
@@ -1194,6 +1204,7 @@ const TILE_TYPES = {
     },
     teleport_blue: {
         draw_layer: DRAW_LAYERS.terrain,
+        slide_mode: 'teleport',
         wire_propagation_mode: 'all',
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;
@@ -1274,6 +1285,7 @@ const TILE_TYPES = {
     },
     teleport_red: {
         draw_layer: DRAW_LAYERS.terrain,
+        slide_mode: 'teleport',
         wire_propagation_mode: 'none',
         teleport_allow_override: true,
         _is_active(me, level) {
@@ -1319,6 +1331,7 @@ const TILE_TYPES = {
     },
     teleport_green: {
         draw_layer: DRAW_LAYERS.terrain,
+        slide_mode: 'teleport',
         teleport_dest_order(me, level, other) {
             let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
             if (all.length <= 1) {
@@ -1345,6 +1358,7 @@ const TILE_TYPES = {
     },
     teleport_yellow: {
         draw_layer: DRAW_LAYERS.terrain,
+        slide_mode: 'teleport',
         teleport_allow_override: true,
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;

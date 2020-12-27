@@ -277,7 +277,7 @@ export class Cell extends Array {
                             level._set_tile_prop(actor, 'is_pushing', true);
                         }
                         if (! level.attempt_out_of_turn_step(tile, direction)) {
-                            if (tile.slide_mode !== null && tile.movement_cooldown !== 0) {
+                            if (tile.slide_mode !== null && tile.movement_cooldown > 0) {
                                 // If the push failed and the obstacle is in the middle of a slide,
                                 // remember this as the next move it'll make
                                 level._set_tile_prop(tile, 'pending_push', direction);
@@ -1087,7 +1087,10 @@ export class Level extends LevelInterface {
         //   succeed, even if overriding in the same direction we're already moving, that does count
         //   as an override.
         let terrain = actor.cell.get_terrain();
-        let may_move = ! forced_only && (! actor.slide_mode || (actor.slide_mode === 'force' && actor.last_move_was_force));
+        let may_move = ! forced_only && (
+            ! actor.slide_mode ||
+            (actor.slide_mode === 'force' && actor.last_move_was_force) ||
+            (actor.slide_mode === 'teleport' && actor.cell.get_terrain().type.teleport_allow_override));
         let [dir1, dir2] = this._extract_player_directions(input);
 
         // Check for special player actions, which can only happen at decision time.  Dropping can
@@ -1181,12 +1184,13 @@ export class Level extends LevelInterface {
 
             // If we're overriding a force floor but the direction we're moving in is blocked, the
             // force floor takes priority (and we've already bumped the wall(s))
-            if (actor.slide_mode && ! open) {
+            if (actor.slide_mode === 'force' && ! open) {
                 this._set_tile_prop(actor, 'last_move_was_force', true);
                 actor.decision = actor.direction;
             }
             else {
                 // Otherwise this is 100% a conscious move so we lose our override power next tic
+                // TODO how does this interact with teleports
                 this._set_tile_prop(actor, 'last_move_was_force', false);
             }
         }
@@ -1292,9 +1296,10 @@ export class Level extends LevelInterface {
         }
         this.set_actor_direction(actor, direction);
 
-        // Record our speed, and halve it below if we're stepping onto a sliding tile
+        // Grab speed /first/, in case the movement or on_blocked turns us into an animation
+        // immediately (and then we won't have a speed!)
+        // FIXME that's a weird case actually since the explosion ends up still moving
         let speed = actor.type.movement_speed;
-        let double_speed = false;
 
         let move = DIRECTIONS[direction].movement;
         if (! this.check_movement(actor, actor.cell, direction, 'push')) {
@@ -1304,16 +1309,15 @@ export class Level extends LevelInterface {
             return false;
         }
 
+        // We're clear!  Compute our speed and move us
         // FIXME this feels clunky
         let goal_cell = this.get_neighboring_cell(actor.cell, direction);
         let terrain = goal_cell.get_terrain();
-        if (terrain && terrain.type.slide_mode && ! actor.ignores(terrain.type.name)) {
-            double_speed = true;
-        }
-
-        // We're clear!
-        if (double_speed || actor.has_item('speed_boots')) {
+        if (actor.has_item('speed_boots')) {
             speed /= 2;
+        }
+        else if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name)) {
+            speed /= terrain.type.speed_factor;
         }
 
         let orig_cell = actor.cell;
@@ -1418,8 +1422,6 @@ export class Level extends LevelInterface {
         }
 
         // Announce we're approaching
-        // Clear the slide here since slide mode is important for knowing our speed
-        this.make_slide(actor, null);
         for (let tile of Array.from(actor.cell)) {
             if (tile === actor)
                 continue;
@@ -1444,9 +1446,6 @@ export class Level extends LevelInterface {
 
             if (tile.type.on_approach) {
                 tile.type.on_approach(tile, this, actor);
-            }
-            if (tile.type.slide_mode) {
-                this.make_slide(actor, tile.type.slide_mode);
             }
         }
 
@@ -1508,11 +1507,10 @@ export class Level extends LevelInterface {
         }
     }
 
-    attempt_teleport(actor, input) {
+    attempt_teleport(actor) {
         let teleporter = actor.just_stepped_on_teleporter;
-        actor.just_stepped_on_teleporter = null;
+        delete actor.just_stepped_on_teleporter;
 
-        let push_mode = actor === this.player ? 'push' : 'bump';
         let original_direction = actor.direction;
         let success = false;
         let dest, direction;
@@ -1528,7 +1526,15 @@ export class Level extends LevelInterface {
             if (dest === teleporter && teleporter.type.name === 'teleport_yellow') {
                 break;
             }
-            if (this.check_movement(actor, dest.cell, direction, push_mode)) {
+            // Note that this uses 'bump' even for players; it would be very bad if we could
+            // initiate movement in this pass (in Lexy rules, anyway), because we might try to push
+            // something that's still waiting to teleport itself!
+            // XXX is this correct?  it does mean you won't try to teleport to a teleporter that's
+            // "blocked" by a block that won't be there anyway by the time you try to move, but that
+            // seems very obscure and i haven't run into a case with it yet.  offhand i don't think
+            // it can even come up under cc2 rules, since teleporting is done after an actor cools
+            // down and before the next actor even gets a chance to act
+            if (this.check_movement(actor, dest.cell, direction, 'bump')) {
                 success = true;
                 // Sound plays from the origin cell simply because that's where the sfx player
                 // thinks the player is currently; position isn't updated til next turn
@@ -1538,64 +1544,28 @@ export class Level extends LevelInterface {
         }
 
         if (success) {
-            if (teleporter.type.teleport_allow_override && actor === this.player) {
-                // Red and yellow teleporters allow players to override the exit direction.  This
-                // can only happen after we've found a suitable destination.  As with normal player
-                // decisions, we aggressively check each direction first (meaning we might bump the
-                // same cell twice here!), and then figure out what to do afterwards.
-                // Note that it's possible to bump a direction multiple times during this process,
-                // and also possible to perform a three-way block slap: the direction she leaves,
-                // the other direction she was holding, and the original exit direction we found.
-                let [dir1, dir2] = this._extract_player_directions(this.p1_input);
-                let open1 = false, open2 = false;
-                if (dir1) {
-                    open1 = this.check_movement(actor, dest.cell, dir1, push_mode);
-                }
-                if (dir2) {
-                    open2 = this.check_movement(actor, dest.cell, dir2, push_mode);
-                }
+            this.set_actor_direction(actor, direction);
+            this.make_slide(actor, 'teleport');
 
-                // If the player didn't even try to override, do nothing
-                if (! dir1 && ! dir2) {
-                }
-                // If only one direction is available, whether because she only held one direction
-                // or because one of them was blocked, use that one
-                else if ((open1 && ! open2) || (dir1 && ! dir2)) {
-                    direction = dir1;
-                }
-                else if (! open1 && open2) {
-                    direction = dir2;
-                }
-                // Otherwise, we have a tie.  If either direction is the exit we found (which
-                // can only happen if both are open), prefer that one...
-                else if (dir1 === direction || dir2 === direction) {
-                }
-                // ...otherwise, prefer the horizontal one.
-                else if (dir1 === 'west' || dir1 === 'east') {
-                    direction = dir1;
-                }
-                else {
-                    direction = dir2;
-                }
-            }
-
-            // Now physically move the actor and have them take a turn
+            // Now physically move the actor, but their movement waits until next decision phase
             this.remove_tile(actor);
             this.add_tile(actor, dest.cell);
-            // FIXME i think the cc2 approach might be to handle this at decision time, hence why
-            // overriding works at all; it happens to work for me because this happens immediately
-            // before decision time as a separate pass!  for now, simulate by undoing the cooldown
-            this.attempt_out_of_turn_step(actor, direction);
-            if (this.compat.use_lynx_loop && actor.movement_cooldown) {
-                this._set_tile_prop(actor, 'movement_cooldown', actor.movement_cooldown + 1);
-            }
         }
-        if (! success && actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
-            // Super duper special yellow teleporter behavior: you pick it the fuck up
-            // FIXME not if there's only one in the level?
-            this.attempt_take(actor, teleporter);
-            if (actor === this.player) {
-                this.sfx.play_once('get-tool', teleporter.cell);
+        else {
+            // Be sure to remove the slide_mode or they'll be stuck forever
+            // TODO: in cc2, if you're on a /disabled/ red teleporter, you'll continue to be pushed
+            // in this direction??  is this a bug, is this the only such case?
+            if (! (teleporter.type.name === 'teleport_red' && ! teleporter.type._is_active(teleporter, this))) {
+                this.make_slide(actor, null);
+            }
+
+            if (actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
+                // Super duper special yellow teleporter behavior: you pick it the fuck up
+                // FIXME not if there's only one in the level?
+                this.attempt_take(actor, teleporter);
+                if (actor === this.player) {
+                    this.sfx.play_once('get-tool', teleporter.cell);
+                }
             }
         }
     }
