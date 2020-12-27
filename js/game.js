@@ -1591,40 +1591,45 @@ export class Level extends LevelInterface {
 
     drop_item(actor, force = false) {
         if (this.stored_level.use_cc1_boots)
-            return;
+            return false;
         if (actor.movement_cooldown > 0)
-            return;
+            return false;
+        if (! actor.toolbelt || actor.toolbelt.length === 0)
+            return false;
+
+        if (actor.cell.get_item() && ! force)
+            return false;
 
         // Drop the oldest item, i.e. the first one
-        if (actor.toolbelt && actor.toolbelt.length > 0 && (force || ! actor.cell.get_item())) {
-            let name = actor.toolbelt[0];
-            if (name === 'teleport_yellow') {
-                // We can only be dropped on regular floor
-                let terrain = actor.cell.get_terrain();
-                if (terrain.type.name !== 'floor')
-                    return;
+        let name = actor.toolbelt[0];
+        if (name === 'teleport_yellow') {
+            // We can only be dropped on regular floor
+            let terrain = actor.cell.get_terrain();
+            if (terrain.type.name !== 'floor')
+                return false;
 
-                this.transmute_tile(terrain, 'teleport_yellow');
-            }
-            else {
-                let type = TILE_TYPES[name];
-                if (type.on_drop) {
-                    name = type.on_drop(this, actor);
-                    if (name) {
-                        type = TILE_TYPES[name];
-                    }
-                }
-                let tile = new Tile(type);
-                this.add_tile(tile, actor.cell);
-                if (type.is_actor) {
-                    this.add_actor(tile);
-                    this.attempt_out_of_turn_step(tile, actor.direction);
-                }
-            }
-
-            actor.toolbelt.shift();
-            this._push_pending_undo(() => actor.toolbelt.unshift(name));
+            this.transmute_tile(terrain, 'teleport_yellow');
         }
+        else {
+            let type = TILE_TYPES[name];
+            if (type.on_drop) {
+                name = type.on_drop(this, actor);
+                if (name) {
+                    type = TILE_TYPES[name];
+                }
+            }
+            let tile = new Tile(type);
+            this.add_tile(tile, actor.cell);
+            if (type.is_actor) {
+                this.add_actor(tile);
+                this.attempt_out_of_turn_step(tile, actor.direction);
+            }
+        }
+
+        actor.toolbelt.shift();
+        this._push_pending_undo(() => actor.toolbelt.unshift(name));
+
+        return true;
     }
 
     _do_wire_phase() {
@@ -2131,13 +2136,18 @@ export class Level extends LevelInterface {
             if (! actor.toolbelt) {
                 actor.toolbelt = [];
             }
+
+            // Nothing can hold more than four items, so try to drop one first.  Note that this may
+            // temporarily cause there to be two items in the cell if we're in the middle of picking
+            // one up, and it means we can't pick up a yellow teleport and swap out another for it
+            // FIXME two items at once is bad, please fix caller somehow
+            if (actor.toolbelt.length === 4) {
+                if (! this.drop_item(actor, true))
+                    return false;
+            }
+
             actor.toolbelt.push(name);
             this._push_pending_undo(() => actor.toolbelt.pop());
-
-            // Nothing can hold more than four items
-            if (actor.toolbelt.length > 4) {
-                this.drop_item(actor, true);
-            }
         }
         return true;
     }
