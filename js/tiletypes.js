@@ -2168,6 +2168,8 @@ const TILE_TYPES = {
             if (other.type.is_real_player && ! me.cell.get_item_mod()) {
                 level._set_tile_prop(me, 'timer', 85);  // FIXME??  wiki just says about 4.3 seconds what
                 level.transmute_tile(me, 'dynamite_lit');
+                // Actors are expected to have this, so populate it
+                level._set_tile_prop(me, 'movement_cooldown', 0);
                 level.add_actor(me);
             }
         },

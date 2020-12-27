@@ -269,8 +269,11 @@ export class Cell extends Array {
                     if (push_mode === 'bump') {
                         // FIXME this doesn't take railroad curves into account, e.g. it thinks a
                         // rover can't push a block through a curve
-                        if (! level.check_movement(tile, tile.cell, direction, push_mode))
+                        if (tile.movement_cooldown > 0 ||
+                            ! level.check_movement(tile, tile.cell, direction, push_mode))
+                        {
                             return false;
+                        }
                     }
                     else if (push_mode === 'push') {
                         if (actor === level.player) {
@@ -1920,6 +1923,7 @@ export class Level extends LevelInterface {
     // for undo/rewind purposes
 
     _set_tile_prop(tile, key, val) {
+        if (Number.isNaN(val)) throw new Error(`got a NaN for ${key} on ${tile.type.name} at ${tile.cell.x}, ${tile.cell.y}`);
         if (! this.undo_enabled) {
             tile[key] = val;
             return;
