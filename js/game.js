@@ -615,8 +615,12 @@ export class Level extends LevelInterface {
         this.wired_outputs = Array.from(wired_outputs);
         this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
 
-        // Finally, let all tiles do any custom init behavior
-        for (let cell of this.linear_cells) {
+        // Finally, let all tiles do any custom init behavior...  but backwards, to match actor
+        // order
+        // FIXME very much need an on_begin that's run at the start of the first tic for stuff like
+        // force floors and bombs
+        for (let i = this.linear_cells.length - 1; i >= 0; i--) {
+            let cell = this.linear_cells[i];
             for (let tile of cell) {
                 if (tile.type.on_ready) {
                     tile.type.on_ready(tile, this);
