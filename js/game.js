@@ -224,13 +224,18 @@ export class Cell extends Array {
         // (Note that here, and anywhere else that has any chance of altering the cell's contents,
         // we iterate over a copy of the cell to insulate ourselves from tiles appearing or
         // disappearing mid-iteration.)
-        for (let tile of Array.from(this)) {
+        for (let tile of Array.from(this).reverse()) {
             // TODO check ignores here?
-            if (actor.type.on_bump) {
-                actor.type.on_bump(actor, level, tile, direction);
-            }
-            if (tile.type.on_bumped) {
-                tile.type.on_bumped(tile, level, actor);
+            // Note that if they can't enter this cell because of a thin wall, then they can't bump
+            // any of our other tiles either.  (This is my best guess at the actual behavior, seeing
+            // as walls also block everything but players can obviously bump /those/.)
+            if (! blocked) {
+                if (actor.type.on_bump) {
+                    actor.type.on_bump(actor, level, tile, direction);
+                }
+                if (tile.type.on_bumped) {
+                    tile.type.on_bumped(tile, level, actor);
+                }
             }
 
             if (! tile.blocks(actor, direction, level))
