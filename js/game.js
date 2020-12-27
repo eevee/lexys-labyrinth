@@ -1832,8 +1832,11 @@ export class Level extends LevelInterface {
                 // Being next to e.g. a red teleporter doesn't count (but pink button is ok)
                 continue;
 
-            if (wired.wire_directions & dirinfo.opposite_bit)
+            if ((wired.wire_directions & dirinfo.opposite_bit) &&
+                ! (wired.wire_tunnel_directions & dirinfo.opposite_bit))
+            {
                 return true;
+            }
         }
         return false;
     }
