@@ -898,7 +898,9 @@ export class Level extends LevelInterface {
                 // Turn the actor around (so ice corners bonk correctly), pretend they stepped on
                 // the tile again (so RFFs roll again), and try moving again
                 this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
-                if (terrain.type.on_arrive) {
+                // Note that ghosts bonk even on ice corners, which they can otherwise pass through,
+                // argh!
+                if (terrain.type.on_arrive && actor.type.name !== 'ghost') {
                     terrain.type.on_arrive(terrain, this, actor);
                 }
                 success = this.attempt_step(actor, actor.direction);
