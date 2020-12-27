@@ -151,6 +151,7 @@ svg.svg-icon {
 /* Button-esque styling is shared with the button definition above */
 .radio-faux-button-set {
     display: flex;
+    align-items: stretch;
     margin: 0.5em 0;
 }
 .radio-faux-button-set > label {
@@ -161,6 +162,8 @@ svg.svg-icon {
 }
 .radio-faux-button-set > label > input + span {
     display: block;
+    box-sizing: border-box;
+    height: 100%;
     border-radius: 0;
     text-align: center;
 }
@@ -1263,6 +1266,7 @@ body.--debug #player-debug {
 }
 #player-debug .-replay-status > .-playback > progress {
     grid-area: progress;
+    width: 100%;
     height: 100%;
 }
 #player-debug .-replay-status > .-playback > output {
