@@ -977,8 +977,10 @@ export class Level extends LevelInterface {
         // FIXME cc2 has very poor interactions between this feature and cloners; come up with some
         // better rules as a default
         if (this.swap_player1) {
-            // Reset the set of keys released since last tic
-            this.p1_released = 0xff;
+            // Reset the set of keys released since last tic (but not the swap key, or holding it
+            // will swap us endlessly)
+            // FIXME this doesn't even quite work, it just swaps less aggressively?  wtf
+            this.p1_released = 0xff & ~INPUT_BITS.swap;
 
             // Iterate backwards over the actor list looking for a viable next player to control
             let i0 = this.actors.indexOf(this.player);
