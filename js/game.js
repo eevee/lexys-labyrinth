@@ -355,8 +355,6 @@ export class Level extends LevelInterface {
         this.bonus_points = 0;
         this.aid = 0;
 
-        this.yellow_tank_decision = null;
-
         // Time
         if (this.stored_level.time_limit === 0) {
             this.time_remaining = null;
@@ -846,11 +844,6 @@ export class Level extends LevelInterface {
             else {
                 this.make_actor_decision(actor, forced_only);
             }
-        }
-
-        // This only persists for a single decision phase
-        if (! forced_only) {
-            this.yellow_tank_decision = null;
         }
     }
 

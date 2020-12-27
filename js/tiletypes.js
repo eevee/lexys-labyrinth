@@ -1448,7 +1448,11 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
-            level.yellow_tank_decision = other.direction;
+            for (let actor of level.actors) {
+                if (actor.type.name === 'tank_yellow') {
+                    level._set_tile_prop(actor, 'pending_decision', other.direction);
+                }
+            }
         },
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
@@ -1916,7 +1920,15 @@ const TILE_TYPES = {
         },
         movement_speed: 4,
         decide_movement(me, level) {
-            return [level.yellow_tank_decision, null];
+            if (me.pending_decision) {
+                let decision = me.pending_decision;
+                level._set_tile_prop(me, 'pending_decision', null);
+                // Yellow tanks don't keep trying to move if blocked
+                return [decision, null];
+            }
+            else {
+                return null;
+            }
         }
     },
     blob: {
