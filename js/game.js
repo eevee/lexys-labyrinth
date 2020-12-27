@@ -1328,7 +1328,12 @@ export class Level extends LevelInterface {
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
                 if (behind_actor && ! behind_actor.movement_cooldown &&
-                    actor.can_push(behind_actor, direction))
+                    // FIXME i don't actually know the precise rules here.  dirt blocks and ghosts
+                    // can pull other blocks even though they can't usually push them.  given the
+                    // existence of monster hooking, i suspect /anything/ can be hooked but on
+                    // monsters it has a weird effect?  figure this out?
+                    behind_actor.type.name.match(/_block$/) &&
+                    (! behind_actor.type.allows_push || behind_actor.type.allows_push(behind_actor, direction)))
                 {
                     this._set_tile_prop(behind_actor, 'is_pulled', true);
                     this.attempt_out_of_turn_step(behind_actor, direction);
