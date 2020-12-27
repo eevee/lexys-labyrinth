@@ -203,7 +203,7 @@ class RailroadTileEditor extends TileEditorOverlay {
         this.root.append(track_list);
 
         this.root.append(mk('h3', "Switch"));
-        let switch_list = mk('ul.editor-railroad-tile-tracks.--switch');
+        let switch_list = mk('ul.editor-railroad-tile-tracks.--switch.editor-tile-editor-svg-parts');
         for (let i of track_order) {
             let input = mk('input', {type: 'radio', name: 'switch', value: i});
             switch_list.append(mk('li', mk('label', input, svg_icons[i].cloneNode(true))));
@@ -212,7 +212,7 @@ class RailroadTileEditor extends TileEditorOverlay {
         // TODO if they pick a track that's missing it should add it
         switch_list.addEventListener('change', ev => {
             if (this.tile) {
-                this.tile.track_switch = ev.target.value;
+                this.tile.track_switch = parseInt(ev.target.value, 10);
                 this.editor.mark_tile_dirty(this.tile);
             }
         });
