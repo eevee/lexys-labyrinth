@@ -2303,7 +2303,7 @@ const TILE_TYPES = {
         decide_movement(me, level) {
             return [me.direction];
         },
-        on_bumped(me, level, other) {
+        on_approach(me, level, other) {
             // Blow up anything that runs into us...  unless we're on a cloner
             // FIXME there are other cases where this won't be right; this shouldn't happen if the
             // cell blocks the actor, but i don't have a callback for that?
