@@ -482,12 +482,19 @@ const TILE_TYPES = {
             return me.type._is_affected(me, other) && ! me.type.has_opening(me, direction);
         },
         on_arrive(me, level, other) {
-            // FIXME actually this happens even if you have the sign so it shouldn't ignore!!
             level._set_tile_prop(me, 'entered_direction', other.direction);
         },
         on_depart(me, level, other) {
             if (! level.is_tile_wired(me, false)) {
-                me.type._switch_track(me, level);
+                // Only switch if both the entering and the leaving are CURRENTLY valid directions
+                // (which has some quirky implications for the railroad sign)
+                if (me.track_switch === null)
+                    return;
+
+                let track = this.track_order[me.track_switch];
+                if (track.indexOf(DIRECTIONS[me.entered_direction].opposite) >= 0 && track.indexOf(other.direction) >= 0) {
+                    me.type._switch_track(me, level);
+                }
             }
         },
         on_power(me, level) {
