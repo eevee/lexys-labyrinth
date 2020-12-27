@@ -138,10 +138,10 @@ const TILE_TYPES = {
     // Floors and walls
     floor: {
         draw_layer: DRAW_LAYERS.terrain,
-        on_arrive(me, level, other) {
+        on_approach(me, level, other) {
             if (other.type.name === 'blob') {
                 // Blobs spread slime onto floor
-                if (me.previous_cell && me.previous_cell.has('slime')) {
+                if (other.previous_cell && other.previous_cell.has('slime')) {
                     level.transmute_tile(me, 'slime');
                 }
             }
