@@ -651,9 +651,19 @@ class Player extends PrimaryView {
 
             let dt = parseInt(button.getAttribute('data-dt'));
             if (dt > 0) {
+                if (this.state === 'stopped') {
+                    return;
+                }
+                this.set_state('paused');
+
                 this.advance_by(dt);
             }
             else if (dt < 0) {
+                if (this.state === 'waiting') {
+                    return;
+                }
+                this.set_state('paused');
+
                 for (let i = 0; i < -dt; i++) {
                     if (! this.level.has_undo())
                         break;
@@ -2300,6 +2310,11 @@ class CompatOverlay extends DialogOverlay {
 
         let ruleset = this.root.elements['__ruleset__'].value;
         this.conductor.set_compat(ruleset, flags);
+
+        // If the player is currently idle at the start of a level, ask it to restart
+        if (this.conductor.player.state === 'waiting') {
+            this.conductor.player.restart_level();
+        }
     }
 
     remember() {
