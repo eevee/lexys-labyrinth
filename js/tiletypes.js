@@ -601,7 +601,8 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         blocks(me, level, other) {
-            return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
+            return ((other.type.name === 'player2' || other.type.name === 'doppelganger2') &&
+                ! other.has_item('hiking_boots'));
         },
         on_arrive(me, level, other) {
             // Bizarre interaction
@@ -614,7 +615,8 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         blocks_collision: COLLISION.monster_solid & ~COLLISION.rover,
         blocks(me, level, other) {
-            return (other.type.name === 'player2' && ! other.has_item('hiking_boots'));
+            return ((other.type.name === 'player2' || other.type.name === 'doppelganger2') &&
+                ! other.has_item('hiking_boots'));
         },
     },
 
