@@ -756,7 +756,12 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'force_floor_s');
             let actor = me.cell.get_actor();
             if (actor && actor.movement_cooldown <= 0) {
-                me.type.on_arrive(me, level, actor);
+                level.set_actor_direction(actor, 'south');
+                // If we're using the Lynx loop, then decisions have already happened, and the new
+                // direction will be overwritten if this actor has yet to move
+                if (actor.decision && ! actor.ignores(me.type.name)) {
+                    actor.decision = actor.direction;
+                }
             }
         },
         on_gray_button: activate_me,
@@ -774,7 +779,10 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'force_floor_w');
             let actor = me.cell.get_actor();
             if (actor && actor.movement_cooldown <= 0) {
-                me.type.on_arrive(me, level, actor);
+                level.set_actor_direction(actor, 'west');
+                if (actor.decision && ! actor.ignores(me.type.name)) {
+                    actor.decision = actor.direction;
+                }
             }
         },
         on_gray_button: activate_me,
@@ -792,7 +800,10 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'force_floor_n');
             let actor = me.cell.get_actor();
             if (actor && actor.movement_cooldown <= 0) {
-                me.type.on_arrive(me, level, actor);
+                level.set_actor_direction(actor, 'north');
+                if (actor.decision && ! actor.ignores(me.type.name)) {
+                    actor.decision = actor.direction;
+                }
             }
         },
         on_gray_button: activate_me,
@@ -810,7 +821,10 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'force_floor_e');
             let actor = me.cell.get_actor();
             if (actor && actor.movement_cooldown <= 0) {
-                me.type.on_arrive(me, level, actor);
+                level.set_actor_direction(actor, 'east');
+                if (actor.decision && ! actor.ignores(me.type.name)) {
+                    actor.decision = actor.direction;
+                }
             }
         },
         on_gray_button: activate_me,
