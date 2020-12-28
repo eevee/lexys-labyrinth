@@ -1979,7 +1979,7 @@ export class Level extends LevelInterface {
     }
 
     adjust_bonus(add, mult = 1) {
-        this.bonus_points = Math.ceil(this.bonus_points * mult) + add;
+        this.bonus_points = Math.floor(this.bonus_points * mult) + add;
     }
 
     pause_timer() {
