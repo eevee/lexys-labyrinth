@@ -1409,8 +1409,19 @@ class Player extends PrimaryView {
                         savefile.total_score = savefile.total_score ?? 0;
                         if (old_scorecard) {
                             savefile.total_score -= old_scorecard.score;
+                            savefile.total_time -= old_scorecard.time;
+                            savefile.total_abstime -= old_scorecard.abstime;
                         }
                         savefile.total_score += scorecard.score;
+                        savefile.total_time += scorecard.time;
+                        savefile.total_abstime += scorecard.abstime;
+
+                        if (! old_scorecard) {
+                            savefile.cleared_levels = (savefile.cleared_levels ?? 0) + 1;
+                        }
+                        else if (old_scorecard.aid > 0 && scorecard.aid === 0) {
+                            savefile.aidless_levels = (savefile.aidless_levels ?? 0) + 1;
+                        }
 
                         savefile.scorecards[level_index] = scorecard;
                         this.conductor.save_savefile();
@@ -1807,15 +1818,17 @@ class Splash extends PrimaryView {
         for (let packdef of BUILTIN_LEVEL_PACKS) {
             stock_pack_idents.add(packdef.ident);
             stock_pack_list.append(this._create_pack_element(packdef.ident, packdef));
+            this.update_pack_score(packdef.ident);
         }
 
         // Populate the list of other packs you've played
-        let custom_pack_list = mk('ul.played-pack-list');
-        this.root.querySelector('#splash-upload-levels').append(custom_pack_list);
+        this.custom_pack_list = mk('ul.played-pack-list');
+        this.root.querySelector('#splash-upload-levels').append(this.custom_pack_list);
         for (let [ident, packinfo] of Object.entries(this.conductor.stash.packs)) {
             if (stock_pack_idents.has(ident))
                 continue;
-            custom_pack_list.append(this._create_pack_element(ident));
+            this.custom_pack_list.append(this._create_pack_element(ident));
+            this.update_pack_score(ident);
         }
 
         // File loading: allow providing either a single file, multiple files, OR an entire
@@ -1940,18 +1953,32 @@ class Splash extends PrimaryView {
             forget_button,
         ));
         this.played_pack_elements[ident] = li;
-
-        this.update_pack_score(ident);
         return li;
     }
 
     update_pack_score(ident) {
-        let li = this.played_pack_elements[ident];
         let packinfo = this.conductor.stash.packs[ident];
-        li.classList.toggle('--unplayed', ! packinfo);
-        if (! packinfo)
-            return;
+        let li = this.played_pack_elements[ident];
 
+        if (! packinfo) {
+            if (li) {
+                li.classList.add('--unplayed');
+            }
+            return;
+        }
+
+        if (! li) {
+            // This must be a new pack, which we haven't created markup for yet, so do that and
+            // stick it at the top of the custom list
+            // FIXME feels rather hokey to do this here; should happen when loading a pack, once
+            // there's something to indicate currently loaded pack + all available files
+            li = this._create_pack_element(ident);
+            // FIXME if these are ordered by last played then /any/ opening of a pack should
+            // reshuffle this list
+            this.custom_pack_list.prepend(li);
+        }
+
+        li.classList.remove('--unplayed');
         let progress = li.querySelector('.-progress');
 
         let score;
@@ -2859,42 +2886,52 @@ class Conductor {
         if (identifier !== null) {
             // TODO again, enforce something about the shape here
             this.current_pack_savefile = JSON.parse(window.localStorage.getItem(STORAGE_PACK_PREFIX + identifier));
-            let changed = false;
-            if (this.current_pack_savefile && this.current_pack_savefile.total_score === null) {
-                // Fix some NaNs that slipped in
-                this.current_pack_savefile.total_score = this.current_pack_savefile.scorecards
-                    .map(scorecard => scorecard ? scorecard.score : 0)
-                    .reduce((a, b) => a + b, 0);
-                changed = true;
-            }
-            if (this.current_pack_savefile && this.current_pack_savefile.cleared_levels === undefined) {
-                // Populate some more recently added fields
-                this.current_pack_savefile.total_levels = stored_game.level_metadata.length;
-                this.current_pack_savefile.total_time = 0;
-                this.current_pack_savefile.total_abstime = 0;
-                this.current_pack_savefile.cleared_levels = 0;
-                this.current_pack_savefile.aidless_levels = 0;
-                for (let scorecard of this.current_pack_savefile.scorecards) {
-                    if (! scorecard)
-                        continue;
-                    this.current_pack_savefile.total_time += scorecard.time;
-                    this.current_pack_savefile.total_abstime += scorecard.abstime;
-                    this.current_pack_savefile.cleared_levels += 1;
-                    if (scorecard.aid === 0) {
-                        this.current_pack_savefile.aidless_levels += 1;
-                    }
+            if (this.current_pack_savefile) {
+                let changed = false;
+                // Do some version upgrades
+                if (this.current_pack_savefile.total_score === null) {
+                    // Fix some NaNs that slipped in
+                    this.current_pack_savefile.total_score = this.current_pack_savefile.scorecards
+                        .map(scorecard => scorecard ? scorecard.score : 0)
+                        .reduce((a, b) => a + b, 0);
+                    changed = true;
                 }
-                changed = true;
-            }
-            if (changed) {
-                this.save_savefile();
+                if (! this.current_pack_savefile.__version__) {
+                    // Populate some more recently added fields
+                    this.current_pack_savefile.total_levels = stored_game.level_metadata.length;
+                    this.current_pack_savefile.total_time = 0;
+                    this.current_pack_savefile.total_abstime = 0;
+                    this.current_pack_savefile.cleared_levels = 0;
+                    this.current_pack_savefile.aidless_levels = 0;
+                    for (let scorecard of this.current_pack_savefile.scorecards) {
+                        if (! scorecard)
+                            continue;
+                        this.current_pack_savefile.total_time += scorecard.time;
+                        this.current_pack_savefile.total_abstime += scorecard.abstime;
+                        this.current_pack_savefile.cleared_levels += 1;
+                        if (scorecard.aid === 0) {
+                            this.current_pack_savefile.aidless_levels += 1;
+                        }
+                    }
+                    this.current_pack_savefile.__version__ = 1;
+                    changed = true;
+                }
+                if (changed) {
+                    this.save_savefile();
+                }
             }
         }
         if (! this.current_pack_savefile) {
             this.current_pack_savefile = {
+                __version__: 1,
                 total_score: 0,
+                total_time: 0,
+                total_abstime: 0,
                 current_level: 1,
                 highest_level: 1,
+                total_levels: stored_game.level_metadata.length,
+                cleared_levels: 0,
+                aidless_levels: 0,
                 // level scorecard: { time, abstime, bonus, score, aid } or null
                 scorecards: [],
             };
@@ -2980,6 +3017,7 @@ class Conductor {
             for (let key of keys) {
                 packinfo[key] = this.current_pack_savefile[key];
             }
+            this.save_stash();
             this.splash.update_pack_score(this._pack_identifier);
         }
     }
