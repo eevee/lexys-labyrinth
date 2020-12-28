@@ -63,7 +63,7 @@ export class Tile {
 
         // FIXME bowling ball isn't affected by helmet?  also not sure bowling ball is stopped by
         // helmet?
-        if (this.has_item('helmet') || (this.type.is_actor && other.has_item('helmet')))
+        if (this.has_item('helmet') || (this.type.is_actor && ! this.type.ttl && other.has_item('helmet')))
             return true;
 
         // FIXME get this out of here
