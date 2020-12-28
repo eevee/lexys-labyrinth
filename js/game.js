@@ -1363,7 +1363,9 @@ export class Level extends LevelInterface {
     attempt_out_of_turn_step(actor, direction) {
         if (this.compat.use_lynx_loop) {
             let success = this._do_actor_movement(actor, direction);
-            this._do_actor_cooldown(actor, this.compat.emulate_60fps ? 1 : 3);
+            if (success) {
+                this._do_actor_cooldown(actor, this.compat.emulate_60fps ? 1 : 3);
+            }
             return success;
         }
 
