@@ -1585,6 +1585,7 @@ const TILE_TYPES = {
     button_black: {
         draw_layer: DRAW_LAYERS.terrain,
         is_power_source: true,
+        wire_propagation_mode: 'cross',
         get_emitting_edges(me, level) {
             // We emit current as long as there's NOT an actor fully on us
             if (! me.cell.some(tile => tile.type.is_actor && tile.movement_cooldown === 0)) {

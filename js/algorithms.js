@@ -30,9 +30,13 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
             else if (terrain.type.wire_propagation_mode === 'none') {
                 // The wires in this tile never connect to each other
             }
-            else if (terrain.wire_directions === 0x0f && terrain.type.wire_propagation_mode !== 'all') {
+            else if (terrain.type.wire_propagation_mode === 'cross' ||
+                (terrain.wire_directions === 0x0f && terrain.type.wire_propagation_mode !== 'all'))
+            {
                 // This is a cross pattern, so only opposite edges connect
-                connections |= edgeinfo.opposite_bit;
+                if (terrain.wire_directions & edgeinfo.opposite_bit) {
+                    connections |= edgeinfo.opposite_bit;
+                }
             }
             else {
                 // Everything connects
