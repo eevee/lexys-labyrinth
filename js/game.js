@@ -1532,8 +1532,8 @@ export class Level extends LevelInterface {
         let dest, direction;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
-            // FIXME should check collision?
-            if (dest.cell.some(tile => tile.type.is_actor && tile !== actor))
+            // FIXME should check collision?  otherwise this catches non-blocking vfx...
+            if (dest.cell.some(tile => tile.type.is_actor && tile !== actor && ! tile.type.ttl))
                 continue;
 
             // XXX lynx treats this as a slide and does it in a pass in the main loop
@@ -1562,6 +1562,9 @@ export class Level extends LevelInterface {
         if (success) {
             this.set_actor_direction(actor, direction);
             this.make_slide(actor, 'teleport');
+
+            this.spawn_animation(actor.cell, 'teleport_flash');
+            this.spawn_animation(dest.cell, 'teleport_flash');
 
             // Now physically move the actor, but their movement waits until next decision phase
             this.remove_tile(actor);

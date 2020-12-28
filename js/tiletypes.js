@@ -2693,6 +2693,13 @@ const TILE_TYPES = {
         collision_mask: 0,
         ttl: 8 * 3,
     },
+    teleport_flash: {
+        // TODO probably not the right layer, vfx might need their own idk
+        draw_layer: DRAW_LAYERS.actor,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 8 * 3,
+    },
 
     // Invalid tiles that appear in some CCL levels because community level
     // designers love to make nonsense
