@@ -884,6 +884,15 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     splash_slime: [[0, 38], [1, 38], [2, 38], [3, 38]],
     player1_exit: [[8, 38], [9, 38], [10, 38], [11, 38]],
     player2_exit: [[12, 38], [13, 38], [14, 38], [15, 38]],
+
+    // More custom tiles
+    gate_red: [0, 39],
+    gate_blue: [1, 39],
+    gate_yellow: [2, 39],
+    gate_green: [3, 39],
+
+    skeleton_key: [4, 39],
+
 });
 
 export class Tileset {

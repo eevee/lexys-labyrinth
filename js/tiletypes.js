@@ -46,6 +46,49 @@ function blocks_leaving_thin_walls(me, actor, direction) {
     return me.type.thin_walls.has(direction) && actor.type.name !== 'ghost';
 }
 
+function _define_door(key) {
+    return {
+        draw_layer: DRAW_LAYERS.terrain,
+        // Doors can be opened by ice blocks, but not dirt blocks
+        blocks_collision: COLLISION.block_cc1,
+        blocks(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
+            return ! (other.type.has_inventory &&
+                (other.has_item(key) || other.has_item('skeleton_key')));
+        },
+        on_arrive(me, level, other) {
+            if (level.take_key_from_actor(other, key) ||
+                level.take_tool_from_actor(other, 'skeleton_key'))
+            {
+                level.sfx.play_once('door', me.cell);
+                level.transmute_tile(me, 'floor');
+            }
+        },
+    };
+}
+function _define_gate(key) {
+    return {
+        draw_layer: DRAW_LAYERS.item,
+        // Doors can be opened by ice blocks, but not dirt blocks
+        blocks_collision: COLLISION.block_cc1,
+        blocks(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
+            return ! (other.type.has_inventory &&
+                (other.has_item(key) || other.has_item('skeleton_key')));
+        },
+        on_arrive(me, level, other) {
+            if (level.take_key_from_actor(other, key) ||
+                level.take_tool_from_actor(other, 'skeleton_key'))
+            {
+                level.sfx.play_once('door', me.cell);
+                level.remove_tile(me);
+            }
+        },
+    };
+}
+
 function player_visual_state(me) {
     if (! me) {
         return 'normal';
@@ -538,63 +581,14 @@ const TILE_TYPES = {
     },
 
     // Locked doors
-    door_red: {
-        draw_layer: DRAW_LAYERS.terrain,
-        blocks(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            // TODO not quite sure if this one is right; there are complex interactions with monsters, e.g. most monsters can eat blue keys but can't actually use them
-            return ! (other.type.has_inventory && other.has_item('key_red'));
-        },
-        on_arrive(me, level, other) {
-            if (level.take_key_from_actor(other, 'key_red')) {
-                level.sfx.play_once('door', me.cell);
-                level.transmute_tile(me, 'floor');
-            }
-        },
-    },
-    door_blue: {
-        draw_layer: DRAW_LAYERS.terrain,
-        blocks(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            return ! (other.type.has_inventory && other.has_item('key_blue'));
-        },
-        on_arrive(me, level, other) {
-            if (level.take_key_from_actor(other, 'key_blue')) {
-                level.sfx.play_once('door', me.cell);
-                level.transmute_tile(me, 'floor');
-            }
-        },
-    },
-    door_yellow: {
-        draw_layer: DRAW_LAYERS.terrain,
-        blocks(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            return ! (other.type.has_inventory && other.has_item('key_yellow'));
-        },
-        on_arrive(me, level, other) {
-            if (level.take_key_from_actor(other, 'key_yellow')) {
-                level.sfx.play_once('door', me.cell);
-                level.transmute_tile(me, 'floor');
-            }
-        },
-    },
-    door_green: {
-        draw_layer: DRAW_LAYERS.terrain,
-        blocks(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            return ! (other.type.has_inventory && other.has_item('key_green'));
-        },
-        on_arrive(me, level, other) {
-            if (level.take_key_from_actor(other, 'key_green')) {
-                level.sfx.play_once('door', me.cell);
-                level.transmute_tile(me, 'floor');
-            }
-        },
-    },
+    door_red: _define_door('key_red'),
+    door_blue: _define_door('key_blue'),
+    door_yellow: _define_door('key_yellow'),
+    door_green: _define_door('key_green'),
+    gate_red: _define_gate('key_red'),
+    gate_blue: _define_gate('key_blue'),
+    gate_yellow: _define_gate('key_yellow'),
+    gate_green: _define_gate('key_green'),
 
     // Terrain
     dirt: {
@@ -2365,34 +2359,36 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     foil: {
-        // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     lightning_bolt: {
-        // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     speed_boots: {
-        // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     bribe: {
-        // TODO not implemented
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     hook: {
+        draw_layer: DRAW_LAYERS.item,
+        is_item: true,
+        is_tool: true,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+    },
+    skeleton_key: {
         draw_layer: DRAW_LAYERS.item,
         is_item: true,
         is_tool: true,

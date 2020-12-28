@@ -1167,11 +1167,10 @@ const EDITOR_PALETTE = [{
     tiles: [
         'key_blue', 'key_red', 'key_yellow', 'key_green',
         'flippers', 'fire_boots', 'cleats', 'suction_boots',
-        'bribe', 'railroad_sign', 'hiking_boots', 'speed_boots',
-        'xray_eye', 'helmet', 'foil', 'lightning_bolt',
-        'bowling_ball', 'dynamite', 'no_sign', 'gift_bow',
+        'hiking_boots', 'speed_boots', 'lightning_bolt', 'railroad_sign',
+        'helmet', 'foil', 'hook', 'xray_eye',
+        'bribe', 'bowling_ball', 'dynamite', 'no_sign',
         'score_10', 'score_100', 'score_1000', 'score_2x',
-        'hook',
     ],
 }, {
     title: "Creatures",
@@ -1232,7 +1231,6 @@ const EDITOR_PALETTE = [{
     // - wires, wire tunnels        probably a dedicated tool, placing tunnels like a tile makes no sense
     // - canopy                     normal tile; layering problem
     // - thin walls                 special rotate logic, like force floors; layering problem
-    // - light switches
     // TODO should tiles that respond to wiring and/or gray buttons be highlighted, highlightable?
 }, {
     title: "Logic",
@@ -1252,7 +1250,17 @@ const EDITOR_PALETTE = [{
         'purple_floor',
         'purple_wall',
         'button_gray',
+    ],
+}, {
+    title: "Experimental",
+    tiles: [
         'circuit_block/xxx',
+        'gift_bow',
+        'skeleton_key',
+        'gate_red',
+        'gate_blue',
+        'gate_yellow',
+        'gate_green',
     ],
 }];
 
