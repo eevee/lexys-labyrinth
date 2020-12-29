@@ -880,6 +880,14 @@ export class Level extends LevelInterface {
         if (! direction)
             return true;
 
+        // Clear this again here due to a perverse CC2 ordering issue: a player with a hook sets
+        // this on a block at decision time, and then the block makes its decision (based on this),
+        // but then the player acts and sets this /again/ so it carries over and the block tries to
+        // move an extra time next turn.
+        if (actor.pending_push) {
+            this._set_tile_prop(actor, 'pending_push', null);
+        }
+
         // Actor is allowed to move, so do so
         let success = this.attempt_step(actor, direction);
 
@@ -1215,7 +1223,7 @@ export class Level extends LevelInterface {
 
         if (actor.pending_push) {
             // Blocks that were pushed while sliding will move in the push direction as soon as
-            // they stop sliding, regardless of what they landed on
+            // they stop sliding, regardless of what they landed on.  Also used for hooking.
             actor.decision = actor.pending_push;
             this._set_tile_prop(actor, 'pending_push', null);
             return;
@@ -1279,9 +1287,51 @@ export class Level extends LevelInterface {
 
     check_movement(actor, orig_cell, direction, push_mode) {
         let dest_cell = this.get_neighboring_cell(orig_cell, direction);
-        return (dest_cell &&
+        let success = (dest_cell &&
             orig_cell.try_leaving(actor, direction) &&
             dest_cell.try_entering(actor, direction, this, push_mode));
+
+        // If we have the hook, pull anything behind us, now that we're out of the way.
+        // This has to happen here to make hook-slapping work and allow hooking a moving block to
+        // stop us, and it has to use pending decisions rather than an immediate move because we're
+        // still in the way (so the block can't move) and also to prevent a block from being able to
+        // follow us through a swivel (which we haven't actually swiveled at decision time).
+        // FIXME so, we shouldn't be able to pull a block through a swivel, but the swivel doesn't
+        // turn until on_depart, which is after this because we have to know we can actually move
+        // first.  but also, hooking can stop us from moving, but it /does/ still allow us to push.
+        // also this all seems to apply exactly the same to monsters, except of course they can't
+        // hook slap.  so where the hell does this actually go?
+        if (success && push_mode === 'push' && actor.has_item('hook')) {
+            let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
+            if (behind_cell) {
+                let behind_actor = behind_cell.get_actor();
+                if (behind_actor &&
+                    // FIXME i don't actually know the precise rules here.  dirt blocks and ghosts
+                    // can pull other blocks even though they can't usually push them.  given the
+                    // existence of monster hooking, i suspect /anything/ can be hooked but on
+                    // monsters it has a weird effect?  figure this out?
+                    behind_actor.type.name.match(/_block$/) &&
+                    (! behind_actor.type.allows_push || behind_actor.type.allows_push(behind_actor, direction)))
+                {
+                    if (behind_actor.movement_cooldown) {
+                        // FIXME this sucks actually, make it not default behavior
+                        return false;
+                    }
+                    else {
+                        this._set_tile_prop(behind_actor, 'is_pulled', true);
+                        // FIXME i am pretty sure lexy benefits immensely from doing an immediate
+                        // move, which also makes it match pushing, but that only works if this
+                        // happens at movement time, which prevents hook slapping, which is nonsense
+                        // anyway
+                        //this.attempt_out_of_turn_step(behind_actor, direction);
+                        this._set_tile_prop(behind_actor, 'pending_push', direction);
+                        behind_actor.decision = direction;
+                    }
+                }
+            }
+        }
+
+        return success;
     }
 
     // Try to move the given actor one tile in the given direction and update their cooldown.
@@ -1334,28 +1384,6 @@ export class Level extends LevelInterface {
         this._set_tile_prop(actor, 'movement_cooldown', speed * 3);
         this._set_tile_prop(actor, 'movement_speed', speed * 3);
         this.move_to(actor, goal_cell, speed);
-
-        // If we have the hook, pull anything behind us, now that we're out of the way
-        if (actor.has_item('hook')) {
-            let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
-            if (behind_cell) {
-                let behind_actor = behind_cell.get_actor();
-                if (behind_actor && ! behind_actor.movement_cooldown &&
-                    // FIXME i don't actually know the precise rules here.  dirt blocks and ghosts
-                    // can pull other blocks even though they can't usually push them.  given the
-                    // existence of monster hooking, i suspect /anything/ can be hooked but on
-                    // monsters it has a weird effect?  figure this out?
-                    behind_actor.type.name.match(/_block$/) &&
-                    (! behind_actor.type.allows_push || behind_actor.type.allows_push(behind_actor, direction)))
-                {
-                    this._set_tile_prop(behind_actor, 'is_pulled', true);
-                    this.attempt_out_of_turn_step(behind_actor, direction);
-                }
-                // TODO this feels like it might be too late, because hook slapping is a thing, but
-                // when this code was in check_movement, it allowed pulling blocks through a swivel
-                // but prevented pulling blocks with a helmet.  how on earth does slapping work??
-            }
-        }
 
         return true;
     }
