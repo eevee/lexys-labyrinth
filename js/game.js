@@ -923,11 +923,15 @@ export class Level extends LevelInterface {
         if (! success) {
             let terrain = actor.cell.get_terrain();
             if (terrain && (
-                (terrain.type.slide_mode === 'ice' || terrain.type.name === 'force_floor_all') &&
-                (actor.slide_mode && ! actor.ignores(terrain.type.name)) ||
+                // Actors bonk on ice even if they're not already sliding (whether because they
+                // started on ice or dropped boots on ice)
                 // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
                 // FIXME and if they have cleats, they get stuck instead (?!)
-                (actor.type.name === 'ghost' && terrain.type.slide_mode === 'ice')))
+                (terrain.type.slide_mode === 'ice' && (
+                    ! actor.ignores(terrain.type.name) || actor.type.name === 'ghost')) ||
+                // But they only bonk on a force floor if it affects them
+                (terrain.type.name === 'force_floor_all' &&
+                    actor.slide_mode && ! actor.ignores(terrain.type.name))))
             {
                 // Turn the actor around (so ice corners bonk correctly), pretend they stepped on
                 // the tile again (so RFFs roll again), and try moving again
