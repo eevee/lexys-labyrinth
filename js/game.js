@@ -943,6 +943,12 @@ export class Level extends LevelInterface {
                 }
                 success = this.attempt_step(actor, actor.direction);
             }
+            else if (actor.slide_mode === 'teleport') {
+                // Failed teleport slides only last for a single attempt.  (Successful teleports
+                // continue the slide until landing on a new tile, as normal; otherwise you couldn't
+                // push a block coming out of a teleporter.)
+                this.make_slide(actor, null);
+            }
         }
 
         // Track whether the player is blocked, both for visual effect and for doppelgangers
@@ -1137,7 +1143,8 @@ export class Level extends LevelInterface {
         let may_move = ! forced_only && (
             ! actor.slide_mode ||
             (actor.slide_mode === 'force' && actor.last_move_was_force) ||
-            (actor.slide_mode === 'teleport' && actor.cell.get_terrain().type.teleport_allow_override));
+            ((actor.slide_mode === 'teleport' || actor.slide_mode === 'teleport-forever') &&
+                actor.cell.get_terrain().type.teleport_allow_override));
         let [dir1, dir2] = this._extract_player_directions(input);
 
         // Check for special player actions, which can only happen at decision time.  Dropping can
@@ -1583,6 +1590,15 @@ export class Level extends LevelInterface {
         let teleporter = actor.just_stepped_on_teleporter;
         delete actor.just_stepped_on_teleporter;
 
+        if (teleporter.type.name === 'teleport_red' && ! teleporter.type._is_active(teleporter, this)) {
+            // Curious special-case red teleporter behavior: if you pass through a wired but
+            // inactive one, you keep sliding indefinitely.  Players can override out of it, but
+            // other actors cannot.  (Normally, a teleport slide ends after one decision phase.)
+            this.make_slide(actor, 'teleport-forever');
+            // Also, there's no sound and whatnot, so everything else is skipped outright.
+            return;
+        }
+
         let original_direction = actor.direction;
         let success = false;
         let dest, direction;
@@ -1615,34 +1631,27 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (success) {
-            this.set_actor_direction(actor, direction);
-            this.make_slide(actor, 'teleport');
-
-            this.spawn_animation(actor.cell, 'teleport_flash');
-            this.spawn_animation(dest.cell, 'teleport_flash');
-
-            // Now physically move the actor, but their movement waits until next decision phase
-            this.remove_tile(actor);
-            this.add_tile(actor, dest.cell);
-        }
-        else {
-            // Be sure to remove the slide_mode or they'll be stuck forever
-            // TODO: in cc2, if you're on a /disabled/ red teleporter, you'll continue to be pushed
-            // in this direction??  is this a bug, is this the only such case?
-            if (! (teleporter.type.name === 'teleport_red' && ! teleporter.type._is_active(teleporter, this))) {
-                this.make_slide(actor, null);
-            }
-
+        if (! success) {
             if (actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
                 // Super duper special yellow teleporter behavior: you pick it the fuck up
                 // FIXME not if there's only one in the level?
+                this.make_slide(actor, null);
                 this.attempt_take(actor, teleporter);
                 if (actor === this.player) {
                     this.sfx.play_once('get-tool', teleporter.cell);
                 }
+                return;
             }
         }
+
+        this.set_actor_direction(actor, direction);
+
+        this.spawn_animation(actor.cell, 'teleport_flash');
+        this.spawn_animation(dest.cell, 'teleport_flash');
+
+        // Now physically move the actor, but their movement waits until next decision phase
+        this.remove_tile(actor);
+        this.add_tile(actor, dest.cell);
     }
 
     cycle_inventory(actor) {
