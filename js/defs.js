@@ -68,12 +68,18 @@ export const DRAW_LAYERS = {
 };
 
 export const COLLISION = {
-    player1:            0x0001,
-    player2:            0x0002,
-    player:             0x0003,
+    real_player1:       0x0001,
+    real_player2:       0x0002,
+    real_player:        0x0003,
+    doppel1:            0x0004,
+    doppel2:            0x0008,
+    doppel:             0x000c,
+    playerlike1:        0x0005,
+    playerlike2:        0x000a,
+    playerlike:         0x000f,
 
-    block_cc1:          0x0004,
-    block_cc2:          0x0008,  // ice + directional
+    block_cc1:          0x0010,
+    block_cc2:          0x0020,  // ice + frame (+ circuit, etc)
 
     // Monsters are a little complicated, because some of them have special rules, e.g. fireballs
     // aren't blocked by fire.
@@ -89,7 +95,7 @@ export const COLLISION = {
     monster_any:        0xff00,  // everything including ghost
 
     // Combo masks used for matching
-    all_but_ghost:      0xffff & ~0x8000,
-    all_but_player:     0xffff & ~0x0003,
-    all:                0xffff,
+    all_but_ghost:          0xffff & ~0x8000,
+    all_but_real_player:    0xffff & ~0x0003,
+    all:                    0xffff,
 };

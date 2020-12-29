@@ -356,14 +356,13 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'popdown_floor');
         },
     },
-    // TODO these also block the corresponding mirror actors
     no_player1_sign: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.player1,
+        blocks_collision: COLLISION.playerlike1,
     },
     no_player2_sign: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.player2,
+        blocks_collision: COLLISION.playerlike2,
     },
     steel: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -1082,8 +1081,7 @@ const TILE_TYPES = {
     },
     cloner: {
         draw_layer: DRAW_LAYERS.terrain,
-        // FIXME can also catch bowling balls
-        blocks_collision: COLLISION.player | COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
         traps(me, actor) {
             return ! actor._clone_release;
         },
@@ -1843,7 +1841,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.bug,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         decide_movement(me, level) {
             // always try turning as left as possible, and fall back to less-left turns
@@ -1856,7 +1854,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         decide_movement(me, level) {
             // always try turning as right as possible, and fall back to less-right turns
@@ -1869,7 +1867,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         decide_movement(me, level) {
             // preserve current direction; if that doesn't work, bounce back the way we came
@@ -1882,7 +1880,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         decide_movement(me, level) {
             // preserve current direction; if that doesn't work, pick a random direction, even the
@@ -1905,7 +1903,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         decide_movement(me, level) {
             // always keep moving forward, but reverse if the flag is set
@@ -1927,7 +1925,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         pushes: {
             dirt_block: true,
             ice_block: true,
@@ -1952,7 +1950,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 8,
         decide_movement(me, level) {
             // move completely at random
@@ -1965,7 +1963,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         movement_parity: 2,
         decide_movement(me, level) {
@@ -1984,7 +1982,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         movement_parity: 2,
         decide_movement(me, level) {
@@ -2003,7 +2001,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.fireball,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         ignores: new Set(['fire', 'flame_jet_on']),
         decide_movement(me, level) {
@@ -2018,7 +2016,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         ignores: new Set(['water', 'turtle']),  // doesn't cause turtles to disappear
         decide_movement(me, level) {
@@ -2033,7 +2031,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.ghost,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         has_inventory: true,
         ignores: new Set([
             'bomb',
@@ -2058,7 +2056,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         movement_speed: 4,
         movement_parity: 4,
         decide_movement: pursue_player,
@@ -2070,7 +2068,7 @@ const TILE_TYPES = {
         is_monster: true,
         has_inventory: true,
         collision_mask: COLLISION.rover,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         can_reveal_walls: true,
         movement_speed: 8,
         movement_parity: 2,
@@ -2215,10 +2213,10 @@ const TILE_TYPES = {
         is_monster: true,
         // FIXME ???????
         collision_mask: COLLISION.block_cc2,
-        blocks_collision: COLLISION.all_but_player,
+        blocks_collision: COLLISION.all_but_real_player,
         // FIXME inherits a copy of player's inventory!
         // FIXME holds down buttons, so needs an on_arrive
-        // FIXME speaking of buttons, destroyed actors should on_depart
+        // FIXME speaking of buttons, destroyed actors should on_depart (behind compat flag)
         // FIXME wait couldn't this just be a decide_movement?
         on_tic(me, level) {
             // FIXME When Chip or Melinda leaves a tile with a time bomb and no no sign on it, the
@@ -2420,9 +2418,8 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         is_real_player: true,
-        collision_mask: COLLISION.player1,
-        // FIXME does this make us block the doppelgangers??
-        blocks_collision: COLLISION.player,
+        collision_mask: COLLISION.real_player1,
+        blocks_collision: COLLISION.real_player,
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -2442,8 +2439,8 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         is_real_player: true,
-        collision_mask: COLLISION.player2,
-        blocks_collision: COLLISION.player,
+        collision_mask: COLLISION.real_player2,
+        blocks_collision: COLLISION.real_player,
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -2464,15 +2461,8 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         is_monster: true,
-        collision_mask: COLLISION.player1,
-        blocks_collision: COLLISION.all_but_player,
-        // FIXME i think if i make monsters and players block each other than this is
-        // unnecessary (but double check cc2 #144 the village)
-        blocks(me, level, other) {
-            if (other.type.is_player) {
-                return true;
-            }
-        },
+        collision_mask: COLLISION.doppel1,
+        blocks_collision: COLLISION.all_but_real_player,
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
@@ -2505,13 +2495,8 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         is_monster: true,
-        collision_mask: COLLISION.player2,
-        blocks_collision: COLLISION.all_but_player,
-        blocks(me, level, other) {
-            if (other.type.is_player) {
-                return true;
-            }
-        },
+        collision_mask: COLLISION.doppel2,
+        blocks_collision: COLLISION.all_but_real_player,
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
@@ -2653,10 +2638,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
         collision_mask: 0,
-        // FIXME feel like blocks_collision should be able to handle this and yet
-        blocks(me, level, other, direction) {
-            return other.type.is_real_player;
-        },
+        blocks_collision: COLLISION.real_player,
         ttl: 16,
         // If anything else even begins to step on an animation, it's erased
         // FIXME possibly erased too fast; cc2 shows it briefly?  could i get away with on_arrive here?
@@ -2668,9 +2650,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
         collision_mask: 0,
-        blocks(me, level, other, direction) {
-            return other.type.is_real_player;
-        },
+        blocks_collision: COLLISION.real_player,
         ttl: 16,
         on_approach(me, level, other) {
             level.remove_tile(me);
@@ -2690,9 +2670,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.overlay,
         is_actor: true,
         collision_mask: 0,
-        blocks(me, level, other, direction) {
-            return other.type.is_real_player;
-        },
+        blocks_collision: COLLISION.real_player,
         ttl: 16,
         on_approach(me, level, other) {
             level.remove_tile(me);
