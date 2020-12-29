@@ -361,6 +361,7 @@ export class Level extends LevelInterface {
         this.aid = 0;
 
         // Time
+        this.done_on_begin = false;
         if (this.stored_level.time_limit === 0) {
             this.time_remaining = null;
         }
@@ -615,10 +616,7 @@ export class Level extends LevelInterface {
         this.wired_outputs = Array.from(wired_outputs);
         this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
 
-        // Finally, let all tiles do any custom init behavior...  but backwards, to match actor
-        // order
-        // FIXME very much need an on_begin that's run at the start of the first tic for stuff like
-        // force floors and bombs
+        // Finally, let all tiles do custom init behavior...  but backwards, to match actor order
         for (let i = this.linear_cells.length - 1; i >= 0; i--) {
             let cell = this.linear_cells[i];
             for (let tile of cell) {
@@ -691,6 +689,26 @@ export class Level extends LevelInterface {
 
     // FIXME a whole bunch of these comments are gonna be wrong or confusing now
     begin_tic(p1_input) {
+        // At the beginning of the very first tic, some tiles want to do initialization that's not
+        // appropriate to do before the game begins.  (For example, bombs blow up anything that
+        // starts on them in CC2, but we don't want to do that before the game has run at all.  We
+        // DEFINITELY don't want to blow the PLAYER up before the game starts!)
+        if (! this.done_on_begin) {
+            // Run backwards, to match actor order
+            for (let i = this.linear_cells.length - 1; i >= 0; i--) {
+                let cell = this.linear_cells[i];
+                for (let tile of cell) {
+                    if (tile.type.on_begin) {
+                        tile.type.on_begin(tile, this);
+                    }
+                }
+            }
+            // It's not possible to rewind to before this happened, so clear undo and permanently
+            // set a flag
+            this.pending_undo = this.create_undo_entry();
+            this.done_on_begin = true;
+        }
+
         if (this.undo_enabled) {
             // Store some current level state in the undo entry.  (These will often not be modified, but
             // they only take a few bytes each so that's fine.)

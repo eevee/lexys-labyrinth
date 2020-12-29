@@ -5,7 +5,7 @@ function activate_me(me, level) {
     me.type.activate(me, level);
 }
 
-function on_ready_force_floor(me, level) {
+function on_begin_force_floor(me, level) {
     // At the start of the level, if there's an actor on a force floor:
     // - use on_arrive to set the actor's direction
     // - set the slide_mode (normally done by the main game loop)
@@ -748,7 +748,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
-        on_ready: on_ready_force_floor,
+        on_begin: on_begin_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'north');
         },
@@ -771,7 +771,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
-        on_ready: on_ready_force_floor,
+        on_begin: on_begin_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'east');
         },
@@ -792,7 +792,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
-        on_ready: on_ready_force_floor,
+        on_begin: on_begin_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'south');
         },
@@ -813,7 +813,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
-        on_ready: on_ready_force_floor,
+        on_begin: on_begin_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'west');
         },
@@ -834,7 +834,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
-        on_ready: on_ready_force_floor,
+        on_begin: on_begin_force_floor,
         // TODO ms: this is random, and an acting wall to monsters (!)
         on_arrive(me, level, other) {
             level.set_actor_direction(other, level.get_force_floor_direction());
@@ -861,10 +861,15 @@ const TILE_TYPES = {
     },
     bomb: {
         draw_layer: DRAW_LAYERS.item,
-        on_ready(me, level) {
-            // FIXME in cc2 only, actors on a bomb immediately explode, but that's tricky for the
-            // player since we can't kill them before the game even starts.  cc2 just murders them
-            // instantly.  maybe we could do that then?  or use on_tic, like flame jets?
+        on_begin(me, level) {
+            if (level.compat.no_immediate_detonate_bombs)
+                return;
+
+            // In CC2, actors on a bomb (but not a green one) are immediately blown up
+            let actor = me.cell.get_actor();
+            if (actor && ! actor.ignores(this.name)) {
+                this.on_arrive(me, level, actor);
+            }
         },
         on_arrive(me, level, other) {
             level.remove_tile(me);

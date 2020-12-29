@@ -2216,6 +2216,10 @@ const COMPAT_FLAGS = [{
     label: "Blue tanks on cloners respond to blue buttons",
     rulesets: new Set(['steam-strict']),
 }, {
+    key: 'no_immediate_detonate_bombs',
+    label: "Don't immediately detonate populated mines",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
     // XXX this is goofy
     key: 'tiles_react_instantly',
     label: "Tiles react instantly",
