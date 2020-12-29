@@ -100,6 +100,14 @@ export class Tile {
             return false;
         }
 
+        // CC2 strikes again: blocks cannot push sliding blocks, except that frame blocks can push
+        // sliding dirt blocks!
+        if (this.type.is_block && tile.slide_mode && ! (
+            this.type.name === 'frame_block' && tile.type.name === 'dirt_block'))
+        {
+            return false;
+        }
+
         // Obey railroad curvature
         direction = tile.cell.redirect_exit(tile, direction);
         // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
@@ -285,9 +293,9 @@ export class Cell extends Array {
                             level._set_tile_prop(actor, 'is_pushing', true);
                         }
                         if (! level.attempt_out_of_turn_step(tile, direction)) {
+                            // If the push failed and the obstacle is in the middle of a slide,
+                            // remember this as the next move it'll make.
                             if (tile.slide_mode !== null && tile.movement_cooldown > 0) {
-                                // If the push failed and the obstacle is in the middle of a slide,
-                                // remember this as the next move it'll make
                                 level._set_tile_prop(tile, 'pending_push', direction);
                             }
                             return false;
@@ -1328,7 +1336,7 @@ export class Level extends LevelInterface {
                     // can pull other blocks even though they can't usually push them.  given the
                     // existence of monster hooking, i suspect /anything/ can be hooked but on
                     // monsters it has a weird effect?  figure this out?
-                    behind_actor.type.name.match(/_block$/) &&
+                    behind_actor.type.is_block &&
                     (! behind_actor.type.allows_push || behind_actor.type.allows_push(behind_actor, direction)))
                 {
                     if (behind_actor.movement_cooldown) {
