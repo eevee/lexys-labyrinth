@@ -94,6 +94,10 @@ export class Tile {
     }
 
     can_push(tile, direction) {
+        // This tile already has a push queued, sorry
+        if (tile.pending_push)
+            return false;
+
         if (! (this.type.pushes && this.type.pushes[tile.type.name] &&
             (! tile.type.allows_push || tile.type.allows_push(tile, direction))))
         {
@@ -906,10 +910,10 @@ export class Level extends LevelInterface {
         if (! direction)
             return true;
 
-        // Clear this again here due to a perverse CC2 ordering issue: a player with a hook sets
-        // this on a block at decision time, and then the block makes its decision (based on this),
-        // but then the player acts and sets this /again/ so it carries over and the block tries to
-        // move an extra time next turn.
+        // Clear this here since we use it to prevent pushing a block that's already been pushed.
+        // Also avoids a perverse CC2 ordering issue: a player with a hook sets this on a block at
+        // decision time; the block makes its decision (based on this); but then the player acts and
+        // sets this /again/ so it carries over and the block tries to move an extra time next turn.
         if (actor.pending_push) {
             this._set_tile_prop(actor, 'pending_push', null);
         }
@@ -1261,8 +1265,8 @@ export class Level extends LevelInterface {
         if (actor.pending_push) {
             // Blocks that were pushed while sliding will move in the push direction as soon as
             // they stop sliding, regardless of what they landed on.  Also used for hooking.
+            // This isn't cleared until the block makes another move; see _do_actor_movement.
             actor.decision = actor.pending_push;
-            this._set_tile_prop(actor, 'pending_push', null);
             return;
         }
 
