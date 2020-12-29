@@ -1282,7 +1282,6 @@ export class Level extends LevelInterface {
         // Check which of those directions we *can*, probably, move in
         if (! direction_preference)
             return;
-        let all_blocked = true;
         for (let [i, direction] of direction_preference.entries()) {
             if (! direction) {
                 // This actor is giving up!  Alas.
@@ -1299,7 +1298,6 @@ export class Level extends LevelInterface {
             if (this.check_movement(actor, actor.cell, direction, 'bump')) {
                 // We found a good direction!  Stop here
                 actor.decision = direction;
-                all_blocked = false;
                 break;
             }
 
@@ -1327,23 +1325,23 @@ export class Level extends LevelInterface {
         // first.  but also, hooking can stop us from moving, but it /does/ still allow us to push.
         // also this all seems to apply exactly the same to monsters, except of course they can't
         // hook slap.  so where the hell does this actually go?
-        if (success && push_mode === 'push' && actor.has_item('hook')) {
+        if (success && actor.has_item('hook')) {
             let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
-                if (behind_actor &&
+                // FIXME starting to think fx should not count as actors
+                if (behind_actor && ! behind_actor.type.ttl &&
                     // FIXME i don't actually know the precise rules here.  dirt blocks and ghosts
                     // can pull other blocks even though they can't usually push them.  given the
                     // existence of monster hooking, i suspect /anything/ can be hooked but on
                     // monsters it has a weird effect?  figure this out?
-                    behind_actor.type.is_block &&
                     (! behind_actor.type.allows_push || behind_actor.type.allows_push(behind_actor, direction)))
                 {
                     if (behind_actor.movement_cooldown) {
                         // FIXME this sucks actually, make it not default behavior
                         return false;
                     }
-                    else {
+                    else if (behind_actor.type.is_block && push_mode === 'push') {
                         this._set_tile_prop(behind_actor, 'is_pulled', true);
                         // FIXME i am pretty sure lexy benefits immensely from doing an immediate
                         // move, which also makes it match pushing, but that only works if this
