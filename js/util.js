@@ -183,7 +183,9 @@ export function b64decode(data) {
 export function format_duration(seconds, places = 0) {
     let mins = Math.floor(seconds / 60);
     let secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs.toFixed(places)}`;
+    let rounded_secs = secs.toFixed(places);
+    // TODO hours?
+    return `${mins}:${parseFloat(rounded_secs) < 10 ? '0' : ''}${rounded_secs}`;
 }
 
 export class DelayTimer {
