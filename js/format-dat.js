@@ -1,3 +1,4 @@
+import { DIRECTIONS } from './defs.js';
 import * as format_base from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 import * as util from './util.js';
@@ -9,10 +10,10 @@ const TILE_ENCODING = {
     0x03: 'water',
     0x04: 'fire',
     0x05: 'wall_invisible',
-    0x06: 'thinwall_n',
-    0x07: 'thinwall_w',
-    0x08: 'thinwall_s',
-    0x09: 'thinwall_e',
+    0x06: ['thin_walls', {edges: DIRECTIONS['north'].bit}],
+    0x07: ['thin_walls', {edges: DIRECTIONS['west'].bit}],
+    0x08: ['thin_walls', {edges: DIRECTIONS['south'].bit}],
+    0x09: ['thin_walls', {edges: DIRECTIONS['east'].bit}],
     // This is MSCC's incomprehensible non-directional dirt block, which needs a direction for Lynx
     // purposes; Tile World defaults it to north
     0x0a: ['dirt_block', 'north'],
@@ -54,7 +55,7 @@ const TILE_ENCODING = {
     0x2d: 'gravel',
     0x2e: 'popwall',
     0x2f: 'hint',
-    0x30: 'thinwall_se',
+    0x30: ['thin_walls', {edges: DIRECTIONS['south'].bit | DIRECTIONS['east'].bit}],
     0x31: 'cloner',
     0x32: 'force_floor_all',
     0x33: 'bogus_player_drowned',
@@ -217,14 +218,18 @@ function parse_level(bytes, number) {
                 throw new Error(`Invalid tile byte 0x${tile_byte.toString(16)} at (${x}, ${y})`);
             }
 
-            let name, direction;
+            let name, extra;
             if (spec instanceof Array) {
-                [name, direction] = spec;
+                [name, extra] = spec;
+                if (typeof extra === 'string') {
+                    extra = {direction: extra};
+                }
             }
             else {
                 name = spec;
+                extra = {};
             }
-            let type = TILE_TYPES[name];
+            let tile = {type: TILE_TYPES[name], ...extra};
 
             for (let i = 0; i < count; i++) {
                 if (c >= 1024)
@@ -242,7 +247,7 @@ function parse_level(bytes, number) {
                     continue;
                 }
 
-                cell.unshift({type, direction});
+                cell.unshift({...tile});
             }
         }
         if (c !== 1024)

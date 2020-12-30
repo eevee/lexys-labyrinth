@@ -18,7 +18,6 @@ import TILE_TYPES from './tiletypes.js';
 // special features i currently have
 // - directions for actors, can be used anywhere
 // - arrows: for directional blocks
-// - mask: for thin walls (though the idea is useful in many more places)
 // - wired: for wired tiles
 // - overlay: for green/purple walls mostly, also some bogus cc1 tiles
 
@@ -246,27 +245,11 @@ export const CC2_TILESET_LAYOUT = {
         hidden: [0, 10],
         revealed: [10, 31],
     },
-    // Thin walls are built piecemeal from these two tiles; the first is N/S,
-    // the second is E/W
-    thinwall_n: {
-        tile: [1, 10],
-        mask: [0, 0, 1, 0.5],
-    },
-    thinwall_s: {
-        tile: [1, 10],
-        mask: [0, 0.5, 1, 0.5],
-    },
-    thinwall_w: {
-        tile: [2, 10],
-        mask: [0, 0, 0.5, 1],
-    },
-    thinwall_e: {
-        tile: [2, 10],
-        mask: [0.5, 0, 0.5, 1],
-    },
-    thinwall_se: {
-        base: 'thinwall_s',
-        overlay: 'thinwall_e',
+    // Thin walls are built piecemeal from two tiles; the first is N/S, the second is E/W
+    thin_walls: {
+        special: 'thin_walls',
+        thin_walls_ns: [1, 10],
+        thin_walls_ew: [2, 10],
     },
     // TODO directional block arrows
     teleport_blue: {
@@ -648,10 +631,15 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     fire: [0, 4],
     wall_invisible: [0, 5],
     wall_invisible_revealed: [0, 1],
-    thinwall_n: [0, 6],
-    thinwall_w: [0, 7],
-    thinwall_s: [0, 8],
-    thinwall_e: [0, 9],
+    // FIXME in cc1 tilesets these are opaque so they should draw at the terrain layer
+    thin_walls: {
+        special: 'thin_walls_cc1',
+        north: [0, 6],
+        west: [0, 7],
+        south: [0, 8],
+        east: [0, 9],
+        southeast: [3, 0],
+    },
     // This is the non-directed dirt block, which we don't have
     // dirt_block: [0, 10],
     dirt: [0, 11],
@@ -700,7 +688,6 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     popwall2: [2, 14],
     hint: [2, 15],
 
-    thinwall_se: [3, 0],
     cloner: [3, 1],
     force_floor_all: [3, 2],
     splash: [3, 3],
@@ -988,6 +975,46 @@ export class Tileset {
         }
     }
 
+    _draw_thin_walls(drawspec, tile, tic, blit) {
+        let edges = tile ? tile.edges : 0x0f;
+
+        // TODO it would be /extremely/ cool to join corners diagonally, but i can't do that without
+        // access to the context, which defeats the whole purpose of this scheme.  damn
+        if (edges & DIRECTIONS['north'].bit) {
+            blit(...drawspec.thin_walls_ns, 0, 0, 1, 0.5);
+        }
+        if (edges & DIRECTIONS['east'].bit) {
+            blit(...drawspec.thin_walls_ew, 0.5, 0, 0.5, 1);
+        }
+        if (edges & DIRECTIONS['south'].bit) {
+            blit(...drawspec.thin_walls_ns, 0, 0.5, 1, 0.5);
+        }
+        if (edges & DIRECTIONS['west'].bit) {
+            blit(...drawspec.thin_walls_ew, 0, 0, 0.5, 1);
+        }
+    }
+
+    _draw_thin_walls_cc1(drawspec, tile, tic, blit) {
+        let edges = tile ? tile.edges : 0x0f;
+
+        // This is kinda best-effort since the tiles are opaque and not designed to combine
+        if (edges === (DIRECTIONS['south'].bit | DIRECTIONS['east'].bit)) {
+            blit(...drawspec.southeast);
+        }
+        else if (edges & DIRECTIONS['north'].bit) {
+            blit(...drawspec.north);
+        }
+        else if (edges & DIRECTIONS['east'].bit) {
+            blit(...drawspec.east);
+        }
+        else if (edges & DIRECTIONS['south'].bit) {
+            blit(...drawspec.south);
+        }
+        else {
+            blit(...drawspec.west);
+        }
+    }
+
     _draw_logic_gate(drawspec, tile, tic, blit) {
         // Layer 1: wiring state
         // Always draw the unpowered wire base
@@ -1138,6 +1165,14 @@ export class Tileset {
                 this._draw_letter(drawspec, tile, tic, blit);
                 return;
             }
+            else if (drawspec.special === 'thin_walls') {
+                this._draw_thin_walls(drawspec, tile, tic, blit);
+                return;
+            }
+            else if (drawspec.special === 'thin_walls_cc1') {
+                this._draw_thin_walls_cc1(drawspec, tile, tic, blit);
+                return;
+            }
             else if (drawspec.special === 'perception') {
                 if (perception >= drawspec.threshold) {
                     drawspec = drawspec.revealed;
@@ -1157,12 +1192,7 @@ export class Tileset {
         }
 
         let coords = drawspec;
-        if (drawspec.mask) {
-            // Some tiles (OK, just the thin walls) don't actually draw a full
-            // tile, so some adjustments are needed; see below
-            coords = drawspec.tile;
-        }
-        else if (drawspec.wired) {
+        if (drawspec.wired) {
             // This /should/ match CC2's draw order exactly, based on experimentation
             let wire_radius = this.layout['#wire-width'] / 2;
             // TODO circuit block with a lightning bolt is always powered
@@ -1282,16 +1312,8 @@ export class Tileset {
             }
         }
 
-        if (drawspec.mask) {
-            // Continue on with masking
-            coords = drawspec.tile;
-            let [x0, y0, w, h] = drawspec.mask;
-            blit(coords[0], coords[1], x0, y0, w, h);
-        }
-        else {
-            if (!coords) console.error(name, tile);
-            blit(coords[0], coords[1]);
-        }
+        if (!coords) console.error(name, tile);
+        blit(coords[0], coords[1]);
 
         // Wired tiles may also have tunnels, drawn on top of everything else
         if (drawspec.wired && tile && tile.wire_tunnel_directions) {

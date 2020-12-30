@@ -216,16 +216,46 @@ const TILE_ENCODING = {
         extra_args: [arg_direction],
     },
     0x1b: {
-        name: 'thinwall_s',
+        // CC1 south thin wall
+        name: 'thin_walls',
         has_next: true,
+        modifier: {
+            dummy: true,
+            decode(tile, mod) {
+                tile.edges = DIRECTIONS['south'].bit;
+            },
+            encode(tile) {
+                return 0;
+            },
+        },
     },
     0x1c: {
-        name: 'thinwall_e',
+        // CC1 east thin wall
+        name: 'thin_walls',
         has_next: true,
+        modifier: {
+            dummy: true,
+            decode(tile, mod) {
+                tile.edges = DIRECTIONS['east'].bit;
+            },
+            encode(tile) {
+                return 0;
+            },
+        },
     },
     0x1d: {
-        name: 'thinwall_se',
+        // CC1 southeast thin wall
+        name: 'thin_walls',
         has_next: true,
+        modifier: {
+            dummy: true,
+            decode(tile, mod) {
+                tile.edges = DIRECTIONS['south'].bit | DIRECTIONS['east'].bit;
+            },
+            encode(tile) {
+                return 0;
+            },
+        },
     },
     0x1e: {
         name: 'gravel',
@@ -1042,21 +1072,11 @@ export function parse_level(buf, number = 1) {
                         // bitmask
                         let mask = bytes[p];
                         p++;
-                        // This order is important; this is the order CC2 draws them in
                         if (mask & 0x10) {
                             cell.push({type: TILE_TYPES['canopy']});
                         }
-                        if (mask & 0x08) {
-                            cell.push({type: TILE_TYPES['thinwall_w']});
-                        }
-                        if (mask & 0x04) {
-                            cell.push({type: TILE_TYPES['thinwall_s']});
-                        }
-                        if (mask & 0x02) {
-                            cell.push({type: TILE_TYPES['thinwall_e']});
-                        }
-                        if (mask & 0x01) {
-                            cell.push({type: TILE_TYPES['thinwall_n']});
+                        if (mask & 0x0f) {
+                            cell.push({type: TILE_TYPES['thin_walls'], edges: mask & 0x0f});
                         }
                         // Skip the rest of the loop.  That means we don't handle any of the other
                         // special behavior below, but neither thin walls nor canopies should use

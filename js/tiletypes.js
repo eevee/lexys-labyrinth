@@ -283,30 +283,17 @@ const TILE_TYPES = {
         },
     },
     // FIXME in a cc1 tileset, these tiles are opaque  >:S
-    thinwall_n: {
-        draw_layer: DRAW_LAYERS.overlay,
-        thin_walls: new Set(['north']),
-        blocks_leaving: blocks_leaving_thin_walls,
-    },
-    thinwall_s: {
-        draw_layer: DRAW_LAYERS.overlay,
-        thin_walls: new Set(['south']),
-        blocks_leaving: blocks_leaving_thin_walls,
-    },
-    thinwall_e: {
-        draw_layer: DRAW_LAYERS.overlay,
-        thin_walls: new Set(['east']),
-        blocks_leaving: blocks_leaving_thin_walls,
-    },
-    thinwall_w: {
-        draw_layer: DRAW_LAYERS.overlay,
-        thin_walls: new Set(['west']),
-        blocks_leaving: blocks_leaving_thin_walls,
-    },
-    thinwall_se: {
-        draw_layer: DRAW_LAYERS.overlay,
-        thin_walls: new Set(['south', 'east']),
-        blocks_leaving: blocks_leaving_thin_walls,
+    thin_walls: {
+        draw_layer: DRAW_LAYERS.thin_wall,
+        blocks(me, level, actor, direction) {
+            return ((me.edges & DIRECTIONS[direction].opposite_bit) !== 0) && actor.type.name !== 'ghost';
+        },
+        blocks_leaving(me, actor, direction) {
+            return ((me.edges & DIRECTIONS[direction].bit) !== 0) && actor.type.name !== 'ghost';
+        },
+        populate_defaults(me) {
+            me.edges = 0;  // bitmask of directions
+        },
     },
     fake_wall: {
         draw_layer: DRAW_LAYERS.terrain,
@@ -369,7 +356,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all,
     },
     canopy: {
-        draw_layer: DRAW_LAYERS.overlay,
+        draw_layer: DRAW_LAYERS.canopy,
         blocks_collision: COLLISION.bug | COLLISION.rover,
         blocks(me, level, other, direction) {
             // Blobs will specifically not move from one canopy to another
@@ -382,9 +369,8 @@ const TILE_TYPES = {
     swivel_floor: {
         draw_layer: DRAW_LAYERS.terrain,
     },
-    // TODO thin walls explicitly draw over swivels, so they might have their own layer
     swivel_ne: {
-        draw_layer: DRAW_LAYERS.overlay,
+        draw_layer: DRAW_LAYERS.swivel,
         thin_walls: new Set(['north', 'east']),
         on_depart(me, level, other) {
             if (other.direction === 'north') {
@@ -401,7 +387,7 @@ const TILE_TYPES = {
         on_power: activate_me,
     },
     swivel_se: {
-        draw_layer: DRAW_LAYERS.overlay,
+        draw_layer: DRAW_LAYERS.swivel,
         thin_walls: new Set(['south', 'east']),
         on_depart(me, level, other) {
             if (other.direction === 'south') {
@@ -418,7 +404,7 @@ const TILE_TYPES = {
         on_power: activate_me,
     },
     swivel_sw: {
-        draw_layer: DRAW_LAYERS.overlay,
+        draw_layer: DRAW_LAYERS.swivel,
         thin_walls: new Set(['south', 'west']),
         on_depart(me, level, other) {
             if (other.direction === 'south') {
@@ -435,7 +421,7 @@ const TILE_TYPES = {
         on_power: activate_me,
     },
     swivel_nw: {
-        draw_layer: DRAW_LAYERS.overlay,
+        draw_layer: DRAW_LAYERS.swivel,
         thin_walls: new Set(['north', 'west']),
         on_depart(me, level, other) {
             if (other.direction === 'north') {
@@ -2641,7 +2627,7 @@ const TILE_TYPES = {
 
     // VFX
     splash: {
-        draw_layer: DRAW_LAYERS.overlay,
+        draw_layer: DRAW_LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
@@ -2653,7 +2639,7 @@ const TILE_TYPES = {
         },
     },
     explosion: {
-        draw_layer: DRAW_LAYERS.overlay,
+        draw_layer: DRAW_LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
@@ -2673,7 +2659,7 @@ const TILE_TYPES = {
     },
     // Custom VFX (identical function, but different aesthetic)
     splash_slime: {
-        draw_layer: DRAW_LAYERS.overlay,
+        draw_layer: DRAW_LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,

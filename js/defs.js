@@ -57,14 +57,16 @@ export const INPUT_BITS = {
     wait:   0x8000,
 };
 
-// TODO cc2 order is: swivel, thinwalls, canopy (and yes you can have them all in the same tile)
 export const DRAW_LAYERS = {
     terrain: 0,
     item: 1,
     item_mod: 2,
     actor: 3,
-    overlay: 4,
-    MAX: 5,
+    vfx: 4,
+    swivel: 5,
+    thin_wall: 6,
+    canopy: 7,
+    MAX: 8,
 };
 
 export const COLLISION = {
