@@ -1309,6 +1309,8 @@ class Player extends PrimaryView {
             this.current_toolbelt[i] = tool;
         }
 
+        this.renderer.perception = (this.level && this.level.player.has_item('xray_eye')) ? 'xray' : 'normal';
+
         if (this.debug.enabled) {
             let t = this.level.tic_counter;
             this.debug.time_tics_el.textContent = `${t}`;

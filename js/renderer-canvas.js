@@ -27,7 +27,7 @@ export class CanvasRenderer {
         this.viewport_dirty = false;
         this.show_actor_bboxes = false;
         this.use_rewind_effect = false;
-        this.perception = 0;  // 0 normal, 1 secret eye, 2 editor
+        this.perception = 'normal';  // normal, xray, editor, palette
     }
 
     set_level(level) {
@@ -68,6 +68,18 @@ export class CanvasRenderer {
             this.tileset.image,
             sx * tw, sy * th, w * tw, h * th,
             dx * tw, dy * th, w * tw, h * th);
+    }
+
+    _make_tileset_blitter(ctx, offsetx = 0, offsety = 0) {
+        // The blit we pass to the tileset has a different signature than our own:
+        // blit(
+        //     source_tile_x, source_tile_y,
+        //     mask_x = 0, mask_y = 0, mask_width = 1, mask_height = mask_width,
+        //     mask_dx = mask_x, mask_dy = mask_y)
+        // This makes it easier to use in the extremely common case of drawing part of one tile atop
+        // another tile, but still aligned to the grid.
+        return (tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) =>
+            this.blit(ctx, tx + mx, ty + my, offsetx + mdx, offsety + mdy, mw, mh);
     }
 
     draw(tic_offset = 0) {
@@ -144,10 +156,12 @@ export class CanvasRenderer {
         // neighboring terrain
         // FIXME this is a bit inefficient when there are a lot of rarely-used layers; consider
         // instead drawing everything under actors, then actors, then everything above actors?
+        // (note: will need to first fix the game to ensure everything is stacked correctly!)
         for (let layer = 0; layer < DRAW_LAYERS.MAX; layer++) {
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
-                    for (let tile of this.level.cell(x, y)) {
+                    let cell = this.level.cell(x, y);
+                    for (let tile of cell) {
                         if (tile.type.draw_layer !== layer)
                             continue;
 
@@ -168,18 +182,20 @@ export class CanvasRenderer {
                             vy = y;
                         }
 
-                        // Note that the blit we pass to the tileset has a different signature:
-                        // blit(
-                        //     source_tile_x, source_tile_y,
-                        //     mask_x = 0, mask_y = 0, mask_width = 1, mask_height = mask_width,
-                        //     mask_dx = mask_x, mask_dy = mask_y)
-                        // This makes it easier to use in the extremely common case of drawing
-                        // part of one tile atop another tile, but still aligned to the grid.
-                        this.tileset.draw(tile, tic, (tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) =>
-                            this.blit(this.ctx,
-                                tx + mx, ty + my,
-                                vx - x0 + mdx, vy - y0 + mdy,
-                                mw, mh));
+                        // For actors (i.e., blocks), perception only applies if there's something
+                        // of potential interest underneath
+                        let perception = this.perception;
+                        if (perception !== 'normal' && tile.type.is_actor &&
+                            ! cell.some(t =>
+                                t.type.draw_layer < layer &&
+                                ! (t.type.name === 'floor' && (t.wire_directions | t.wire_tunnel_directions) === 0)))
+                        {
+                            perception = 'normal';
+                        }
+
+                        this.tileset.draw(
+                            tile, tic, perception,
+                            this._make_tileset_blitter(this.ctx, vx - x0, vy - y0));
                     }
                 }
             }
@@ -221,8 +237,8 @@ export class CanvasRenderer {
     create_tile_type_canvas(name, tile = null) {
         let canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
         let ctx = canvas.getContext('2d');
-        this.tileset.draw_type(name, tile, 0, this.perception, (tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) =>
-            this.blit(ctx, tx + mx, ty + my, mdx, mdy, mw, mh));
+        // Individual tile types always reveal what they are
+        this.tileset.draw_type(name, tile, 0, 'palette', this._make_tileset_blitter(ctx));
         return canvas;
     }
 }

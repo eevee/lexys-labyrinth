@@ -43,10 +43,9 @@ export const CC2_TILESET_LAYOUT = {
     key_blue: [5, 1],
     key_yellow: [6, 1],
     key_green: [7, 1],
-    // FIXME these shouldn't be drawn with a hole when drawn in isolation, gruh
     dirt_block: {
         special: 'perception',
-        threshold: 2,
+        modes: new Set(['editor', 'xray']),
         hidden: [8, 1],
         revealed: [9, 1],
     },
@@ -64,10 +63,9 @@ export const CC2_TILESET_LAYOUT = {
         wired_cross: [10, 26],
         is_wired_optional: true,
     },
-    // FIXME i think these are visible with the secret eye, but my tileset puts text on them, whoops
     wall_invisible: {
         special: 'perception',
-        threshold: 2,
+        modes: new Set(['palette', 'editor', 'xray']),
         hidden: [0, 2],
         revealed: [9, 31],
     },
@@ -75,7 +73,7 @@ export const CC2_TILESET_LAYOUT = {
     wall_invisible_revealed: [1, 2],
     wall_appearing: {
         special: 'perception',
-        threshold: 2,
+        modes: new Set(['palette', 'editor', 'xray']),
         hidden: [0, 2],
         revealed: [11, 31],
     },
@@ -109,10 +107,9 @@ export const CC2_TILESET_LAYOUT = {
         [8, 2],
         [9, 2],
     ],
-    // FIXME these shouldn't be drawn with a hole when drawn in isolation, gruh
     ice_block: {
         special: 'perception',
-        threshold: 2,
+        modes: new Set(['editor', 'xray']),
         hidden: [10, 2],
         revealed: [11, 2],
     },
@@ -123,12 +120,21 @@ export const CC2_TILESET_LAYOUT = {
 
     // LCD digit font
     green_chip: [9, 3],
-    chip_extra: [10, 3],
+    chip_extra: {
+        special: 'perception',
+        modes: new Set(['palette', 'editor']),
+        hidden: [11, 3],
+        revealed: [10, 3],
+    },
     chip: [11, 3],
     bribe: [12, 3],
     speed_boots: [13, 3],
-    canopy: [14, 3],
-    // canopy xray
+    canopy: {
+        special: 'perception',
+        modes: new Set(['editor', 'xray']),
+        hidden: [14, 3],
+        revealed: [15, 3],
+    },
 
     dynamite: [0, 4],
     // FIXME lit frames
@@ -153,7 +159,7 @@ export const CC2_TILESET_LAYOUT = {
     popdown_wall: [12, 5],
     popdown_floor: {
         special: 'perception',
-        threshold: 2,
+        modes: new Set(['palette', 'editor', 'xray']),
         hidden: [12, 5],
         revealed: [13, 5],
     },
@@ -238,10 +244,9 @@ export const CC2_TILESET_LAYOUT = {
     ],
 
     fake_wall: [0, 10],
-    // FIXME i think these are visible with the secret eye, but my tileset puts text on them, whoops
     fake_floor: {
         special: 'perception',
-        threshold: 2,
+        modes: new Set(['palette', 'editor', 'xray']),
         hidden: [0, 10],
         revealed: [10, 31],
     },
@@ -318,7 +323,7 @@ export const CC2_TILESET_LAYOUT = {
     // TODO [0, 16] some kinda red/blue outline
     floor_mimic: {
         special: 'perception',
-        threshold: 1,
+        modes: new Set(['palette', 'editor', 'xray']),
         hidden: [0, 2],
         revealed: [14, 16],
     },
@@ -893,9 +898,8 @@ export class Tileset {
         this.animation_slowdown = 2;
     }
 
-    draw(tile, tic, blit) {
-        // FIXME perception
-        this.draw_type(tile.type.name, tile, tic, 0, blit);
+    draw(tile, tic, perception, blit) {
+        this.draw_type(tile.type.name, tile, tic, perception, blit);
     }
 
     // Draw a "standard" drawspec, which is either:
@@ -1174,7 +1178,7 @@ export class Tileset {
                 return;
             }
             else if (drawspec.special === 'perception') {
-                if (perception >= drawspec.threshold) {
+                if (drawspec.modes.has(perception)) {
                     drawspec = drawspec.revealed;
                 }
                 else {
