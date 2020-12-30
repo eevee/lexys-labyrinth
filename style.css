@@ -1413,6 +1413,14 @@ body.--debug #player-debug {
     stroke-width: 0.0625;
     fill: none;
 }
+#editor .level-editor-overlay rect.overlay-cursor {
+    display: none;
+    stroke: hsla(225, 100%, 60%, 0.5);
+    fill: hsla(225, 100%, 75%, 0.25);
+}
+#editor .level-editor-overlay rect.overlay-cursor.--visible {
+    display: initial;
+}
 #editor .level-editor-overlay rect.overlay-cxn {
     stroke: red;
 }
@@ -1523,7 +1531,11 @@ body.--debug #player-debug {
 #editor .palette {
     isolation: isolate;
     grid-area: palette;
-    padding-right: 0.25em;  /* in case of scrollbar */
+    width: calc(32px * 8 + 4px * 9);
+    padding-right: 1em;  /* make room for scrollbar so we don't get a horizontal one */
+    /* TODO when there IS a scrollbar, the h2s are slightly narrower.  think this is an
+     * unexpected consequence of using min-content, which i guess does not take the
+     * possibility of a scrollbar into account */
     overflow-y: auto;
 }
 #editor .palette h2 {

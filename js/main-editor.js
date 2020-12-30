@@ -2097,6 +2097,10 @@ export class Editor extends PrimaryView {
     }
 
     setup() {
+        // Add more bits to SVG overlay
+        this.svg_cursor = mk_svg('rect.overlay-cursor', {x: 0, y: 0, width: 1, height: 1});
+        this.svg_overlay.append(this.svg_cursor);
+
         // Keyboard shortcuts
         window.addEventListener('keydown', ev => {
             if (! this.active)
@@ -2161,6 +2165,17 @@ export class Editor extends PrimaryView {
         window.addEventListener('mousemove', ev => {
             if (! this.active)
                 return;
+
+            let [x, y] = this.renderer.cell_coords_from_event(ev);
+            if (this.is_in_bounds(x, y)) {
+                this.svg_cursor.classList.add('--visible');
+                this.svg_cursor.setAttribute('x', x);
+                this.svg_cursor.setAttribute('y', y);
+            }
+            else {
+                this.svg_cursor.classList.remove('--visible');
+            }
+
             if (! this.mouse_op)
                 return;
             if ((ev.buttons & this.mouse_op.button_mask) === 0) {

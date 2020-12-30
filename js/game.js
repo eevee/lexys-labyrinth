@@ -617,6 +617,7 @@ export class Level extends LevelInterface {
                                 }
                             }
                             else if (tile.type.on_power) {
+                                // FIXME this isn't quite right since there's seemingly a 1-frame delay
                                 add_to_edge_map(circuit.tiles, tile, DIRECTIONS[edge].bit);
                                 wired_outputs.add(tile);
                             }
