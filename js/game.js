@@ -754,7 +754,10 @@ export class Level extends LevelInterface {
 
     // Only the Lexy-style loop has a notion of "finishing" a tic, since (unlike the Lynx loop) the
     // decision phase happens in the /middle/
-    finish_tic() {
+    finish_tic(p1_input) {
+        this.p1_input = p1_input;
+        this.p1_released |= ~p1_input;  // Action keys released since we last checked them
+        
         if (this.compat.use_lynx_loop) {
             return;
         }

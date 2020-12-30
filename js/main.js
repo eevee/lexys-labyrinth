@@ -1105,6 +1105,7 @@ class Player extends PrimaryView {
             }
 
             let has_input = wait || input;
+            let did_finish = false;
             // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
             if (this.turn_mode === 2) {
                 if (has_input) {
@@ -1113,6 +1114,7 @@ class Player extends PrimaryView {
                     // did, the first time we tried it
                     this.level.finish_tic(input);
                     this.turn_mode = 1;
+                    did_finish = true;
                 }
                 else {
                     continue;
@@ -1120,14 +1122,18 @@ class Player extends PrimaryView {
             }
 
             // We should now be at the start of a tic
-            this.level.begin_tic(input);
-            if (this.turn_mode > 0 && this.level.can_accept_input() && ! has_input) {
-                // If we're in turn-based mode and could provide input here, but don't have any,
-                // then wait until we do
-                this.turn_mode = 2;
-            }
-            else {
-                this.level.finish_tic(input);
+            // but only start one if we didn't finish one
+            if (!did_finish)
+            {
+                this.level.begin_tic(input);
+                if (this.turn_mode > 0 && this.level.can_accept_input() && !input) {
+                    // If we're in turn-based mode and could provide input here, but don't have any,
+                    // then wait until we do
+                    this.turn_mode = 2;
+                }
+                else {
+                    this.level.finish_tic(input);
+                }
             }
 
             if (this.level.state !== 'playing') {
@@ -1142,7 +1148,7 @@ class Player extends PrimaryView {
             this.debug.replay_custom_label.textContent = format_replay_duration(this.debug.custom_replay.duration);
         }
     }
-
+    
     // Main driver of the level; advances by one tic, then schedules itself to
     // be called again next tic
     advance() {
@@ -1204,7 +1210,7 @@ class Player extends PrimaryView {
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
         let tic_offset;
-        if (this.turn_mode === 2) {
+        if (this.turn_mode === 2 && this.level.can_accept_input()) {
             // We're dawdling between tics, so nothing is actually animating, but the clock hasn't
             // advanced yet; pretend whatever's currently animating has finished
             tic_offset = 0.999;
