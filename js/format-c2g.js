@@ -1391,10 +1391,46 @@ export function synthesize_level(stored_level) {
 
         // TODO complain if duplicates on a layer
         let dummy_terrain_tile = null;
+        let handled_thin_walls = false;
+        // FIXME sort first, otherwise the canopy assumption that thin walls are immediately below
+        // breaks!  maybe just fix that also
         for (let i = cell.length - 1; i >= 0; i--) {
             let tile = cell[i];
             // FIXME does not yet support canopy or thin walls  >:S
             let spec = REVERSE_TILE_ENCODING[tile.type.name];
+
+            if (tile.type.name === 'canopy' || tile.type.name === 'thin_walls') {
+                // These two tiles are encoded together despite being on different layers.  If we
+                // see the canopy first, then find the thin wall tile (if any) and set a flag so we
+                // don't try to encode it again
+                if (handled_thin_walls)
+                    continue;
+                handled_thin_walls = true;
+
+                let canopy, thin_walls;
+                if (tile.type.name === 'canopy') {
+                    canopy = tile;
+                    if (i > 0 && cell[i - 1].type.name === 'thin_walls') {
+                        thin_walls = cell[i - 1];
+                    }
+                }
+                else {
+                    thin_walls = tile;
+                }
+
+                let arg = 0;
+                if (canopy) {
+                    arg |= 0x10;
+                }
+                if (thin_walls) {
+                    arg |= thin_walls.edges;
+                }
+
+                map_bytes[p] = REVERSE_TILE_ENCODING['#thinwall/canopy'].tile_byte;
+                map_bytes[p + 1] = arg;
+                p += 2;
+                continue;
+            }
 
             // Handle the swivel, a tile that draws as an overlay but is stored like terrain.  In a
             // level, it has two parts: the swivel itself, and a dummy swivel_floor terrain which is

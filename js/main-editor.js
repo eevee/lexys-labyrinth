@@ -423,18 +423,7 @@ class PencilOperation extends DrawOperation {
             }
             else if (template) {
                 // Erase whatever's on the same layer
-                // TODO this seems like the wrong place for this
-                let layer = template.type.draw_layer;
-                for (let i = cell.length - 1; i >= 0; i--) {
-                    if (cell[i].type.draw_layer === layer) {
-                        cell.splice(i, 1);
-                    }
-                }
-                // Don't allow erasing the floor entirely
-                if (layer === 0) {
-                    cell.unshift({type: TILE_TYPES.floor});
-                }
-                this.editor.mark_cell_dirty(cell);
+                this.editor.erase_tile(cell);
             }
         }
         else {
@@ -1124,9 +1113,9 @@ const EDITOR_TOOL_ORDER = ['pencil', 'adjust', 'force-floors', 'tracks', 'wire',
 const EDITOR_PALETTE = [{
     title: "Basics",
     tiles: [
-        'player', 'player2',
-        'chip', 'chip_extra',
-        'floor', 'wall', 'hint', 'socket', 'exit',
+        'player', 'player2', 'hint',
+        'floor', 'wall', 'thin_walls/south',
+        'chip', 'chip_extra', 'socket', 'exit',
     ],
 }, {
     title: "Terrain",
@@ -1161,6 +1150,7 @@ const EDITOR_PALETTE = [{
         'water', 'turtle', 'fire',
         'ice', 'ice_nw',
         'force_floor_n', 'force_floor_all',
+        'canopy',
     ],
 }, {
     title: "Items",
@@ -1266,13 +1256,14 @@ const EDITOR_PALETTE = [{
 }];
 
 const SPECIAL_PALETTE_ENTRIES = {
+    'thin_walls/south':     { name: 'thin_walls', edges: DIRECTIONS['south'].bit },
     'frame_block/0':  { name: 'frame_block', direction: 'south', arrows: new Set },
     'frame_block/1':  { name: 'frame_block', direction: 'north', arrows: new Set(['north']) },
     'frame_block/2a': { name: 'frame_block', direction: 'north', arrows: new Set(['north', 'east']) },
     'frame_block/2o': { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'south']) },
     'frame_block/3':  { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south']) },
     'frame_block/4':  { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south', 'west']) },
-    // FIXME these should be additive/subtractive, but a track picked up from the level should replace
+    // FIXME need to handle entered_direction intelligently, but also allow setting it explicitly
     'railroad/straight':    { name: 'railroad', tracks: 1 << 5, track_switch: null, entered_direction: 'north' },
     'railroad/curve':       { name: 'railroad', tracks: 1 << 0, track_switch: null, entered_direction: 'north' },
     'railroad/switch':      { name: 'railroad', tracks: 0, track_switch: 0, entered_direction: 'north' },
@@ -1289,6 +1280,31 @@ const SPECIAL_PALETTE_ENTRIES = {
 const _RAILROAD_ROTATED_LEFT = [3, 0, 1, 2, 5, 4];
 const _RAILROAD_ROTATED_RIGHT = [1, 2, 3, 0, 5, 4];
 const SPECIAL_PALETTE_BEHAVIOR = {
+    thin_walls: {
+        pick_palette_entry(tile) {
+            return 'thin_walls/south';
+        },
+        rotate_left(tile) {
+            if (tile.edges & 0x01) {
+                tile.edges |= 0x10;
+            }
+            tile.edges >>= 1;
+        },
+        rotate_right(tile) {
+            tile.edges <<= 1;
+            if (tile.edges & 0x10) {
+                tile.edges = (tile.edges & ~0x10) | 0x01;
+            }
+        },
+        combine_draw(palette_tile, existing_tile) {
+            existing_tile.edges |= palette_tile.edges;
+        },
+        combine_erase(palette_tile, existing_tile) {
+            existing_tile.edges &= ~palette_tile.edges;
+            if (existing_tile.edges === 0)
+                return true;
+        },
+    },
     frame_block: {
         pick_palette_entry(tile) {
             if (tile.arrows.size === 2) {
@@ -1376,6 +1392,61 @@ const SPECIAL_PALETTE_BEHAVIOR = {
 
             if (tile.entered_direction) {
                 tile.entered_direction = DIRECTIONS[tile.entered_direction].right;
+            }
+        },
+        combine_draw(palette_tile, existing_tile) {
+            existing_tile.tracks |= palette_tile.tracks;
+            // If we have a switch already, the just-placed track becomes the current one
+            if (existing_tile.track_switch !== null) {
+                for (let i = 0; i < 6; i++) {
+                    if (palette_tile.tracks & (1 << i)) {
+                        existing_tile.track_switch = i;
+                        break;
+                    }
+                }
+            }
+
+            if (palette_tile.track_switch !== null && existing_tile.track_switch === null) {
+                // The palette's switch is just an indication that we should have one, not what it
+                // ought to be
+                existing_tile.track_switch = palette_tile.track_switch;
+                for (let i = 0; i < 6; i++) {
+                    if (existing_tile.tracks & (1 << i)) {
+                        existing_tile.track_switch = i;
+                        break;
+                    }
+                }
+            }
+        },
+        combine_erase(palette_tile, existing_tile) {
+            existing_tile.tracks &= ~palette_tile.tracks;
+
+            // If there are no track pieces left, remove the railroad.  It's technically possible to
+            // have a railroad with no tracks, but you're very unlikely to want it, and if you
+            // really do then you can do it yourself
+            if (existing_tile.tracks === 0)
+                return true;
+
+            if (palette_tile.track_switch !== null) {
+                existing_tile.track_switch = null;
+            }
+
+            // Fix the track switch if necessary
+            if (existing_tile.track_switch !== null) {
+                let num_tracks = 0;
+                for (let i = 0; i < 6; i++) {
+                    if (existing_tile.tracks & (1 << i)) {
+                        num_tracks += 1;
+                        if (! (existing_tile.tracks & (1 << existing_tile.track_switch))) {
+                            existing_tile.track_switch = i;
+                        }
+                    }
+                }
+
+                // Remove the switch if there's nothing to switch
+                if (num_tracks <= 1) {
+                    existing_tile.track_switch = null;
+                }
             }
         },
     },
@@ -1693,15 +1764,15 @@ export class Editor extends PrimaryView {
                 let tile = Object.assign({}, SPECIAL_PALETTE_ENTRIES[key]);
                 tile.type = TILE_TYPES[tile.name];
                 delete tile.name;
-                this.select_palette(tile);
+                this.select_palette(tile, true);
             }
             else {
                 // Regular tile name
-                this.select_palette(key);
+                this.select_palette(key, true);
             }
         });
         this.palette_selection = null;
-        this.select_palette('floor');
+        this.select_palette('floor', true);
     }
 
     activate() {
@@ -1911,7 +1982,7 @@ export class Editor extends PrimaryView {
         this.tool_button_els[this.current_tool].classList.add('-selected');
     }
 
-    select_palette(name_or_tile) {
+    select_palette(name_or_tile, from_palette = false) {
         let name, tile;
         if (typeof name_or_tile === 'string') {
             name = name_or_tile;
@@ -1936,6 +2007,7 @@ export class Editor extends PrimaryView {
 
         // Store the tile
         this.palette_selection = tile;
+        this.palette_selection_from_palette = from_palette;
 
         // Select it in the palette, if possible
         let key = name;
@@ -2028,16 +2100,59 @@ export class Editor extends PrimaryView {
 
         let cell = this.cell(x, y);
         // Replace whatever's on the same layer
-        // TODO probably not the best heuristic yet, since i imagine you can
-        // combine e.g. the tent with thin walls
         // TODO should preserve wiring if possible too
         for (let i = cell.length - 1; i >= 0; i--) {
+            // If we find a tile of the same type as the one being drawn, see if it has custom
+            // combine behavior (only the case if it came from the palette)
+            if (cell[i].type === tile.type &&
+                // FIXME this is hacky garbage
+                tile === this.palette_selection && this.palette_selection_from_palette &&
+                SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
+                SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw)
+            {
+                SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw(tile, cell[i]);
+                return;
+            }
+
             if (cell[i].type.draw_layer === tile.type.draw_layer) {
                 cell.splice(i, 1);
             }
         }
+
         cell.push(Object.assign({}, tile));
         cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
+    }
+
+    erase_tile(cell, tile = null) {
+        if (tile === null) {
+            tile = this.palette_selection;
+        }
+
+        let layer = tile.type.draw_layer;
+        for (let i = cell.length - 1; i >= 0; i--) {
+            // If we find a tile of the same type as the one being drawn, see if it has custom
+            // combine behavior (only the case if it came from the palette)
+            if (cell[i].type === tile.type &&
+                // FIXME this is hacky garbage
+                tile === this.palette_selection && this.palette_selection_from_palette &&
+                SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
+                SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase)
+            {
+                let remove = SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase(tile, cell[i]);
+                if (! remove)
+                    return;
+            }
+
+            if (cell[i].type.draw_layer === layer) {
+                cell.splice(i, 1);
+            }
+        }
+
+        // Don't allow erasing the floor entirely
+        if (layer === 0) {
+            cell.unshift({type: TILE_TYPES.floor});
+        }
+        this.mark_cell_dirty(cell);
     }
 
     open_tile_prop_overlay(tile, x0, y0) {
