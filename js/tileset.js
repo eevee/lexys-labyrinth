@@ -893,6 +893,8 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     gate_green: [3, 39],
 
     skeleton_key: [4, 39],
+
+    sand: [10, 40],
 });
 
 export class Tileset {

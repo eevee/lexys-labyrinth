@@ -1261,6 +1261,7 @@ const EDITOR_PALETTE = [{
         'gate_blue',
         'gate_yellow',
         'gate_green',
+        'sand',
     ],
 }];
 

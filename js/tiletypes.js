@@ -612,6 +612,11 @@ const TILE_TYPES = {
                 ! other.has_item('hiking_boots'));
         },
     },
+    sand: {
+        draw_layer: DRAW_LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
+        speed_factor: 0.5,
+    },
 
     // Hazards
     fire: {
@@ -2189,6 +2194,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_ignores: new Set(['sand']),
         // FIXME uhh these "ignore" that dirt and gravel block us, but they don't ignore the on_arrive, so, uhhhh
     },
     // Other tools
