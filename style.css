@@ -1421,6 +1421,35 @@ body.--debug #player-debug {
     fill: black;
 }
 
+.editor-big-tooltip {
+    /* shared between toolbar and palette tooltips */
+    opacity: 0;
+    visibility: hidden;
+    z-index: 1;
+    position: absolute;
+    padding: 0.33em 0.75em;
+    pointer-events: none;
+
+    transition-property: margin, opacity, visibility;
+    transition-timing-function: ease-out;
+    transition-duration: 0.125s, 0.125s, 0s;
+    transition-delay: 0s, 0s, 0.125s;
+
+    border: 1px solid black;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    text-transform: none;
+    text-align: left;
+    color: #d8d8d8;
+    background: hsl(225, 10%, 20%);
+    box-shadow: 0 1px 2px 1px #0004;
+}
+.editor-big-tooltip h3 {
+    font-size: 1.25em;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid currentColor;
+    color: white;
+}
 #editor .controls {
     /* TODO with the hint area gone i don't think this needs to be a grid?  could just flex */
     grid-area: controls;
@@ -1442,33 +1471,9 @@ body.--debug #player-debug {
     grid-area: toolbar;
 }
 #editor-toolbar .-help {
-    opacity: 0;
-    visibility: hidden;
-    z-index: 1;
-    position: absolute;
     width: max-content;
     margin-top: -0.25em;
     margin-left: -0.5em;
-    padding: 0.33em 0.75em;
-    pointer-events: none;
-
-    border: 1px solid black;
-    white-space: pre-wrap;
-    line-height: 1.5;
-    text-transform: none;
-    text-align: left;
-    background: hsl(225, 10%, 20%);
-    box-shadow: 0 1px 2px 1px #0004;
-
-    transition-property: margin-top, opacity, visibility;
-    transition-timing-function: ease-out;
-    transition-duration: 0.125s, 0.125s, 0s;
-    transition-delay: 0s, 0s, 0.125s;
-}
-#editor-toolbar .-help h3 {
-    font-size: 1.25em;
-    margin-bottom: 0.25rem;
-    border-bottom: 1px solid currentColor;
 }
 #editor-toolbar button:hover .-help {
     opacity: 1;
@@ -1532,6 +1537,22 @@ body.--debug #player-debug {
 .palette-entry.--selected {
     z-index: 1;
     box-shadow: 0 0 0 1px black, 0 0 0 3px white;
+}
+.editor-palette-tooltip {
+    width: 20em;
+
+    /* Don't immediately hide me when mousing between entries */
+    /* FIXME if it's in mid-fade and you mouse over an entry again, it stays frozen in mid-fade
+     * for 0.5s  :( */
+    transition-delay: 0.5s, 0.5s, 0.625s;
+}
+.editor-palette-tooltip.--visible {
+    opacity: 1;
+    z-index: 2;  /* show above any that are in mid-fade */
+    visibility: visible;
+    margin-left: 1em;
+    transition-delay: 0.5s;
+    transition-timing-function: ease-in;
 }
 
 .editor-level-browser {
