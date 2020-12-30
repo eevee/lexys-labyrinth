@@ -33,6 +33,12 @@ input[type=range] {
     margin: 0.125em;
     vertical-align: middle;
 }
+input[type=number] {
+    font-size: inherit;
+    width: 4em;
+    width: 8ch;
+    text-align: right;
+}
 button,
 .radio-faux-button-set > label > input + span {
     font-size: inherit;
@@ -263,6 +269,12 @@ dl.formgrid > dt {
 dl.formgrid > dd {
     grid-column: 2;
     margin: 0;
+}
+dl.formgrid > dd button {
+    margin: 0.25em 0;
+}
+dl.formgrid > dd button + button {
+    margin-left: 0.25em;
 }
 
 /* Individual overlays */

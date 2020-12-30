@@ -5,7 +5,7 @@ import * as c2g from './format-c2g.js';
 import { PrimaryView, TransientOverlay, DialogOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
-import { SVG_NS, mk, mk_svg, string_from_buffer_ascii, bytestring_to_buffer, walk_grid } from './util.js';
+import { SVG_NS, mk, mk_button, mk_svg, string_from_buffer_ascii, bytestring_to_buffer, walk_grid } from './util.js';
 import * as util from './util.js';
 
 class EditorPackMetaOverlay extends DialogOverlay {
@@ -45,7 +45,7 @@ class EditorLevelMetaOverlay extends DialogOverlay {
         let dl = mk('dl.formgrid');
         this.main.append(dl);
 
-        let time_limit_input = mk('input', {name: 'time_limit', type: 'range', min: 0, max: 999, value: stored_level.time_limit});
+        let time_limit_input = mk('input', {name: 'time_limit', type: 'number', min: 0, max: 999, value: stored_level.time_limit});
         let time_limit_output = mk('output');
         let update_time_limit = () => {
             let time_limit = parseInt(time_limit_input.value, 10);
@@ -54,7 +54,7 @@ class EditorLevelMetaOverlay extends DialogOverlay {
                 text = "No time limit";
             }
             else {
-                text = `${time_limit} (${util.format_duration(time_limit)})`;
+                text = util.format_duration(time_limit);
             }
             time_limit_output.textContent = text;
         };
@@ -74,14 +74,48 @@ class EditorLevelMetaOverlay extends DialogOverlay {
             mk('dt', "Author"),
             mk('dd', mk('input', {name: 'author', type: 'text', value: stored_level.author})),
             mk('dt', "Time limit"),
-            mk('dd', time_limit_input, " ", time_limit_output),
+            mk('dd',
+                time_limit_input,
+                " ",
+                time_limit_output,
+                mk('br'),
+                mk_button("None", ev => {
+                    this.root.elements['time_limit'].value = 0;
+                    update_time_limit();
+                }),
+                mk_button("−30s", ev => {
+                    this.root.elements['time_limit'].value = Math.max(0,
+                        parseInt(this.root.elements['time_limit'].value, 10) - 30);
+                    update_time_limit();
+                }),
+                mk_button("+30s", ev => {
+                    this.root.elements['time_limit'].value = Math.min(999,
+                        parseInt(this.root.elements['time_limit'].value, 10) + 30);
+                    update_time_limit();
+                }),
+                mk_button("Max", ev => {
+                    this.root.elements['time_limit'].value = 999;
+                    update_time_limit();
+                }),
+            ),
             mk('dt', "Size"),
             mk('dd',
-                "Width: ",
                 mk('input', {name: 'size_x', type: 'number', min: 10, max: 100, value: stored_level.size_x}),
-                mk('br'),
-                "Height: ",
+                " × ",
                 mk('input', {name: 'size_y', type: 'number', min: 10, max: 100, value: stored_level.size_y}),
+                mk('br'),
+                mk_button("10×10", ev => {
+                    this.root.elements['size_x'].value = 10;
+                    this.root.elements['size_y'].value = 10;
+                }),
+                mk_button("32×32", ev => {
+                    this.root.elements['size_x'].value = 32;
+                    this.root.elements['size_y'].value = 32;
+                }),
+                mk_button("100×100", ev => {
+                    this.root.elements['size_x'].value = 100;
+                    this.root.elements['size_y'].value = 100;
+                }),
             ),
             mk('dt', "Viewport"),
             mk('dd',

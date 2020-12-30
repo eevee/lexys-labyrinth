@@ -30,6 +30,12 @@ export function mk(tag_selector, ...children) {
     return _mk(el, children);
 }
 
+export function mk_button(label, onclick) {
+    let el = mk('button', {type: 'button'}, label);
+    el.addEventListener('click', onclick);
+    return el;
+}
+
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 export function mk_svg(tag_selector, ...children) {
     let [tag, ...classes] = tag_selector.split('.');
