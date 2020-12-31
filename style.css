@@ -1413,13 +1413,35 @@ body.--debug #player-debug {
     stroke-width: 0.0625;
     fill: none;
 }
-#editor .level-editor-overlay rect.overlay-cursor {
+#editor .level-editor-overlay .overlay-transient {
     display: none;
+}
+#editor .level-editor-overlay .overlay-transient.--visible {
+    display: initial;
+}
+#editor .level-editor-overlay rect.overlay-cursor {
+    x-stroke: hsla(225, 100%, 60%, 0.5);
+    fill: hsla(225, 100%, 75%, 0.25);
+}
+#editor .level-editor-overlay rect.overlay-pending-selection {
     stroke: hsla(225, 100%, 60%, 0.5);
     fill: hsla(225, 100%, 75%, 0.25);
 }
-#editor .level-editor-overlay rect.overlay-cursor.--visible {
-    display: initial;
+#editor .level-editor-overlay rect.overlay-selection {
+    stroke: #000c;
+    fill: hsla(225, 0%, 75%, 0.25);
+    stroke-dasharray: 0.125, 0.125;
+    animation: marching-ants 1s linear infinite;
+    pointer-events: auto;
+    cursor: move;
+}
+@keyframes marching-ants {
+    0% {
+        stroke-dashoffset: 0.25;
+    }
+    100% {
+        stroke-dashoffset: 0;
+    }
 }
 #editor .level-editor-overlay rect.overlay-cxn {
     stroke: red;

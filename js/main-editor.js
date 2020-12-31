@@ -482,6 +482,36 @@ class PencilOperation extends DrawOperation {
     }
 }
 
+class SelectOperation extends MouseOperation {
+    start() {
+        this.pending_selection = this.editor.selection.create_pending();
+        this.update_pending_selection();
+        this.has_moved = false;
+    }
+    step(mx, my, gxf, gyf, gx, gy) {
+        this.has_moved = true;
+        this.update_pending_selection();
+    }
+
+    update_pending_selection() {
+        this.pending_selection.set_extrema(this.gx0, this.gy0, this.gx1, this.gy1);
+    }
+
+    commit() {
+        if (! this.has_moved) {
+            // Plain click clears selection
+            this.pending_selection.discard();
+            this.editor.selection.clear();
+        }
+        else {
+            this.pending_selection.commit();
+        }
+    }
+    abort() {
+        this.pending_selection.discard();
+    }
+}
+
 class ForceFloorOperation extends DrawOperation {
     start() {
         // Begin by placing an all-way force floor under the mouse
@@ -1094,6 +1124,12 @@ const EDITOR_TOOLS = {
         desc: "Flood-fill an area with tiles",
         uses_palette: true,
     },
+    select_box: {
+        icon: 'icons/tool-select-box.png',
+        name: "Box select",
+        desc: "Select and manipulate rectangles.",
+        op1: SelectOperation,
+    },
     'force-floors': {
         icon: 'icons/tool-force-floors.png',
         name: "Force floors",
@@ -1141,7 +1177,7 @@ const EDITOR_TOOLS = {
     // slade when you have some selected?
     // TODO ah, railroads...
 };
-const EDITOR_TOOL_ORDER = ['pencil', 'adjust', 'force-floors', 'tracks', 'wire', 'camera'];
+const EDITOR_TOOL_ORDER = ['pencil', 'select_box', 'adjust', 'force-floors', 'tracks', 'wire', 'camera'];
 
 // TODO this MUST use a LL tileset!
 const EDITOR_PALETTE = [{
@@ -2063,6 +2099,81 @@ for (let cycle of [
     }
 }
 
+// TODO probably need to combine this with Selection somehow since it IS one, just not committed yet
+class PendingSelection {
+    constructor(owner) {
+        this.owner = owner;
+        this.element = mk_svg('rect.overlay-pending-selection');
+        this.owner.svg_group.append(this.element);
+        this.rect = null;
+    }
+
+    set_extrema(x0, y0, x1, y1) {
+        this.rect = new DOMRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x0 - x1) + 1, Math.abs(y0 - y1) + 1);
+        this.element.classList.add('--visible');
+        this.element.setAttribute('x', this.rect.x);
+        this.element.setAttribute('y', this.rect.y);
+        this.element.setAttribute('width', this.rect.width);
+        this.element.setAttribute('height', this.rect.height);
+    }
+
+    commit() {
+        this.owner.set_from_rect(this.rect);
+        this.element.remove();
+    }
+
+    discard() {
+        this.element.remove();
+    }
+}
+
+class Selection {
+    constructor(editor) {
+        this.editor = editor;
+
+        this.svg_group = mk_svg('g');
+        this.editor.svg_overlay.append(this.svg_group);
+
+        this.rect = null;
+        this.element = mk_svg('rect.overlay-selection.overlay-transient');
+        this.svg_group.append(this.element);
+
+        this.floating_contents = null;
+    }
+
+    get is_empty() {
+        return this.rect === null;
+    }
+
+    contains(x, y) {
+        // Empty selection means everything is selected?
+        if (this.rect === null)
+            return true;
+
+        return this.rect.left <= x && x < this.rect.right && this.rect.top <= y && y < this.rect.bottom;
+    }
+
+    create_pending() {
+        return new PendingSelection(this);
+    }
+
+    set_from_rect(rect) {
+        this.rect = rect;
+        this.element.classList.add('--visible');
+        this.element.setAttribute('x', this.rect.x);
+        this.element.setAttribute('y', this.rect.y);
+        this.element.setAttribute('width', this.rect.width);
+        this.element.setAttribute('height', this.rect.height);
+    }
+
+    clear() {
+        this.rect = null;
+        this.element.classList.remove('--visible');
+    }
+
+    // TODO allow floating/dragging, ctrl-dragging to copy, anchoring...
+    // TODO make more stuff respect this (more things should go through Editor for undo reasons anyway)
+}
 
 export class Editor extends PrimaryView {
     constructor(conductor) {
@@ -2098,7 +2209,7 @@ export class Editor extends PrimaryView {
 
     setup() {
         // Add more bits to SVG overlay
-        this.svg_cursor = mk_svg('rect.overlay-cursor', {x: 0, y: 0, width: 1, height: 1});
+        this.svg_cursor = mk_svg('rect.overlay-transient.overlay-cursor', {x: 0, y: 0, width: 1, height: 1});
         this.svg_overlay.append(this.svg_cursor);
 
         // Keyboard shortcuts
@@ -2389,6 +2500,8 @@ export class Editor extends PrimaryView {
 
         this.palette_selection = null;
         this.select_palette('floor', true);
+
+        this.selection = new Selection(this);
     }
 
     activate() {
@@ -2743,6 +2856,9 @@ export class Editor extends PrimaryView {
         if (! tile)
             return;
 
+        if (! this.selection.contains(x, y))
+            return;
+
         let cell = this.cell(x, y);
         // Replace whatever's on the same layer
         // TODO should preserve wiring if possible too
@@ -2769,6 +2885,8 @@ export class Editor extends PrimaryView {
     }
 
     erase_tile(cell, tile = null) {
+        // TODO respect selection
+
         if (tile === null) {
             tile = this.palette_selection;
         }
