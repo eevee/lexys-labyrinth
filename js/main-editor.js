@@ -2329,11 +2329,11 @@ export class Editor extends PrimaryView {
         // TODO ones for the palette too??
         this.palette_rotation_index = 0;
         this.palette_actor_direction = 'south';
-        let rotate_right_button = mk('button.--image', {type: 'button'}, mk('img', {src: '/icons/rotate-right.png'}));
+        let rotate_right_button = mk('button.--image', {type: 'button'}, mk('img', {src: 'icons/rotate-right.png'}));
         rotate_right_button.addEventListener('click', ev => {
             this.rotate_tile_right(this.palette_selection);
         });
-        let rotate_left_button = mk('button.--image', {type: 'button'}, mk('img', {src: '/icons/rotate-left.png'}));
+        let rotate_left_button = mk('button.--image', {type: 'button'}, mk('img', {src: 'icons/rotate-left.png'}));
         rotate_left_button.addEventListener('click', ev => {
             this.rotate_tile_left(this.palette_selection);
         });
