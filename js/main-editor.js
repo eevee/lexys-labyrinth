@@ -1752,7 +1752,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "Flame jet (off)",
         desc: "No effect.  Turned on while an orange button is held or while receiving power.  Turned on permanently by a gray button.",
     },
-    flame_jet_off: {
+    flame_jet_on: {
         name: "Flame jet (on)",
         desc: "Destroys almost anything that passes over it, except dirt blocks, fireballs, and anything wearing fire boots.  Turned off while an orange button is held or while receiving power.  Turned off permanently by a gray button.",
     },
@@ -1834,7 +1834,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "Light switch (off)",
         desc: "No effect.  Turns on when stepped on.  May contain wires.",
     },
-    light_switch_off: {
+    light_switch_on: {
         name: "Light switch (on)",
         desc: "Emits power.  Turns off when stepped on.  May contain wires.",
     },
