@@ -2317,14 +2317,28 @@ export class Editor extends PrimaryView {
         });
 
         // Toolbox
-        // Selected tile
-        this.selected_tile_el = this.root.querySelector('.controls #editor-tile');
+        // Selected tile and rotation buttons
+        this.selected_tile_el = mk('div');
+        this.selected_tile_el.id = 'editor-tile';
         this.selected_tile_el.addEventListener('click', ev => {
             if (this.palette_selection && TILES_WITH_PROPS[this.palette_selection.type.name]) {
                 // FIXME use tile bounds
                 this.open_tile_prop_overlay(this.palette_selection, ev.clientX, ev.clientY);
             }
         });
+        // TODO ones for the palette too??
+        this.palette_rotation_index = 0;
+        this.palette_actor_direction = 'south';
+        let rotate_right_button = mk('button.--image', {type: 'button'}, mk('img', {src: '/icons/rotate-right.png'}));
+        rotate_right_button.addEventListener('click', ev => {
+            this.rotate_tile_right(this.palette_selection);
+        });
+        let rotate_left_button = mk('button.--image', {type: 'button'}, mk('img', {src: '/icons/rotate-left.png'}));
+        rotate_left_button.addEventListener('click', ev => {
+            this.rotate_tile_left(this.palette_selection);
+        });
+        this.root.querySelector('.controls').append(
+            mk('div.editor-tile-controls', rotate_right_button, this.selected_tile_el, rotate_left_button));
         // Tools themselves
         let toolbox = mk('div.icon-button-set', {id: 'editor-toolbar'});
         this.root.querySelector('.controls').append(toolbox);
@@ -2354,15 +2368,6 @@ export class Editor extends PrimaryView {
 
             this.select_tool(button.getAttribute('data-tool'));
         });
-
-        // Rotation buttons, which affect both the palette tile and the entire palette
-        this.palette_rotation_index = 0;
-        this.palette_actor_direction = 'south';
-        let rotate_left_button = mk('button.--image', {type: 'button'}, mk('img', {src: '/icons/rotate-left.png'}));
-        rotate_left_button.addEventListener('click', ev => {
-            this.rotate_palette_left();
-        });
-        // TODO finish this up: this.root.querySelector('.controls').append(rotate_left_button);
 
         // Toolbar buttons for saving, exporting, etc.
         let button_container = mk('div.-buttons');
