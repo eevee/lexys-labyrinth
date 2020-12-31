@@ -2776,6 +2776,9 @@ class Conductor {
         this.editor = new Editor(this);
         this.player = new Player(this);
 
+        this.loaded_in_editor = false;
+        this.loaded_in_player = false;
+
         // Bind the header buttons
         document.querySelector('#main-options').addEventListener('click', ev => {
             new OptionsOverlay(this).open();
@@ -2833,7 +2836,9 @@ class Conductor {
         document.querySelector('#editor-play').addEventListener('click', ev => {
             // Restart the level to ensure it takes edits into account
             // TODO need to finish thinking out the exact flow between editor/player and what happens when...
-            this.player.restart_level();
+            if (this.loaded_in_player) {
+                this.player.restart_level();
+            }
             this.switch_to_player();
         });
 
@@ -2869,6 +2874,10 @@ class Conductor {
         if (this.current) {
             this.current.deactivate();
         }
+        if (! this.loaded_in_editor) {
+            this.editor.load_level(this.stored_level);
+            this.loaded_in_editor = true;
+        }
         this.editor.activate();
         this.current = this.editor;
         document.body.setAttribute('data-mode', 'editor');
@@ -2877,6 +2886,10 @@ class Conductor {
     switch_to_player() {
         if (this.current) {
             this.current.deactivate();
+        }
+        if (! this.loaded_in_player) {
+            this.player.load_level(this.stored_level);
+            this.loaded_in_player = true;
         }
         this.player.activate();
         this.current = this.player;
@@ -2965,8 +2978,16 @@ class Conductor {
         this.update_level_title();
         this.update_nav_buttons();
 
-        this.player.load_level(this.stored_level);
-        this.editor.load_level(this.stored_level);
+        this.loaded_in_editor = false;
+        this.loaded_in_player = false;
+        if (this.current === this.player) {
+            this.player.load_level(this.stored_level);
+            this.loaded_in_player = true;
+        }
+        if (this.current === this.editor) {
+            this.editor.load_level(this.stored_level);
+            this.loaded_in_editor = true;
+        }
         return true;
     }
 
