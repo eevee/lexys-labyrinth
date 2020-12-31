@@ -1899,6 +1899,41 @@ const SPECIAL_PALETTE_ENTRIES = {
 const _RAILROAD_ROTATED_LEFT = [3, 0, 1, 2, 5, 4];
 const _RAILROAD_ROTATED_RIGHT = [1, 2, 3, 0, 5, 4];
 const SPECIAL_PALETTE_BEHAVIOR = {
+    floor_letter: {
+        pick_palette_entry(tile) {
+            return 'floor_letter';
+        },
+        _arrows: ["⬆", "➡", "⬇", "⬅"],
+        rotate_left(tile) {
+            // Rotate through arrows and ASCII separately
+            let arrow_index = this._arrows.indexOf(tile.overlaid_glyph);
+            if (arrow_index >= 0) {
+                tile.overlaid_glyph = this._arrows[(arrow_index + 3) % 4];
+                return;
+            }
+
+            let cp = tile.overlaid_glyph.charCodeAt(0);
+            cp -= 1;
+            if (cp < 32) {
+                cp = 95;
+            }
+            tile.overlaid_glyph = String.fromCharCode(cp);
+        },
+        rotate_right(tile) {
+            let arrow_index = this._arrows.indexOf(tile.overlaid_glyph);
+            if (arrow_index >= 0) {
+                tile.overlaid_glyph = this._arrows[(arrow_index + 1) % 4];
+                return;
+            }
+
+            let cp = tile.overlaid_glyph.charCodeAt(0);
+            cp += 1;
+            if (cp > 95) {
+                cp = 32;
+            }
+            tile.overlaid_glyph = String.fromCharCode(cp);
+        },
+    },
     thin_walls: {
         pick_palette_entry(tile) {
             return 'thin_walls/south';
