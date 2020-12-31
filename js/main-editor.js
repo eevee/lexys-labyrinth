@@ -484,13 +484,39 @@ class PencilOperation extends DrawOperation {
 
 class SelectOperation extends MouseOperation {
     start() {
-        this.pending_selection = this.editor.selection.create_pending();
-        this.update_pending_selection();
+        if (! this.editor.selection.is_empty && this.editor.selection.contains(this.gx0, this.gy0)) {
+            // Move existing selection
+            this.mode = 'float';
+            if (this.modifier === 'ctrl') {
+                this.make_copy = true;
+            }
+        }
+        else {
+            // Create new selection
+            this.pending_selection = this.editor.selection.create_pending();
+            this.update_pending_selection();
+        }
         this.has_moved = false;
     }
     step(mx, my, gxf, gyf, gx, gy) {
+        if (this.mode === 'float') {
+            if (! this.has_moved) {
+                if (this.make_copy) {
+                    // FIXME support directly making a copy of a copy
+                    this.editor.selection.defloat();
+                    this.editor.selection.enfloat(true);
+                }
+                else if (! this.editor.selection.is_floating) {
+                    this.editor.selection.enfloat();
+                }
+            }
+            this.editor.selection.move_by(Math.floor(gx - this.gx1), Math.floor(gy - this.gy1));
+        }
+        else {
+            this.update_pending_selection();
+        }
+
         this.has_moved = true;
-        this.update_pending_selection();
     }
 
     update_pending_selection() {
@@ -498,17 +524,26 @@ class SelectOperation extends MouseOperation {
     }
 
     commit() {
-        if (! this.has_moved) {
-            // Plain click clears selection
-            this.pending_selection.discard();
-            this.editor.selection.clear();
+        if (this.mode === 'float') {
         }
         else {
-            this.pending_selection.commit();
+            if (! this.has_moved) {
+                // Plain click clears selection
+                this.pending_selection.discard();
+                this.editor.selection.clear();
+            }
+            else {
+                this.pending_selection.commit();
+            }
         }
     }
     abort() {
-        this.pending_selection.discard();
+        if (this.mode === 'float') {
+            // Nothing to do really
+        }
+        else {
+            this.pending_selection.discard();
+        }
     }
 }
 
@@ -2173,11 +2208,16 @@ class Selection {
         this.element = mk_svg('rect.overlay-selection.overlay-transient');
         this.svg_group.append(this.element);
 
-        this.floating_contents = null;
+        this.floated_cells = null;
+        this.floated_element = null;
     }
 
     get is_empty() {
         return this.rect === null;
+    }
+
+    get is_floating() {
+        return !! this.floated_cells;
     }
 
     contains(x, y) {
@@ -2189,6 +2229,8 @@ class Selection {
     }
 
     create_pending() {
+        this.defloat();
+
         return new PendingSelection(this);
     }
 
@@ -2201,9 +2243,90 @@ class Selection {
         this.element.setAttribute('height', this.rect.height);
     }
 
+    move_by(dx, dy) {
+        if (! this.rect)
+            return;
+
+        this.rect.x += dx;
+        this.rect.y += dy;
+        this.element.setAttribute('x', this.rect.x);
+        this.element.setAttribute('y', this.rect.y);
+
+        if (! this.floated_element)
+            return;
+
+        let bbox = this.rect;
+        this.floated_element.setAttribute('transform', `translate(${bbox.x} ${bbox.y})`);
+    }
+
     clear() {
+        this.defloat();
+
         this.rect = null;
         this.element.classList.remove('--visible');
+    }
+
+    *iter_cells() {
+        if (! this.rect)
+            return;
+
+        for (let x = this.rect.left; x < this.rect.right; x++) {
+            for (let y = this.rect.top; y < this.rect.bottom; y++) {
+                yield [x, y];
+            }
+        }
+    }
+
+    enfloat(copy = false) {
+        if (this.floated_cells)
+            console.error("Trying to float a selection that's already floating");
+
+        this.floated_cells = [];
+        let tileset = this.editor.conductor.tileset;
+        let stored_level = this.editor.stored_level;
+        let bbox = this.rect;
+        let canvas = mk('canvas', {width: bbox.width * tileset.size_x, height: bbox.height * tileset.size_y});
+        let ctx = canvas.getContext('2d');
+        ctx.drawImage(
+            this.editor.renderer.canvas,
+            bbox.x * tileset.size_x, bbox.y * tileset.size_y, bbox.width * tileset.size_x, bbox.height * tileset.size_y,
+            0, 0, bbox.width * tileset.size_x, bbox.height * tileset.size_y);
+        for (let [x, y] of this.iter_cells()) {
+            let n = stored_level.coords_to_scalar(x, y);
+            if (copy) {
+                this.floated_cells.push(stored_level.linear_cells[n].map(tile => ({...tile})));
+            }
+            else {
+                this.floated_cells.push(stored_level.linear_cells[n]);
+                stored_level.linear_cells[n] = [{type: TILE_TYPES['floor']}];
+                this.editor.mark_cell_dirty(stored_level.linear_cells[n]);
+            }
+        }
+        this.floated_element = mk_svg('g', mk_svg('foreignObject', {
+            x: 0, y: 0,
+            width: canvas.width, height: canvas.height,
+            transform: `scale(${1/tileset.size_x} ${1/tileset.size_y})`,
+        }, canvas));
+        this.floated_element.setAttribute('transform', `translate(${bbox.x} ${bbox.y})`);
+        this.svg_group.append(this.floated_element);
+    }
+
+    defloat() {
+        if (! this.floated_element)
+            return;
+
+        let bbox = this.rect;
+        let stored_level = this.editor.stored_level;
+        let i = 0;
+        for (let [x, y] of this.iter_cells()) {
+            let n = stored_level.coords_to_scalar(x, y);
+            stored_level.linear_cells[n] = this.floated_cells[i];
+            this.editor.mark_cell_dirty(stored_level.linear_cells[n]);
+            i += 1;
+        }
+        this.floated_element.remove();
+        this.floated_element = null;
+        this.floated_cells = null;
     }
 
     // TODO allow floating/dragging, ctrl-dragging to copy, anchoring...
