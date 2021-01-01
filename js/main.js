@@ -447,23 +447,22 @@ class Player extends PrimaryView {
             }
 
             // Per-tic navigation; only useful if the game isn't running
-            // FIXME these are funky in turn-based mode still.  don't update the debug panel timer,
-            // and don't show us at the end of the tic
             if (ev.key === ',') {
                 if (this.state === 'stopped' || this.state === 'paused' || this.turn_mode > 0) {
-                    this.undo();
-                    this._redraw();
                     this.set_state('paused');
+                    this.undo();
+                    this.update_ui();
+                    this._redraw();
                 }
                 return;
             }
             if (ev.key === '.') {
                 if (this.state === 'waiting' || this.state === 'paused' || this.turn_mode > 0) {
-                    this.advance_by(1, true);
-                    this._redraw();
                     if (this.state === 'waiting' || this.turn_mode === 1) {
                         this.set_state('paused');
                     }
+                    this.advance_by(1, true);
+                    this._redraw();
                 }
                 return;
             }
@@ -1265,7 +1264,18 @@ class Player extends PrimaryView {
 
     // Actually redraw.  Used to force drawing outside of normal play, in which case we don't
     // interpolate (because we're probably paused)
-    _redraw(tic_offset = 0) {
+    _redraw(tic_offset = null) {
+        if (tic_offset === null) {
+            // Default to drawing the "end" state of the tic when we're paused; it matches
+            // turn-based mode's "waiting" behavior, and it makes tic-by-tic navigation make a lot
+            // more sense visually
+            if (this.state === 'paused') {
+                tic_offset = 0.999;
+            }
+            else {
+                tic_offset = 0;
+            }
+        }
         this.renderer.draw(tic_offset);
     }
 
@@ -1344,7 +1354,12 @@ class Player extends PrimaryView {
 
         if (this.debug.enabled) {
             let t = this.level.tic_counter;
-            this.debug.time_tics_el.textContent = `${t}`;
+            if (this.turn_mode === 2) {
+                this.debug.time_tics_el.textContent = `${t}½`;
+            }
+            else {
+                this.debug.time_tics_el.textContent = `${t}`;
+            }
             this.debug.time_moves_el.textContent = `${Math.floor(t/4)}`;
             this.debug.time_secs_el.textContent = (t / 20).toFixed(2);
 
