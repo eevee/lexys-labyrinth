@@ -1499,7 +1499,8 @@ export function synthesize_level(stored_level) {
     hints = hints.map(hint => hint ?? '');
     hints.push('');
     hints.unshift('');
-    c2m.add_section('NOTE', hints.join('\n[CLUE]\n'));
+    // Must use Windows linebreaks here  🙄
+    c2m.add_section('NOTE', hints.join('\r\n[CLUE]\r\n'));
 
     let compressed_map = compress(map_bytes);
     if (compressed_map) {
