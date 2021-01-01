@@ -941,6 +941,10 @@ export class Tileset {
                     }
                     coords = coords[Math.floor(i * coords.length)];
                 }
+                else if (tile && tile.type.movement_speed) {
+                    // This is an actor that's not moving, so use the first frame
+                    coords = coords[0];
+                }
                 else {
                     // This tile animates on a global timer, one cycle every quarter of a second
                     coords = coords[Math.floor(tic / this.animation_slowdown % 5 / 5 * coords.length)];
@@ -1269,59 +1273,7 @@ export class Tileset {
             }
         }
 
-        // Generic sprite definitions from here on!
-        // If we still have an object, it must be a table of directions
-        if (!(coords instanceof Array)) {
-            coords = coords[(tile && tile.direction) ?? 'south'];
-        }
-
-        // Deal with animation
-        if (coords[0] instanceof Array) {
-            if (tic !== null) {
-                if (tile && tile.movement_speed) {
-                    // This tile reports its own animation timing (in frames), so trust that, and
-                    // just use the current tic's fraction.
-                    // That said: adjusting animation speed complicates this slightly.  Consider the
-                    // player's walk animation, which takes 4 tics to complete, during which time we
-                    // cycle through 8 frames.  Playing that at half speed means only half the
-                    // animation actually plays, but if the player continues walking, then on the
-                    // NEXT four tics, we should play the other half.  To make this work, use the
-                    // tic as a global timer as well: if the animation started on tics 0-4, play the
-                    // first half; if it started on tics 5-8, play the second half.  They could get
-                    // out of sync if the player hesitates, but no one will notice that, and this
-                    // approach minimizes storing extra state.
-                    let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1 * 3) / tile.movement_speed;
-                    // FIXME hack for cc2 mode, the only place we can see a cooldown of 0 which
-                    // makes i be 1
-                    i = Math.min(0.999, i);
-                    // But do NOT do this for explosions or splashes, which have a fixed duration
-                    // and only play once
-                    if (this.animation_slowdown > 1 && ! tile.type.ttl) {
-                        // i ranges from [0, 1), but a slowdown of N means we'll only play the first
-                        // 1/N of it before the game ends (or loops) the animation.
-                        // So increase by [0..N-1] to get it in some other range, then divide by N
-                        // to scale back down to [0, 1)
-                        i += Math.floor(tic * 3 / tile.movement_speed % this.animation_slowdown);
-                        i /= this.animation_slowdown;
-                    }
-                    coords = coords[Math.floor(i * coords.length)];
-                }
-                else if (tile && tile.type.movement_speed) {
-                    // This is an actor that's not moving, so use the first frame
-                    coords = coords[0];
-                }
-                else {
-                    // This tile animates on a global timer, one cycle every quarter of a second
-                    coords = coords[Math.floor(tic / this.animation_slowdown % 5 / 5 * coords.length)];
-                }
-            }
-            else {
-                coords = coords[0];
-            }
-        }
-
-        if (!coords) console.error(name, tile);
-        blit(coords[0], coords[1]);
+        this._draw_standard(coords, tile, tic, blit);
 
         // Wired tiles may also have tunnels, drawn on top of everything else
         if (drawspec.wired && tile && tile.wire_tunnel_directions) {
