@@ -162,6 +162,7 @@ class EditorLevelMetaOverlay extends DialogOverlay {
             let title = els.title.value;
             if (title !== stored_level.title) {
                 stored_level.title = title;
+                this.conductor.stored_game.level_metadata[this.conductor.level_index].title = title;
                 this.conductor.update_level_title();
             }
             let author = els.author.value;
@@ -2543,34 +2544,7 @@ export class Editor extends PrimaryView {
             new EditorLevelMetaOverlay(this.conductor, this.stored_level).open();
         });
         this.save_button = _make_button("Save", ev => {
-            // TODO need feedback.  or maybe not bc this should be replaced with autosave later
-            // TODO also need to update the pack data's last modified time
-            let stored_game = this.conductor.stored_game;
-            if (! stored_game.editor_metadata)
-                return;
-
-            // Update the pack index; we need to do this to update the last modified time anyway, so
-            // there's no point in checking whether anything actually changed
-            let pack_key = stored_game.editor_metadata.key;
-            this.stash.packs[pack_key].title = stored_game.title;
-            this.stash.packs[pack_key].last_modified = Date.now();
-
-            // Update the pack itself
-            // TODO maybe should keep this around, but there's a tricky order of operations thing
-            // with it
-            let pack_stash = load_json_from_storage(pack_key);
-            pack_stash.title = stored_game.title;
-            pack_stash.last_modified = Date.now();
-
-            // Serialize the level itself
-            let buf = c2g.synthesize_level(this.stored_level);
-            let stringy_buf = string_from_buffer_ascii(buf);
-
-            // Save everything at once, level first, to minimize chances of an error getting things
-            // out of sync
-            window.localStorage.setItem(this.stored_level.editor_metadata.key, stringy_buf);
-            save_json_to_storage(pack_key, pack_stash);
-            save_json_to_storage("Lexy's Labyrinth editor", this.stash);
+            this.save_level();
         });
         if (this.stored_level) {
             this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
@@ -2671,6 +2645,8 @@ export class Editor extends PrimaryView {
         super.activate();
         this.renderer.draw();
     }
+
+    // Level creation, management, and saving
 
     _make_cell() {
         let cell = new format_base.StoredCell;
@@ -2818,6 +2794,39 @@ export class Editor extends PrimaryView {
         window.localStorage.setItem(level_key, stringy_buf);
 
         this.conductor.change_level(index);
+    }
+
+    save_level() {
+        // TODO need feedback.  or maybe not bc this should be replaced with autosave later
+        // TODO also need to update the pack data's last modified time
+        let stored_game = this.conductor.stored_game;
+        if (! stored_game.editor_metadata)
+            return;
+
+        // Update the pack index; we need to do this to update the last modified time anyway, so
+        // there's no point in checking whether anything actually changed
+        let pack_key = stored_game.editor_metadata.key;
+        this.stash.packs[pack_key].title = stored_game.title;
+        this.stash.packs[pack_key].last_modified = Date.now();
+
+        // Update the pack itself
+        // TODO maybe should keep this around, but there's a tricky order of operations thing
+        // with it
+        let pack_stash = load_json_from_storage(pack_key);
+        pack_stash.title = stored_game.title;
+        pack_stash.last_modified = Date.now();
+        pack_stash.levels[this.conductor.level_index].title = this.stored_level.title;
+        pack_stash.levels[this.conductor.level_index].last_modified = Date.now();
+
+        // Serialize the level itself
+        let buf = c2g.synthesize_level(this.stored_level);
+        let stringy_buf = string_from_buffer_ascii(buf);
+
+        // Save everything at once, level first, to minimize chances of an error getting things
+        // out of sync
+        window.localStorage.setItem(this.stored_level.editor_metadata.key, stringy_buf);
+        save_json_to_storage(pack_key, pack_stash);
+        save_json_to_storage("Lexy's Labyrinth editor", this.stash);
     }
 
     load_game(stored_game) {

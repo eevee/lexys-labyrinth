@@ -446,9 +446,35 @@ class Player extends PrimaryView {
                 return;
             }
 
+            // Per-tic navigation; only useful if the game isn't running
+            // FIXME these are funky in turn-based mode still.  don't update the debug panel timer,
+            // and don't show us at the end of the tic
+            if (ev.key === ',') {
+                if (this.state === 'stopped' || this.state === 'paused' || this.turn_mode > 0) {
+                    this.undo();
+                    this._redraw();
+                    this.set_state('paused');
+                }
+                return;
+            }
+            if (ev.key === '.') {
+                if (this.state === 'waiting' || this.state === 'paused' || this.turn_mode > 0) {
+                    this.advance_by(1, true);
+                    this._redraw();
+                    if (this.state === 'waiting' || this.turn_mode === 1) {
+                        this.set_state('paused');
+                    }
+                }
+                return;
+            }
+
             if (ev.key === ' ') {
                 if (this.state === 'waiting') {
                     // Start without moving
+                    this.set_state('playing');
+                }
+                else if (this.state === 'paused') {
+                    // Turns out I do this an awful lot expecting it to work, so
                     this.set_state('playing');
                 }
                 else if (this.state === 'stopped') {
@@ -656,7 +682,7 @@ class Player extends PrimaryView {
                 }
                 this.set_state('paused');
 
-                this.advance_by(dt);
+                this.advance_by(dt, true);
             }
             else if (dt < 0) {
                 if (this.state === 'waiting') {
@@ -1084,7 +1110,7 @@ class Player extends PrimaryView {
         return input;
     }
 
-    advance_by(tics) {
+    advance_by(tics, force = false) {
         for (let i = 0; i < tics; i++) {
             // FIXME turn-based mode should be disabled during a replay
             let input = this.get_input();
@@ -1107,7 +1133,7 @@ class Player extends PrimaryView {
             let has_input = wait || input;
             // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
             if (this.turn_mode === 2) {
-                if (has_input) {
+                if (has_input || force) {
                     // Finish the current tic, then continue as usual.  This means the end of the
                     // tic doesn't count against the number of tics to advance -- because it already
                     // did, the first time we tried it
@@ -1121,7 +1147,7 @@ class Player extends PrimaryView {
 
             // We should now be at the start of a tic
             this.level.begin_tic(input);
-            if (this.turn_mode > 0 && this.level.can_accept_input() && !input) {
+            if (this.turn_mode > 0 && this.level.can_accept_input() && ! has_input) {
                 // If we're in turn-based mode and could provide input here, but don't have any,
                 // then wait until we do
                 this.turn_mode = 2;
@@ -1207,6 +1233,10 @@ class Player extends PrimaryView {
         if (this.turn_mode === 2) {
             // We're dawdling between tics, so nothing is actually animating, but the clock hasn't
             // advanced yet; pretend whatever's currently animating has finished
+            // FIXME this creates bizarre side effects like actors making a huge first step when
+            // stepping forwards one tic at a time, but without it you get force floors animating
+            // and then abruptly reversing in turn-based mode (maybe we should just not interpolate
+            // at all in that case??)
             tic_offset = 0.999;
         }
         else if (this.use_interpolation) {
@@ -1224,6 +1254,7 @@ class Player extends PrimaryView {
         // Check for a stopped game *after* drawing, so that if the game ends, we still draw its
         // final result before stopping the draw loop
         // TODO for bonus points, also finish the player animation (but don't advance the game any further)
+        // TODO stop redrawing when in turn-based mode 2?
         if (this.state === 'playing' || this.state === 'rewinding') {
             this._redraw_handle = requestAnimationFrame(this._redraw_bound);
         }
@@ -1334,6 +1365,11 @@ class Player extends PrimaryView {
     }
 
     autopause() {
+        if (this.turn_mode > 0) {
+            // Turn-based mode doesn't need this
+            return;
+        }
+
         this.set_state('paused');
     }
 

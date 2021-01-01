@@ -1306,6 +1306,10 @@ export class Tileset {
                     }
                     coords = coords[Math.floor(i * coords.length)];
                 }
+                else if (tile && tile.type.movement_speed) {
+                    // This is an actor that's not moving, so use the first frame
+                    coords = coords[0];
+                }
                 else {
                     // This tile animates on a global timer, one cycle every quarter of a second
                     coords = coords[Math.floor(tic / this.animation_slowdown % 5 / 5 * coords.length)];
