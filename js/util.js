@@ -1,3 +1,5 @@
+import * as fflate from 'https://unpkg.com/fflate/esm/index.mjs';
+
 // Base class for custom errors
 export class LLError extends Error {}
 
@@ -411,5 +413,27 @@ export class EntryFileSource extends FileSource {
 
         let file = await new Promise((res, rej) => entry.file(res, rej));
         return await file.arrayBuffer();
+    }
+}
+// Zip files, using fflate
+// TODO somewhat unfortunately fflate only supports unzipping the whole thing at once, not
+// individual files as needed, but it's also pretty new so maybe later?
+export class ZipFileSource extends FileSource {
+    constructor(buf) {
+        super();
+        // TODO async?  has some setup time but won't freeze browser
+        let files = fflate.unzipSync(new Uint8Array(buf));
+        this.files = {};
+        for (let [path, file] of Object.entries(files)) {
+            this.files['/' + path.toLowerCase()] = file;
+        }
+    }
+
+    async get(path) {
+        let file = this.files[path.toLowerCase()];
+        if (! file)
+            throw new LLError(`No such file in zip: ${path}`);
+
+        return file.buffer;
     }
 }

@@ -1,5 +1,7 @@
 // TODO bugs and quirks i'm aware of:
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
+import * as fflate from 'https://unpkg.com/fflate/esm/index.mjs';
+
 import { DIRECTIONS, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
@@ -3138,6 +3140,13 @@ class Conductor {
         else if (magic === '\xac\xaa\x02\x00' || magic == '\xac\xaa\x02\x01') {
             stored_game = dat.parse_game(buf);
         }
+        else if (magic === 'PK\x03\x04') {
+            // That's the ZIP header
+            // FIXME move this here i guess and flesh it out some
+            // FIXME if this doesn't find something then we should abort
+            await this.splash.search_multi_source(new util.ZipFileSource(buf));
+            return;
+        }
         else if (magic.toLowerCase() === 'game') {
             // TODO this isn't really a magic number and isn't required to be first, so, maybe
             // this one should just go by filename
@@ -3149,12 +3158,28 @@ class Conductor {
                 dir = path.replace(/[/][^/]+$/, '');
             }
             stored_game = await c2g.parse_game(buf, source, dir);
+
+            if (stored_game.identifier) {
+                // Migrate any scores saved under the old path-based identifier
+                let new_identifier = stored_game.identifier;
+                if (this.stash.packs[identifier] && ! this.stash.packs[new_identifier]) {
+                    this.stash.packs[new_identifier] = this.stash.packs[identifier];
+                    delete this.stash.packs[identifier];
+                    this.save_stash();
+
+                    window.localStorage.setItem(
+                        STORAGE_PACK_PREFIX + new_identifier,
+                        window.localStorage.getItem(STORAGE_PACK_PREFIX + identifier));
+                    window.localStorage.removeItem(STORAGE_PACK_PREFIX + identifier);
+                }
+
+                identifier = new_identifier;
+            }
         }
         else {
             throw new Error("Unrecognized file format");
         }
 
-        // TODO load title for a C2G
         if (! stored_game.title) {
             stored_game.title = title ?? identifier ?? "Untitled pack";
         }

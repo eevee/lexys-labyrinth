@@ -1980,6 +1980,16 @@ const MAX_SIMULTANEOUS_REQUESTS = 5;
             fetch_map(path, level_number);
             level_number++;
         }
+        else if (stmt.kind === 'directive' && stmt.name === 'game') {
+            // TODO apparently cc2 lets you change this mid-game and will then use a different save
+            // slot (?!), but i can't even consider that until i actually execute these things in
+            // order
+            if (game.identifier === undefined) {
+                let title = stmt.args[0].value;
+                game.identifier = title;
+                game.title = title;
+            }
+        }
         statements.push(stmt);
     }
 
