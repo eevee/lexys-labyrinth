@@ -16,7 +16,7 @@ body {
     background-size: 10%;
     color: #ececec;
 
-    --panel-bg-color: hsl(225, 10%, 20%);
+    --panel-bg-color: hsl(225, 10%, 15%);
     --button-bg-color: hsl(225, 10%, 25%);
     --button-bg-hover-color: hsl(225, 15%, 30%);
     --generic-bg-hover-on-white: hsl(225, 60%, 85%);
@@ -46,7 +46,7 @@ button,
     font-family: inherit;
     color: white;
     background: var(--button-bg-color);
-    border: 1px solid hsl(225, 10%, 15%);
+    border: 1px solid hsl(225, 10%, 10%);
     box-shadow:
         inset 0 0 0 1px hsl(225, 10%, 33%),
         0 1px 1px hsl(225, 10%, 10%);
@@ -196,6 +196,15 @@ svg.svg-icon {
         inset 0 1px 0 1px hsl(225, 10%, 20%),
         inset 0 -0em 2em 0.5em hsl(225, 50%, 30%),
         0 1px 1px hsl(225, 10%, 10%);
+}
+
+.button-row {
+    display: flex;
+    gap: 0.5em;
+    align-items: stretch;
+}
+.button-row > button {
+    flex: 1;
 }
 
 /* Overlay styling */
@@ -555,24 +564,23 @@ pre.stack-trace {
 #splash {
     display: grid;
     grid:
-        "header header  header"
-        "intro  stock   upload"
-        "links  stock   yours"
-        / 1fr 1fr 1fr
-    ;
-    grid:
-        "header header  header"
-        "intro  intro   intro"
-        "stock  upload  yours"
-        "links  upload  yours"
-        / 1fr 1fr 1fr
+        "header header"
+        "links  links"
+        "stock  yours"
+        / 1fr 1fr
     ;
     gap: 1em;
 
     position: relative;
     padding: 1em 10%;
-    margin: auto;
+    margin: auto 0;
     overflow: auto;
+}
+#splash::after {
+    /* Force some breathing room at the bottom of the scroll */
+    content: '';
+    display: block;
+    height: 2em;
 }
 #splash > .drag-overlay {
     display: none;
@@ -597,17 +605,29 @@ pre.stack-trace {
 
 #splash > header {
     grid-area: header;
+    display: grid;
+    grid:
+        "image  title"      2fr
+        "image  tagline"    1fr
+    ;
+    gap: 0 2em;
 
-    text-align: center;
-}
-#splash > header img {
-    display: block;
     margin: auto;
 }
+#splash > header img {
+    grid-area: image;
+    align-self: center;
+}
 #splash > header h1 {
-    font-size: 3em;
+    grid-area: title;
+    align-self: end;
+    font-size: 4em;
+    margin: 0;
 }
 #splash > header p {
+    grid-area: tagline;
+    align-self: start;
+    font-size: 1.5em;
     margin: 0;
     font-style: italic;
     color: #909090;
@@ -622,15 +642,17 @@ pre.stack-trace {
     background: var(--panel-bg-color);
     box-shadow: 0 0.25em 1em black;
 }
+#splash-links {
+    grid-area: links;
+    font-size: 1.5em;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 2em;
+}
 #splash > #splash-intro {
     grid-area: intro;
     font-size: 20px;
-}
-#splash > #splash-links {
-    grid-area: links;
-}
-#splash > #splash-links ul.normal-list li {
-    margin: 0.5em 0;
 }
 #splash > #splash-stock-levels {
     grid-area: stock;
@@ -655,20 +677,29 @@ pre.stack-trace {
         /* 10% padding is way way too much */
         padding: 1em;
     }
+    #splash::after {
+        /* This needs different handling in a flex container */
+        flex: 0 0 0.5em;
+        height: auto;
+    }
     /* Shrink logo and title */
+    #splash > header {
+        grid-template-rows: auto auto;
+        column-gap: 0.5em;
+    }
     #splash > header img {
         width: 48px;
     }
     #splash > header h1 {
         font-size: 2em;
     }
-    #splash-links {
-        /* Put this last I guess?? */
-        order: 99;
+    #splash > header p {
+        font-size: 1em;
     }
     /* No need to boost the font size here */
-    #splash > #splash-intro {
+    #splash > #splash-links {
         font-size: inherit;
+        column-gap: 1em;
     }
 }
 
@@ -679,8 +710,7 @@ pre.stack-trace {
     margin-bottom: 1em;
 }
 .played-pack-list p {
-    font-size: 0.833em;
-    font-style: italic;
+    color: #e8e8e8;
 }
 .played-pack-list .-progress {
     display: flex;
@@ -709,6 +739,15 @@ button.level-pack-button {
 
     padding: 0.5em;
     text-align: left;
+}
+button.level-pack-button:enabled {
+    background: hsl(225, 30%, 25%);
+    box-shadow:
+        inset 0 0 0 1px hsl(225, 30%, 33%),
+        0 1px 1px hsl(225, 10%, 10%);
+}
+button.level-pack-button:enabled:hover {
+    background: hsl(225, 40%, 30%);
 }
 button.level-pack-button h3 {
     grid-area: title;

@@ -1740,10 +1740,16 @@ class Player extends PrimaryView {
 
 
 const BUILTIN_LEVEL_PACKS = [{
+    path: 'levels/CC2LP1.zip',
+    ident: 'Chips Challenge 2 Level Pack 1',
+    title: "Chip's Challenge 2 Level Pack 1",
+    desc: "Thoroughly demonstrates what Chip's Challenge 2 is capable of.  Fair, but doesn't hold your hand; you'd better have at least a passing familiarity with the CC2 elements.",
+    url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_2_Level_Pack_1',
+}, {
     path: 'levels/CCLP1.ccl',
     ident: 'cclp1',
     title: "Chip's Challenge Level Pack 1",
-    desc: "Designed and recommended for new players, starting with gentle introductory levels.  A prequel to the other packs.",
+    desc: "Designed like a direct replacement for Chip's Challenge 1, with introductory levels for new players and a gentle difficulty curve.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1',
 }, {
     path: 'levels/CCLP4.ccl',
@@ -1866,8 +1872,7 @@ class Splash extends PrimaryView {
         super(conductor, document.body.querySelector('main#splash'));
 
         // Populate the list of available level packs
-        let stock_pack_list = mk('ul.played-pack-list');
-        document.querySelector('#splash-stock-levels').append(stock_pack_list);
+        let stock_pack_list = document.querySelector('#splash-stock-pack-list');
         this.played_pack_elements = {};
         let stock_pack_idents = new Set;
         for (let packdef of BUILTIN_LEVEL_PACKS) {
@@ -1877,8 +1882,7 @@ class Splash extends PrimaryView {
         }
 
         // Populate the list of other packs you've played
-        this.custom_pack_list = mk('ul.played-pack-list');
-        this.root.querySelector('#splash-upload-levels').append(this.custom_pack_list);
+        this.custom_pack_list = document.querySelector('#splash-other-pack-list');
         for (let [ident, packinfo] of Object.entries(this.conductor.stash.packs)) {
             if (stock_pack_idents.has(ident))
                 continue;

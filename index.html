@@ -92,52 +92,46 @@
     <main id="splash" hidden>
         <div class="drag-overlay"></div>
         <header>
-            <h1><img src="og-preview.png" alt="">Lexy's Labyrinth</h1>
-            <p>an unapproved Chip's Challenge emulator</p>
+            <img src="og-preview.png" alt="">
+            <h1>Lexy's Labyrinth</h1>
+            <p>an unapproved Chip's Challenge 2 emulator</p>
         </header>
-        <section id="splash-intro">
-            <p><strong>Welcome</strong> to Lexy's Labyrinth, an open source puzzle game that is curiously similar to — but legally distinct from! — the Atari classic <a href="https://en.wikipedia.org/wiki/Chip%27s_Challenge">Chip's Challenge</a>.  It's been lovingly crafted from scratch with completely new art, sounds, and music; it lets you undo your mistakes; and it's the <em>only</em> way to play Chip's Challenge 2 levels on Linux, Mac, or a phone!</p>
-            <p>Pick a level pack to get started!  You can also load and play any levels you've got lying around, or brave the level editor and make one of your own.</p>
-        </section>
-        <section id="splash-links">
-            <h2>More resources</h2>
-            <ul class="normal-list">
-                <li><a href="https://github.com/eevee/lexys-labyrinth/wiki/How-To-Play">How to play</a></li>
-                <li><a href="https://github.com/eevee/lexys-labyrinth">Source code and project details on GitHub</a></li>
-                <li><a href="https://patreon.com/eevee">Support this project (and others) on my Patreon</a></li>
-                <li><a href="https://bitbusters.club/">Bit Busters Club</a>, a fansite with an extensive <a href="https://wiki.bitbusters.club/Main_Page">wiki</a>, vastly more <a href="https://sets.bitbusters.club/">community levels</a>, speedrun records, and more</li>
-                <li><a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge 1</a> (free) and <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a> ($5) on Steam</li>
-                <li><a href="http://www.niffler.co.uk/">Niffler</a>, the current publisher of Chip's Challenge and its spiritual sequel <a href="https://store.steampowered.com/app/262590/Chucks_Challenge_3D_2020/">Chuck's Challenge 3D</a></li>
+        <div id="splash-links">
+            <a href="https://github.com/eevee/lexys-labyrinth/wiki">About</a>
+            <a href="https://github.com/eevee/lexys-labyrinth/wiki/How-To-Play">How to play</a>
+            <a href="https://github.com/eevee/lexys-labyrinth">Source code and more</a>
+            <a href="https://patreon.com/eevee">Support on Patreon</a>
+        </div>
+
+        <section id="splash-stock-levels">
+            <h2>Play</h2>
+            <ul class="played-pack-list" id="splash-stock-pack-list">
+                <!-- populated by js -->
+            </ul>
+            <div class="button-row">
+                <button type="button" class="button-big" disabled>More levels</button>
+                <button type="button" class="button-big" disabled>Other saved scores</button>
+            </div>
+
+            <h2>More levels</h2>
+            <p>Supports CCL/DAT, C2G, C2M, and ZIP; drag and drop; and both custom and official levels.  <a href="https://github.com/eevee/lexys-labyrinth/wiki/Loading-Levels">More details</a></p>
+            <div class="button-row">
+                <input id="splash-upload-file" type="file" accept=".dat,.ccl,.c2m,.ccs" multiple>
+                <input id="splash-upload-dir" type="file" webkitdirectory>
+                <button type="button" id="splash-upload-file-button" class="button-big">Load files</button>
+                <button type="button" id="splash-upload-dir-button" class="button-big">Load directory</button>
+            </div>
+            <ul class="played-pack-list" id="splash-other-pack-list">
+                <!-- populated by js -->
             </ul>
         </section>
 
-        <section id="splash-stock-levels">
-            <h2>Play community levels</h2>
-            <!-- populated by js -->
-        </section>
-
-        <section id="splash-upload-levels">
-            <h2>Other levels</h2>
-            <p>You can load custom levels as well — CCL/DAT, C2G, or individual C2Ms (though scores aren't saved for those).</p>
-            <!-- TODO zip files! -->
-            <p>You can also drag and drop files or directories into this window.</p>
-            <input id="splash-upload-file" type="file" accept=".dat,.ccl,.c2m,.ccs" multiple>
-            <input id="splash-upload-dir" type="file" webkitdirectory>
-            <button type="button" id="splash-upload-file-button" class="button-big">Load files</button>
-            <button type="button" id="splash-upload-dir-button" class="button-big">Load directory</button>
-            <p>To play the original levels, you can load <code>CHIPS.DAT</code> from the ancient Microsoft port, or load the Steam levels as follows:</p>
-            <ol class="normal-list">
-                <li>Right-click the game in Steam and choose <em>Properties</em>.  On the <em>Local Files</em> tab, click <em>Browse local files</em>.</li>
-                <li>Open the <code>data</code> folder, then <code>games</code>.</li>
-                <li>You should see either a <code>cc1</code> or <code>cc2</code> folder.  Drag it into this window, or load it with the button above.</li>
-            </ol>
-        </section>
-
         <section id="splash-your-levels">
-            <h2>Make your own (WIP lol)</h2>
-            <p>Please note that the level editor is <strong>very</strong> unfinished, and doesn't even have undo yet.  It may eat your work!  Beware!</p>
-            <p><button type="button" id="splash-create-pack" class="button-big">New pack</button></p>
-            <p><button type="button" id="splash-create-level" class="button-big">New scratch level<br>(won't be saved!)</button></p>
+            <h2>Create</h2>
+            <div class="button-row">
+                <button type="button" id="splash-create-pack" class="button-big">New pack</button>
+                <button type="button" id="splash-create-level" class="button-big">New scratch level<br>(won't be saved!)</button>
+            </div>
         </section>
     </main>
     <main id="player" hidden>
