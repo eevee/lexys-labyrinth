@@ -3137,7 +3137,14 @@ class Conductor {
             stored_game = c2g.wrap_individual_level(buf);
             identifier = null;
         }
-        else if (magic === '\xac\xaa\x02\x00' || magic == '\xac\xaa\x02\x01') {
+        else if (
+            // standard mscc DAT
+            magic === '\xac\xaa\x02\x00' ||
+            // tile world i think
+            magic === '\xac\xaa\x02\x01' ||
+            // pgchip, which adds ice blocks
+            magic === '\xac\xaa\x03\x00')
+        {
             stored_game = dat.parse_game(buf);
         }
         else if (magic === 'PK\x03\x04') {
