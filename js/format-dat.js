@@ -247,6 +247,16 @@ function parse_level(bytes, number) {
                     continue;
                 }
 
+                // pgchip grants directions to ice blocks on cloners by putting a clone block
+                // beneath them instead
+                if (l === 1 && 0x0e <= tile_byte && tile_byte <= 0x11 &&
+                    cell[0] && cell[0].type.name === 'ice_block')
+                {
+                    cell[0].direction = extra.direction;
+                    cell.unshift({type: TILE_TYPES['cloner']});
+                    continue;
+                }
+
                 cell.unshift({...tile});
             }
         }
