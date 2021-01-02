@@ -82,6 +82,7 @@ export const COLLISION = {
 
     block_cc1:          0x0010,
     block_cc2:          0x0020,  // ice + frame (+ circuit, etc)
+    dropped_item:       0x0040,  // rolling ball, dynamite
 
     // Monsters are a little complicated, because some of them have special rules, e.g. fireballs
     // aren't blocked by fire.

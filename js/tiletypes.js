@@ -2207,8 +2207,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.item,
         is_actor: true,
         is_monster: true,
-        // FIXME ???????
-        collision_mask: COLLISION.block_cc2,
+        collision_mask: COLLISION.dropped_item,
         blocks_collision: COLLISION.all_but_real_player,
         // FIXME inherits a copy of player's inventory!
         // FIXME holds down buttons, so needs an on_arrive
@@ -2301,11 +2300,10 @@ const TILE_TYPES = {
     rolling_ball: {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
+        is_monster: true,
         has_inventory: true,
         can_reveal_walls: true,
-        // FIXME ???????
-        // FIXME we need to hit the player also
-        collision_mask: COLLISION.block_cc2,
+        collision_mask: COLLISION.dropped_item,
         // FIXME do i start moving immediately when dropped, or next turn?
         movement_speed: 4,
         decide_movement(me, level) {
@@ -2328,6 +2326,9 @@ const TILE_TYPES = {
         },
         on_blocked(me, level, direction) {
             // Blow up anything we run into
+            // FIXME if we hit a wall, we should definitely /not/ blow up an actor...  but that's
+            // tricky because on_blocked doesn't tell us what we hit, and on_bump goes top to bottom
+            // so it hits actors before walls...
             let cell = level.get_neighboring_cell(me.cell, direction);
             let other;
             if (cell) {
@@ -2700,7 +2701,7 @@ const TILE_TYPES = {
         draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         collision_mask: 0,
-        ttl: 4 * 3,
+        ttl: 6 * 3,
     },
 
     // Invalid tiles that appear in some CCL levels because community level
