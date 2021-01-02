@@ -637,6 +637,9 @@ pre.stack-trace {
     color: #909090;
     text-shadow: 0 1px #0004;
 }
+#splash * + h2 {
+    margin-top: 1rem;
+}
 #splash > section {
     padding: 1em;
     background: var(--panel-bg-color);
