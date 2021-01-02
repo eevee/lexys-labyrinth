@@ -1926,13 +1926,20 @@ class Splash extends PrimaryView {
         // Allow loading a local directory onto us, via the WebKit
         // file entry interface
         // TODO? this always takes a moment to register, not sure why...
-        // FIXME as written this won't correctly handle CCLs
         util.handle_drop(this.root, {
             require_file: true,
             dropzone_class: '--drag-hover',
             on_drop: async ev => {
-                // TODO for now, always use the entry interface, but if these are all files then
-                // they can just be loaded normally
+                // If we got exactly one file, try to open it directly
+                // TODO should have some sensible handling of receiving multiple packs
+                if (ev.dataTransfer.files && ev.dataTransfer.files.length === 1) {
+                    let file = ev.dataTransfer.files[0];
+                    let buf = await file.arrayBuffer();
+                    await this.conductor.parse_and_load_game(buf, null, '/' + file.name);
+                    return;
+                }
+
+                // Otherwise, try the WebKit entry interface, which also exposes directory structure
                 let entries = [];
                 for (let item of ev.dataTransfer.items) {
                     entries.push(item.webkitGetAsEntry());
