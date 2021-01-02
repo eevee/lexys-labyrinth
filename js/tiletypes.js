@@ -1207,6 +1207,10 @@ const TILE_TYPES = {
                 let options = me.type._blob_mogrifications;
                 level.transmute_tile(other, options[level.prng() % options.length]);
             }
+            else {
+                return;
+            }
+            level.spawn_animation(me.cell, 'transmogrify_flash');
         },
         on_power(me, level) {
             // No need to do anything, we just need this here as a signal that our .powered_edges
@@ -2690,6 +2694,13 @@ const TILE_TYPES = {
         is_actor: true,
         collision_mask: 0,
         ttl: 8 * 3,
+    },
+    transmogrify_flash: {
+        // TODO probably not the right layer, vfx might need their own idk
+        draw_layer: DRAW_LAYERS.actor,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 4 * 3,
     },
 
     // Invalid tiles that appear in some CCL levels because community level

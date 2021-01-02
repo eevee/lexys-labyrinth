@@ -877,16 +877,17 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     teleport_flash: [[4, 38], [5, 38], [6, 38], [7, 38]],
     player1_exit: [[8, 38], [9, 38], [10, 38], [11, 38]],
     player2_exit: [[12, 38], [13, 38], [14, 38], [15, 38]],
+    transmogrify_flash: [[4, 39], [5, 39], [6, 39], [7, 39]],
 
     // More custom tiles
-    gate_red: [0, 39],
-    gate_blue: [1, 39],
-    gate_yellow: [2, 39],
-    gate_green: [3, 39],
+    gate_red: [0, 40],
+    gate_blue: [1, 40],
+    gate_yellow: [2, 40],
+    gate_green: [3, 40],
 
-    skeleton_key: [4, 39],
+    skeleton_key: [4, 40],
 
-    sand: [10, 40],
+    sand: [10, 41],
 });
 
 export class Tileset {
