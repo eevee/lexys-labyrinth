@@ -2253,6 +2253,11 @@ const TILE_TYPES = {
                             // Terrain gets transmuted afterwards
                             terrain = tile;
                         }
+                        else if (tile.type.is_real_player) {
+                            // TODO it would be nice if i didn't have to special-case this every
+                            // time
+                            level.fail(me.type.name);
+                        }
                         else {
                             // Everything else is destroyed
                             level.remove_tile(tile);
