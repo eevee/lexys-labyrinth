@@ -2,7 +2,7 @@
 
 This is a web implementation of a puzzle game that bears a _striking_ similarity to [Chip's Challenge](https://wiki.bitbusters.club/Chip%27s_Challenge) and its [sequel](https://wiki.bitbusters.club/Chip%27s_Challenge_2), but is legally distinct, and also free!
 
-It is a work in progress and also might be abandoned and forgotten at any time.
+Documentation is underway on the [wiki](https://github.com/eevee/lexys-labyrinth/wiki).
 
 ## Play online
 
@@ -10,27 +10,23 @@ Give it a try, I guess!  [https://c.eev.ee/lexys-labyrinth/](https://c.eev.ee/le
 
 ## Current status
 
-- Supports 99% of Chip's Challenge 1
-- Supports 75% of Chip's Challenge 2
+- Full support for Chip's Challenge 1
+- Full support for Chip's Challenge 2...  barring a few obscure bugs
 - Completely original tileset, sound effects, and music
-- Can load MS Chip's Challenge DAT/CCL files and Steam Chip's Challenge C2M files
-- Can load levels from your hard drive
-- Can play back replays (demos) from C2M files, though some may desync
-- Allows undoing moves, with moderate success
-- Has the beginning bits of a level editor
+- Support for MS Chip's Challenge DAT/CCL files, Steam Chip's Challenge C2G/C2M files, and ZIP files
+- Can load one of its built-in level packs, the original levels, or anything you've got lying around
+- Support for recording and playing back demos (replays) from Steam-format levels
+- Lets you rewind your mistakes, up to 30 seconds back
+- Lets you take the pressure off by switching from real-time to turn-based mode, where nothing moves until you do
+- Contains a completely usable level editor with support for every tile in Chip's Challenge 2
+- Works on touchscreens too
+- Has compatibility settings for opting into behavior (or bugs) from particular implementations
+- Debug mode (click the logo in the lower left)
 
 ### Planned features
 
-- Save your score, and compare it to the BBC leaderboards
 - Load levels directly from the BBC set list
-- Support for all of the nonsense in Chip's Challenge 2
-- Allow playing the original commercial levels by dragging the data files in from your own computer
-- Support various sets of bugs from various implementations
-- Play the game turn-based instead of realtime (i.e., nothing moves until Chip does)
-- Record demos
-- Mouse and touchscreen support
-- Bunches of debug features
-- Outright cheat in a variety of ways
+- Mouse support
 
 ### Noble aspirations
 
