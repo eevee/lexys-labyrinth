@@ -2631,7 +2631,7 @@ export class Editor extends PrimaryView {
             }, 60 * 1000);
         });
         _make_button("Share", ev => {
-            let data = util.b64encode(c2g.synthesize_level(this.stored_level));
+            let data = util.b64encode(fflate.zlibSync(new Uint8Array(c2g.synthesize_level(this.stored_level))));
             let url = new URL(location);
             url.searchParams.delete('level');
             url.searchParams.delete('setpath');

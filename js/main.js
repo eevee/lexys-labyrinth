@@ -3263,6 +3263,11 @@ async function main() {
     else if (b64level) {
         // TODO all the more important to show errors!!
         let buf = util.b64decode(b64level);
+        let u8array = new Uint8Array(buf);
+        if (u8array[0] === 0x78) {
+            // zlib compressed
+            buf = fflate.unzlibSync(u8array).buffer;
+        }
         await conductor.parse_and_load_game(buf, null, 'shared.c2m', null, "Shared level");
     }
 }
