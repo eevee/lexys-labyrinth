@@ -2617,8 +2617,10 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.remaining_players -= 1;
-                if (other === level.player && level.remaining_players > 0) {
-                    level.swap_player1 = true;
+                if (level.remaining_players > 0) {
+                    if (other === level.player) {
+                        level.swap_player1 = true;
+                    }
                     level.transmute_tile(other, other.type.name === 'player' ? 'player1_exit' : 'player2_exit');
                 }
             }
