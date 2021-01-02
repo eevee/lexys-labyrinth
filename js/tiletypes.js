@@ -1205,7 +1205,7 @@ const TILE_TYPES = {
             else if (name === 'blob') {
                 // TODO how is this randomness determined?  important for replays!
                 let options = me.type._blob_mogrifications;
-                level.transmute_tile(other, options[Math.floor(Math.random() * options.length)]);
+                level.transmute_tile(other, options[level.prng() % options.length]);
             }
         },
         on_power(me, level) {
