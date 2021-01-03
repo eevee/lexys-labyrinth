@@ -258,7 +258,7 @@ const TILE_TYPES = {
     },
     popwall: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_ready(me, level) {
             if (! level.compat.no_auto_convert_ccl_popwalls &&
                 level.stored_level.use_ccl_compat &&
@@ -316,7 +316,7 @@ const TILE_TYPES = {
     },
     fake_floor: {
         draw_layer: DRAW_LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_bumped(me, level, other) {
             if (other.type.can_reveal_walls) {
                 level.transmute_tile(me, 'floor');
