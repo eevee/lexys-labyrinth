@@ -186,6 +186,7 @@ const TILE_TYPES = {
                 // Blobs spread slime onto floor
                 if (other.previous_cell && other.previous_cell.has('slime')) {
                     level.transmute_tile(me, 'slime');
+                    level.sfx.play_once('splash-slime', me.cell);
                 }
             }
         },
@@ -588,6 +589,9 @@ const TILE_TYPES = {
             if (other.type.name === 'ghost' && ! other.has_item('hiking_boots'))
                 return;
             level.transmute_tile(me, 'floor');
+            if (other === level.player) {
+                level.sfx.play_once('step-gravel', me.cell);
+            }
         },
     },
     gravel: {
@@ -619,8 +623,9 @@ const TILE_TYPES = {
                 return;
             }
             else if (other.type.name === 'ice_block') {
-                level.transmute_tile(other, 'explosion');
+                level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'water');
+                level.sfx.play_once('splash', me.cell);
             }
             else if (other.type.is_real_player) {
                 level.fail('burned');
@@ -665,8 +670,8 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.ghost | COLLISION.fireball,
         on_depart(me, level, other) {
             level.transmute_tile(me, 'water');
-            // TODO feels like we should spawn water underneath us, then transmute ourselves into the splash?
             level.spawn_animation(me.cell, 'splash');
+            level.sfx.play_once('splash', me.cell);
         },
     },
     ice: {
@@ -833,18 +838,20 @@ const TILE_TYPES = {
     slime: {
         draw_layer: DRAW_LAYERS.terrain,
         on_arrive(me, level, other) {
+            if (other.type.name === 'ghost' || other.type.name === 'blob') {
+                // No effect
+                return;
+            }
+
+
+            level.sfx.play_once('splash-slime', me.cell);
             if (other.type.name === 'dirt_block' || other.type.name === 'ice_block') {
                 level.transmute_tile(me, 'floor');
-            }
-            else if (other.type.name === 'ghost' || other.type.name === 'blob') {
-                // No effect
             }
             else if (other.type.is_real_player) {
                 level.fail('slimed');
             }
             else {
-                // FIXME needs a sound effect
-                level.sfx.play_once('splash', me.cell);
                 level.transmute_tile(other, 'splash_slime');
             }
         },
@@ -957,14 +964,14 @@ const TILE_TYPES = {
             frame_block: true,
         },
         on_bumped(me, level, other) {
-            // Fireballs melt ice blocks on regular floor
+            // Fireballs melt ice blocks on regular floor FIXME and water!
             // XXX what if i'm in motion?
             if (other.type.name === 'fireball') {
                 let terrain = me.cell.get_terrain();
                 if (terrain.type.name === 'floor') {
-                    level.remove_tile(me);
+                    level.transmute_tile(me, 'splash');
                     level.transmute_tile(terrain, 'water');
-                    // FIXME splash?
+                    level.sfx.play_once('splash', me.cell);
                 }
             }
         },
@@ -1210,6 +1217,7 @@ const TILE_TYPES = {
                 return;
             }
             level.spawn_animation(me.cell, 'transmogrify_flash');
+            level.sfx.play_once('transmogrify', me.cell);
         },
         on_power(me, level) {
             // No need to do anything, we just need this here as a signal that our .powered_edges
@@ -2557,6 +2565,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.adjust_bonus(10);
+                level.sfx.play_once('get-bonus', me.cell);
             }
             // TODO turn this into a flag on those types??  idk
             if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
@@ -2570,6 +2579,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.adjust_bonus(100);
+                level.sfx.play_once('get-bonus', me.cell);
             }
             if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
                 level.remove_tile(me);
@@ -2582,6 +2592,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.adjust_bonus(1000);
+                level.sfx.play_once('get-bonus', me.cell);
             }
             if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
                 level.remove_tile(me);
@@ -2594,6 +2605,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.adjust_bonus(0, 2);
+                level.sfx.play_once('get-bonus', me.cell);
             }
             if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
                 level.remove_tile(me);

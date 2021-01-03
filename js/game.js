@@ -296,7 +296,12 @@ export class Cell extends Array {
                         if (actor === level.player) {
                             level._set_tile_prop(actor, 'is_pushing', true);
                         }
-                        if (! level.attempt_out_of_turn_step(tile, direction)) {
+                        if (level.attempt_out_of_turn_step(tile, direction)) {
+                            if (actor === level.player) {
+                                level.sfx.play_once('push');
+                            }
+                        }
+                        else {
                             // If the push failed and the obstacle is in the middle of a slide,
                             // remember this as the next move it'll make.
                             if (tile.slide_mode !== null && tile.movement_cooldown > 0) {
@@ -1174,7 +1179,9 @@ export class Level extends LevelInterface {
                 this.p1_released &= ~INPUT_BITS.cycle;
             }
             if ((new_input & INPUT_BITS.drop) && may_move) {
-                this.drop_item(this.player);
+                if (this.drop_item(this.player)) {
+                    this.sfx.play_once('drop');
+                }
                 this.p1_released &= ~INPUT_BITS.drop;
             }
             if ((new_input & INPUT_BITS.swap) && this.remaining_players > 1) {
@@ -1510,10 +1517,6 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (actor === this.player && goal_cell[0].type.name === 'floor') {
-            this.sfx.play_once('step-floor');
-        }
-
         // Announce we're approaching.  Slide mode is set here, since it's about the tile we're
         // moving towards and needs to last through our next decision
         this.make_slide(actor, null);
@@ -1595,6 +1598,39 @@ export class Level extends LevelInterface {
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
+            }
+        }
+
+        // Play step sound
+        if (actor === this.player) {
+            let terrain = cell.get_terrain();
+            if (actor.slide_mode === 'ice') {
+                this.sfx.play_once('slide-ice');
+            }
+            else if (actor.slide_mode === 'force') {
+                this.sfx.play_once('slide-force');
+            }
+            else if (terrain.type.name === 'floor') {
+                this.sfx.play_once('step-floor');
+            }
+            else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad') {
+                this.sfx.play_once('step-gravel');
+            }
+            else if (terrain.type.name === 'water') {
+                if (actor.ignores(terrain.type.name)) {
+                    this.sfx.play_once('step-water');
+                }
+            }
+            else if (terrain.type.name === 'fire') {
+                if (actor.has_item('fire_boots')) {
+                    this.sfx.play_once('step-fire');
+                }
+            }
+            else if (terrain.type.slide_mode === 'force') {
+                this.sfx.play_once('step-force');
+            }
+            else if (terrain.type.slide_mode === 'ice') {
+                this.sfx.play_once('step-ice');
             }
         }
     }

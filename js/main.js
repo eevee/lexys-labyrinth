@@ -141,23 +141,49 @@ class SFXPlayer {
             'button-release': 'sfx/button-release.ogg',
             // https://jummbus.bitbucket.io/#j2N04doorn110s0k0l00e00t3Mmfa3g00j07i0r1O_U00o30T0v0zL0OD0Ou00q0d1f8y0z2C0w2c0h0T2v0pL0OD0Ou02q0d1f8y3ziC0w1b4gp1f0aqEQ0lCNzrYUY0
             door: 'sfx/door.ogg',
+            // https://jummbus.bitbucket.io/#j3N04dropn100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o2T0v0pL0OaD0Ou00q1d1f4y2z9C0w2c0h0b4p1bGqKHGjner00
+            drop: 'sfx/drop.ogg',
+            // https://jummbus.bitbucket.io/#j3N09get-bonusn100s1k0l00e00t50mba3g00j07i0r1O_U0o4T0v0pL0OaD0Ou00q1d5f8y0z2C1w0c0h8b4p1iFyWAxoHwmacOem8s60
+            'get-bonus': 'sfx/get-bonus.ogg',
             // https://jummbus.bitbucket.io/#j2N08get-chipn100s0k0l00e00t3Mmca3g00j07i0r1O_U0o4T0v0zL0OD0Ou00q1d1f6y1z2C0wac0h0b4p1dFyW7czgUK7aw0
             'get-chip': 'sfx/get-chip.ogg',
             // https://jummbus.bitbucket.io/#j2N07get-keyn100s0k0l00e00t3Mmfa3g00j07i0r1O_U0o5T0v0pL0OD0Ou00q1d5f8y0z2C0w1c0h0b4p1dFyW85CbwwzBg0
             'get-key': 'sfx/get-key.ogg',
             // https://jummbus.bitbucket.io/#j2N08get-tooln100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o2T0v0pL0OD0Ou00q1d1f4y2z9C0w2c0h0b4p1bGqKNW4isVk0
             'get-tool': 'sfx/get-tool.ogg',
+            // https://jummbus.bitbucket.io/#j3N04pushn110s0k0l00e00t3Mm3a3g00j07i0r1O_U00o30T5v0pL0OaD0Ou50q1d5f8y1z6C1c0h0H-JJAArrqiih999T2v01L0OaD0Ou02q2d2f6y1zhC0w0h0b4gp1f0bkoUzCcqy1FMo0
+            // TODO less sure about this one
+            push: 'sfx/push.ogg',
             // https://jummbus.bitbucket.io/#j2N06socketn110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T5v0pL0OD0Ou05q1d1f8y1z7C1c0h0HU7000U0006000ET2v0pL0OD0Ou02q1d6f5y3z2C0w0b4gp1xGoKHGhFBcn2FyPkxk0rE2AGcNCQyHwUY0
             socket: 'sfx/socket.ogg',
-            // https://jummbus.bitbucket.io/#j2N06splashn110s0k0l00e00t3Mm5a3g00j07i0r1O_U00o20T0v0pL0OD0Ou00q0d0fay0z0C0w9c0h8T2v05L0OD0Ou02q2d6fay0z1C0w0b4gp1lGqKQy02gUY1qh7D1wb2Y0
             // https://jummbus.bitbucket.io/#j2N06splashn110s0k0l00e00t3Mm5a3g00j07i0r1O_U00o20T0v0pL0OD0Ou00q0d0fay0z0C0w9c0h8T2v05L0OD0Ou02q2d6fay0z1C0w0b4gp1lGqKQxw_zzM5F4us60IbM0
             splash: 'sfx/splash.ogg',
+            // https://jummbus.bitbucket.io/#j3N0csplash-slimen110s0k0l00e00t3Mm2a3g00j07i0r1O_U00o20T0v0pL0OaD0Ou00q3d7f3y2z1C0w9c3h0T2v01L0OaD0Ou02q2d7f2y1z0C0w0h0b4gp1nJ5nqgGgGusu0J0zjb0i9Hw0
+            'splash-slime': 'sfx/splash-slime.ogg',
+            // https://jummbus.bitbucket.io/#j3N0bslide-forcen110s1k0l00e00t4Im3a3g00j07i0r1O_U00o40T1v05L0OaD0Ou01q0d7f3y0z1C0c0h0A0F0B0V1Q0000Pff00E0711T2v01L0OaD0Ou02q2d7fay5z1C0w0h0b4gp1bJ8n55isS000
+            'slide-force': 'sfx/slide-force.ogg',
+            // https://jummbus.bitbucket.io/#j3N09slide-icen110s0k0l00e00t3Mm3a3g00j07i0r1O_U00o50T0v0fL0OaD0Ou00q2d2f8y0z1C0w9c3h0T2v01L0OaD0Ou02q2d3fay5z5C0w0h0b4gp1jGgKb8er0l5mlg84Ddw0
+            // https://jummbus.bitbucket.io/#j3N09slide-icen110s1k0l00e00t4Im3a3g00j07i0r1O_U00o50T1v0aL0OaD0Ou01q3d7f5y0z9C0c0h0A9F3B2VdQ5428Paa74E0019T2v01L0OaD0Ou02q2d7fay5z1C0w0h0b4gp1kLwb2HbEBer0l0l509Po0
+            'slide-ice': 'sfx/slide-ice.ogg',
+            // https://jummbus.bitbucket.io/#j3N09step-firen110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o10T0v05L0OaD0Ou10q0d0f8y0z1C2w2c0Gc0h0T2v0pL0OaD0Ou02q3d7fay3z1C0w1h0b4gp1b0ayH2w40VI0
+            'step-fire': 'sfx/step-fire.ogg',
+            // https://jummbus.bitbucket.io/#j3N0astep-forcen110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T0v0aL0OaD0Ou00q1d1fay2z6C1wdc0h3T2v01L0OaD0zu02q0d1f9y2z1C1w8h0b4gp1mJdlagwgQsu0J5mqhK0qsu0
+            'step-force': 'sfx/step-force.ogg',
             // https://jummbus.bitbucket.io/#j2N0astep-floorn100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o1T0v05L0OD0Ou00q0d2f1y1zjC2w0c0h0b4p1aGaKaxqer00
             'step-floor': 'sfx/step-floor.ogg',
+            // https://jummbus.bitbucket.io/#j3N0bstep-graveln110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o50T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0T2v05L0OaD0Ou02q0d2f2y0z0C1w0h0b4gp1lLp719LjCM5EGOEJ3per00
+            // https://jummbus.bitbucket.io/#j3N0bstep-graveln110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o50T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0T2v01L0OaD0zu02q0d1f9y2z1C2w0Gc0h0b4gp1d0bhlCAmxID7w0
+            'step-gravel': 'sfx/step-gravel.ogg',
+            // https://jummbus.bitbucket.io/#j3N08step-icen100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o5T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0b4p1aLp719LjCM0
+            'step-ice': 'sfx/step-ice.ogg',
+            // https://jummbus.bitbucket.io/#j3N0astep-watern100s0k0l00e00t3Mm2a3g00j07i0r1O_U0o3T0v0kL0OaD0Ou00q1d6f2y0z0C1w9c0h3b4p1dJ5moMMAa16sG0
+            'step-water': 'sfx/step-water.ogg',
             // https://jummbus.bitbucket.io/#j2N08teleportn110s1k0l00e00t3Mm7a3g00j07i0r1O_U00o50T0v0pL0OD0Ou00q1d1f8y4z6C2w5c4h0T2v0kL0OD0Ou02q1d7f8y4z3C1w4b4gp1wF2Uzh5wdC18yHH4hhBhHwaATXu0Asds0
             teleport: 'sfx/teleport.ogg',
             // https://jummbus.bitbucket.io/#j2N05thiefn100s1k0l00e00t3Mm3a3g00j07i0r1O_U0o1T0v0pL0OD0Ou00q1d1f5y1z8C2w2c0h0b4p1fFyUBBr9mGkKKds0
             thief: 'sfx/thief.ogg',
+            // https://jummbus.bitbucket.io/#j3N0ctransmogrifyn110s1k0l00e00t3Mm7a3g00j07i0r1O_U00o50T0v0pL0OaD0Ou00q1d0f8y4z6C1w1c1h0T2v05L0OaD0Ou02q1d7f8y4zcC1w4h0b4gp1BINp2j8mhPcn1R8xQSAb8oyUiPt0l9LOYq0qU0
+            transmogrify: 'sfx/transmogrify.ogg',
 
             // handcrafted
             lose: 'sfx/bummer.ogg',
