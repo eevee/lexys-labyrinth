@@ -2311,7 +2311,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        on_drop(level, owner) {
+        on_drop(level) {
             return 'rolling_ball';
         },
     },
@@ -2656,7 +2656,7 @@ const TILE_TYPES = {
 
     // VFX
     splash: {
-        draw_layer: DRAW_LAYERS.vfx,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
@@ -2668,7 +2668,7 @@ const TILE_TYPES = {
         },
     },
     explosion: {
-        draw_layer: DRAW_LAYERS.vfx,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
@@ -2688,7 +2688,7 @@ const TILE_TYPES = {
     },
     // Custom VFX (identical function, but different aesthetic)
     splash_slime: {
-        draw_layer: DRAW_LAYERS.vfx,
+        draw_layer: DRAW_LAYERS.actor,
         is_actor: true,
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
@@ -2700,27 +2700,25 @@ const TILE_TYPES = {
     // New VFX (not in CC2, so they don't block to avoid altering gameplay)
     // TODO would like these to play faster but the first frame is often skipped due to other bugs
     player1_exit: {
-        draw_layer: DRAW_LAYERS.actor,
+        draw_layer: DRAW_LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
         ttl: 8 * 3,
     },
     player2_exit: {
-        draw_layer: DRAW_LAYERS.actor,
+        draw_layer: DRAW_LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
         ttl: 8 * 3,
     },
     teleport_flash: {
-        // TODO probably not the right layer, vfx might need their own idk
-        draw_layer: DRAW_LAYERS.actor,
+        draw_layer: DRAW_LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
         ttl: 8 * 3,
     },
     transmogrify_flash: {
-        // TODO probably not the right layer, vfx might need their own idk
-        draw_layer: DRAW_LAYERS.actor,
+        draw_layer: DRAW_LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
         ttl: 6 * 3,

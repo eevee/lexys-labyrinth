@@ -66,6 +66,12 @@ export class Tile {
         if (this.has_item('helmet') || (this.type.is_actor && ! this.type.ttl && other.has_item('helmet')))
             return true;
 
+        // Blocks being pulled are blocked by their pullers (which are, presumably, the only things
+        // they can be moving towards)
+        // FIXME something about this broke pulling blocks through teleporters; see #99 Delirium
+        if (this.type.is_actor && other.type.is_block && other.is_pulled)
+            return true;
+
         // FIXME get this out of here
         if (this.type.thin_walls &&
             this.type.thin_walls.has(DIRECTIONS[direction].opposite) &&
@@ -1507,8 +1513,6 @@ export class Level extends LevelInterface {
             return;
 
         let original_cell = actor.cell;
-        this.remove_tile(actor);
-        this.add_tile(actor, goal_cell);
 
         // Announce we're leaving, for the handful of tiles that care about it
         for (let tile of Array.from(original_cell)) {
@@ -1536,7 +1540,7 @@ export class Level extends LevelInterface {
         // Announce we're approaching.  Slide mode is set here, since it's about the tile we're
         // moving towards and needs to last through our next decision
         this.make_slide(actor, null);
-        for (let tile of Array.from(actor.cell)) {
+        for (let tile of Array.from(goal_cell)) {
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))
@@ -1565,6 +1569,11 @@ export class Level extends LevelInterface {
                 this.make_slide(actor, tile.type.slide_mode);
             }
         }
+
+        // Now physically move the actor; we wait until here in case some of those callbacks handled
+        // interactions between actors on the same layer (e.g. monsters erasing splashes)
+        this.remove_tile(actor);
+        this.add_tile(actor, goal_cell);
 
         // If we're a monster stepping on the player's tail, that also kills her immediately; the
         // player and a monster must be strictly more than 4 tics apart
@@ -1737,7 +1746,7 @@ export class Level extends LevelInterface {
         }
     }
 
-    drop_item(actor, force = false) {
+    drop_item(actor) {
         if (this.stored_level.use_cc1_boots)
             return false;
         if (actor.movement_cooldown > 0)
@@ -1745,37 +1754,57 @@ export class Level extends LevelInterface {
         if (! actor.toolbelt || actor.toolbelt.length === 0)
             return false;
 
-        if (actor.cell.get_item() && ! force)
-            return false;
-
         // Drop the oldest item, i.e. the first one
         let name = actor.toolbelt[0];
-        if (name === 'teleport_yellow') {
-            // We can only be dropped on regular floor
-            let terrain = actor.cell.get_terrain();
+        if (this._place_dropped_item(name, actor.cell, actor)) {
+            actor.toolbelt.shift();
+            this._push_pending_undo(() => actor.toolbelt.unshift(name));
+            return true;
+        }
+        return false;
+    }
+
+    // Attempt to place an item in the world, as though dropped by an actor
+    _place_dropped_item(name, cell, dropping_actor) {
+        let type = TILE_TYPES[name];
+        if (type.draw_layer === 0) {
+            // Terrain items (i.e., yellow teleports) can only be dropped on regular floor
+            let terrain = cell.get_terrain();
             if (terrain.type.name !== 'floor')
                 return false;
 
-            this.transmute_tile(terrain, 'teleport_yellow');
+            this.transmute_tile(terrain, name);
         }
         else {
-            let type = TILE_TYPES[name];
+            // Note that we can't drop a bowling ball if there's already an item, even though a
+            // dropped bowling ball is really an actor (TODO arguably a bug)
+            if (cell.get_item())
+                return false;
+
             if (type.on_drop) {
-                name = type.on_drop(this, actor);
+                // FIXME quirky things happen if a dropped bowling ball can't enter the facing cell
+                // (mostly it disappears) (also arguably a bug)
+                // FIXME does this even need to be a function lol
+                name = type.on_drop(this);
                 if (name) {
                     type = TILE_TYPES[name];
                 }
             }
             let tile = new Tile(type);
-            this.add_tile(tile, actor.cell);
             if (type.is_actor) {
+                // This is tricky -- the item has become an actor, but whatever dropped it is
+                // already in this cell's actor layer.  But we also know for sure that there's no
+                // item in this cell, so we'll cheat a little: add it in the item layer, set it
+                // rolling (which should shift it into the next cell over), then switch it to the
+                // actor layer.
+                // TODO do that
                 this.add_actor(tile);
-                this.attempt_out_of_turn_step(tile, actor.direction);
+                this.attempt_out_of_turn_step(tile, dropping_actor.direction);
+            }
+            else {
+                this.add_tile(tile, cell);
             }
         }
-
-        actor.toolbelt.shift();
-        this._push_pending_undo(() => actor.toolbelt.unshift(name));
 
         return true;
     }
@@ -2248,10 +2277,31 @@ export class Level extends LevelInterface {
 
     // Have an actor try to pick up a particular tile; it's prevented if there's a no sign, and the
     // tile is removed if successful
+    // FIXME do not allow overflow dropping before picking up the new item
     attempt_take(actor, tile) {
-        let mod = tile.cell.get_item_mod();
+        let cell = tile.cell;
+        let mod = cell.get_item_mod();
         if (mod && mod.type.item_modifier === 'ignore')
             return false;
+
+        // Handling a full inventory is a teeny bit complicated.  We want the following:
+        // - At no point are two items in the same cell
+        // - A yellow teleporter cannot be dropped in exchange for another yellow teleporter
+        // - If the oldest item can't be dropped, the pickup fails
+        // Thus we have to check whether dropping is possible FIRST, but only place the dropped item
+        // AFTER the pickup.
+        let dropped_item;
+        if (! tile.type.is_key && actor.toolbelt && actor.toolbelt.length >= 4) {
+            let oldest_item_type = TILE_TYPES[actor.toolbelt[0]];
+            if (oldest_item_type.draw_layer === 0 && cell.get_terrain().type.name !== 'floor') {
+                // This is a yellow teleporter, and we are not standing on floor; abort!
+                return false;
+            }
+            // Otherwise, it's either an item or a yellow teleporter we're allowed to drop, so steal
+            // it out of their inventory to be dropped later
+            dropped_item = actor.toolbelt.shift();
+            this._push_pending_undo(() => actor.toolbelt.unshift(dropped_item));
+        }
 
         if (this.give_actor(actor, tile.type.name)) {
             if (tile.type.draw_layer === 0) {
@@ -2264,8 +2314,16 @@ export class Level extends LevelInterface {
             if (mod && mod.type.item_modifier === 'pickup') {
                 this.remove_tile(mod);
             }
+
+            // Drop any overflowed item
+            if (dropped_item) {
+                // TODO what if this fails??
+                this._place_dropped_item(dropped_item, cell, actor);
+            }
+
             return true;
         }
+        // TODO what happens to the dropped item if the give fails somehow?
         return false;
     }
 
@@ -2289,12 +2347,11 @@ export class Level extends LevelInterface {
                 actor.toolbelt = [];
             }
 
-            // Nothing can hold more than four items, so try to drop one first.  Note that this may
-            // temporarily cause there to be two items in the cell if we're in the middle of picking
-            // one up, and it means we can't pick up a yellow teleport and swap out another for it
-            // FIXME two items at once is bad, please fix caller somehow
-            if (actor.toolbelt.length === 4) {
-                if (! this.drop_item(actor, true))
+            // Nothing can hold more than four items, so try to drop one first.  Note that normally,
+            // this should already have happened in attempt_take, so this should only come up when
+            // forcibly given an item via debug tools
+            if (actor.toolbelt.length >= 4) {
+                if (! this.drop_item(actor))
                     return false;
             }
 
