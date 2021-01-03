@@ -808,35 +808,66 @@ ol.packtest-summary > li {
     flex: 1;
 }
 .packtest-results {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
     margin-bottom: 1em;
 }
-.packtest-results > li {
-    padding: 0.25em;
-    margin: 0.25em 0;
+.packtest-results th {
+    font-weight: normal;
 }
-.packtest-results > li > canvas {
+.packtest-results tbody {
+    cursor: pointer;
+    border-top: 1px solid #0004;
+}
+.packtest-results tbody:hover {
+    outline: 2px solid #000;
+}
+.packtest-results td {
+    padding: 0.25em;
+}
+.packtest-results .-level {
+    text-align: left;
+}
+.packtest-results .-result {
+    width: 8em;
+    text-align: center;
+}
+.packtest-results .-clock {
+    width: 6em;
+    text-align: right;
+}
+.packtest-results .-delta {
+    width: 8em;
+    text-align: right;
+}
+.packtest-results .-speed {
+    width: 8em;
+    text-align: right;
+}
+.packtest-results canvas {
     display: block;
     margin: 0.5em auto;
 }
-ol.packtest-colorcoded > li[data-status=no-replay] {
+.packtest-colorcoded [data-status=no-replay] {
     background: hsl(0, 0%, 25%);
 }
-ol.packtest-colorcoded > li[data-status=running] {
+.packtest-colorcoded [data-status=running] {
     background: hsl(30, 100%, 75%);
 }
-ol.packtest-colorcoded > li[data-status=success] {
+.packtest-colorcoded [data-status=success] {
     background: hsl(120, 60%, 75%);
 }
-ol.packtest-colorcoded > li[data-status=early] {
+.packtest-colorcoded [data-status=early] {
     background: hsl(75, 60%, 75%);
 }
-ol.packtest-colorcoded > li[data-status=failure] {
+.packtest-colorcoded [data-status=failure] {
     background: hsl(0, 60%, 60%);
 }
-ol.packtest-colorcoded > li[data-status=short] {
+.packtest-colorcoded [data-status=short] {
     background: hsl(330, 60%, 75%);
 }
-ol.packtest-colorcoded > li[data-status=error] {
+.packtest-colorcoded [data-status=error] {
     background: black;
     color: white;
 }

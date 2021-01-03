@@ -2480,12 +2480,21 @@ class PackTestDialog extends DialogOverlay {
 
         this.current_status = mk('p', "Ready");
 
-        this.results = mk('ol.packtest-results.packtest-colorcoded');
+        this.results = mk('table.packtest-results.packtest-colorcoded',
+            mk('thead', mk('tr',
+                mk('th.-level', "Level"),
+                mk('th.-result', "Result"),
+                mk('th.-clock', "Play time"),
+                mk('th.-delta', "Replay delta"),
+                mk('th.-speed', "Run speed"),
+            )),
+            mk('tbody'),
+        );
         this.results.addEventListener('click', ev => {
-            let li = ev.target.closest('li');
-            if (! li)
+            let tbody = ev.target.closest('tbody');
+            if (! tbody)
                 return;
-            let index = li.getAttribute('data-index');
+            let index = tbody.getAttribute('data-index');
             if (index === undefined)
                 return;
             this.close();
@@ -2521,6 +2530,7 @@ class PackTestDialog extends DialogOverlay {
 
     async run(handle) {
         let pack = this.conductor.stored_game;
+        let tileset = this.conductor.tileset;
         let dummy_sfx = {
             set_player_position() {},
             play() {},
@@ -2540,7 +2550,9 @@ class PackTestDialog extends DialogOverlay {
             }
         }
 
-        this.results.textContent = '';
+        for (let tbody of this.results.querySelectorAll('tbody')) {
+            tbody.remove();
+        }
         for (let li of this.results_summary.childNodes) {
             li.removeAttribute('data-status');
         }
@@ -2553,28 +2565,55 @@ class PackTestDialog extends DialogOverlay {
         for (let i = 0; i < num_levels; i++) {
             let stored_level, level;
             let status_li = this.results_summary.childNodes[i];
-            let record_result = (token, short_status, comment, include_canvas) => {
+            let level_start_time = performance.now();
+            let record_result = (token, short_status, include_canvas, comment) => {
                 let level_title = stored_level ? stored_level.title : "???";
                 status_li.setAttribute('data-status', token);
                 status_li.setAttribute('title', `${short_status} (#${i + 1} ${level_title})`);
-                let li = mk(
-                    'li', {'data-status': token, 'data-index': i},
-                    `#${i + 1} ${level_title}: `,
-                    comment);
-                status_li.onclick = () => {
-                    li.scrollIntoView();
-                };
-                if (include_canvas && level) {
-                    let canvas = mk('canvas', {
-                        width: this.renderer.canvas.width,
-                        height: this.renderer.canvas.height,
-                    });
-                    this.renderer.set_level(level);
-                    this.renderer.draw();
-                    canvas.getContext('2d').drawImage(this.renderer.canvas, 0, 0, canvas.width, canvas.height);
-                    li.append(canvas);
+                let tbody = mk('tbody', {'data-status': token, 'data-index': i});
+                status_li.addEventListener('click', () => {
+                    tbody.scrollIntoView();
+                });
+
+                let tr = mk('tr',
+                    mk('td.-level', `#${i + 1} ${level_title}`),
+                    mk('td.-result', short_status),
+                );
+                if (level) {
+                    tr.append(
+                        mk('td.-clock', util.format_duration(level.tic_counter / TICS_PER_SECOND)),
+                        mk('td.-delta', util.format_duration((level.tic_counter - stored_level.replay.duration) / TICS_PER_SECOND, 2)),
+                        mk('td.-speed', ((level.tic_counter / TICS_PER_SECOND) / (performance.now() - level_start_time) * 1000).toFixed(2) + '×'),
+                    );
                 }
-                this.results.append(li);
+                else {
+                    tr.append(mk('td.-clock'), mk('td.-delta'), mk('td.-speed'));
+                }
+                tbody.append(tr);
+
+                if (comment) {
+                    tbody.append(mk('tr', mk('td.-full', {colspan: 5}, comment)));
+                }
+                if (include_canvas && level) {
+                    try {
+                        let canvas = mk('canvas', {
+                            width: Math.min(this.renderer.canvas.width, level.size_x * tileset.size_x),
+                            height: Math.min(this.renderer.canvas.height, level.size_y * tileset.size_y),
+                        });
+                        this.renderer.set_level(level);
+                        this.renderer.draw();
+                        canvas.getContext('2d').drawImage(
+                            this.renderer.canvas, 0, 0,
+                            this.renderer.canvas.width, this.renderer.canvas.height);
+                        tbody.append(mk('tr', mk('td.-full', {colspan: 5}, canvas)));
+                    }
+                    catch (e) {
+                        console.error(e);
+                        tbody.append(mk('tr', mk('td.-full', {colspan: 5},
+                            `Internal error while trying to capture screenshot: ${e}`)));
+                    }
+                }
+                this.results.append(tbody);
 
                 if (level) {
                     total_tics += level.tic_counter;
@@ -2584,7 +2623,7 @@ class PackTestDialog extends DialogOverlay {
             try {
                 stored_level = pack.load_level(i);
                 if (! stored_level.has_replay) {
-                    record_result('no-replay', "N/A", "No replay available");
+                    record_result('no-replay', "No replay");
                     continue;
                 }
 
@@ -2605,39 +2644,26 @@ class PackTestDialog extends DialogOverlay {
                         if (level.tic_counter < replay.duration - 10) {
                             // Early exit is dubious (e.g. this happened sometimes before multiple
                             // players were implemented correctly)
-                            record_result(
-                                'early', "Won early",
-                                `Exited early after ${util.format_duration(level.tic_counter / TICS_PER_SECOND)} with ${util.format_duration((replay.duration - level.tic_counter) / TICS_PER_SECOND)} left in the replay`,
-                                true);
+                            record_result('early', "Won early", true);
                         }
                         else {
-                            record_result(
-                                'success', "Won",
-                                `Exited successfully after ${util.format_duration(level.tic_counter / TICS_PER_SECOND)} (delta ${level.tic_counter - replay.duration})`);
+                            record_result('success', "Won");
                         }
                         num_passed += 1;
                         break;
                     }
                     else if (level.state === 'failure') {
-                        record_result(
-                            'failure', "Lost",
-                            `Died at ${util.format_duration(level.tic_counter / TICS_PER_SECOND)} (tic ${level.tic_counter}/${replay.duration}, ${Math.floor(level.tic_counter / replay.duration * 100)}%)`,
-                            true);
+                        record_result('failure', "Lost", true);
                         break;
                     }
                     else if (level.tic_counter >= replay.duration + 200) {
-                        record_result(
-                            'short', "Out of input",
-                            `Replay completed without exiting; ran for ${util.format_duration(replay.duration / TICS_PER_SECOND)}, gave up after 10 more seconds`,
-                            true);
+                        record_result('short', "Out of input", true);
                         break;
                     }
 
                     if (level.tic_counter % 20 === 1) {
                         if (handle.cancel) {
-                            record_result(
-                                'interrupted', "Interrupted",
-                                "Interrupted");
+                            record_result('interrupted', "Interrupted");
                             this.current_status.textContent = `Interrupted on level ${i + 1}/${num_levels}; ${num_passed} passed`;
                             return;
                         }
@@ -2656,7 +2682,7 @@ class PackTestDialog extends DialogOverlay {
             catch (e) {
                 console.error(e);
                 record_result(
-                    'error', "Error",
+                    'error', "Error", true,
                     `Replay failed due to internal error (see console for traceback): ${e}`);
             }
         }
@@ -2687,7 +2713,13 @@ class PackTestDialog extends DialogOverlay {
             }
         }
 
-        let final_status = `Finished!  Simulated ${util.format_duration(total_tics / TICS_PER_SECOND)} of play time in ${util.format_duration((performance.now() - t0) / 1000)}; ${num_passed}/${num_levels} levels passed`;
+        let total_game_time = total_tics / TICS_PER_SECOND;
+        let total_wall_time = (performance.now() - t0) / 1000;
+        let final_status = `Finished!
+Simulated ${util.format_duration(total_game_time)} of play time
+in ${util.format_duration(total_wall_time)}
+(${(total_game_time / total_wall_time).toFixed(2)}×);
+${num_passed}/${num_levels} levels passed`;
         if (num_passed === num_levels) {
             final_status += "!  Congratulations!  🎆";
         } else {
