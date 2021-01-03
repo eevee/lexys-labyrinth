@@ -1,4 +1,4 @@
-import { COLLISION, DIRECTIONS, DIRECTION_ORDER, DRAW_LAYERS } from './defs.js';
+import { COLLISION, DIRECTIONS, DIRECTION_ORDER, DRAW_LAYERS, TICS_PER_SECOND } from './defs.js';
 import { random_choice } from './util.js';
 
 function activate_me(me, level) {
@@ -2300,6 +2300,10 @@ const TILE_TYPES = {
                     }
                 }
             }
+        },
+        visual_state(me) {
+            // 0 1 2 3 4
+            return Math.min(4, Math.max(0, Math.floor((me.timer ?? 0) / TICS_PER_SECOND)));
         },
     },
     bowling_ball: {

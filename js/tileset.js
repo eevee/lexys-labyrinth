@@ -137,8 +137,13 @@ export const CC2_TILESET_LAYOUT = {
     },
 
     dynamite: [0, 4],
-    // FIXME lit frames
-    dynamite_lit: [0, 4],
+    dynamite_lit: {
+        0: [0, 4],
+        1: [1, 4],
+        2: [2, 4],
+        3: [3, 4],
+        4: [4, 4],
+    },
     bomb: [5, 4],
     green_bomb: [6, 4],
     // TODO bomb fuse tile, ugh
