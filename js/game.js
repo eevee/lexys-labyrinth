@@ -1648,6 +1648,11 @@ export class Level extends LevelInterface {
             return;
         }
 
+        // Explicitly set us as teleport sliding, since in some very obscure cases (auto-dropping a
+        // yellow teleporter because you picked up an item with a full inventory and immediately
+        // teleporting through it) it may not have been applied
+        this.make_slide(actor, 'teleport');
+
         let original_direction = actor.direction;
         let success = false;
         let dest, direction;
