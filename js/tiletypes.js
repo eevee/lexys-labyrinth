@@ -1190,7 +1190,7 @@ const TILE_TYPES = {
             teeth: 'teeth_timid',
             teeth_timid: 'teeth',
         },
-        _blob_mogrifications: ['ball', 'walker', 'fireball', 'glider', 'paramecium', 'bug', 'tank_blue', 'teeth', 'teeth_timid'],
+        _blob_mogrifications: ['glider', 'paramecium', 'fireball', 'bug', 'walker', 'ball', 'teeth', 'tank_blue', 'teeth_timid'],
         on_arrive(me, level, other) {
             // Note: Transmogrifiers technically contain wires the way teleports do, and CC2 uses
             // the presence and poweredness of those wires to determine whether the transmogrifier
@@ -1203,7 +1203,6 @@ const TILE_TYPES = {
                 level.transmute_tile(other, me.type._mogrifications[name]);
             }
             else if (name === 'blob') {
-                // TODO how is this randomness determined?  important for replays!
                 let options = me.type._blob_mogrifications;
                 level.transmute_tile(other, options[level.prng() % options.length]);
             }
