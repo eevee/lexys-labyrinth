@@ -2039,8 +2039,8 @@ const TILE_TYPES = {
             'bomb',
             'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
             'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
-            // Ghosts don't activate swivels
-            'swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw',
+            // Ghosts don't activate swivels or popwalls
+            'popwall', 'swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw',
         ]),
         movement_speed: 4,
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief

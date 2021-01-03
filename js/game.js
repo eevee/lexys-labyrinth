@@ -233,6 +233,20 @@ export class Cell extends Array {
     try_entering(actor, direction, level, push_mode = null) {
         let pushable_tiles = [];
         let blocked = false;
+        // Subtleties ahoy!  This is **EXTREMELY** sensitive to ordering.  Consider:
+        // - An actor with foil MUST NOT bump a wall on the other side of a thin wall.
+        // - A ghost with foil MUST bump a wall (even on the other side of a thin wall) and be
+        //   deflected by the resulting steel.
+        // - A bowling ball MUST NOT destroy an actor on the other side of a thin wall, or on top of
+        //   a regular wall.
+        // - A fireball MUST melt an ice block AND ALSO still be deflected by it, even if the ice
+        //   block is on top of an item (which blocks the fireball), but NOT one on the other side
+        //   of a thin wall.
+        // - A rover MUST NOT bump walls underneath a canopy (which blocks it).
+        // It seems the order is thus: canopy + thin wall; terrain; actor; item.  Which is the usual
+        // ordering from the top down, except that terrain is checked before actors.  Really, the
+        // ordering is from "outermost" to "innermost", which makes physical sense.
+        // FIXME make that work, then.  i think i may need to shift to fixed slots unfortunately
         // (Note that here, and anywhere else that has any chance of altering the cell's contents,
         // we iterate over a copy of the cell to insulate ourselves from tiles appearing or
         // disappearing mid-iteration.)
@@ -242,9 +256,6 @@ export class Cell extends Array {
             // any of our other tiles either.  (This is my best guess at the actual behavior, seeing
             // as walls also block everything but players can obviously bump /those/.)
             if (! blocked) {
-                if (actor.type.on_bump) {
-                    actor.type.on_bump(actor, level, tile, direction);
-                }
                 if (tile.type.on_bumped) {
                     tile.type.on_bumped(tile, level, actor);
                 }
@@ -555,6 +566,10 @@ export class Level extends LevelInterface {
                 if (terrain.type.name === 'logic_gate') {
                     let dir = terrain.direction;
                     let cxns = terrain.type._gate_types[terrain.gate_type];
+                    if (! cxns) {
+                        // Voodoo tile
+                        continue;
+                    }
                     for (let i = 0; i < 4; i++) {
                         let cxn = cxns[i];
                         if (cxn && cxn.match(/^out/)) {
@@ -839,6 +854,7 @@ export class Level extends LevelInterface {
 
     // Lynx-style loop: everyone decides, then everyone moves/cools.
     _begin_tic_lynx() {
+        // FIXME this should have three wire passes too, chief
         this._do_decision_phase();
         this._do_combined_action_phase(3);
         this._do_wire_phase();
