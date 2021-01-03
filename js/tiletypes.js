@@ -2341,7 +2341,7 @@ const TILE_TYPES = {
             if (cell) {
                 other = cell.get_actor();
                 if (other) {
-                    if (other.is_real_player) {
+                    if (other.type.is_real_player) {
                         level.fail(me.type.name);
                     }
                     else {
