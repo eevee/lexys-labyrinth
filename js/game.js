@@ -1514,7 +1514,9 @@ export class Level extends LevelInterface {
             this.sfx.play_once('step-floor');
         }
 
-        // Announce we're approaching
+        // Announce we're approaching.  Slide mode is set here, since it's about the tile we're
+        // moving towards and needs to last through our next decision
+        this.make_slide(actor, null);
         for (let tile of Array.from(actor.cell)) {
             if (tile === actor)
                 continue;
@@ -1540,6 +1542,9 @@ export class Level extends LevelInterface {
             if (tile.type.on_approach) {
                 tile.type.on_approach(tile, this, actor);
             }
+            if (tile.type.slide_mode) {
+                this.make_slide(actor, tile.type.slide_mode);
+            }
         }
 
         // If we're a monster stepping on the player's tail, that also kills her immediately; the
@@ -1564,9 +1569,6 @@ export class Level extends LevelInterface {
 
     // Step on every tile in a cell we just arrived in
     step_on_cell(actor, cell) {
-        // Also reset slide here, since slide mode is differently important for forced moves
-        this.make_slide(actor, null);
-
         // Step on topmost things first -- notably, it's safe to step on water with flippers on top
         for (let tile of Array.from(cell).reverse()) {
             if (tile === actor)
@@ -1593,9 +1595,6 @@ export class Level extends LevelInterface {
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
-            }
-            if (tile.type.slide_mode) {
-                this.make_slide(actor, tile.type.slide_mode);
             }
         }
     }
@@ -2244,6 +2243,14 @@ export class Level extends LevelInterface {
 
             actor.toolbelt.push(name);
             this._push_pending_undo(() => actor.toolbelt.pop());
+
+            // FIXME hardcodey, but, this doesn't seem to fit anywhere else
+            if (name === 'cleats' && actor.slide_mode === 'ice') {
+                this.make_slide(actor, null);
+            }
+            else if (name === 'suction_boots' && actor.slide_mode === 'force') {
+                this.make_slide(actor, null);
+            }
         }
         return true;
     }
