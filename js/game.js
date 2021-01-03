@@ -1760,7 +1760,11 @@ export class Level extends LevelInterface {
         for (let tile of this.power_sources) {
             if (! tile.cell)
                 continue;
-            let emitting = tile.type.get_emitting_edges(tile, this);
+            let emitting = 0;
+            if (tile.type.get_emitting_edges) {
+                // This method may not exist any more, if the tile was destroyed by e.g. dynamite
+                emitting = tile.type.get_emitting_edges(tile, this);
+            }
             if (emitting !== tile.emitting_edges) {
                 any_changed = true;
                 this._set_tile_prop(tile, 'emitting_edges', emitting);
