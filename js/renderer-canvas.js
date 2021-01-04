@@ -82,19 +82,24 @@ export class CanvasRenderer {
             this.blit(ctx, tx + mx, ty + my, offsetx + mdx, offsety + mdy, mw, mh);
     }
 
+    _adjust_viewport_if_dirty() {
+        if (! this.viewport_dirty)
+            return;
+
+        this.viewport_dirty = false;
+        this.canvas.setAttribute('width', this.tileset.size_x * this.viewport_size_x);
+        this.canvas.setAttribute('height', this.tileset.size_y * this.viewport_size_y);
+        this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
+        this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
+    }
+
     draw(tic_offset = 0) {
         if (! this.level) {
             console.warn("CanvasRenderer.draw: No level to render");
             return;
         }
 
-        if (this.viewport_dirty) {
-            this.viewport_dirty = false;
-            this.canvas.setAttribute('width', this.tileset.size_x * this.viewport_size_x);
-            this.canvas.setAttribute('height', this.tileset.size_y * this.viewport_size_y);
-            this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
-            this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
-        }
+        this._adjust_viewport_if_dirty();
 
         let tic = (this.level.tic_counter ?? 0) + tic_offset;
         let tw = this.tileset.size_x;
@@ -237,6 +242,8 @@ export class CanvasRenderer {
     // Used by the editor and map previews.  Draws a region of the level (probably a StoredLevel),
     // assuming nothing is moving.
     draw_static_region(x0, y0, x1, y1, destx = x0, desty = y0) {
+        this._adjust_viewport_if_dirty();
+
         for (let x = x0; x <= x1; x++) {
             for (let y = y0; y <= y1; y++) {
                 let cell = this.level.cell(x, y);

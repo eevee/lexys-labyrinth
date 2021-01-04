@@ -2755,7 +2755,7 @@ export class Editor extends PrimaryView {
         for (let i = 0; i < size_x * size_y; i++) {
             stored_level.linear_cells.push(this._make_cell(...stored_level.scalar_to_coords(i)));
         }
-        stored_level.linear_cells[LAYERS.actor] = {type: TILE_TYPES['player'], direction: 'south'};
+        stored_level.linear_cells[0][LAYERS.actor] = {type: TILE_TYPES['player'], direction: 'south'};
         return stored_level;
     }
 
