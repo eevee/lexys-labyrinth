@@ -1956,21 +1956,47 @@ class Splash extends PrimaryView {
             require_file: true,
             dropzone_class: '--drag-hover',
             on_drop: async ev => {
-                // If we got exactly one file, try to open it directly
-                // TODO should have some sensible handling of receiving multiple packs
-                if (ev.dataTransfer.files && ev.dataTransfer.files.length === 1) {
-                    let file = ev.dataTransfer.files[0];
+                // Safari doesn't support .items; the spec doesn't support directories; the WebKit
+                // interface /does/ support directories but obviously isn't standard (yet?).
+                // Try to make this all work.
+                // By the way, if you access .files, it seems .items becomes inaccessible??
+                // TODO also, we don't yet support receiving multiple packs
+                let files;
+                if (ev.dataTransfer.items) {
+                    // Prefer the WebKit entry interface, which preserves directory structure, but
+                    // fall back to a list of files if we must
+                    let entries = [];
+                    files = [];
+                    for (let item of ev.dataTransfer.items) {
+                        if (item.kind !== 'file')
+                            continue;
+
+                        files.push(item.getAsFile());
+                        if (item.webkitGetAsEntry) {
+                            entries.push(item.webkitGetAsEntry());
+                        }
+                    }
+
+                    // Do NOT try this if we only got a single regular file
+                    if (entries.length && ! (entries.length === 1 && ! entries[0].isDirectory)) {
+                        await this.search_multi_source(new util.EntryFileSource(entries));
+                        return;
+                    }
+                }
+                else {
+                    files = ev.dataTransfer.files;
+                }
+
+                // If all we have is a list of files, try to open the first one directly (since we
+                // can't handle multiple yet)
+                // TODO can we detect if a file is actually supposed to be a directory and say the
+                // browser doesn't support the experimental interface for this?
+                if (files && files.length) {
+                    let file = files[0];
                     let buf = await file.arrayBuffer();
                     await this.conductor.parse_and_load_game(buf, null, '/' + file.name);
                     return;
                 }
-
-                // Otherwise, try the WebKit entry interface, which also exposes directory structure
-                let entries = [];
-                for (let item of ev.dataTransfer.items) {
-                    entries.push(item.webkitGetAsEntry());
-                }
-                await this.search_multi_source(new util.EntryFileSource(entries));
             },
         });
     }

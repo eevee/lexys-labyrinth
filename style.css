@@ -588,16 +588,19 @@ pre.stack-trace {
     align-items: center;
 
     font-size: 10vmin;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 1rem;
-    right: 1rem;
-    background: #fff2;
-    border: 0.25rem dashed white;
-    border-radius: 1rem;
+    position: fixed;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    background: #0004;
+    border: 0.125rem dashed white;
+    border-radius: 0.25rem;
     text-shadow: 0 1px 5px black;
     text-align: center;
+}
+#splash > .drag-overlay::before {
+    content: "drop levels here";
 }
 #splash.--drag-hover > .drag-overlay {
     display: flex;
