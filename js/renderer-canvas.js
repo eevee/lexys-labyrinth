@@ -105,21 +105,11 @@ export class CanvasRenderer {
         // TODO what about levels smaller than the viewport...?  shrink the canvas in set_level?
         let xmargin = (this.viewport_size_x - 1) / 2;
         let ymargin = (this.viewport_size_y - 1) / 2;
-        let px, py;
-        // FIXME editor vs player
-        if (this.level.player) {
-            [px, py] = this.level.player.visual_position(tic_offset);
-        }
-        else {
-            [px, py] = [0, 0];
-        }
+        let [px, py] = this.level.player.visual_position(tic_offset);
         // Figure out where to start drawing
         // TODO support overlapping regions better
         let x0 = px - xmargin;
         let y0 = py - ymargin;
-        // FIXME editor vs player again ugh, which is goofy since none of this is even relevant;
-        // maybe need to have a separate positioning method
-        if (this.level.stored_level) {
         for (let region of this.level.stored_level.camera_regions) {
             if (px >= region.left && px < region.right &&
                 py >= region.top && py < region.bottom)
@@ -127,7 +117,6 @@ export class CanvasRenderer {
                 x0 = Math.max(region.left, Math.min(region.right - this.viewport_size_x, x0));
                 y0 = Math.max(region.top, Math.min(region.bottom - this.viewport_size_y, y0));
             }
-        }
         }
         // Always keep us within the map bounds
         x0 = Math.max(0, Math.min(this.level.size_x - this.viewport_size_x, x0));
@@ -152,55 +141,67 @@ export class CanvasRenderer {
         // include the tiles just outside it, so we allow this fencepost problem to fly
         let x1 = Math.min(this.level.size_x - 1, Math.ceil(x0 + this.viewport_size_x));
         let y1 = Math.min(this.level.size_y - 1, Math.ceil(y0 + this.viewport_size_y));
-        // Draw one layer at a time, so animated objects aren't overdrawn by
+        // Tiles in motion (i.e., actors) don't want to be overdrawn by neighboring tiles' terrain,
+        // so draw in three passes: everything below actors, actors, and everything above actors
         // neighboring terrain
-        // FIXME this is a bit inefficient when there are a lot of rarely-used layers; consider
-        // instead drawing everything under actors, then actors, then everything above actors?
-        // (note: will need to first fix the game to ensure everything is stacked correctly!)
-        for (let layer = 0; layer < LAYERS.MAX; layer++) {
-            for (let x = xf0; x <= x1; x++) {
-                for (let y = yf0; y <= y1; y++) {
-                    let cell = this.level.cell(x, y);
+        for (let x = xf0; x <= x1; x++) {
+            for (let y = yf0; y <= y1; y++) {
+                let cell = this.level.cell(x, y);
+                for (let layer = 0; layer < LAYERS.actor; layer++) {
                     let tile = cell[layer];
                     if (! tile)
                         continue;
 
-                    let vx, vy;
-                    if (tile.type.is_actor &&
-                        // FIXME kind of a hack for the editor, which uses bare tile objects
-                        tile.visual_position)
-                    {
-                        // Handle smooth scrolling
-                        [vx, vy] = tile.visual_position(tic_offset);
-                        // Round this to the pixel grid too!
-                        vx = Math.floor(vx * tw + 0.5) / tw;
-                        vy = Math.floor(vy * th + 0.5) / th;
-                    }
-                    else {
-                        // Non-actors can't move
-                        vx = x;
-                        vy = y;
-                    }
+                    this.tileset.draw(
+                        tile, tic, this.perception,
+                        this._make_tileset_blitter(this.ctx, x - x0, y - y0));
+                }
+            }
+        }
+        for (let x = xf0; x <= x1; x++) {
+            for (let y = yf0; y <= y1; y++) {
+                let cell = this.level.cell(x, y);
+                let actor = cell[LAYERS.actor];
+                if (! actor)
+                    continue;
 
-                    // For actors (i.e., blocks), perception only applies if there's something
-                    // of potential interest underneath
-                    let perception = this.perception;
-                    if (perception !== 'normal' && tile.type.is_actor &&
-                        ! cell.some(t =>
-                            t && t.type.layer < layer &&
-                            ! (t.type.name === 'floor' && (t.wire_directions | t.wire_tunnel_directions) === 0)))
-                    {
-                        perception = 'normal';
-                    }
+                // Handle smooth scrolling
+                let [vx, vy] = actor.visual_position(tic_offset);
+                // Round this to the pixel grid too!
+                vx = Math.floor(vx * tw + 0.5) / tw;
+                vy = Math.floor(vy * th + 0.5) / th;
+
+                // For actors (i.e., blocks), perception only applies if there's something of
+                // potential interest underneath
+                let perception = this.perception;
+                if (perception !== 'normal' &&
+                    ! cell.some(t => t && t.type.layer < layer && ! (
+                        t.type.name === 'floor' && (t.wire_directions | t.wire_tunnel_directions) === 0)))
+                {
+                    perception = 'normal';
+                }
+
+                this.tileset.draw(
+                    actor, tic, perception,
+                    this._make_tileset_blitter(this.ctx, vx - x0, vy - y0));
+            }
+        }
+        for (let x = xf0; x <= x1; x++) {
+            for (let y = yf0; y <= y1; y++) {
+                let cell = this.level.cell(x, y);
+                for (let layer = LAYERS.actor + 1; layer < LAYERS.MAX; layer++) {
+                    let tile = cell[layer];
+                    if (! tile)
+                        continue;
 
                     this.tileset.draw(
-                        tile, tic, perception,
-                        this._make_tileset_blitter(this.ctx, vx - x0, vy - y0));
+                        tile, tic, this.perception,
+                        this._make_tileset_blitter(this.ctx, x - x0, y - y0));
                 }
             }
         }
 
-        if (this.show_actor_bboxes && this.level.constructor.name === 'Level') {  // FIXME dumb hack so this doesn't happen in editor
+        if (this.show_actor_bboxes) {
             this.ctx.fillStyle = '#f004';
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
@@ -229,6 +230,41 @@ export class CanvasRenderer {
                     this.canvas,
                     0, y + dy, this.canvas.width, 1,
                     -dy * dy, y + dy, this.canvas.width, 1);
+            }
+        }
+    }
+
+    // Used by the editor and map previews.  Draws a region of the level (probably a StoredLevel),
+    // assuming nothing is moving.
+    draw_static_region(x0, y0, x1, y1, destx = x0, desty = y0) {
+        for (let x = x0; x <= x1; x++) {
+            for (let y = y0; y <= y1; y++) {
+                let cell = this.level.cell(x, y);
+                if (! cell)
+                    continue;
+
+                let seen_anything_interesting;
+                for (let tile of cell) {
+                    if (! tile)
+                        continue;
+
+                    // For actors (i.e., blocks), perception only applies if there's something
+                    // of potential interest underneath
+                    let perception = this.perception;
+                    if (perception !== 'normal' && tile.type.is_actor && ! seen_anything_interesting) {
+                        perception = 'normal';
+                    }
+
+                    if (tile.type.layer < LAYERS.actor && ! (
+                        tile.type.name === 'floor' && (tile.wire_directions | tile.wire_tunnel_directions) === 0))
+                    {
+                        seen_anything_interesting = true;
+                    }
+
+                    this.tileset.draw(
+                        tile, 0, perception,
+                        this._make_tileset_blitter(this.ctx, destx + x - x0, desty + y - y0));
+                }
             }
         }
     }

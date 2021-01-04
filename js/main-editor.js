@@ -282,7 +282,7 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
         let stored_level = this.conductor.stored_game.load_level(index);
         this.renderer.set_level(stored_level);
         this.renderer.set_viewport_size(stored_level.size_x, stored_level.size_y);
-        this.renderer.draw();
+        this.renderer.draw_static_region(0, 0, stored_level.size_x, stored_level.size_y);
         let canvas = mk('canvas', {
             width: stored_level.size_x * this.conductor.tileset.size_x / 4,
             height: stored_level.size_y * this.conductor.tileset.size_y / 4,
@@ -2424,7 +2424,7 @@ export class Editor extends PrimaryView {
                 ev.stopPropagation();
 
                 // FIXME eventually this should be automatic
-                this.renderer.draw();
+                this.redraw_entire_level();
             }
             else if (ev.button === 1) {
                 // Middle button: always pan
@@ -2443,7 +2443,7 @@ export class Editor extends PrimaryView {
                 ev.preventDefault();
                 ev.stopPropagation();
 
-                this.renderer.draw();
+                this.redraw_entire_level();
             }
         });
         // Once the mouse is down, we should accept mouse movement anywhere
@@ -2471,7 +2471,7 @@ export class Editor extends PrimaryView {
             this.mouse_op.do_mousemove(ev);
 
             // FIXME !!!
-            this.renderer.draw();
+            this.redraw_entire_level();
         });
         // TODO should this happen for a mouseup anywhere?
         this.viewport_el.addEventListener('mouseup', ev => {
@@ -2720,7 +2720,7 @@ export class Editor extends PrimaryView {
 
     activate() {
         super.activate();
-        this.renderer.draw();
+        this.redraw_entire_level();
     }
 
     // Level creation, management, and saving
@@ -2934,7 +2934,7 @@ export class Editor extends PrimaryView {
 
         this.renderer.set_level(stored_level);
         if (this.active) {
-            this.renderer.draw();
+            this.redraw_entire_level();
         }
 
         if (this.save_button) {
@@ -3073,6 +3073,8 @@ export class Editor extends PrimaryView {
         this.palette_actor_direction = DIRECTIONS[this.palette_actor_direction].left;
     }
 
+    // -- Drawing --
+
     mark_tile_dirty(tile) {
         // TODO partial redraws!  until then, redraw everything
         if (tile === this.palette_selection) {
@@ -3081,13 +3083,19 @@ export class Editor extends PrimaryView {
             this.selected_tile_el.append(this.renderer.create_tile_type_canvas(tile.type.name, tile));
         }
         else {
-            this.renderer.draw();
+            this.redraw_entire_level();
         }
     }
 
     mark_cell_dirty(cell) {
-        this.renderer.draw();
+        this.redraw_entire_level();
     }
+
+    redraw_entire_level() {
+        this.renderer.draw_static_region(0, 0, this.stored_level.size_x, this.stored_level.size_y);
+    }
+
+    // -- Utility/inspection --
 
     is_in_bounds(x, y) {
         return 0 <= x && x < this.stored_level.size_x && 0 <= y && y < this.stored_level.size_y;
@@ -3101,6 +3109,8 @@ export class Editor extends PrimaryView {
             return null;
         }
     }
+
+    // -- Mutation --
 
     place_in_cell(x, y, tile) {
         // TODO weird api?
@@ -3167,6 +3177,8 @@ export class Editor extends PrimaryView {
         this.mark_cell_dirty(cell);
     }
 
+    // -- Misc?? --
+
     open_tile_prop_overlay(tile, x0, y0) {
         this.cancel_mouse_operation();
         // FIXME keep these around, don't recreate them constantly
@@ -3222,6 +3234,6 @@ export class Editor extends PrimaryView {
         this.stored_level.size_x = size_x;
         this.stored_level.size_y = size_y;
         this.update_viewport_size();
-        this.renderer.draw();
+        this.redraw_entire_level();
     }
 }
