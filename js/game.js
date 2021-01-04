@@ -1372,7 +1372,16 @@ export class Level extends LevelInterface {
 
     check_movement(actor, orig_cell, direction, push_mode) {
         let dest_cell = this.get_neighboring_cell(orig_cell, direction);
-        let success = (dest_cell &&
+        if (! dest_cell) {
+            if (push_mode === 'push') {
+                if (actor.type.on_blocked) {
+                    actor.type.on_blocked(actor, this, direction, null);
+                }
+            }
+            return false;
+        }
+
+        let success = (
             orig_cell.try_leaving(actor, direction, this, push_mode) &&
             dest_cell.try_entering(actor, direction, this, push_mode));
 
@@ -1802,7 +1811,7 @@ export class Level extends LevelInterface {
         }
         else {
             // Note that we can't drop a bowling ball if there's already an item, even though a
-            // dropped bowling ball is really an actor (TODO arguably a bug)
+            // dropped bowling ball is really an actor
             if (cell.get_item())
                 return false;
 
@@ -1821,7 +1830,7 @@ export class Level extends LevelInterface {
                 // already in this cell's actor layer.  But we also know for sure that there's no
                 // item in this cell, so we'll cheat a little: remove the dropping actor, set the
                 // item moving, then put the dropping actor back before anyone notices.
-                cell._remove(dropping_actor);
+                this.remove_tile(dropping_actor);
                 this.add_tile(tile, cell);
                 if (! this.attempt_out_of_turn_step(tile, dropping_actor.direction)) {
                     // It was unable to move, so there's nothing we can do but destroy it
@@ -1831,7 +1840,7 @@ export class Level extends LevelInterface {
                 else {
                     this.add_actor(tile);
                 }
-                cell._add(dropping_actor);
+                this.add_tile(dropping_actor, cell);
             }
             else {
                 this.add_tile(tile, cell);

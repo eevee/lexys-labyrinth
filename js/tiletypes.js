@@ -2343,7 +2343,7 @@ const TILE_TYPES = {
         },
         on_blocked(me, level, direction, obstacle) {
             // Blow up anything we run into
-            if (obstacle.type.is_actor) {
+            if (obstacle && obstacle.type.is_actor) {
                 if (obstacle.type.is_real_player) {
                     level.fail(me.type.name);
                 }
