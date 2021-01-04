@@ -745,10 +745,10 @@ class WireOperation extends DrawOperation {
             let terrain = cell[LAYERS.terrain];
             if (terrain.type.name === 'floor') {
                 if (this.alt_mode) {
-                    tile.wire_tunnel_directions &= ~bit;
+                    terrain.wire_tunnel_directions &= ~bit;
                 }
                 else {
-                    tile.wire_tunnel_directions |= bit;
+                    terrain.wire_tunnel_directions |= bit;
                 }
             }
             return;
