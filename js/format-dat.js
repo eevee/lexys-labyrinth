@@ -250,9 +250,9 @@ function parse_level(bytes, number) {
                 // pgchip grants directions to ice blocks on cloners by putting a clone block
                 // beneath them instead
                 if (l === 1 && 0x0e <= tile_byte && tile_byte <= 0x11 &&
-                    cell[LAYER.actor] && cell[LAYER.actor].type.name === 'ice_block')
+                    cell[LAYERS.actor] && cell[LAYERS.actor].type.name === 'ice_block')
                 {
-                    cell[LAYER.actor].direction = extra.direction;
+                    cell[LAYERS.actor].direction = extra.direction;
                     let type = TILE_TYPES['cloner'];
                     cell[type.layer] = {type};
                     continue;
@@ -267,8 +267,8 @@ function parse_level(bytes, number) {
 
     // Fix the "floor/empty" nonsense here by adding floor to any cell with no terrain on bottom
     for (let cell of level.linear_cells) {
-        if (! cell[LAYER.terrain]) {
-            cell[LAYER.terrain] = { type: TILE_TYPES['floor'] };
+        if (! cell[LAYERS.terrain]) {
+            cell[LAYERS.terrain] = { type: TILE_TYPES['floor'] };
         }
         // TODO we could also deal with weird cases where there's terrain /on top of/ something
         // else: things underwater, the quirk where a glider will erase the item underneath...
