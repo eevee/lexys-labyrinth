@@ -1,6 +1,10 @@
+import { LAYERS } from './defs.js';
 import * as util from './util.js';
 
 export class StoredCell extends Array {
+    constructor() {
+        super(LAYERS.MAX);
+    }
 }
 
 export class Replay {

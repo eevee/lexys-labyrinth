@@ -453,9 +453,10 @@ export class Level extends LevelInterface {
 
                 let stored_cell = this.stored_level.linear_cells[n];
                 n++;
-
-                // FIXME give this same treatment to stored cells (otherwise the editor is fucked)
                 for (let template_tile of stored_cell) {
+                    if (! template_tile)
+                        continue;
+
                     let tile = Tile.from_template(template_tile);
                     if (tile.type.is_hint) {
                         // Copy over the tile-specific hint, if any

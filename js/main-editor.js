@@ -444,7 +444,13 @@ class PencilOperation extends DrawOperation {
         if (this.modifier === 'ctrl') {
             let cell = this.cell(x, y);
             if (cell) {
-                this.editor.select_palette(cell[cell.length - 1]);
+                // Pick the topmost thing
+                for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
+                    if (cell[layer]) {
+                        this.editor.select_palette(cell[layer]);
+                        break;
+                    }
+                }
             }
             return;
         }
@@ -455,8 +461,10 @@ class PencilOperation extends DrawOperation {
             let cell = this.cell(x, y);
             if (this.modifier === 'shift') {
                 // Aggressive mode: erase the entire cell
-                cell.length = 0;
-                cell.push({type: TILE_TYPES.floor});
+                for (let layer = 0; layer < LAYERS.MAX; layer++) {
+                    cell[layer] = null;
+                }
+                cell[LAYERS.terrain] = {type: TILE_TYPES.floor};
             }
             else if (template) {
                 // Erase whatever's on the same layer
@@ -470,10 +478,12 @@ class PencilOperation extends DrawOperation {
             if (this.modifier === 'shift') {
                 // Aggressive mode: erase whatever's already in the cell
                 let cell = this.cell(x, y);
-                cell.length = 0;
+                for (let layer = 0; layer < LAYERS.MAX; layer++) {
+                    cell[layer] = null;
+                }
                 let type = this.editor.palette_selection.type;
                 if (type.layer !== LAYERS.terrain) {
-                    cell.push({type: TILE_TYPES.floor});
+                    cell[LAYERS.terrain] = {type: TILE_TYPES.floor};
                 }
                 this.editor.place_in_cell(x, y, template);
             }
@@ -593,16 +603,16 @@ class ForceFloorOperation extends DrawOperation {
             // had some kind of force floor
             if (i === 2) {
                 let prevcell = this.editor.cell(prevx, prevy);
-                if (prevcell[0].type.name.startsWith('force_floor_')) {
-                    prevcell[0].type = TILE_TYPES[name];
+                if (prevcell[LAYERS.terrain].type.name.startsWith('force_floor_')) {
+                    prevcell[LAYERS.terrain].type = TILE_TYPES[name];
                 }
             }
 
             // Drawing a loop with force floors creates ice (but not in the previous
             // cell, obviously)
             let cell = this.editor.cell(x, y);
-            if (cell[0].type.name.startsWith('force_floor_') &&
-                cell[0].type.name !== name)
+            if (cell[LAYERS.terrain].type.name.startsWith('force_floor_') &&
+                cell[LAYERS.terrain].type.name !== name)
             {
                 name = 'ice';
             }
@@ -732,9 +742,8 @@ class WireOperation extends DrawOperation {
             }
             let bit = DIRECTIONS[direction].bit;
 
-            for (let tile of cell) {
-                if (tile.type.name !== 'floor')
-                    continue;
+            let terrain = cell[LAYERS.terrain];
+            if (terrain.type.name === 'floor') {
                 if (this.alt_mode) {
                     tile.wire_tunnel_directions &= ~bit;
                 }
@@ -846,6 +855,8 @@ class WireOperation extends DrawOperation {
             let cell = this.cell(x, y);
             for (let tile of Array.from(cell).reverse()) {
                 // TODO probably a better way to do this
+                if (! tile)
+                    continue;
                 if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block'].indexOf(tile.type.name) < 0)
                     continue;
 
@@ -908,7 +919,7 @@ class AdjustOperation extends MouseOperation {
         let cell = this.cell(this.gx1, this.gy1);
         if (this.modifier === 'ctrl') {
             for (let tile of cell) {
-                if (TILES_WITH_PROPS[tile.type.name] !== undefined) {
+                if (tile && TILES_WITH_PROPS[tile.type.name] !== undefined) {
                     // TODO use the tile's bbox, not the mouse position
                     this.editor.open_tile_prop_overlay(tile, this.mx0, this.my0);
                     break;
@@ -917,8 +928,10 @@ class AdjustOperation extends MouseOperation {
             return;
         }
         // FIXME implement shift to always target floor, or maybe start from bottom
-        for (let i = cell.length - 1; i >= 0; i--) {
-            let tile = cell[i];
+        for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
+            let tile = cell[layer];
+            if (! tile)
+                continue;
 
             let rotated;
             if (this.alt_mode) {
@@ -2301,7 +2314,7 @@ class Selection {
             }
             else {
                 this.floated_cells.push(stored_level.linear_cells[n]);
-                stored_level.linear_cells[n] = [{type: TILE_TYPES['floor']}];
+                stored_level.linear_cells[n] = this.editor._make_cell(x, y);
                 this.editor.mark_cell_dirty(stored_level.linear_cells[n]);
             }
         }
@@ -2712,9 +2725,11 @@ export class Editor extends PrimaryView {
 
     // Level creation, management, and saving
 
-    _make_cell() {
+    _make_cell(x, y) {
         let cell = new format_base.StoredCell;
-        cell.push({type: TILE_TYPES['floor']});
+        cell.x = x;
+        cell.y = y;
+        cell[LAYERS.terrain] = {type: TILE_TYPES.floor};
         return cell;
     }
 
@@ -2725,9 +2740,9 @@ export class Editor extends PrimaryView {
         stored_level.size_y = size_y;
         stored_level.viewport_size = 10;
         for (let i = 0; i < size_x * size_y; i++) {
-            stored_level.linear_cells.push(this._make_cell());
+            stored_level.linear_cells.push(this._make_cell(...stored_level.scalar_to_coords(i)));
         }
-        stored_level.linear_cells[0].push({type: TILE_TYPES['player'], direction: 'south'});
+        stored_level.linear_cells[LAYERS.actor] = {type: TILE_TYPES['player'], direction: 'south'};
         return stored_level;
     }
 
@@ -3098,26 +3113,25 @@ export class Editor extends PrimaryView {
         let cell = this.cell(x, y);
         // Replace whatever's on the same layer
         // TODO should preserve wiring if possible too
-        for (let i = cell.length - 1; i >= 0; i--) {
+        let existing_tile = cell[tile.type.layer];
+        if (existing_tile) {
             // If we find a tile of the same type as the one being drawn, see if it has custom
             // combine behavior (only the case if it came from the palette)
-            if (cell[i].type === tile.type &&
+            if (existing_tile.type === tile.type &&
                 // FIXME this is hacky garbage
                 tile === this.palette_selection && this.palette_selection_from_palette &&
                 SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
                 SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw)
             {
-                SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw(tile, cell[i]);
+                SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw(tile, existing_tile);
                 return;
             }
 
-            if (cell[i].type.layer === tile.type.layer) {
-                cell.splice(i, 1);
-            }
+            // Otherwise erase it
+            cell[tile.type.layer] = null;
         }
 
-        cell.push(Object.assign({}, tile));
-        cell.sort((a, b) => a.type.layer - b.type.layer);
+        cell[tile.type.layer] = {...tile};
     }
 
     erase_tile(cell, tile = null) {
@@ -3127,29 +3141,28 @@ export class Editor extends PrimaryView {
             tile = this.palette_selection;
         }
 
-        let layer = tile.type.layer;
-        for (let i = cell.length - 1; i >= 0; i--) {
+        let existing_tile = cell[tile.type.layer];
+        if (existing_tile) {
             // If we find a tile of the same type as the one being drawn, see if it has custom
             // combine behavior (only the case if it came from the palette)
-            if (cell[i].type === tile.type &&
+            if (existing_tile.type === tile.type &&
                 // FIXME this is hacky garbage
                 tile === this.palette_selection && this.palette_selection_from_palette &&
                 SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
                 SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase)
             {
-                let remove = SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase(tile, cell[i]);
+                let remove = SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase(tile, existing_tile);
                 if (! remove)
                     return;
             }
 
-            if (cell[i].type.layer === layer) {
-                cell.splice(i, 1);
-            }
+            // Otherwise erase it
+            cell[tile.type.layer] = null;
         }
 
         // Don't allow erasing the floor entirely
-        if (layer === 0) {
-            cell.unshift({type: TILE_TYPES.floor});
+        if (tile.type.layer === LAYERS.terrain) {
+            cell[LAYERS.terrain] = {type: TILE_TYPES.floor};
         }
         this.mark_cell_dirty(cell);
     }
@@ -3201,7 +3214,7 @@ export class Editor extends PrimaryView {
         let new_cells = [];
         for (let y = y0; y < y0 + size_y; y++) {
             for (let x = x0; x < x0 + size_x; x++) {
-                new_cells.push(this.cell(x, y) ?? this._make_cell());
+                new_cells.push(this.cell(x, y) ?? this._make_cell(x, y));
             }
         }
 

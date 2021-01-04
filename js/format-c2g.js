@@ -1073,10 +1073,12 @@ export function parse_level(buf, number = 1) {
                         let mask = bytes[p];
                         p++;
                         if (mask & 0x10) {
-                            cell.push({type: TILE_TYPES['canopy']});
+                            let type = TILE_TYPES['canopy'];
+                            cell[type.layer] = {type};
                         }
                         if (mask & 0x0f) {
-                            cell.push({type: TILE_TYPES['thin_walls'], edges: mask & 0x0f});
+                            let type = TILE_TYPES['thin_walls'];
+                            cell[type.layer] = {type, edges: mask & 0x0f};
                         }
                         // Skip the rest of the loop.  That means we don't handle any of the other
                         // special behavior below, but neither thin walls nor canopies should use
@@ -1091,7 +1093,7 @@ export function parse_level(buf, number = 1) {
                     let type = TILE_TYPES[name];
                     if (!type) console.error(name, spec);
                     let tile = {type};
-                    cell.push(tile);
+                    cell[type.layer] = tile;
                     if (spec.modifier) {
                         spec.modifier.decode(tile, modifier);
                     }
@@ -1100,7 +1102,8 @@ export function parse_level(buf, number = 1) {
                     // TODO this should go on the bottom
                     // TODO we should sort and also only allow one thing per layer
                     if (spec.dummy_terrain) {
-                        cell.push({type: TILE_TYPES[spec.dummy_terrain]});
+                        let type = TILE_TYPES[spec.dummy_terrain];
+                        cell[type.layer] = {type};
                     }
 
                     if (type.is_required_chip) {
@@ -1125,7 +1128,6 @@ export function parse_level(buf, number = 1) {
                     if (! spec.has_next)
                         break;
                 }
-                cell.reverse();
                 level.linear_cells.push(cell);
             }
         }
@@ -1389,15 +1391,12 @@ export function synthesize_level(stored_level) {
             map_view = new DataView(map_bytes.buffer);
         }
 
-        // TODO complain if duplicates on a layer
         let dummy_terrain_tile = null;
         let handled_thin_walls = false;
-        // FIXME sort first, otherwise the canopy assumption that thin walls are immediately below
-        // breaks!  maybe just fix that also
-        for (let i = cell.length - 1; i >= 0; i--) {
+        for (let i = LAYERS.MAX - 1; i >= 0; i--) {
             let tile = cell[i];
-            // FIXME does not yet support canopy or thin walls  >:S
-            let spec = REVERSE_TILE_ENCODING[tile.type.name];
+            if (! tile)
+                continue;
 
             if (tile.type.name === 'canopy' || tile.type.name === 'thin_walls') {
                 // These two tiles are encoded together despite being on different layers.  If we
@@ -1410,9 +1409,7 @@ export function synthesize_level(stored_level) {
                 let canopy, thin_walls;
                 if (tile.type.name === 'canopy') {
                     canopy = tile;
-                    if (i > 0 && cell[i - 1].type.name === 'thin_walls') {
-                        thin_walls = cell[i - 1];
-                    }
+                    thin_walls = cell[LAYERS.thin_wall];
                 }
                 else {
                     thin_walls = tile;
@@ -1431,6 +1428,8 @@ export function synthesize_level(stored_level) {
                 p += 2;
                 continue;
             }
+
+            let spec = REVERSE_TILE_ENCODING[tile.type.name];
 
             // Handle the swivel, a tile that draws as an overlay but is stored like terrain.  In a
             // level, it has two parts: the swivel itself, and a dummy swivel_floor terrain which is
