@@ -1,4 +1,4 @@
-import { DIRECTIONS, DRAW_LAYERS } from './defs.js';
+import { DIRECTIONS, LAYERS } from './defs.js';
 import { mk } from './util.js';
 import TILE_TYPES from './tiletypes.js';
 
@@ -157,46 +157,45 @@ export class CanvasRenderer {
         // FIXME this is a bit inefficient when there are a lot of rarely-used layers; consider
         // instead drawing everything under actors, then actors, then everything above actors?
         // (note: will need to first fix the game to ensure everything is stacked correctly!)
-        for (let layer = 0; layer < DRAW_LAYERS.MAX; layer++) {
+        for (let layer = 0; layer < LAYERS.MAX; layer++) {
             for (let x = xf0; x <= x1; x++) {
                 for (let y = yf0; y <= y1; y++) {
                     let cell = this.level.cell(x, y);
-                    for (let tile of cell) {
-                        if (tile.type.draw_layer !== layer)
-                            continue;
+                    let tile = cell[layer];
+                    if (! tile)
+                        continue;
 
-                        let vx, vy;
-                        if (tile.type.is_actor &&
-                            // FIXME kind of a hack for the editor, which uses bare tile objects
-                            tile.visual_position)
-                        {
-                            // Handle smooth scrolling
-                            [vx, vy] = tile.visual_position(tic_offset);
-                            // Round this to the pixel grid too!
-                            vx = Math.floor(vx * tw + 0.5) / tw;
-                            vy = Math.floor(vy * th + 0.5) / th;
-                        }
-                        else {
-                            // Non-actors can't move
-                            vx = x;
-                            vy = y;
-                        }
-
-                        // For actors (i.e., blocks), perception only applies if there's something
-                        // of potential interest underneath
-                        let perception = this.perception;
-                        if (perception !== 'normal' && tile.type.is_actor &&
-                            ! cell.some(t =>
-                                t.type.draw_layer < layer &&
-                                ! (t.type.name === 'floor' && (t.wire_directions | t.wire_tunnel_directions) === 0)))
-                        {
-                            perception = 'normal';
-                        }
-
-                        this.tileset.draw(
-                            tile, tic, perception,
-                            this._make_tileset_blitter(this.ctx, vx - x0, vy - y0));
+                    let vx, vy;
+                    if (tile.type.is_actor &&
+                        // FIXME kind of a hack for the editor, which uses bare tile objects
+                        tile.visual_position)
+                    {
+                        // Handle smooth scrolling
+                        [vx, vy] = tile.visual_position(tic_offset);
+                        // Round this to the pixel grid too!
+                        vx = Math.floor(vx * tw + 0.5) / tw;
+                        vy = Math.floor(vy * th + 0.5) / th;
                     }
+                    else {
+                        // Non-actors can't move
+                        vx = x;
+                        vy = y;
+                    }
+
+                    // For actors (i.e., blocks), perception only applies if there's something
+                    // of potential interest underneath
+                    let perception = this.perception;
+                    if (perception !== 'normal' && tile.type.is_actor &&
+                        ! cell.some(t =>
+                            t && t.type.layer < layer &&
+                            ! (t.type.name === 'floor' && (t.wire_directions | t.wire_tunnel_directions) === 0)))
+                    {
+                        perception = 'normal';
+                    }
+
+                    this.tileset.draw(
+                        tile, tic, perception,
+                        this._make_tileset_blitter(this.ctx, vx - x0, vy - y0));
                 }
             }
         }

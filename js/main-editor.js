@@ -1,6 +1,6 @@
 import * as fflate from 'https://unpkg.com/fflate/esm/index.mjs';
 
-import { DIRECTIONS, TICS_PER_SECOND } from './defs.js';
+import { DIRECTIONS, LAYERS, TICS_PER_SECOND } from './defs.js';
 import { TILES_WITH_PROPS } from './editor-tile-overlays.js';
 import * as format_base from './format-base.js';
 import * as c2g from './format-c2g.js';
@@ -472,7 +472,7 @@ class PencilOperation extends DrawOperation {
                 let cell = this.cell(x, y);
                 cell.length = 0;
                 let type = this.editor.palette_selection.type;
-                if (type.draw_layer !== 0) {
+                if (type.layer !== LAYERS.terrain) {
                     cell.push({type: TILE_TYPES.floor});
                 }
                 this.editor.place_in_cell(x, y, template);
@@ -3111,13 +3111,13 @@ export class Editor extends PrimaryView {
                 return;
             }
 
-            if (cell[i].type.draw_layer === tile.type.draw_layer) {
+            if (cell[i].type.layer === tile.type.layer) {
                 cell.splice(i, 1);
             }
         }
 
         cell.push(Object.assign({}, tile));
-        cell.sort((a, b) => a.type.draw_layer - b.type.draw_layer);
+        cell.sort((a, b) => a.type.layer - b.type.layer);
     }
 
     erase_tile(cell, tile = null) {
@@ -3127,7 +3127,7 @@ export class Editor extends PrimaryView {
             tile = this.palette_selection;
         }
 
-        let layer = tile.type.draw_layer;
+        let layer = tile.type.layer;
         for (let i = cell.length - 1; i >= 0; i--) {
             // If we find a tile of the same type as the one being drawn, see if it has custom
             // combine behavior (only the case if it came from the palette)
@@ -3142,7 +3142,7 @@ export class Editor extends PrimaryView {
                     return;
             }
 
-            if (cell[i].type.draw_layer === layer) {
+            if (cell[i].type.layer === layer) {
                 cell.splice(i, 1);
             }
         }

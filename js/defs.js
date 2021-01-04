@@ -57,7 +57,7 @@ export const INPUT_BITS = {
     wait:   0x8000,
 };
 
-export const DRAW_LAYERS = {
+export const LAYERS = {
     terrain: 0,
     item: 1,
     item_mod: 2,
@@ -66,6 +66,7 @@ export const DRAW_LAYERS = {
     swivel: 5,
     thin_wall: 6,
     canopy: 7,
+
     MAX: 8,
 };
 

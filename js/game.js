@@ -1,5 +1,5 @@
 import * as algorithms from './algorithms.js';
-import { DIRECTIONS, DIRECTION_ORDER, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
+import { DIRECTIONS, DIRECTION_ORDER, LAYERS, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
 import { LevelInterface } from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 
@@ -54,9 +54,15 @@ export class Tile {
         // Extremely awkward special case: items don't block monsters if the cell also contains an
         // item modifier (i.e. "no" sign) or a real player
         // TODO would love to get this outta here
-        if (this.type.is_item &&
-            this.cell.some(tile => tile.type.item_modifier || tile.type.is_real_player))
-            return false;
+        if (this.type.is_item) {
+            let item_mod = this.cell.get_item_mod();
+            if (item_mod && item_mod.type.item_modifier)
+                return false;
+
+            let actor = this.cell.get_actor();
+            if (actor && actor.type.is_real_player)
+                return false;
+        }
 
         if (this.type.blocks_collision & other.type.collision_mask)
             return true;
@@ -122,6 +128,7 @@ export class Tile {
         direction = tile.cell.redirect_exit(tile, direction);
         // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
         // which would fail, but it would still change the block's direction
+        // XXX this expects to take a level but it only matters with push_mode === 'push'
         return tile.cell.try_leaving(tile, direction);
     }
 
@@ -142,37 +149,36 @@ Tile.prototype.wire_tunnel_directions = 0;
 
 export class Cell extends Array {
     constructor(x, y) {
-        super();
+        super(LAYERS.MAX);
         this.x = x;
         this.y = y;
     }
 
-    _add(tile, index = null) {
-        if (index === null) {
-            this.push(tile);
+    _add(tile) {
+        let index = tile.type.layer;
+        if (this[index]) {
+            console.error("ATTEMPTING TO ADD", tile, "TO CELL", this, "WHICH ERASES EXISTING TILE", this[index]);
+            this[index].cell = null;
         }
-        else {
-            this.splice(index, 0, tile);
-        }
+        this[index] = tile;
         tile.cell = this;
     }
 
     // DO NOT use me to remove a tile permanently, only to move it!
     // Should only be called from Level, which handles some bookkeeping!
     _remove(tile) {
-        let index = this.indexOf(tile);
-        if (index < 0)
+        let index = tile.type.layer;
+        if (this[index] !== tile)
             throw new Error("Asked to remove tile that doesn't seem to exist");
 
-        this.splice(index, 1);
+        this[index] = null;
         tile.cell = null;
-        return index;
     }
 
     get_wired_tile() {
         let ret = null;
         for (let tile of this) {
-            if ((tile.wire_directions || tile.wire_tunnel_directions) && ! tile.movement_cooldown) {
+            if (tile && (tile.wire_directions || tile.wire_tunnel_directions) && ! tile.movement_cooldown) {
                 ret = tile;
                 // Don't break; we want the topmost tile!
             }
@@ -181,52 +187,53 @@ export class Cell extends Array {
     }
 
     get_terrain() {
-        for (let tile of this) {
-            if (tile.type.draw_layer === 0)
-                return tile;
-        }
-        return null;
+        return this[LAYERS.terrain] ?? null;
     }
 
     get_actor() {
-        for (let tile of this) {
-            if (tile.type.is_actor)
-                return tile;
-        }
-        return null;
+        return this[LAYERS.actor] ?? null;
     }
 
     get_item() {
-        for (let tile of this) {
-            if (tile.type.is_item)
-                return tile;
-        }
-        return null;
+        return this[LAYERS.item] ?? null;
     }
 
     get_item_mod() {
-        for (let tile of this) {
-            if (tile.type.item_modifier)
-                return tile;
-        }
-        return null;
+        return this[LAYERS.item_mod] ?? null;
     }
 
     has(name) {
-        return this.some(tile => tile.type.name === name);
+        let current = this[TILE_TYPES[name].layer];
+        return current && current.type.name === name;
     }
 
-    try_leaving(actor, direction) {
-        for (let tile of this) {
-            if (tile === actor)
-                continue;
+    // FIXME honestly no longer sure why these two are on Cell, or even separate really
+    try_leaving(actor, direction, level, push_mode) {
+        // The only tiles that can trap us are thin walls and terrain, so for perf (this is very hot
+        // code), only bother checking those)
+        let terrain = this[LAYERS.terrain];
+        let thin_walls = this[LAYERS.thin_wall];
+        let blocker;
 
-            if (tile.type.traps && tile.type.traps(tile, actor))
-                return false;
-
-            if (tile.type.blocks_leaving && tile.type.blocks_leaving(tile, actor, direction))
-                return false;
+        if (thin_walls && thin_walls.type.blocks_leaving && thin_walls.type.blocks_leaving(thin_walls, actor, direction)) {
+            blocker = thin_walls;
         }
+        else if (terrain.type.traps && terrain.type.traps(terrain, actor)) {
+            blocker = terrain;
+        }
+        else if (terrain.type.blocks_leaving && terrain.type.blocks_leaving(terrain, actor, direction)) {
+            blocker = terrain;
+        }
+
+        if (blocker) {
+            if (push_mode === 'push') {
+                if (actor.type.on_blocked) {
+                    actor.type.on_blocked(actor, level, direction, blocker);
+                }
+            }
+            return false;
+        }
+
         return true;
     }
 
@@ -238,7 +245,6 @@ export class Cell extends Array {
     // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
     try_entering(actor, direction, level, push_mode = null) {
         let pushable_tiles = [];
-        let blocked = false;
         // Subtleties ahoy!  This is **EXTREMELY** sensitive to ordering.  Consider:
         // - An actor with foil MUST NOT bump a wall on the other side of a thin wall.
         // - A ghost with foil MUST bump a wall (even on the other side of a thin wall) and be
@@ -252,19 +258,17 @@ export class Cell extends Array {
         // It seems the order is thus: canopy + thin wall; terrain; actor; item.  Which is the usual
         // ordering from the top down, except that terrain is checked before actors.  Really, the
         // ordering is from "outermost" to "innermost", which makes physical sense.
-        // FIXME make that work, then.  i think i may need to shift to fixed slots unfortunately
-        // (Note that here, and anywhere else that has any chance of altering the cell's contents,
-        // we iterate over a copy of the cell to insulate ourselves from tiles appearing or
-        // disappearing mid-iteration.)
-        for (let tile of Array.from(this).reverse()) {
+        for (let layer of [
+            LAYERS.canopy, LAYERS.thin_wall, LAYERS.terrain, LAYERS.swivel,
+            LAYERS.actor, LAYERS.item_mod, LAYERS.item])
+        {
+            let tile = this[layer];
+            if (! tile)
+                continue;
+
             // TODO check ignores here?
-            // Note that if they can't enter this cell because of a thin wall, then they can't bump
-            // any of our other tiles either.  (This is my best guess at the actual behavior, seeing
-            // as walls also block everything but players can obviously bump /those/.)
-            if (! blocked) {
-                if (tile.type.on_bumped) {
-                    tile.type.on_bumped(tile, level, actor);
-                }
+            if (tile.type.on_bumped) {
+                tile.type.on_bumped(tile, level, actor);
             }
 
             if (! tile.blocks(actor, direction, level))
@@ -274,22 +278,18 @@ export class Cell extends Array {
                 return false;
 
             if (! actor.can_push(tile, direction)) {
+                // It's in our way and we can't push it, so we're done here
                 if (push_mode === 'push') {
-                    // Track this instead of returning immediately, because 'push' mode also bumps
-                    // every tile in the cell
-                    blocked = true;
+                    if (actor.type.on_blocked) {
+                        actor.type.on_blocked(actor, level, direction, tile);
+                    }
                 }
-                else {
-                    return false;
-                }
+                return false;
             }
 
             // Collect pushables for later, so we don't inadvertently push through a wall
             pushable_tiles.push(tile);
         }
-
-        if (blocked)
-            return false;
 
         // If we got this far, all that's left is to deal with pushables
         if (pushable_tiles.length > 0) {
@@ -340,7 +340,7 @@ export class Cell extends Array {
             // BLOX replay, and right at the end ice blocks spring mine each other.  also, the wiki
             // suggests something about another actor moving away at the same time?
             if (! (level.compat.emulate_spring_mining && actor.type.is_real_player) &&
-                push_mode === 'push' && this.some(tile => tile.blocks(actor, direction, level)))
+                push_mode === 'push' && this.some(tile => tile && tile.blocks(actor, direction, level)))
                 return false;
         }
 
@@ -349,10 +349,9 @@ export class Cell extends Array {
 
     // Special railroad ability: change the direction we attempt to leave
     redirect_exit(actor, direction) {
-        for (let tile of this) {
-            if (tile.type.redirect_exit) {
-                return tile.type.redirect_exit(tile, actor, direction);
-            }
+        let terrain = this.get_terrain();
+        if (terrain && terrain.type.redirect_exit) {
+            return terrain.type.redirect_exit(terrain, actor, direction);
         }
         return direction;
     }
@@ -455,6 +454,7 @@ export class Level extends LevelInterface {
                 let stored_cell = this.stored_level.linear_cells[n];
                 n++;
 
+                // FIXME give this same treatment to stored cells (otherwise the editor is fucked)
                 for (let template_tile of stored_cell) {
                     let tile = Tile.from_template(template_tile);
                     if (tile.type.is_hint) {
@@ -508,7 +508,7 @@ export class Level extends LevelInterface {
                 if (target_cell_n && target_cell_n < this.width * this.height) {
                     let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
                     for (let tile of this.cell(tx, ty)) {
-                        if (goals === tile.type.name) {
+                        if (tile && goals === tile.type.name) {
                             connectable.connection = tile;
                             break;
                         }
@@ -522,7 +522,7 @@ export class Level extends LevelInterface {
                 for (let cell of this.iter_cells_in_diamond(connectable.cell)) {
                     let target = null;
                     for (let tile of cell) {
-                        if (goals.has(tile.type.name)) {
+                        if (tile && goals.has(tile.type.name)) {
                             target = tile;
                             break;
                         }
@@ -625,7 +625,10 @@ export class Level extends LevelInterface {
                     // Dead end handling (potentially logic gates, etc.)
                     (cell, edge) => {
                         for (let tile of cell) {
-                            if (tile.type.name === 'logic_gate') {
+                            if (! tile) {
+                                continue;
+                            }
+                            else if (tile.type.name === 'logic_gate') {
                                 // Logic gates are the one non-wired tile that get attached to circuits,
                                 // mostly so blue teleporters can follow them
                                 if (! tile.circuits) {
@@ -659,6 +662,8 @@ export class Level extends LevelInterface {
         for (let i = this.linear_cells.length - 1; i >= 0; i--) {
             let cell = this.linear_cells[i];
             for (let tile of cell) {
+                if (! tile)
+                    continue;
                 if (tile.type.on_ready) {
                     tile.type.on_ready(tile, this);
                 }
@@ -737,7 +742,7 @@ export class Level extends LevelInterface {
             for (let i = this.linear_cells.length - 1; i >= 0; i--) {
                 let cell = this.linear_cells[i];
                 for (let tile of cell) {
-                    if (tile.type.on_begin) {
+                    if (tile && tile.type.on_begin) {
                         tile.type.on_begin(tile, this);
                     }
                 }
@@ -1116,6 +1121,7 @@ export class Level extends LevelInterface {
         this.commit();
     }
 
+    // TODO this only has one caller
     _extract_player_directions(input) {
         // Extract directions from an input mask
         let dir1 = null, dir2 = null;
@@ -1322,7 +1328,7 @@ export class Level extends LevelInterface {
         }
         if (forced_only)
             return;
-        if (actor.cell.some(tile => tile.type.traps && tile.type.traps(tile, actor))) {
+        if (terrain.type.traps && terrain.type.traps(terrain, actor)) {
             // An actor in a cloner or a closed trap can't turn
             // TODO because of this, if a tank is trapped when a blue button is pressed, then
             // when released, it will make one move out of the trap and /then/ turn around and
@@ -1366,7 +1372,7 @@ export class Level extends LevelInterface {
     check_movement(actor, orig_cell, direction, push_mode) {
         let dest_cell = this.get_neighboring_cell(orig_cell, direction);
         let success = (dest_cell &&
-            orig_cell.try_leaving(actor, direction) &&
+            orig_cell.try_leaving(actor, direction, this, push_mode) &&
             dest_cell.try_entering(actor, direction, this, push_mode));
 
         // If we have the hook, pull anything behind us, now that we're out of the way.
@@ -1439,12 +1445,8 @@ export class Level extends LevelInterface {
         let speed = actor.type.movement_speed;
 
         let move = DIRECTIONS[direction].movement;
-        if (! this.check_movement(actor, actor.cell, direction, 'push')) {
-            if (actor.type.on_blocked) {
-                actor.type.on_blocked(actor, this, direction);
-            }
+        if (! this.check_movement(actor, actor.cell, direction, 'push'))
             return false;
-        }
 
         // We're clear!  Compute our speed and move us
         // FIXME this feels clunky
@@ -1497,6 +1499,8 @@ export class Level extends LevelInterface {
             // XXX that's still not perfect; if actor X is tic-misaligned, like if there's a chain
             // of 3 or more actors cloning directly onto red buttons for other cloners, then this
             // cannot possibly work
+            // TODO now that i have steam-strict mode this is largely pointless, just do what seems
+            // correct
             actor.cooldown_delay_hack = 1;
             return true;
         }
@@ -1513,14 +1517,21 @@ export class Level extends LevelInterface {
             return;
 
         let original_cell = actor.cell;
+        // Physically remove the actor first, so that it won't get in the way of e.g. a splash
+        // spawned from stepping off of a lilypad
+        this.remove_tile(actor);
 
         // Announce we're leaving, for the handful of tiles that care about it
-        for (let tile of Array.from(original_cell)) {
+        for (let tile of original_cell) {
+            if (! tile)
+                continue;
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))
                 continue;
 
+            // FIXME ah, stepping off a lilypad will add a splash but we're still here?  but then
+            // why did the warning not catch it
             if (tile.type.on_depart) {
                 tile.type.on_depart(tile, this, actor);
             }
@@ -1532,7 +1543,7 @@ export class Level extends LevelInterface {
         }
         for (let tile of goal_cell) {
             // FIXME this could go in on_approach now
-            if (actor === this.player && tile.type.is_hint) {
+            if (tile && actor === this.player && tile.type.is_hint) {
                 this.hint_shown = tile.hint_text ?? this.stored_level.hint;
             }
         }
@@ -1540,7 +1551,9 @@ export class Level extends LevelInterface {
         // Announce we're approaching.  Slide mode is set here, since it's about the tile we're
         // moving towards and needs to last through our next decision
         this.make_slide(actor, null);
-        for (let tile of Array.from(goal_cell)) {
+        for (let tile of goal_cell) {
+            if (! tile)
+                continue;
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))
@@ -1570,10 +1583,17 @@ export class Level extends LevelInterface {
             }
         }
 
-        // Now physically move the actor; we wait until here in case some of those callbacks handled
-        // interactions between actors on the same layer (e.g. monsters erasing splashes)
-        this.remove_tile(actor);
-        this.add_tile(actor, goal_cell);
+        // Now add the actor back; we have to wait this long because e.g. monsters erase splashes
+        if (goal_cell.get_actor()) {
+            // FIXME a monster or block killing the player will still move into her cell!!!  i don't
+            // know what to do about this, i feel like i tried making monster/player block each
+            // other before and it did not go well.  maybe it was an ordering issue though?
+            this.add_tile(actor, original_cell);
+            return;
+        }
+        else {
+            this.add_tile(actor, goal_cell);
+        }
 
         // If we're a monster stepping on the player's tail, that also kills her immediately; the
         // player and a monster must be strictly more than 4 tics apart
@@ -1598,7 +1618,11 @@ export class Level extends LevelInterface {
     // Step on every tile in a cell we just arrived in
     step_on_cell(actor, cell) {
         // Step on topmost things first -- notably, it's safe to step on water with flippers on top
-        for (let tile of Array.from(cell).reverse()) {
+        // TODO is there a custom order here similar to collision checking?
+        for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
+            let tile = cell[layer];
+            if (! tile)
+                continue;
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))
@@ -1607,7 +1631,7 @@ export class Level extends LevelInterface {
             if (tile.type.is_item &&
                 // FIXME implement item priority i'm begging you
                 ((actor.type.has_inventory && ! (tile.type.name === 'key_red' && ! actor.type.is_player)) ||
-                    cell.some(t => t.type.item_modifier === 'pickup')) &&
+                    (cell.get_item_mod() && cell.get_item_mod().type.item_modifier === 'pickup')) &&
                 this.attempt_take(actor, tile))
             {
                 if (tile.type.is_key) {
@@ -1684,7 +1708,7 @@ export class Level extends LevelInterface {
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
             // FIXME should check collision?  otherwise this catches non-blocking vfx...
-            if (dest.cell.some(tile => tile.type.is_actor && tile !== actor && ! tile.type.ttl))
+            if (dest.cell.some(tile => tile && tile.type.is_actor && tile !== actor && ! tile.type.ttl))
                 continue;
 
             // XXX lynx treats this as a slide and does it in a pass in the main loop
@@ -1767,7 +1791,7 @@ export class Level extends LevelInterface {
     // Attempt to place an item in the world, as though dropped by an actor
     _place_dropped_item(name, cell, dropping_actor) {
         let type = TILE_TYPES[name];
-        if (type.draw_layer === 0) {
+        if (type.layer === LAYERS.terrain) {
             // Terrain items (i.e., yellow teleports) can only be dropped on regular floor
             let terrain = cell.get_terrain();
             if (terrain.type.name !== 'floor')
@@ -1794,12 +1818,19 @@ export class Level extends LevelInterface {
             if (type.is_actor) {
                 // This is tricky -- the item has become an actor, but whatever dropped it is
                 // already in this cell's actor layer.  But we also know for sure that there's no
-                // item in this cell, so we'll cheat a little: add it in the item layer, set it
-                // rolling (which should shift it into the next cell over), then switch it to the
-                // actor layer.
-                // TODO do that
-                this.add_actor(tile);
-                this.attempt_out_of_turn_step(tile, dropping_actor.direction);
+                // item in this cell, so we'll cheat a little: remove the dropping actor, set the
+                // item moving, then put the dropping actor back before anyone notices.
+                cell._remove(dropping_actor);
+                this.add_tile(tile, cell);
+                if (! this.attempt_out_of_turn_step(tile, dropping_actor.direction)) {
+                    // It was unable to move, so there's nothing we can do but destroy it
+                    // TODO maybe blow it up with a nonblocking vfx?  in cc2 it just vanishes
+                    this.remove_tile(tile);
+                }
+                else {
+                    this.add_actor(tile);
+                }
+                cell._add(dropping_actor);
             }
             else {
                 this.add_tile(tile, cell);
@@ -1946,7 +1977,9 @@ export class Level extends LevelInterface {
     // Some non-actor tiles still want to act every tic.  Note that this should happen AFTER wiring.
     _do_static_phase() {
         for (let tile of this.static_on_tic_tiles) {
-            tile.type.on_tic(tile, this);
+            if (tile.type.on_tic) {
+                tile.type.on_tic(tile, this);
+            }
         }
     }
 
@@ -1964,6 +1997,7 @@ export class Level extends LevelInterface {
     // The starting cell is iterated last.
     *iter_tiles_in_reading_order(start_cell, name, reverse = false) {
         let i = this.coords_to_scalar(start_cell.x, start_cell.y);
+        let index = TILE_TYPES[name].layer;
         while (true) {
             if (reverse) {
                 i -= 1;
@@ -1977,10 +2011,9 @@ export class Level extends LevelInterface {
             }
 
             let cell = this.linear_cells[i];
-            for (let tile of cell) {
-                if (tile.type.name === name) {
-                    yield tile;
-                }
+            let tile = cell[index];
+            if (tile && tile.type.name === name) {
+                yield tile;
             }
 
             if (cell === start_cell)
@@ -2228,12 +2261,12 @@ export class Level extends LevelInterface {
 
     remove_tile(tile) {
         let cell = tile.cell;
-        let index = cell._remove(tile);
-        this._push_pending_undo(() => cell._add(tile, index));
+        cell._remove(tile);
+        this._push_pending_undo(() => cell._add(tile));
     }
 
-    add_tile(tile, cell, index = null) {
-        cell._add(tile, index);
+    add_tile(tile, cell) {
+        cell._add(tile);
         this._push_pending_undo(() => cell._remove(tile));
     }
 
@@ -2260,13 +2293,28 @@ export class Level extends LevelInterface {
     }
 
     transmute_tile(tile, name) {
-        let current = tile.type.name;
-        this._push_pending_undo(() => tile.type = TILE_TYPES[current]);
-        tile.type = TILE_TYPES[name];
+        let old_type = tile.type;
+        let new_type = TILE_TYPES[name];
+        if (old_type.layer !== new_type.layer) {
+            // Move it to the right layer!
+            let cell = tile.cell;
+            cell._remove(tile);
+            tile.type = new_type;
+            cell._add(tile);
+            this._push_pending_undo(() => {
+                cell._remove(tile);
+                tile.type = old_type;
+                cell._add(tile);
+            });
+        }
+        else {
+            tile.type = new_type;
+            this._push_pending_undo(() => tile.type = old_type);
+        }
 
         // For transmuting into an animation, set up the timer immediately
         if (tile.type.ttl) {
-            if (! TILE_TYPES[current].is_actor) {
+            if (! old_type.is_actor) {
                 console.warn("Transmuting a non-actor into an animation!");
             }
             this._set_tile_prop(tile, 'previous_cell', null);
@@ -2293,7 +2341,7 @@ export class Level extends LevelInterface {
         let dropped_item;
         if (! tile.type.is_key && actor.toolbelt && actor.toolbelt.length >= 4) {
             let oldest_item_type = TILE_TYPES[actor.toolbelt[0]];
-            if (oldest_item_type.draw_layer === 0 && cell.get_terrain().type.name !== 'floor') {
+            if (oldest_item_type.layer === LAYERS.terrain && cell.get_terrain().type.name !== 'floor') {
                 // This is a yellow teleporter, and we are not standing on floor; abort!
                 return false;
             }
@@ -2304,7 +2352,7 @@ export class Level extends LevelInterface {
         }
 
         if (this.give_actor(actor, tile.type.name)) {
-            if (tile.type.draw_layer === 0) {
+            if (tile.type.layer === LAYERS.terrain) {
                 // This should only happen for the yellow teleporter
                 this.transmute_tile(tile, 'floor');
             }

@@ -1,4 +1,4 @@
-import { DIRECTIONS } from './defs.js';
+import { DIRECTIONS, LAYERS } from './defs.js';
 import * as format_base from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 import * as util from './util.js';
@@ -266,7 +266,7 @@ function parse_level(bytes, number) {
 
     // Fix the "floor/empty" nonsense here by adding floor to any cell with no terrain on bottom
     for (let cell of level.linear_cells) {
-        if (cell.length === 0 || cell[0].type.draw_layer !== 0) {
+        if (cell.length === 0 || cell[0].type.layer !== LAYERS.terrain) {
             // No terrain; insert a floor
             cell.unshift({ type: TILE_TYPES['floor'] });
         }

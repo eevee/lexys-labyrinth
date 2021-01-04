@@ -1,4 +1,4 @@
-import { DIRECTIONS, DIRECTION_ORDER } from './defs.js';
+import { DIRECTIONS, DIRECTION_ORDER, LAYERS } from './defs.js';
 import * as format_base from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 import * as util from './util.js';
@@ -1438,7 +1438,7 @@ export function synthesize_level(stored_level) {
             // save it until we reach the terrain layer, and then sub it in instead.
             // TODO if i follow in tyler's footsteps and give swivel its own layer then i'll need to
             // complicate this somewhat
-            if (tile.type.draw_layer === 0 && dummy_terrain_tile) {
+            if (tile.type.layer === LAYERS.terrain && dummy_terrain_tile) {
                 tile = dummy_terrain_tile;
                 spec = REVERSE_TILE_ENCODING[tile.type.name];
             }
