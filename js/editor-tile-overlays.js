@@ -10,8 +10,20 @@ class TileEditorOverlay extends TransientOverlay {
         this.tile = null;
     }
 
-    edit_tile(tile) {
+    edit_tile(tile, cell) {
         this.tile = tile;
+        this.cell = cell;
+    }
+
+    mark_dirty() {
+        if (this.cell) {
+            this.editor.mark_cell_dirty(this.cell);
+        }
+        else {
+            // TODO i guess i'm just kind of assuming it's the palette selection, but it doesn't
+            // necessarily have to be, if i...  do something later
+            this.editor.redraw_palette_selection();
+        }
     }
 
     static configure_tile_defaults(tile) {
@@ -46,13 +58,13 @@ class LetterTileEditor extends TileEditorOverlay {
         list.addEventListener('change', ev => {
             if (this.tile) {
                 this.tile.overlaid_glyph = this.root.elements['glyph'].value;
-                this.editor.mark_tile_dirty(this.tile);
+                this.mark_dirty();
             }
         });
     }
 
-    edit_tile(tile) {
-        super.edit_tile(tile);
+    edit_tile(tile, cell) {
+        super.edit_tile(tile, cell);
         this.root.elements['glyph'].value = tile.overlaid_glyph;
     }
 
@@ -75,8 +87,8 @@ class HintTileEditor extends TileEditorOverlay {
         });
     }
 
-    edit_tile(tile) {
-        super.edit_tile(tile);
+    edit_tile(tile, cell) {
+        super.edit_tile(tile, cell);
         this.text.value = tile.hint_text ?? "";
     }
 
@@ -144,13 +156,13 @@ class FrameBlockTileEditor extends TileEditorOverlay {
             else {
                 this.tile.arrows.delete(ev.target.value);
             }
-            this.editor.mark_tile_dirty(this.tile);
+            this.mark_dirty();
         });
         this.root.append(arrow_list);
     }
 
-    edit_tile(tile) {
-        super.edit_tile(tile);
+    edit_tile(tile, cell) {
+        super.edit_tile(tile, cell);
 
         for (let input of this.root.elements['direction']) {
             input.checked = tile.arrows.has(input.value);
@@ -197,7 +209,7 @@ class RailroadTileEditor extends TileEditorOverlay {
                 else {
                     this.tile.tracks &= ~bit;
                 }
-                this.editor.mark_tile_dirty(this.tile);
+                this.mark_dirty();
             }
         });
         this.root.append(track_list);
@@ -213,7 +225,7 @@ class RailroadTileEditor extends TileEditorOverlay {
         switch_list.addEventListener('change', ev => {
             if (this.tile) {
                 this.tile.track_switch = parseInt(ev.target.value, 10);
-                this.editor.mark_tile_dirty(this.tile);
+                this.mark_dirty();
             }
         });
         this.root.append(switch_list);
@@ -222,8 +234,8 @@ class RailroadTileEditor extends TileEditorOverlay {
         // TODO initial actor facing (maybe only if there's an actor in the cell)
     }
 
-    edit_tile(tile) {
-        super.edit_tile(tile);
+    edit_tile(tile, cell) {
+        super.edit_tile(tile, cell);
 
         for (let input of this.root.elements['track']) {
             input.checked = !! (tile.tracks & (1 << input.value));

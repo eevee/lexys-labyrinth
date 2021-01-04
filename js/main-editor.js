@@ -869,7 +869,7 @@ class WireOperation extends DrawOperation {
                     // Draw
                     tile.wire_directions |= DIRECTIONS[wire_direction].bit;
                 }
-                // TODO this.editor.mark_tile_dirty(tile);
+                this.editor.mark_cell_dirty(cell);
                 break;
             }
 
@@ -921,7 +921,7 @@ class AdjustOperation extends MouseOperation {
             for (let tile of cell) {
                 if (tile && TILES_WITH_PROPS[tile.type.name] !== undefined) {
                     // TODO use the tile's bbox, not the mouse position
-                    this.editor.open_tile_prop_overlay(tile, this.mx0, this.my0);
+                    this.editor.open_tile_prop_overlay(tile, cell, this.mx0, this.my0);
                     break;
                 }
             }
@@ -942,7 +942,7 @@ class AdjustOperation extends MouseOperation {
                 rotated = this.editor.rotate_tile_right(tile);
             }
             if (rotated) {
-                this.editor.mark_tile_dirty(tile);
+                this.editor.mark_cell_dirty(cell);
                 break;
             }
 
@@ -950,7 +950,7 @@ class AdjustOperation extends MouseOperation {
             let other = (this.alt_mode ? ADJUST_TOGGLES_CCW : ADJUST_TOGGLES_CW)[tile.type.name];
             if (other) {
                 tile.type = TILE_TYPES[other];
-                this.editor.mark_tile_dirty(tile);
+                this.editor.mark_cell_dirty(cell);
                 break;
             }
         }
@@ -2397,6 +2397,7 @@ export class Editor extends PrimaryView {
                 }
                 else if (this.palette_selection) {
                     this.rotate_tile_left(this.palette_selection);
+                    this.redraw_palette_selection();
                 }
             }
             else if (ev.key === '.') {
@@ -2405,6 +2406,7 @@ export class Editor extends PrimaryView {
                 }
                 else if (this.palette_selection) {
                     this.rotate_tile_right(this.palette_selection);
+                    this.redraw_palette_selection();
                 }
             }
         });
@@ -2497,7 +2499,7 @@ export class Editor extends PrimaryView {
         this.selected_tile_el.addEventListener('click', ev => {
             if (this.palette_selection && TILES_WITH_PROPS[this.palette_selection.type.name]) {
                 // FIXME use tile bounds
-                this.open_tile_prop_overlay(this.palette_selection, ev.clientX, ev.clientY);
+                this.open_tile_prop_overlay(this.palette_selection, null, ev.clientX, ev.clientY);
             }
         });
         // TODO ones for the palette too??
@@ -2506,10 +2508,12 @@ export class Editor extends PrimaryView {
         let rotate_right_button = mk('button.--image', {type: 'button'}, mk('img', {src: 'icons/rotate-right.png'}));
         rotate_right_button.addEventListener('click', ev => {
             this.rotate_tile_right(this.palette_selection);
+            this.redraw_palette_selection();
         });
         let rotate_left_button = mk('button.--image', {type: 'button'}, mk('img', {src: 'icons/rotate-left.png'}));
         rotate_left_button.addEventListener('click', ev => {
             this.rotate_tile_left(this.palette_selection);
+            this.redraw_palette_selection();
         });
         this.root.querySelector('.controls').append(
             mk('div.editor-tile-controls', rotate_right_button, this.selected_tile_el, rotate_left_button));
@@ -2721,6 +2725,15 @@ export class Editor extends PrimaryView {
     activate() {
         super.activate();
         this.redraw_entire_level();
+        this._schedule_redraw_loop();
+    }
+
+    deactivate() {
+        if (this._redraw_handle) {
+            window.cancelAnimationFrame(this._redraw_handle);
+            this._redraw_handle = null;
+        }
+        super.deactivate();
     }
 
     // Level creation, management, and saving
@@ -3028,7 +3041,7 @@ export class Editor extends PrimaryView {
             this.palette_selection_el.classList.add('--selected');
         }
 
-        this.mark_tile_dirty(tile);
+        this.redraw_palette_selection();
 
         // Some tools obviously don't work with a palette selection, in which case changing tiles
         // should default you back to the pencil
@@ -3048,7 +3061,6 @@ export class Editor extends PrimaryView {
             return false;
         }
 
-        this.mark_tile_dirty(tile);
         return true;
     }
 
@@ -3063,7 +3075,6 @@ export class Editor extends PrimaryView {
             return false;
         }
 
-        this.mark_tile_dirty(tile);
         return true;
     }
 
@@ -3075,24 +3086,53 @@ export class Editor extends PrimaryView {
 
     // -- Drawing --
 
-    mark_tile_dirty(tile) {
-        // TODO partial redraws!  until then, redraw everything
-        if (tile === this.palette_selection) {
-            // FIXME should redraw in an existing canvas
-            this.selected_tile_el.textContent = '';
-            this.selected_tile_el.append(this.renderer.create_tile_type_canvas(tile.type.name, tile));
-        }
-        else {
-            this.redraw_entire_level();
-        }
+    redraw_palette_selection() {
+        // FIXME should redraw in an existing canvas
+        this.selected_tile_el.textContent = '';
+        this.selected_tile_el.append(this.renderer.create_tile_type_canvas(
+            this.palette_selection.type.name, this.palette_selection));
     }
 
     mark_cell_dirty(cell) {
-        this.redraw_entire_level();
+        if (! this._dirty_rect) {
+            this._dirty_rect = new DOMRect(cell.x, cell.y, 1, 1);
+        }
+        else {
+            let rect = this._dirty_rect;
+            if (cell.x < rect.left) {
+                rect.width = rect.right - cell.x;
+                rect.x = cell.x;
+            }
+            else if (cell.x >= rect.right) {
+                rect.width = cell.x - rect.left + 1;
+            }
+            if (cell.y < rect.top) {
+                rect.height = rect.bottom - cell.y;
+                rect.y = cell.y;
+            }
+            else if (cell.y >= rect.bottom) {
+                rect.height = cell.y - rect.top + 1;
+            }
+        }
     }
 
     redraw_entire_level() {
         this.renderer.draw_static_region(0, 0, this.stored_level.size_x, this.stored_level.size_y);
+    }
+
+    _schedule_redraw_loop() {
+        this._redraw_handle = window.requestAnimationFrame(this._redraw_dirty.bind(this));
+        this._dirty_rect = null;
+    }
+
+    // Automatically redraw only what's changed
+    _redraw_dirty() {
+        if (this._dirty_rect) {
+            this.renderer.draw_static_region(
+                this._dirty_rect.left, this._dirty_rect.top,
+                this._dirty_rect.right, this._dirty_rect.bottom);
+            this._schedule_redraw_loop();
+        }
     }
 
     // -- Utility/inspection --
@@ -3179,12 +3219,12 @@ export class Editor extends PrimaryView {
 
     // -- Misc?? --
 
-    open_tile_prop_overlay(tile, x0, y0) {
+    open_tile_prop_overlay(tile, cell, x0, y0) {
         this.cancel_mouse_operation();
         // FIXME keep these around, don't recreate them constantly
         let overlay_class = TILES_WITH_PROPS[tile.type.name];
         let overlay = new overlay_class(this.conductor);
-        overlay.edit_tile(tile);
+        overlay.edit_tile(tile, cell);
         overlay.open();
 
         // FIXME move this into TransientOverlay or some other base class
