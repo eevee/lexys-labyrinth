@@ -180,7 +180,7 @@ export class CanvasRenderer {
                 // potential interest underneath
                 let perception = this.perception;
                 if (perception !== 'normal' &&
-                    ! cell.some(t => t && t.type.layer < layer && ! (
+                    ! cell.some(t => t && t.type.layer < LAYERS.actor && ! (
                         t.type.name === 'floor' && (t.wire_directions | t.wire_tunnel_directions) === 0)))
                 {
                     perception = 'normal';
