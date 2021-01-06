@@ -3127,6 +3127,7 @@ export class Editor extends PrimaryView {
 
     // Automatically redraw only what's changed
     _redraw_dirty() {
+        // TODO draw sparkle background under the starting player
         if (this._dirty_rect) {
             this.renderer.draw_static_region(
                 this._dirty_rect.left, this._dirty_rect.top,

@@ -62,6 +62,7 @@ function _define_door(key) {
                 level.take_tool_from_actor(other, 'skeleton_key'))
             {
                 level.sfx.play_once('door', me.cell);
+                level.spawn_animation(me.cell, 'puff');
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -83,6 +84,7 @@ function _define_gate(key) {
                 level.take_tool_from_actor(other, 'skeleton_key'))
             {
                 level.sfx.play_once('door', me.cell);
+                level.spawn_animation(me.cell, 'puff');
                 level.remove_tile(me);
             }
         },
@@ -271,6 +273,7 @@ const TILE_TYPES = {
             }
         },
         on_depart(me, level, other) {
+            level.spawn_animation(me.cell, 'puff');
             level.transmute_tile(me, 'wall');
         },
     },
@@ -280,6 +283,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_depart(me, level, other) {
+            level.spawn_animation(me.cell, 'puff');
             level.transmute_tile(me, 'popwall');
         },
     },
@@ -320,6 +324,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_bumped(me, level, other) {
             if (other.type.can_reveal_walls) {
+                level.spawn_animation(me.cell, 'puff');
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -2625,6 +2630,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (level.chips_remaining === 0) {
                 level.sfx.play_once('socket', me.cell);
+                level.spawn_animation(me.cell, 'puff');
                 level.transmute_tile(me, 'floor');
             }
         },
@@ -2712,7 +2718,13 @@ const TILE_TYPES = {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
-        ttl: 6 * 3,
+        ttl: 4 * 3,
+    },
+    puff: {
+        layer: LAYERS.vfx,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 4 * 3,
     },
 
     // Invalid tiles that appear in some CCL levels because community level

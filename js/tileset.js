@@ -1,37 +1,14 @@
 import { DIRECTIONS } from './defs.js';
 import TILE_TYPES from './tiletypes.js';
 
-// TODO really need to specify this format more concretely, whoof
-// XXX special kinds of drawing i know this has for a fact:
-// - letter tiles draw from a block (one of two blocks!) of half-tiles onto the center of the base
-// - force floors are cropped from a double-size tile
-// - wired tiles are a whole thing (floor)
-// - thin walls are packed into just two tiles
-// - directional blocks have arrows in an awkward layout, not 4x4 grid but actually positioned on the edges
-// - green and purple toggle walls use an overlay
-// - turtles use an overlay, seem to pick a tile at random every so often
-// - animations are common, should maybe have configurable timing??
-// - custom floors and walls /should/ be consolidated into a single tile probably
-// - thin walls should probably be consolidated?
-// - traps have a state
-
-// special features i currently have
-// - directions for actors, can be used anywhere
-// - arrows: for directional blocks
-// - wired: for wired tiles
-// - overlay: for green/purple walls mostly, also some bogus cc1 tiles
-
-// things that are currently NOT handled
-// - bomb is supposed to have a fuse
-// - critters should only animate when moving
-// - rover animation depends on behavior, also has a quarter-tile overlay for its direction
-// - slime and walkers have double-size tiles when moving
-// - logic gates draw over the stuff underneath them
-// - railroad tracks overlay a Lot
-// - canopy, at all
-// - swivel's floor (eugh)
-// - xray vision
-// - editor vision
+// TODO move the remaining stuff (arrows, overlay i think, probably force floor thing) into specials
+// TODO more explicitly define animations, give them a speed!  maybe fold directions into it
+// TODO relatedly, the push animations are sometimes glitchy depending on when you start?
+// TODO animate swimming player always
+// TODO life might be easier if i used the lynx-style loop with cooldown at the end
+// TODO define a draw state object to pass into here; need it for making turtles work right, fixing
+// blur with cc2 blobs/walkers, also makes a lot of signatures cleaner (make sure not slower)
+// TODO monsters should only animate while moving?  (not actually how cc2 works...)
 export const CC2_TILESET_LAYOUT = {
     '#wire-width': 1/16,
 
@@ -144,9 +121,16 @@ export const CC2_TILESET_LAYOUT = {
         3: [3, 4],
         4: [4, 4],
     },
-    bomb: [5, 4],
-    green_bomb: [6, 4],
-    // TODO bomb fuse tile, ugh
+    bomb: {
+        special: 'bomb-fuse',
+        bomb: [5, 4],
+        fuse: [7, 4],
+    },
+    green_bomb: {
+        special: 'bomb-fuse',
+        bomb: [6, 4],
+        fuse: [7, 4],
+    },
     floor_custom_green: [8, 4],
     floor_custom_pink: [9, 4],
     floor_custom_yellow: [10, 4],
@@ -181,7 +165,7 @@ export const CC2_TILESET_LAYOUT = {
     suction_boots: [3, 6],
     hiking_boots: [4, 6],
     lightning_bolt: [5, 6],
-    // FIXME draw the current player background...  more external state for the renderer though...
+    '#active-player-background': [6, 6],
     // TODO dopps can push but i don't think they have any other visuals
     doppelganger1: {
         base: [7, 6],
@@ -313,26 +297,34 @@ export const CC2_TILESET_LAYOUT = {
     foil: [12, 12],
     turtle: {
         // Turtles draw atop fake water, but don't act like water otherwise
-        overlay: [13, 12],  // TODO also 14 + 15 for sinking
+        overlay: [13, 12],  // TODO also 14 + 15, bobbing pseudorandomly
         base: 'water',
     },
 
-    walker: [0, 13],
-    // FIXME walker animations span multiple tiles
+    walker: {
+        special: 'double-size-monster',
+        base: [0, 13],
+        vertical: [[1, 13], [2, 13], [3, 13], [4, 13], [5, 13], [6, 13], [7, 13]],
+        horizontal: [[8, 13], [10, 13], [12, 13], [14, 13], [8, 14], [10, 14], [12, 14]],
+    },
     helmet: [0, 14],
     stopwatch_toggle: [14, 14],
     stopwatch_bonus: [15, 14],
 
-    blob: [0, 15],
-    // FIXME blob animations span multiple tiles
-    // TODO [0, 16] some kinda red/blue outline
+    blob: {
+        special: 'double-size-monster',
+        base: [0, 15],
+        vertical: [[1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15]],
+        horizontal: [[8, 15], [10, 15], [12, 15], [14, 15], [8, 16], [10, 16], [12, 16]],
+    },
+    // (cc2 editor copy/paste outline)
     floor_mimic: {
         special: 'perception',
         modes: new Set(['palette', 'editor', 'xray']),
         hidden: [0, 2],
         revealed: [14, 16],
     },
-    // TODO [15, 16] some kinda yellow/black outline
+    // (cc2 editor cursor outline)
 
     // timid teeth
     teeth_timid: {
@@ -352,24 +344,27 @@ export const CC2_TILESET_LAYOUT = {
         west: [[14, 17], [15, 17]],
     },
 
-    // TODO rover has an overlay showing its direction
     rover: {
+        special: 'rover',
+        direction: [10, 18],
         inert: [0, 18],
         teeth: [[0, 18], [8, 18]],
-        glider: [
-            // quite fast
-            [0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18],
-            [0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18],
+        // cw, slow
+        glider: [[0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18]],
+        // ccw, fast
+        bug: [
+            [7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18],
+            [7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18],
         ],
-        bug: [[0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18]],
         ball: [[0, 18], [4, 18]],
         teeth_timid: [[0, 18], [9, 18]],
-        fireball: [
-            // quite fast
-            [7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18],
-            [7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18],
+        // ccw, slow
+        fireball: [[7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18]],
+        // cw, fast
+        paramecium: [
+            [0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18],
+            [0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18],
         ],
-        paramecium: [[7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18]],
         walker: [[8, 18], [9, 18]],
     },
     xray_eye: [11, 18],
@@ -424,19 +419,19 @@ export const CC2_TILESET_LAYOUT = {
             west: [8, 23],
             east: [8, 22],
         },
-        blocked: 'pushing',
+        blocked: {
+            north: [8, 24],
+            east: [9, 24],
+            south: [10, 24],
+            west: [11, 24],
+        },
         moving: {
             north: [[0, 22], [1, 22], [2, 22], [3, 22], [4, 22], [5, 22], [6, 22], [7, 22]],
             east: [[8, 22], [9, 22], [10, 22], [11, 22], [12, 22], [13, 22], [14, 22], [15, 22]],
             south: [[0, 23], [1, 23], [2, 23], [3, 23], [4, 23], [5, 23], [6, 23], [7, 23]],
             west: [[8, 23], [9, 23], [10, 23], [11, 23], [12, 23], [13, 23], [14, 23], [15, 23]],
         },
-        pushing: {
-            north: [8, 24],
-            east: [9, 24],
-            south: [10, 24],
-            west: [11, 24],
-        },
+        pushing: 'blocked',
         swimming: {
             north: [[0, 24], [1, 24]],
             east: [[2, 24], [3, 24]],
@@ -594,7 +589,6 @@ export const CC2_TILESET_LAYOUT = {
         [15, 29],
     ],
 
-    // TODO handle train tracks!  this is gonna be complicated.
     railroad: {
         special: 'railroad',
         base: [9, 10],
@@ -817,6 +811,12 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
 
     // Extra player sprites
     player: Object.assign({}, CC2_TILESET_LAYOUT.player, {
+        pushing: {
+            north: [[8, 24], [0, 34], [8, 24], [1, 34]],
+            east: [[9, 24], [2, 34], [9, 24], [3, 34]],
+            south: [[10, 24], [4, 34], [10, 24], [5, 34]],
+            west: [[11, 24], [6, 34], [11, 24], [7, 34]],
+        },
         skating: {
             north: [0, 33],
             east: [1, 33],
@@ -834,7 +834,19 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
         slimed: [1, 38],
     }),
     player2: Object.assign({}, CC2_TILESET_LAYOUT.player2, {
-        // TODO skating
+        pushing: {
+            north: [[8, 29], [8, 34], [8, 29], [9, 34]],
+            east: [[9, 29], [10, 34], [9, 29], [11, 34]],
+            south: [[10, 29], [12, 34], [10, 29], [13, 34]],
+            west: [[11, 29], [14, 34], [11, 29], [15, 34]],
+        },
+        skating: {
+            north: [8, 33],
+            east: [9, 33],
+            south: [10, 33],
+            west: [11, 33],
+        },
+        forced: 'skating',
         exited: [15, 32],
         burned: {
             north: [12, 33],
@@ -880,9 +892,19 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     // Custom VFX
     splash_slime: [[0, 38], [1, 38], [2, 38], [3, 38]],
     teleport_flash: [[4, 38], [5, 38], [6, 38], [7, 38]],
+    chip_extra: {
+        special: 'perception',
+        modes: new Set(['palette', 'editor']),
+        hidden: [[11, 3], [0, 39], [1, 39], [0, 39]],
+        revealed: [10, 3],
+    },
+    chip: [[11, 3], [0, 39], [1, 39], [0, 39]],
+    green_chip: [[9, 3], [2, 39], [3, 39], [2, 39]],
+    // FIXME make these work with a stock tileset
     player1_exit: [[8, 38], [9, 38], [10, 38], [11, 38]],
     player2_exit: [[12, 38], [13, 38], [14, 38], [15, 38]],
-    transmogrify_flash: [[4, 39], [5, 39], [6, 39], [7, 39]],
+    puff: [[4, 39], [5, 39], [6, 39], [7, 39]],
+    transmogrify_flash: [[8, 39], [9, 39], [10, 39], [11, 39], [12, 39], [13, 39], [14, 39], [15, 39]],
 
     // More custom tiles
     gate_red: [0, 40],
@@ -921,46 +943,44 @@ export class Tileset {
 
         // Deal with animation
         if (coords[0] instanceof Array) {
-            if (tic !== null) {
-                if (tile && tile.movement_speed) {
-                    // This tile reports its own animation timing (in frames), so trust that, and
-                    // just use the current tic's fraction.
-                    // That said: adjusting animation speed complicates this slightly.  Consider the
-                    // player's walk animation, which takes 4 tics to complete, during which time we
-                    // cycle through 8 frames.  Playing that at half speed means only half the
-                    // animation actually plays, but if the player continues walking, then on the
-                    // NEXT four tics, we should play the other half.  To make this work, use the
-                    // tic as a global timer as well: if the animation started on tics 0-4, play the
-                    // first half; if it started on tics 5-8, play the second half.  They could get
-                    // out of sync if the player hesitates, but no one will notice that, and this
-                    // approach minimizes storing extra state.
-                    let i = ((tile.movement_speed - tile.movement_cooldown) + tic % 1 * 3) / tile.movement_speed;
-                    // FIXME hack for cc2 mode, the only place we can see a cooldown of 0 which
-                    // makes i be 1
-                    i = Math.min(0.999, i);
-                    // But do NOT do this for explosions or splashes, which have a fixed duration
-                    // and only play once
-                    if (this.animation_slowdown > 1 && ! tile.type.ttl) {
-                        // i ranges from [0, 1), but a slowdown of N means we'll only play the first
-                        // 1/N of it before the game ends (or loops) the animation.
-                        // So increase by [0..N-1] to get it in some other range, then divide by N
-                        // to scale back down to [0, 1)
-                        i += Math.floor(tic * 3 / tile.movement_speed % this.animation_slowdown);
-                        i /= this.animation_slowdown;
-                    }
-                    coords = coords[Math.floor(i * coords.length)];
+            if (tic === null) {
+                coords = coords[0];
+            }
+            else if (tile && tile.movement_speed) {
+                // This tile reports its own animation timing (in frames), so trust that, and use
+                // the current tic's fraction.  If we're between tics, interpolate.
+                // FIXME if the game ever runs every frame we will have to adjust the interpolation
+                let p = ((tile.movement_speed - tile.movement_cooldown) + tic % 1 * 3) / tile.movement_speed;
+                if (this.animation_slowdown > 1 && ! tile.type.ttl) {
+                    // The players have full walk animations, but they look very silly when squeezed
+                    // into the span of a single step, so instead we only play half at a time.  The
+                    // halves alternate, so the player still sees the whole animation when walking
+                    // continuously.  To make this work, consider: p, the current progress through
+                    // the animation, is in [0, 1).  To play the first half, we want [0, 0.5); to
+                    // play the second half, we want [0.5, 1).  Thus we add an integer in [0, 2) to
+                    // offset us into which half to play, then divide by 2 to renormalize.
+                    // Which half to use is determined by when the animation /started/, as measured
+                    // in animation lengths.
+                    let start_time = (tic * 3 / tile.movement_speed) - p;
+                    // Rounding smooths out float error (assuming the framerate never exceeds 1000)
+                    let segment = Math.floor(Math.round(start_time * 1000) / 1000 % this.animation_slowdown);
+                    p = (p + segment) / this.animation_slowdown;
                 }
-                else if (tile && tile.type.movement_speed) {
-                    // This is an actor that's not moving, so use the first frame
-                    coords = coords[0];
+                // Lexy runs cooldown from S to 1; CC2 from S-1 to 0.  0 is bad, because p becomes 1
+                // and will overflow the cel lookup
+                // FIXME handle this better!  it happens even to lexy
+                if (p >= 1) {
+                    p = 0.999;
                 }
-                else {
-                    // This tile animates on a global timer, one cycle every quarter of a second
-                    coords = coords[Math.floor(tic / this.animation_slowdown % 5 / 5 * coords.length)];
-                }
+                coords = coords[Math.floor(p * coords.length)];
+            }
+            else if (tile && tile.type.movement_speed) {
+                // This is an actor that's not moving, so use the first frame
+                coords = coords[0];
             }
             else {
-                coords = coords[0];
+                // This tile animates on a global timer, one cycle every quarter of a second
+                coords = coords[Math.floor(tic / this.animation_slowdown % 5 / 5 * coords.length)];
             }
         }
 
@@ -1030,6 +1050,91 @@ export class Tileset {
         else {
             blit(...drawspec.west);
         }
+    }
+
+    _draw_bomb_fuse(drawspec, tile, tic, blit) {
+        // Draw the base bomb
+        this._draw_standard(drawspec.bomb, tile, tic, blit);
+
+        // The fuse is made up of four quarter-tiles and animates...  um...  at a rate.  I cannot
+        // tell.  I have spent over an hour poring over this and cannot find a consistent pattern.
+        // It might be random!  I'm gonna say it loops every 0.3 seconds = 18 frames, so 4.5 frames
+        // per cel, I guess.  No one will know.  (But...  I'll know.)
+        // Also it's drawn in the upper right, that's important.
+        let cel = Math.floor(tic / 0.3 * 4) % 4;
+        blit(...drawspec.fuse, 0.5 * (cel % 2), 0.5 * Math.floor(cel / 2), 0.5, 0.5, 0.5, 0);
+    }
+
+    _draw_double_size_monster(drawspec, tile, tic, blit) {
+        // CC2's tileset has double-size art for blobs and walkers that spans the tile they're
+        // moving from AND the tile they're moving into.
+        // First, of course, this only happens if they're moving at all.
+        if (! tile || ! tile.movement_speed) {
+            this._draw_standard(drawspec.base, tile, tic, blit);
+            return;
+        }
+
+        // They only support horizontal and vertical moves, not all four directions.  The other two
+        // directions are simply the animations played in reverse.
+        let axis_cels;
+        let w = 1, h = 1, x = 0, y = 0, reverse = false;
+        if (tile.direction === 'north') {
+            axis_cels = drawspec.vertical;
+            reverse = true;
+            h = 2;
+        }
+        else if (tile.direction === 'south') {
+            axis_cels = drawspec.vertical;
+            h = 2;
+        }
+        else if (tile.direction === 'west') {
+            axis_cels = drawspec.horizontal;
+            reverse = true;
+            w = 2;
+        }
+        else if (tile.direction === 'east') {
+            axis_cels = drawspec.horizontal;
+            w = 2;
+        }
+
+        // FIXME lexy is n to 1, cc2 n-1 to 0, and this mixes them
+        let p = tile.movement_speed - tile.movement_cooldown;
+        p = (p + tic % 1 * 3) / tile.movement_speed;
+        p = Math.min(p, 0.999);  // FIXME hack for differing movement counters
+        let index = Math.floor(p * (axis_cels.length + 1));
+        if (index === 0 || index > axis_cels.length) {
+            this._draw_standard(drawspec.base, tile, tic, blit);
+        }
+        else {
+            // Tragically we have to counter the renderer's attempts to place the tile at its visual
+            // position
+            // FIXME this gets off the pixel grid because the value already baked into blit() has
+            // already been rounded.  i don't know how to fix this
+            let [vx, vy] = tile.visual_position(tic % 1);
+            let cel = reverse ? axis_cels[axis_cels.length - index] : axis_cels[index - 1];
+            blit(...cel, 0, 0, w, h, x - vx % 1, y - vy % 1);
+        }
+    }
+
+    _draw_rover(drawspec, tile, tic, blit) {
+        // Rovers draw fairly normally (with their visual_state giving the monster they're copying),
+        // but they also have an overlay indicating their direction
+        let state = tile ? tile.type.visual_state(tile) : 'inert';
+        this._draw_standard(drawspec[state], tile, tic, blit);
+
+        if (! tile)
+            return;
+
+        // The direction overlay is one of four quarter-tiles, drawn about in the center of the
+        // rover but shifted an eighth of a tile in the direction in question
+        let overlay_position = this._rotate(tile.direction, 0.25, 0.125, 0.75, 0.625);
+        let index = {north: 0, east: 1, west: 2, south: 3}[tile.direction];
+        if (index === undefined)
+            return;
+        blit(
+            ...drawspec.direction,
+            0.5 * (index % 2), 0.5 * Math.floor(index / 2), 0.5, 0.5,
+            overlay_position[0], overlay_position[1]);
     }
 
     _draw_logic_gate(drawspec, tile, tic, blit) {
@@ -1188,6 +1293,18 @@ export class Tileset {
             }
             else if (drawspec.special === 'thin_walls_cc1') {
                 this._draw_thin_walls_cc1(drawspec, tile, tic, blit);
+                return;
+            }
+            else if (drawspec.special === 'bomb-fuse') {
+                this._draw_bomb_fuse(drawspec, tile, tic, blit);
+                return;
+            }
+            else if (drawspec.special === 'double-size-monster') {
+                this._draw_double_size_monster(drawspec, tile, tic, blit);
+                return;
+            }
+            else if (drawspec.special === 'rover') {
+                this._draw_rover(drawspec, tile, tic, blit);
                 return;
             }
             else if (drawspec.special === 'perception') {

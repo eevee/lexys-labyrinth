@@ -28,11 +28,16 @@ export class CanvasRenderer {
         this.show_actor_bboxes = false;
         this.use_rewind_effect = false;
         this.perception = 'normal';  // normal, xray, editor, palette
+        this.active_player = null;
     }
 
     set_level(level) {
         this.level = level;
         // TODO update viewport size...  or maybe Game should do that since you might be cheating
+    }
+
+    set_active_player(actor) {
+        this.active_player = actor;
     }
 
     // Change the viewport size.  DOES NOT take effect until the next redraw!
@@ -176,19 +181,23 @@ export class CanvasRenderer {
                 vx = Math.floor(vx * tw + 0.5) / tw;
                 vy = Math.floor(vy * th + 0.5) / th;
 
-                // For actors (i.e., blocks), perception only applies if there's something of
-                // potential interest underneath
+                // For blocks, perception only applies if there's something of interest underneath
                 let perception = this.perception;
-                if (perception !== 'normal' &&
+                if (perception !== 'normal' && actor.type.is_block &&
                     ! cell.some(t => t && t.type.layer < LAYERS.actor && ! (
                         t.type.name === 'floor' && (t.wire_directions | t.wire_tunnel_directions) === 0)))
                 {
                     perception = 'normal';
                 }
 
-                this.tileset.draw(
-                    actor, tic, perception,
-                    this._make_tileset_blitter(this.ctx, vx - x0, vy - y0));
+                let blit = this._make_tileset_blitter(this.ctx, vx - x0, vy - y0);
+
+                // Draw the active player background
+                if (actor === this.active_player) {
+                    this.tileset.draw_type('#active-player-background', null, tic, perception, blit);
+                }
+
+                this.tileset.draw(actor, tic, perception, blit);
             }
         }
         for (let x = xf0; x <= x1; x++) {

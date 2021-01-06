@@ -1352,6 +1352,8 @@ class Player extends PrimaryView {
         }
         this.message_el.textContent = this.level.hint_shown ?? "";
 
+        this.renderer.set_active_player(this.level.remaining_players > 1 ? this.level.player : null);
+
         // Keys appear in a consistent order
         for (let [key, nodes] of Object.entries(this.inventory_key_nodes)) {
             let count = this.level.player.keyring[key] ?? 0;
@@ -2627,6 +2629,7 @@ class PackTestDialog extends DialogOverlay {
                             height: Math.min(this.renderer.canvas.height, level.size_y * tileset.size_y),
                         });
                         this.renderer.set_level(level);
+                        this.renderer.set_active_player(level.player);
                         this.renderer.draw();
                         canvas.getContext('2d').drawImage(
                             this.renderer.canvas, 0, 0,
