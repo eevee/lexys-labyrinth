@@ -412,7 +412,6 @@ export class Level extends LevelInterface {
         // global clock which doesn't get reset between levels (!).
         this.step_parity = 5;
 
-        this.hint_shown = null;
         // TODO in lynx/steam, this carries over between levels; in tile world, you can set it manually
         this.force_floor_direction = 'north';
         // PRNG is initialized to zero
@@ -668,9 +667,6 @@ export class Level extends LevelInterface {
                 if (tile.type.on_ready) {
                     tile.type.on_ready(tile, this);
                 }
-                if (cell === this.player.cell && tile.type.is_hint) {
-                    this.hint_shown = tile.hint_text ?? this.stored_level.hint;
-                }
             }
         }
         // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
@@ -760,7 +756,7 @@ export class Level extends LevelInterface {
             for (let key of [
                     '_rng1', '_rng2', '_blob_modifier', 'force_floor_direction',
                     'tic_counter', 'time_remaining', 'timer_paused',
-                    'chips_remaining', 'bonus_points', 'hint_shown', 'state',
+                    'chips_remaining', 'bonus_points', 'state',
                     'remaining_players', 'player',
             ]) {
                 this.pending_undo.level_props[key] = this[key];
@@ -1547,17 +1543,6 @@ export class Level extends LevelInterface {
             }
         }
 
-        // Check for a couple effects that always apply immediately
-        if (actor === this.player) {
-            this.hint_shown = null;
-        }
-        for (let tile of goal_cell) {
-            // FIXME this could go in on_approach now
-            if (tile && actor === this.player && tile.type.is_hint) {
-                this.hint_shown = tile.hint_text ?? this.stored_level.hint;
-            }
-        }
-
         // Announce we're approaching.  Slide mode is set here, since it's about the tile we're
         // moving towards and needs to last through our next decision
         this.make_slide(actor, null);
@@ -1760,7 +1745,9 @@ export class Level extends LevelInterface {
         this.set_actor_direction(actor, direction);
 
         this.spawn_animation(actor.cell, 'teleport_flash');
-        this.spawn_animation(dest.cell, 'teleport_flash');
+        if (dest.cell !== actor.cell) {
+            this.spawn_animation(dest.cell, 'teleport_flash');
+        }
 
         // Now physically move the actor, but their movement waits until next decision phase
         this.remove_tile(actor);

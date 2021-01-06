@@ -296,7 +296,7 @@ class Player extends PrimaryView {
         this.root.style.setProperty('--tile-height', `${this.conductor.tileset.size_y}px`);
         this.level_el = this.root.querySelector('.level');
         this.overlay_message_el = this.root.querySelector('.overlay-message');
-        this.message_el = this.root.querySelector('.message');
+        this.hint_el = this.root.querySelector('.player-hint');
         this.chips_el = this.root.querySelector('.chips output');
         this.time_el = this.root.querySelector('.time output');
         this.bonus_el = this.root.querySelector('.bonus output');
@@ -1061,6 +1061,7 @@ class Player extends PrimaryView {
         this.last_advance = 0;
         this.current_keyring = {};
         this.current_toolbelt = [];
+        this.previous_hint_tile = null;
 
         this.chips_el.classList.remove('--done');
         this.time_el.classList.remove('--frozen');
@@ -1350,7 +1351,38 @@ class Player extends PrimaryView {
         if (this.level.bonus_points > 0) {
             this.root.classList.add('--bonus-visible');
         }
-        this.message_el.textContent = this.level.hint_shown ?? "";
+
+        // Check for the player standing on a hint tile; this is slightly invasive but lets us
+        // notice exactly when it changes (and anyway it's a UI thing, not gameplay)
+        let terrain = this.level.player.cell.get_terrain();
+        let hint_tile = null;
+        if (terrain.type.is_hint) {
+            hint_tile = terrain;
+        }
+        if (hint_tile !== this.previous_hint_tile) {
+            this.previous_hint_tile = hint_tile;
+            this.hint_el.textContent = '';
+            if (hint_tile) {
+                // Parse out %X sequences and replace them with <kbd> elements
+                let hint_text = hint_tile.hint_text ?? this.level.stored_level.hint;
+                for (let [i, chunk] of hint_text.split(/%(\w)/).entries()) {
+                    if (i % 2 === 0) {
+                        this.hint_el.append(chunk);
+                    }
+                    else {
+                        // TODO better place to get these?
+                        // TODO 1 through 7 are player 2's inputs in split-screen mode
+                        let key = {
+                            // up, down, left, right
+                            U: 'W', D: 'S', L: 'A', R: 'D',
+                            // drop, cycle, swap
+                            P: 'Q', C: 'E', S: 'C',
+                        }[chunk] ?? "?";
+                        this.hint_el.append(mk('kbd', key));
+                    }
+                }
+            }
+        }
 
         this.renderer.set_active_player(this.level.remaining_players > 1 ? this.level.player : null);
 

@@ -125,6 +125,14 @@ pre {
 code {
     color: #c0c0e0;
 }
+kbd {
+    padding: 0 0.25em;
+    border: 1px solid currentColor;
+    border-radius: 0.25em;
+    box-shadow: 0 2px 0 currentColor;
+    text-align: center;
+    text-transform: uppercase;
+}
 
 a {
     color: #c0c0c0;
@@ -931,7 +939,7 @@ ol.packtest-summary > li {
         "level      chips"      min-content
         "level      time"       min-content
         "level      bonus"      min-content
-        "level      message"    1fr
+        "level      hint"       1fr
         "level      inventory"  min-content
         /* Need explicit min-content to force the hint to wrap */
         / min-content min-content
@@ -1093,8 +1101,8 @@ dl.score-chart .-sum {
     display: flex;
 }
 
-.message {
-    grid-area: message;
+#player-game-area > .player-hint {
+    grid-area: hint;
     align-self: stretch;
 
     font-size: calc(var(--tile-height) * var(--scale) / 3);
@@ -1105,10 +1113,10 @@ dl.score-chart .-sum {
     background: #080808;
     border: 1px inset #202020;
 
-    /* FIXME find a way to enforce that the message never makes the grid get bigger */
+    /* FIXME find a way to enforce that the hint never makes the grid get bigger */
     overflow: auto;
 }
-.message:empty {
+#player-game-area > .player-hint:empty {
     display: none;
 }
 
@@ -1186,14 +1194,8 @@ dl.score-chart .-sum {
     left: 0;
     right: 0;
     top: -2em;
-    width: 1em;
     margin: auto;
     color: #404040;
-    border: 1px solid #202020;
-    border-radius: 0.25em;
-    box-shadow: 0 2px 0 #202020;
-    text-align: center;
-    text-transform: uppercase;
 }
 #player button:disabled .keyhint {
     display: none;
@@ -1422,7 +1424,7 @@ body.--debug #player-debug {
         /* stick me in the center right */
         place-self: center end;
     }
-    #player .message {
+    #player > .player-hint {
         /* Overlay hints on the inventory area */
         grid-row: chips / bonus;
         grid-column: level;
