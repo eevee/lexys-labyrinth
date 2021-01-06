@@ -1491,11 +1491,35 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     floor_custom_green: {
         name: "Custom floor",
-        desc: "Decorative flooring.  Acts like normal floor.  Stops ghosts.",
+        desc: "Decorative.  Acts like normal floor, but stops ghosts.",
+    },
+    floor_custom_red: {
+        name: "Custom floor",
+        desc: "Decorative.  Acts like normal floor, but stops ghosts.",
+    },
+    floor_custom_yellow: {
+        name: "Custom floor",
+        desc: "Decorative.  Acts like normal floor, but stops ghosts.",
+    },
+    floor_custom_blue: {
+        name: "Custom floor",
+        desc: "Decorative.  Acts like normal floor, but stops ghosts.",
     },
     wall_custom_green: {
         name: "Custom wall",
-        desc: "Decorative flooring.  Acts like normal wall.  Stops ghosts.",
+        desc: "Decorative.  Acts like normal wall, but stops ghosts.",
+    },
+    wall_custom_red: {
+        name: "Custom wall",
+        desc: "Decorative.  Acts like normal wall, but stops ghosts.",
+    },
+    wall_custom_yellow: {
+        name: "Custom wall",
+        desc: "Decorative.  Acts like normal wall, but stops ghosts.",
+    },
+    wall_custom_blue: {
+        name: "Custom wall",
+        desc: "Decorative.  Acts like normal wall, but stops ghosts.",
     },
     door_blue: {
         name: "Blue door",
@@ -1719,7 +1743,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     ghost: {
         name: "Ghost",
-        desc: "Turns left when it hits something.  Passes freely through almost all obstacles except blocks and other monsters, steel walls, water, lilypads, and custom floors/walls.  Does not set off mines.  Collects items and opens doors.  With fire boots, erases fire it steps on.  With flippers, can pass through water, but not lilypads.  Can only be destroyed by flame jets.",
+        desc: "Turns left when it hits something.  Passes freely through almost all obstacles except blocks and other monsters, steel walls, water, lilypads, and custom floors/walls.  Does not set off mines.  Collects items and opens doors.  With fire boots, erases fire it steps on.  With flippers, can pass through water, but not lilypads.  Can only be destroyed by flame jets, bowling balls, and dynamite.",
     },
     rover: {
         name: "Rover",
@@ -1833,7 +1857,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     stopwatch_penalty: {
         name: "Time penalty",
-        desc: "Subtracts ten seconds from the clock.  If less than ten seconds remain, the player will fail immediately.  An untimed level becomes timed and fails immediately.",
+        desc: "Subtracts ten seconds from the clock.  If less than ten seconds remain, the clock will be reduced to its minimum, and the player will fail immediately if the clock is not paused.  An untimed level becomes timed and fails immediately.",
     },
     stopwatch_toggle: {
         name: "Stopwatch",
