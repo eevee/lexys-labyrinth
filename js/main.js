@@ -467,6 +467,9 @@ class Player extends PrimaryView {
         key_target.addEventListener('keydown', ev => {
             if (! this.active)
                 return;
+            // Ignore IME composition and repeat events
+            if (ev.isComposing || ev.keyCode === 229 || ev.repeat)
+                return;
             this.using_touch = false;
 
             if (ev.key === 'p' || ev.key === 'Pause') {
