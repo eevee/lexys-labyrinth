@@ -1198,7 +1198,6 @@ export class Level extends LevelInterface {
         // Q, you'll throw the first, wait a second or so, then release the rest rapid-fire.  absurd
         if (! forced_only) {
             let new_input = input & this.p1_released;
-            this.p1_released = 0xff;
             if (new_input & INPUT_BITS.cycle) {
                 this.cycle_inventory(this.player);
                 this.p1_released &= ~INPUT_BITS.cycle;
