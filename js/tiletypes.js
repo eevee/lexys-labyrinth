@@ -636,7 +636,8 @@ const TILE_TYPES = {
                 level.fail('burned');
             }
             else {
-                level.remove_tile(other);
+                level.transmute_tile(other, 'explosion');
+                level.sfx.play_once('bomb', me.cell);
             }
         },
     },
