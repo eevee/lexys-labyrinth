@@ -2335,7 +2335,7 @@ class Selection {
         for (let [x, y] of this.iter_cells()) {
             let n = stored_level.coords_to_scalar(x, y);
             if (copy) {
-                this.floated_cells.push(stored_level.linear_cells[n].map(tile => ({...tile})));
+                this.floated_cells.push(stored_level.linear_cells[n].map(tile => tile ? {...tile} : null));
             }
             else {
                 this.floated_cells.push(stored_level.linear_cells[n]);
