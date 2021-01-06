@@ -327,7 +327,8 @@ class MouseOperation {
         this.editor = editor;
         this.target = target;
         this.button_mask = MOUSE_BUTTON_MASKS[ev.button];
-        this.alt_mode = ev.button > 0;
+        // Check .buttons instead of .button because Macs use ctrl-click to mean right click
+        this.alt_mode = !! (ev.buttons & 2);
         this.modifier = null;  // or 'shift' or 'ctrl' (ctrl takes precedent)
         this._update_modifier(ev);
 
