@@ -2216,7 +2216,7 @@ const TILE_TYPES = {
         },
     },
     dynamite_lit: {
-        layer: LAYERS.item,
+        layer: LAYERS.actor,
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.dropped_item,
