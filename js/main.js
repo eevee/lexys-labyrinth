@@ -2683,7 +2683,6 @@ class PackTestDialog extends DialogOverlay {
 
             try {
                 stored_level = pack.load_level(i);
-                console.log(i + 1, stored_level.title);
                 if (! stored_level.has_replay) {
                     record_result('no-replay', "No replay");
                     continue;

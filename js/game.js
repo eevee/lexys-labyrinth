@@ -157,7 +157,9 @@ export class Cell extends Array {
     _add(tile) {
         let index = tile.type.layer;
         if (this[index]) {
-            console.error("ATTEMPTING TO ADD", tile, "TO CELL", this, "WHICH ERASES EXISTING TILE", this[index]);
+            if (index !== LAYERS.vfx) {
+                console.error("ATTEMPTING TO ADD", tile, "TO CELL", this, "WHICH ERASES EXISTING TILE", this[index]);
+            }
             this[index].cell = null;
         }
         this[index] = tile;
