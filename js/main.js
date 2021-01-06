@@ -1365,6 +1365,7 @@ class Player extends PrimaryView {
         if (hint_tile !== this.previous_hint_tile) {
             this.previous_hint_tile = hint_tile;
             this.hint_el.textContent = '';
+            this.hint_el.parentNode.classList.toggle('--visible', !! hint_tile);
             if (hint_tile) {
                 // Parse out %X sequences and replace them with <kbd> elements
                 let hint_text = hint_tile.hint_text ?? this.level.stored_level.hint;

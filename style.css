@@ -1101,10 +1101,13 @@ dl.score-chart .-sum {
     display: flex;
 }
 
-#player-game-area > .player-hint {
+/* This has a wrapper because scrollables don't work too well as the direct child of a grid or flex
+ * parent; they really want to expand to their natural size, and I do not want that */
+#player-game-area > .player-hint-wrapper {
     grid-area: hint;
     align-self: stretch;
 
+    display: none;
     font-size: calc(var(--tile-height) * var(--scale) / 3);
     padding: 0.25em 0.5em;
     font-family: serif;
@@ -1112,12 +1115,16 @@ dl.score-chart .-sum {
     color: hsl(45, 100%, 60%);
     background: #080808;
     border: 1px inset #202020;
-
-    /* FIXME find a way to enforce that the hint never makes the grid get bigger */
-    overflow: auto;
 }
-#player-game-area > .player-hint:empty {
-    display: none;
+#player-game-area > .player-hint-wrapper > .player-hint {
+    overflow: auto;
+    /* Set our inherent height or whatever to zero, but then force us to expand to whatever size our
+     * parent happens to be.  Magic! */
+    height: 0;
+    min-height: 100%;
+}
+#player-game-area > .player-hint-wrapper.--visible {
+    display: initial;
 }
 
 #player .inventory {
@@ -1424,7 +1431,7 @@ body.--debug #player-debug {
         /* stick me in the center right */
         place-self: center end;
     }
-    #player > .player-hint {
+    #player-game-area > .player-hint-wrapper {
         /* Overlay hints on the inventory area */
         grid-row: chips / bonus;
         grid-column: level;
