@@ -3518,7 +3518,7 @@ class Conductor {
     update_nav_buttons() {
         this.nav_choose_level_button.disabled = !this.stored_game;
         this.nav_prev_button.disabled = !this.stored_game || this.level_index <= 0;
-        this.nav_next_button.disabled = !this.stored_game || this.level_index >= this.stored_game.level_metadata.length;
+        this.nav_next_button.disabled = !this.stored_game || this.level_index >= this.stored_game.level_metadata.length - 1;
     }
 
     set_compat(ruleset, flags) {
