@@ -3674,6 +3674,11 @@ async function main() {
         conductor.player._start_in_debug_mode = true;
     }
 
+    // Cheap hack to make sure the tileset(s) have loaded before we go any further
+    // FIXME this can wait until we switch, it's not needed for the splash screen!  but it's here
+    // for the moment because of ?level, do a better fix
+    await Promise.all(Object.values(conductor.tilesets).map(tileset => tileset.image.decode()));
+
     // Pick a level (set)
     // TODO error handling  :(
     let path = query.get('setpath');
