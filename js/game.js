@@ -2174,8 +2174,8 @@ export class Level extends LevelInterface {
     }
 
     collect_chip() {
+        this.sfx.play_once('get-chip');
         if (this.chips_remaining > 0) {
-            this.sfx.play_once('get-chip');
             this.chips_remaining--;
         }
     }
