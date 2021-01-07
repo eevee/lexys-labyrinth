@@ -199,7 +199,8 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
         this.set_title("choose a level");
 
         // Set up some infrastructure to lazily display level renders
-        this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
+        // FIXME should this use the tileset appropriate for the particular level?
+        this.renderer = new CanvasRenderer(this.conductor.tilesets['ll'], 32);
         this.awaiting_renders = [];
         this.observer = new IntersectionObserver((entries, observer) => {
                 let any_new = false;
@@ -284,8 +285,8 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
         this.renderer.set_viewport_size(stored_level.size_x, stored_level.size_y);
         this.renderer.draw_static_region(0, 0, stored_level.size_x, stored_level.size_y);
         let canvas = mk('canvas', {
-            width: stored_level.size_x * this.conductor.tileset.size_x / 4,
-            height: stored_level.size_y * this.conductor.tileset.size_y / 4,
+            width: stored_level.size_x * this.renderer.tileset.size_x / 4,
+            height: stored_level.size_y * this.renderer.tileset.size_y / 4,
         });
         canvas.getContext('2d').drawImage(this.renderer.canvas, 0, 0, canvas.width, canvas.height);
         element.querySelector('.-preview').append(canvas);
@@ -1051,8 +1052,8 @@ class CameraOperation extends MouseOperation {
     }
     step(mx, my, gxf, gyf, gx, gy) {
         // FIXME not right if we zoom, should use gxf
-        let dx = Math.floor((mx - this.mx0) / this.editor.conductor.tileset.size_x + 0.5);
-        let dy = Math.floor((my - this.my0) / this.editor.conductor.tileset.size_y + 0.5);
+        let dx = Math.floor((mx - this.mx0) / this.editor.renderer.tileset.size_x + 0.5);
+        let dy = Math.floor((my - this.my0) / this.editor.renderer.tileset.size_y + 0.5);
 
         let stored_level = this.editor.stored_level;
         if (this.mode === 'create') {
@@ -2323,7 +2324,7 @@ class Selection {
             console.error("Trying to float a selection that's already floating");
 
         this.floated_cells = [];
-        let tileset = this.editor.conductor.tileset;
+        let tileset = this.editor.renderer.tileset;
         let stored_level = this.editor.stored_level;
         let bbox = this.rect;
         let canvas = mk('canvas', {width: bbox.width * tileset.size_x, height: bbox.height * tileset.size_y});
@@ -2396,7 +2397,7 @@ export class Editor extends PrimaryView {
         this.level_stash = null;
 
         // FIXME don't hardcode size here, convey this to renderer some other way
-        this.renderer = new CanvasRenderer(this.conductor.tileset, 32);
+        this.renderer = new CanvasRenderer(this.conductor.tilesets['ll'], 32);
         this.renderer.perception = 'editor';
 
         // FIXME need this in load_level which is called even if we haven't been setup yet

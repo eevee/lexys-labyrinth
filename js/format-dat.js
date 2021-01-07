@@ -175,7 +175,8 @@ export function parse_level_metadata(bytes) {
 function parse_level(bytes, number) {
     let level = new format_base.StoredLevel(number);
     level.has_custom_connections = true;
-    level.use_ccl_compat = true;
+    level.format = 'ccl';
+    level.uses_ll_extensions = false;
     // Map size is always fixed as 32x32 in CC1
     level.size_x = 32;
     level.size_y = 32;

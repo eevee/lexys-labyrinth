@@ -1,4 +1,4 @@
-import { mk, mk_svg, walk_grid } from './util.js';
+import { mk } from './util.js';
 
 // Superclass for the main display modes: the player, the editor, and the splash screen
 export class PrimaryView {
@@ -24,6 +24,8 @@ export class PrimaryView {
         this.root.setAttribute('hidden', '');
         this.active = false;
     }
+
+    reload_options(options) {}
 }
 
 // Stackable modal overlay of some kind, usually a dialog

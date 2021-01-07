@@ -94,7 +94,10 @@ export class StoredLevel extends LevelInterface {
         this.viewport_size = 9;
         this.extra_chunks = [];
         this.use_cc1_boots = false;
-        this.use_ccl_compat = false;
+        // What we were parsed from: 'ccl', 'c2m', or null
+        this.format = null;
+        // Whether we use LL features that don't exist in CC2; null means we don't know
+        this.uses_ll_extensions = null;
         // 0 - deterministic (PRNG + simple convolution)
         // 1 - 4 patterns (default; PRNG + rotating through 0-3)
         // 2 - extra random (like deterministic, but initial seed is "actually" random)

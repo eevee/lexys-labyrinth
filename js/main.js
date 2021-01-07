@@ -7,11 +7,11 @@ import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
 import { Level } from './game.js';
-import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay, flash_button } from './main-base.js';
+import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import { Editor } from './main-editor.js';
 import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
-import { Tileset, CC2_TILESET_LAYOUT, LL_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT } from './tileset.js';
+import { Tileset, CC2_TILESET_LAYOUT, LL_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT, TILESET_LAYOUTS } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, mk_svg, promise_event } from './util.js';
 import * as util from './util.js';
@@ -121,6 +121,9 @@ const OBITUARIES = {
 class SFXPlayer {
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext);  // come the fuck on, safari
+        this.volume = 1.0;
+        this.enabled = true;
+
         // This automatically reduces volume when a lot of sound effects are playing at once
         this.compressor_node = this.ctx.createDynamicsCompressor();
         this.compressor_node.threshold.value = -40;
@@ -217,6 +220,9 @@ class SFXPlayer {
     }
 
     play_once(name, cell = null) {
+        if (! this.enabled)
+            return;
+
         let data = this.sounds[name];
         if (! data) {
             // Hasn't loaded yet, not much we can do
@@ -240,25 +246,23 @@ class SFXPlayer {
         let node = this.ctx.createBufferSource();
         node.buffer = data.audiobuf;
 
+        let volume = this.volume;
         if (cell && this.player_x !== null) {
             // Reduce the volume for further-away sounds
             let dx = cell.x - this.player_x;
             let dy = cell.y - this.player_y;
             let dist = Math.sqrt(dx*dx + dy*dy);
-            let gain = this.ctx.createGain();
             // x/(x + a) is a common and delightful way to get an easy asymptote and output between
             // 0 and 1.  Here, the result is above 2/3 for almost everything on screen; drops down
             // to 1/3 for things 20 tiles away (which is, roughly, the periphery when standing in
             // the center of a CC1 map), and bottoms out at 1/15 for standing in one corner of a
             // CC2 map of max size and hearing something on the far opposite corner.
-            gain.gain.value = 1 - dist / (dist + 10);
-            node.connect(gain);
-            gain.connect(this.compressor_node);
+            volume *= 1 - dist / (dist + 10);
         }
-        else {
-            // Play at full volume
-            node.connect(this.compressor_node);
-        }
+        let gain = this.ctx.createGain();
+        gain.gain.value = volume;
+        node.connect(gain);
+        gain.connect(this.compressor_node);
         node.start(this.ctx.currentTime);
     }
 
@@ -292,8 +296,6 @@ class Player extends PrimaryView {
         this.scale = 1;
         this.play_speed = 1;
 
-        this.root.style.setProperty('--tile-width', `${this.conductor.tileset.size_x}px`);
-        this.root.style.setProperty('--tile-height', `${this.conductor.tileset.size_y}px`);
         this.level_el = this.root.querySelector('.level');
         this.overlay_message_el = this.root.querySelector('.overlay-message');
         this.hint_el = this.root.querySelector('.player-hint');
@@ -305,32 +307,6 @@ class Player extends PrimaryView {
         this.music_el = this.root.querySelector('#player-music');
         this.music_audio_el = this.music_el.querySelector('audio');
         this.music_index = null;
-        let volume_el = this.music_el.querySelector('#player-music-volume');
-        this.music_audio_el.volume = this.conductor.options.music_volume ?? 1.0;
-        volume_el.value = this.music_audio_el.volume;
-        volume_el.addEventListener('input', ev => {
-            let volume = ev.target.value;
-            this.conductor.options.music_volume = volume;
-            this.conductor.save_stash();
-
-            this.music_audio_el.volume = ev.target.value;
-        });
-        let enabled_el = this.music_el.querySelector('#player-music-unmute');
-        this.music_enabled = this.conductor.options.music_enabled ?? true;
-        enabled_el.checked = this.music_enabled;
-        enabled_el.addEventListener('change', ev => {
-            this.music_enabled = ev.target.checked;
-            this.conductor.options.music_enabled = this.music_enabled;
-            this.conductor.save_stash();
-
-            // TODO also hide most of the music stuff
-            if (this.music_enabled) {
-                this.update_music_playback_state();
-            }
-            else {
-                this.music_audio_el.pause();
-            }
-        });
 
         // 0: normal realtime mode
         // 1: turn-based mode, at the start of a tic
@@ -421,7 +397,9 @@ class Player extends PrimaryView {
         });
 
         this.use_interpolation = true;
-        this.renderer = new CanvasRenderer(this.conductor.tileset);
+        // Default to the LL tileset for safety, but change when we load a level
+        this.renderer = new CanvasRenderer(this.conductor.tilesets['ll']);
+        this._loaded_tileset = false;
         this.level_el.append(this.renderer.canvas);
         this.renderer.canvas.addEventListener('auxclick', ev => {
             if (ev.button !== 1)
@@ -436,14 +414,11 @@ class Player extends PrimaryView {
             // actually "happens"
         });
 
-        // Populate inventory
-        this._inventory_tiles = {};
-        let floor_tile = this.render_inventory_tile('floor');
-        this.inventory_el.style.backgroundImage = `url(${floor_tile})`;
+        // Populate a skeleton inventory
         this.inventory_key_nodes = {};
         this.inventory_tool_nodes = [];
         for (let key of ['key_red', 'key_blue', 'key_yellow', 'key_green']) {
-            let img = mk('img', {src: this.render_inventory_tile(key)});
+            let img = mk('img');  // drawn in update_tileset
             let count = mk('span.-count');
             let root = mk('span', img, count);
             this.inventory_key_nodes[key] = {root, img, count};
@@ -678,12 +653,16 @@ class Player extends PrimaryView {
     }
 
     setup() {
+        if (this._start_in_debug_mode) {
+            this.setup_debug();
+        }
     }
 
     // Link up the debug panel and enable debug features
     // (note that this might be called /before/ setup!)
     setup_debug() {
         document.body.classList.add('--debug');
+        document.querySelector('#header-icon').src = 'icon-debug.png';
         let debug_el = this.root.querySelector('#player-debug');
         this.debug = {
             enabled: true,
@@ -1003,6 +982,40 @@ class Player extends PrimaryView {
         }
     }
 
+    reload_options(options) {
+        this.music_audio_el.volume = options.music_volume ?? 1.0;
+        // TODO hide music info when disabled?
+        this.music_enabled = options.music_enabled ?? true;
+        this.sfx_player.volume = options.sound_volume ?? 1.0;
+        this.sfx_player.enabled = options.sound_enabled ?? true;
+
+        if (this.level) {
+            this.update_tileset();
+            this._redraw();
+        }
+    }
+
+    update_tileset() {
+        if (! this.level)
+            return;
+
+        let tileset = this.conductor.choose_tileset_for_level(this.level.stored_level);
+        if (tileset === this.renderer.tileset && this._loaded_tileset)
+            return;
+        this._loaded_tileset = true;
+
+        this.renderer.set_tileset(tileset);
+        this.root.style.setProperty('--tile-width', `${tileset.size_x}px`);
+        this.root.style.setProperty('--tile-height', `${tileset.size_y}px`);
+
+        this._inventory_tiles = {};  // flush the render_inventory_tile cache
+        let floor_tile = this.render_inventory_tile('floor');
+        this.inventory_el.style.backgroundImage = `url(${floor_tile})`;
+        for (let [key, nodes] of Object.entries(this.inventory_key_nodes)) {
+            nodes.img.src = this.render_inventory_tile(key);
+        }
+    }
+
     load_game(stored_game) {
     }
 
@@ -1018,6 +1031,7 @@ class Player extends PrimaryView {
 
         this.level = new Level(stored_level, this.conductor.compat);
         this.level.sfx = this.sfx_player;
+        this.update_tileset();
         this.renderer.set_level(this.level);
         this.update_viewport_size();
         // TODO base this on a hash of the UA + some identifier for the pack + the level index.  StoredLevel doesn't know its own index atm...
@@ -1741,12 +1755,12 @@ class Player extends PrimaryView {
         // but note that we have 2x4 extra tiles for the inventory depending on layout
         let base_x, base_y;
         if (is_portrait) {
-            base_x = this.conductor.tileset.size_x * this.renderer.viewport_size_x;
-            base_y = this.conductor.tileset.size_y * (this.renderer.viewport_size_y + 2);
+            base_x = this.renderer.tileset.size_x * this.renderer.viewport_size_x;
+            base_y = this.renderer.tileset.size_y * (this.renderer.viewport_size_y + 2);
         }
         else {
-            base_x = this.conductor.tileset.size_x * (this.renderer.viewport_size_x + 4);
-            base_y = this.conductor.tileset.size_y * this.renderer.viewport_size_y;
+            base_x = this.renderer.tileset.size_x * (this.renderer.viewport_size_x + 4);
+            base_y = this.renderer.tileset.size_y * this.renderer.viewport_size_y;
         }
         // Unfortunately, finding the available space is a little tricky.  The container is a CSS
         // flex item, and the flex cell doesn't correspond directly to any element, so there's no
@@ -2196,6 +2210,16 @@ class Splash extends PrimaryView {
 // -------------------------------------------------------------------------------------------------
 // Central controller, thingy
 
+const BUILTIN_TILESETS = {
+    lexy: {
+        name: "Lexy's Labyrinth",
+        src: 'tileset-lexy.png',
+        layout: 'lexy',
+        tile_width: 32,
+        tile_height: 32,
+    },
+};
+
 // Report an error when a level fails to load
 class LevelErrorOverlay extends DialogOverlay {
     constructor(conductor, error) {
@@ -2220,99 +2244,359 @@ class LevelErrorOverlay extends DialogOverlay {
     }
 }
 
-// About dialog
-const ABOUT_HTML = `
-<p>Welcome to Lexy's Labyrinth, an exciting old-school tile-based puzzle adventure that is compatible with — but legally distinct from! — <a href="https://store.steampowered.com/app/346850/Chips_Challenge_1/">Chip's Challenge</a> and its long-awaited sequel <a href="https://store.steampowered.com/app/348300/Chips_Challenge_2/">Chip's Challenge 2</a>.</p>
-<p>This is a reimplementation from scratch of the game and uses none of its original code or assets.  It aims to match the behavior of the Steam releases (sans obvious bugs), since those are now the canonical versions of the game, but compatibility settings aren't off the table.</p>
-<p>The default level pack is the community-made <a href="https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1">Chip's Challenge Level Pack 1</a>, which I had no hand in whatsoever; please follow the link for full attribution.</p>
-<p>Source code is on <a href="https://github.com/eevee/lexys-labyrinth">GitHub</a>.</p>
-<p>Special thanks to:</p>
-<ul class="normal-list">
-    <li>The lovingly maintained <a href="https://bitbusters.club/">Bit Busters Club</a>, its incredibly detailed <a href="https://wiki.bitbusters.club/Main_Page">wiki</a>, and its <a href="https://discord.gg/Xd4dUY9">Discord</a> full of welcoming and patient folks who've been more than happy to playtest this thing and answer all kinds of arcane questions about Chip's Challenge mechanics.</li>
-    <li><a href="https://tw2.bitbusters.club/">Tile World</a>, the original Chip's Challenge 1 emulator whose source code was indispensable.</li>
-    <li>Everyone who contributed to the soundtrack, without whom there would still only be one song.</li>
-    <li>Chuck Sommerville, for creating the original game!</li>
-</ul>
-<p>Not affiliated with, endorsed by, aided by, or done with the permission of Chuck Sommerville, Niffler Inc., or Alpha Omega Productions.</p>
-`;
-class AboutOverlay extends DialogOverlay {
-    constructor(conductor) {
-        super(conductor);
-        this.set_title("about");
-        this.main.innerHTML = ABOUT_HTML;
-        this.add_button("cool", ev => {
-            this.close();
-        });
-    }
-}
-
 // Options dialog
-// functionality?:
-// - store local levels and tilesets in localstorage?  (will duplicate space but i'll be able to remember them)
-// aesthetics:
-// - tileset
-// - animations on or off
-// compat:
-// - flicking
-// - that cc2 hook wrapping thing
-// - that cc2 thing where a brown button sends a 1-frame pulse to a wired trap
-// - cc2 something about blue teleporters at 0, 0 forgetting they're looking for unwired only
-// - monsters go in fire
-// - rff blocks monsters
-// - rff truly random
-// - all manner of fucking bugs
-// TODO distinguish between deliberately gameplay changes and bugs, though that's kind of an arbitrary line
-const AESTHETIC_OPTIONS = [{
-    key: 'anim_half_speed',
-    label: "Animate at half speed",
-    default: true,
-    note: "CC2 plays animations at utterly ludicrous speeds and it looks very bad.  This option plays them at half speed (except for explosions and splashes, which have a fixed duration), which is objectively better in every way.",
+const TILESET_SLOTS = [{
+    ident: 'cc1',
+    name: "CC1",
 }, {
-    key: 'offset_actors',
-    label: "Offset some actors",
-    default: true,
-    note: "Chip's Challenge typically draws everything in a grid, which looks a bit funny for tall skinny objects like...  the player.  And teeth.  This option draws both of them raised up slightly, so they'll break the grid and add a slight 3D effect.  May not work for all tilesets.",
+    ident: 'cc2',
+    name: "CC2",
+}, {
+    ident: 'll',
+    name: "LL/editor",
 }];
-const OPTIONS_TABS = [{
-    name: 'aesthetic',
-    label: "Aesthetics",
-}];
+const CUSTOM_TILESET_BUCKETS = ['Custom 1', 'Custom 2', 'Custom 3'];
+const CUSTOM_TILESET_PREFIX = "Lexy's Labyrinth custom tileset: ";
 class OptionsOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
         this.root.classList.add('dialog-options');
         this.set_title("options");
-        this.add_button("well alright then", ev => {
-            this.close();
-        });
 
-        this.main.append(mk('p', "Sorry!  This stuff doesn't actually work yet."));
+        let dl = mk('dl.formgrid');
+        this.main.append(dl);
 
-        let tab_strip = mk('nav.tabstrip');
-        this.main.append(tab_strip);
-        this.tab_links = {};
-        this.tab_blocks = {};
-        this.current_tab = 'aesthetic';
-        for (let tabdef of OPTIONS_TABS) {
-            let link = mk('a', {href: 'javascript:', 'data-tab': tabdef.name}, tabdef.label);
-            link.addEventListener('click', ev => {
-                ev.preventDefault();
-                this.switch_tab(ev.target.getAttribute('data-tab'));
+        // Volume options
+        dl.append(
+            mk('dt', "Music volume"),
+            mk('dd.option-volume',
+                mk('label', mk('input', {name: 'music-enabled', type: 'checkbox'}), " Enabled"),
+                mk('input', {name: 'music-volume', type: 'range', min: 0, max: 1, step: 0.05}),
+            ),
+            mk('dt', "Sound volume"),
+            mk('dd.option-volume',
+                mk('label', mk('input', {name: 'sound-enabled', type: 'checkbox'}), " Enabled"),
+                mk('input', {name: 'sound-volume', type: 'range', min: 0, max: 1, step: 0.05}),
+            ),
+        );
+        // Update volume live, if the player is active and was playing when this dialog was opened
+        // (note that it won't auto-pause until open())
+        let player = this.conductor.player;
+        if (this.conductor.current === player && player.state === 'playing') {
+            this.original_music_volume = player.music_audio_el.volume;
+            this.original_sound_volume = player.sfx_player.volume;
+
+            this.resume_music_on_open = true;
+
+            // Adjust music volume in realtime
+            this.root.elements['music-enabled'].addEventListener('change', ev => {
+                if (ev.target.checked) {
+                    player.music_audio_el.play();
+                }
+                else {
+                    player.music_audio_el.pause();
+                }
             });
-            tab_strip.append(link);
-            this.tab_links[tabdef.name] = link;
-            let block = mk('section.tabblock');
-            this.main.append(block);
-            this.tab_blocks[tabdef.name] = block;
-
-            if (tabdef.name === this.current_tab) {
-                link.classList.add('--selected');
-                block.classList.add('--selected');
-            }
+            this.root.elements['music-volume'].addEventListener('input', ev => {
+                player.music_audio_el.volume = parseFloat(ev.target.value);
+            });
+            // Play a sound effect after altering volume
+            this.root.elements['sound-enabled'].addEventListener('change', ev => {
+                if (ev.target.checked) {
+                    this._play_random_sfx();
+                }
+            });
+            this.root.elements['sound-volume'].addEventListener('input', ev => {
+                player.sfx_player.volume = parseFloat(ev.target.value);
+                if (this.root.elements['sound-enabled'].checked) {
+                    this._play_random_sfx();
+                }
+            });
         }
 
-        // Aesthetic tab
-        this._add_options(this.tab_blocks['aesthetic'], AESTHETIC_OPTIONS);
+        // Tileset options
+        this.tileset_els = {};
+        this.renderers = {};
+        this.available_tilesets = {};
+        for (let [ident, def] of Object.entries(BUILTIN_TILESETS)) {
+            let newdef = { ...def, is_builtin: true };
+            newdef.ident = ident;
+            newdef.tileset = conductor._loaded_tilesets[ident];
+            if (! newdef.tileset) {
+                let img = new Image;
+                // FIXME again, wait, or what?
+                img.src = newdef.src;
+                newdef.tileset = new Tileset(
+                    img, TILESET_LAYOUTS[newdef.layout] ?? 'lexy',
+                    newdef.tile_width, newdef.tile_height);
+            }
+            this.available_tilesets[ident] = newdef;
+        }
+        for (let bucket of CUSTOM_TILESET_BUCKETS) {
+            if (conductor._loaded_tilesets[bucket]) {
+                this.available_tilesets[bucket] = {
+                    ident: bucket,
+                    name: bucket,
+                    is_already_stored: true,
+                    tileset: conductor._loaded_tilesets[bucket],
+                };
+            }
+        }
+        for (let slot of TILESET_SLOTS) {
+            let renderer = new CanvasRenderer(conductor.tilesets[slot.ident], 1);
+            this.renderers[slot.ident] = renderer;
+
+            let select = mk('select', {name: `tileset-${slot.ident}`});
+            for (let [ident, def] of Object.entries(this.available_tilesets)) {
+                if (def.tileset.layout['#supported-versions'].has(slot.ident)) {
+                    select.append(mk('option', {value: ident}, def.name));
+                }
+            }
+            select.value = conductor.options.tilesets[slot.ident] ?? 'lexy';
+            select.addEventListener('change', ev => {
+                this.update_selected_tileset(slot.ident);
+            });
+
+            let el = mk('dd.option-tileset', select);
+            this.tileset_els[slot.ident] = el;
+            this.update_selected_tileset(slot.ident);
+
+            dl.append(
+                mk('dt', `${slot.name} tileset`),
+                el,
+            );
+        }
+        this.custom_tileset_counter = 1;
+        dl.append(
+            mk('dd',
+                "You can also load a custom tileset, which will be saved in browser storage.",
+                mk('br'),
+                "Supports the Tile World static layout and the Steam layout.",
+                mk('br'),
+                "(Steam tilesets can be found in ", mk('code', "data/bmp"), " within the game's local files).",
+                mk('br'),
+                mk('input', {type: 'file', name: 'custom-tileset'}),
+                mk('div.option-load-tileset',
+                ),
+            ),
+        );
+
+        // Load current values
+        this.root.elements['music-volume'].value = this.conductor.options.music_volume ?? 1.0;
+        this.root.elements['music-enabled'].checked = this.conductor.options.music_enabled ?? true;
+        this.root.elements['sound-volume'].value = this.conductor.options.sound_volume ?? 1.0;
+        this.root.elements['sound-enabled'].checked = this.conductor.options.sound_enabled ?? true;
+
+        this.root.elements['custom-tileset'].addEventListener('change', ev => {
+            this._load_custom_tileset(ev.target.files[0]);
+        });
+
+        this.add_button("save", ev => {
+            let options = this.conductor.options;
+            options.music_volume = parseFloat(this.root.elements['music-volume'].value);
+            options.music_enabled = this.root.elements['music-enabled'].checked;
+            options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
+            options.sound_enabled = this.root.elements['sound-enabled'].checked;
+
+            // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data
+            // URIs, and /delete/ any custom ones we're not using any more, both of which require
+            // knowing which slots we're already using first
+            let buckets_in_use = new Set;
+            let chosen_tilesets = {};
+            for (let slot of TILESET_SLOTS) {
+                let tileset_ident = this.root.elements[`tileset-${slot.ident}`].value;
+                let tilesetdef = this.available_tilesets[tileset_ident];
+                if (! tilesetdef) {
+                    tilesetdef = this.available_tilesets['lexy'];
+                }
+
+                chosen_tilesets[slot.ident] = tilesetdef;
+                if (tilesetdef.is_already_stored) {
+                    buckets_in_use.add(tilesetdef.ident);
+                }
+            }
+            for (let [slot_ident, tilesetdef] of Object.entries(chosen_tilesets)) {
+                if (tilesetdef.is_builtin || tilesetdef.is_already_stored) {
+                    options.tilesets[slot_ident] = tilesetdef.ident;
+                }
+                else {
+                    // This is a newly uploaded one
+                    let data_uri = tilesetdef.data_uri ?? tilesetdef.canvas.toDataURL('image/png');
+                    let storage_bucket = CUSTOM_TILESET_BUCKETS.find(
+                        bucket => ! buckets_in_use.has(bucket));
+                    if (! storage_bucket) {
+                        console.error("Somehow ran out of storage buckets, this should be impossible??");
+                        continue;
+                    }
+                    buckets_in_use.add(storage_bucket);
+                    save_json_to_storage(CUSTOM_TILESET_PREFIX + storage_bucket, {
+                        src: data_uri,
+                        name: storage_bucket,
+                        layout: tilesetdef.layout,
+                        tile_width: tilesetdef.tile_width,
+                        tile_height: tilesetdef.tile_height,
+                    });
+                    options.tilesets[slot_ident] = storage_bucket;
+                }
+
+                // Update the conductor's loaded tilesets
+                this.conductor.tilesets[slot_ident] = tilesetdef.tileset;
+                this.conductor._loaded_tilesets[tilesetdef.ident] = tilesetdef.tileset;
+            }
+            // Delete old custom set URIs
+            for (let bucket of CUSTOM_TILESET_BUCKETS) {
+                if (! buckets_in_use.has(bucket)) {
+                    window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + bucket);
+                }
+            }
+
+            this.conductor.save_stash();
+            this.conductor.reload_all_options();
+
+            this.close();
+        });
+        this.add_button("forget it", ev => {
+            // Restore the player's music volume just in case
+            if (this.original_music_volume !== undefined) {
+                this.conductor.player.music_audio_el.volume = this.original_music_volume;
+                this.conductor.player.sfx_player.volume = this.original_sound_volume;
+            }
+            this.close();
+        });
+    }
+
+    open() {
+        super.open();
+
+        // Forcibly start the music player, since opening this dialog auto-pauses the game, and
+        // anyway it's hard to gauge music volume if it's not playing
+        if (this.resume_music_on_open && this.conductor.player.music_enabled) {
+            this.conductor.player.music_audio_el.play();
+        }
+    }
+
+    _play_random_sfx() {
+        let sfx = this.conductor.player.sfx_player;
+        // Temporarily force enable it
+        let was_enabled = sfx.enabled;
+        sfx.enabled = true;
+        sfx.play_once(util.random_choice([
+            'blocked', 'door', 'get-chip', 'get-key', 'get-tool', 'socket', 'splash',
+        ]));
+        sfx.enabled = was_enabled;
+    }
+
+    async _load_custom_tileset(file) {
+        // This is dumb and roundabout, but such is the web
+        let reader = new FileReader;
+        let reader_loaded = util.promise_event(reader, 'load', 'error');
+        reader.readAsDataURL(file);
+        await reader_loaded;
+
+        let img = mk('img');
+        img.src = reader.result;
+        await img.decode();
+
+        // Now we've got an <img> ready to go, and we can guess its layout based on its aspect
+        // ratio, hopefully.  Note that the LL layout is currently in progress so we can't
+        // really detect that, but there can't really be alternatives to it either
+        let result_el = this.root.querySelector('.option-load-tileset');
+        let layout;
+        // Note: Animated Tile World has a 1px gap between rows to indicate where animations
+        // start and also a single extra 1px column on the left, which I super don't support :(
+        for (let try_layout of [CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT]) {
+            let [w, h] = try_layout['#dimensions'];
+            // XXX this assumes square tiles, but i have written mountains of code that doesn't!
+            if (img.naturalWidth * h === img.naturalHeight * w) {
+                layout = try_layout;
+                break;
+            }
+        }
+        if (! layout) {
+            result_el.textContent = '';
+            result_el.append("This doesn't look like a tileset layout I understand, sorry!");
+            return;
+        }
+
+        // Load into a canvas and erase the transparent color
+        let canvas = mk('canvas', {width: img.naturalWidth, height: img.naturalHeight});
+        let ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        let trans = layout['#transparent-color'];
+        let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let px = image_data.data;
+        for (let i = 0; i < canvas.width * canvas.height * 4; i += 4) {
+            if (px[i] === trans[0] && px[i + 1] === trans[1] &&
+                px[i + 2] === trans[2] && px[i + 3] === trans[3])
+            {
+                px[i] = 0;
+                px[i + 1] = 0;
+                px[i + 2] = 0;
+                px[i + 3] = 0;
+            }
+        }
+        ctx.putImageData(image_data, 0, 0);
+
+        let [w, h] = layout['#dimensions'];
+        let tw = Math.floor(img.naturalWidth / w);
+        let th = Math.floor(img.naturalHeight / h);
+        let tileset = new Tileset(canvas, layout, tw, th);
+        let renderer = new CanvasRenderer(tileset, 1);
+        result_el.textContent = '';
+        result_el.append(
+            `This looks like a ${layout['#name']} tileset with ${tw}×${th} tiles.`,
+            mk('br'),
+            renderer.create_tile_type_canvas('player'),
+            renderer.create_tile_type_canvas('chip'),
+            renderer.create_tile_type_canvas('exit'),
+            mk('br'),
+        );
+
+        let tileset_ident = `custom-${this.custom_tileset_counter}`;
+        let tileset_name = `New custom ${this.custom_tileset_counter}`;
+        this.custom_tileset_counter += 1;
+        for (let slot of TILESET_SLOTS) {
+            if (! layout['#supported-versions'].has(slot.ident))
+                continue;
+
+            let dd = this.tileset_els[slot.ident];
+            let select = dd.querySelector('select');
+            select.append(mk('option', {value: tileset_ident}, tileset_name));
+
+            let button = util.mk_button(`Use for ${slot.name}`, ev => {
+                select.value = tileset_ident;
+                this.update_selected_tileset(slot.ident);
+            });
+            result_el.append(button);
+        }
+
+        this.available_tilesets[tileset_ident] = {
+            ident: tileset_ident,
+            name: tileset_name,
+            canvas: canvas,
+            tileset: tileset,
+            layout: layout['#ident'],
+            tile_width: tw,
+            tile_height: th,
+        };
+    }
+
+    update_selected_tileset(slot_ident) {
+        let dd = this.tileset_els[slot_ident];
+        let select = dd.querySelector('select');
+        let tileset_ident = select.value;
+
+        let renderer = this.renderers[slot_ident];
+        renderer.tileset = this.available_tilesets[tileset_ident].tileset;
+        for (let canvas of dd.querySelectorAll('canvas')) {
+            canvas.remove();
+        }
+        dd.append(
+            // TODO allow me to draw an arbitrary tile to an arbitrary point on a given canvas!
+            renderer.create_tile_type_canvas('player'),
+            renderer.create_tile_type_canvas('chip'),
+            renderer.create_tile_type_canvas('exit'),
+        );
     }
 
     _add_options(root, options) {
@@ -2335,15 +2619,11 @@ class OptionsOverlay extends DialogOverlay {
         }
     }
 
-    switch_tab(tab) {
-        if (this.current_tab === tab)
-            return;
+    close() {
+        // Ensure the player's music is set back how we left it
+        this.conductor.player.update_music_playback_state();
 
-        this.tab_links[this.current_tab].classList.remove('--selected');
-        this.tab_blocks[this.current_tab].classList.remove('--selected');
-        this.current_tab = tab;
-        this.tab_links[this.current_tab].classList.add('--selected');
-        this.tab_blocks[this.current_tab].classList.add('--selected');
+        super.close();
     }
 }
 const COMPAT_RULESETS = [
@@ -2589,12 +2869,11 @@ class PackTestDialog extends DialogOverlay {
             this.close();
         });
 
-        this.renderer = new CanvasRenderer(this.conductor.tileset, 16);
+        this.renderer = new CanvasRenderer(this.conductor.tilesets['ll'], 16);
     }
 
     async run(handle) {
         let pack = this.conductor.stored_game;
-        let tileset = this.conductor.tileset;
         let dummy_sfx = {
             set_player_position() {},
             play() {},
@@ -2660,6 +2939,8 @@ class PackTestDialog extends DialogOverlay {
                 }
                 if (include_canvas && level) {
                     try {
+                        let tileset = this.conductor.choose_tileset_for_level(level.stored_level);
+                        this.renderer.set_tileset(tileset);
                         let canvas = mk('canvas', {
                             width: Math.min(this.renderer.canvas.width, level.size_x * tileset.size_x),
                             height: Math.min(this.renderer.canvas.height, level.size_y * tileset.size_y),
@@ -2924,9 +3205,8 @@ const STORAGE_PACK_PREFIX = "Lexy's Labyrinth: ";
 // - list of the levels they own and basic metadata like name
 // Stored individual levels: given dummy names, all indexed on their own
 class Conductor {
-    constructor(tileset) {
+    constructor() {
         this.stored_game = null;
-        this.tileset = tileset;
 
         this.stash = JSON.parse(window.localStorage.getItem(STORAGE_KEY));
         // TODO more robust way to ensure this is shaped how i expect?
@@ -2936,12 +3216,16 @@ class Conductor {
         if (! this.stash.options) {
             this.stash.options = {};
         }
+        if (! this.stash.options.tilesets) {
+            this.stash.options.tilesets = {};
+        }
         if (! this.stash.compat) {
             this.stash.compat = 'lexy';
         }
         if (! this.stash.packs) {
             this.stash.packs = {};
         }
+
         // Handy aliases
         this.options = this.stash.options;
         this.compat = {};
@@ -2959,9 +3243,40 @@ class Conductor {
         }
         this.set_compat(this._compat_ruleset, this.compat);
 
+        this._loaded_tilesets = {};  // tileset ident => tileset
+        this.tilesets = {};  // slot (game type) => tileset
+        for (let slot of TILESET_SLOTS) {
+            let tileset_ident = this.options.tilesets[slot.ident] ?? 'lexy';
+            let tilesetdef;
+            if (BUILTIN_TILESETS[tileset_ident]) {
+                tilesetdef = BUILTIN_TILESETS[tileset_ident];
+            }
+            else {
+                tilesetdef = load_json_from_storage(CUSTOM_TILESET_PREFIX + tileset_ident);
+                if (! tilesetdef) {
+                    tileset_ident = 'lexy';
+                    tilesetdef = BUILTIN_TILESETS['lexy'];
+                }
+            }
+
+            if (this._loaded_tilesets[tileset_ident]) {
+                this.tilesets[slot.ident] = this._loaded_tilesets[tileset_ident];
+                continue;
+            }
+
+            let layout = TILESET_LAYOUTS[tilesetdef.layout] ?? 'lexy';
+            let img = new Image;
+            img.src = tilesetdef.src;
+            // FIXME wait on the img to decode (well i can't in a constructor), or what?
+            let tileset = new Tileset(img, layout, tilesetdef.tile_width, tilesetdef.tile_height);
+            this.tilesets[slot.ident] = tileset;
+            this._loaded_tilesets[tileset_ident] = tileset;
+        }
+
         this.splash = new Splash(this);
         this.editor = new Editor(this);
         this.player = new Player(this);
+        this.reload_all_options();
 
         this.loaded_in_editor = false;
         this.loaded_in_player = false;
@@ -3037,7 +3352,6 @@ class Conductor {
                     "but disable all saving of scores until you reload the page!",
                     () => {
                         this.player.setup_debug();
-                        ev.target.src = 'icon-debug.png';
                     },
                 ).open();
             }
@@ -3081,6 +3395,22 @@ class Conductor {
         this.player.activate();
         this.current = this.player;
         document.body.setAttribute('data-mode', 'player');
+    }
+
+    reload_all_options() {
+        this.splash.reload_options(this.options);
+        this.player.reload_options(this.options);
+        this.editor.reload_options(this.options);
+    }
+
+    choose_tileset_for_level(stored_level) {
+        if (stored_level.format === 'ccl') {
+            return this.tilesets['cc1'];
+        }
+        if (stored_level.uses_ll_extensions === false) {
+            return this.tilesets['cc2'];
+        }
+        return this.tilesets['ll'];
     }
 
     load_game(stored_game, identifier = null) {
@@ -3336,44 +3666,12 @@ async function main() {
     let local = !! location.host.match(/localhost/);
     let query = new URLSearchParams(location.search);
 
-    // Pick a tileset
-    // These alternative ones only work locally for me for testing purposes, since they're part of
-    // the commercial games!
-    let tilesheet = new Image();
-    let tilesize;
-    let tilelayout;
-    if (local && query.get('tileset') === 'ms') {
-        tilesheet.src = 'tileset-ms.png';
-        tilesize = 32;
-        tilelayout = CC2_TILESET_LAYOUT;
-    }
-    else if (local && query.get('tileset') === 'steam') {
-        tilesheet.src = 'tileset-steam.png';
-        tilesize = 32;
-        tilelayout = CC2_TILESET_LAYOUT;
-    }
-    else if (query.get('tileset') === 'tworld') {
-        tilesheet.src = 'tileset-tworld.png';
-        tilesize = 48;
-        tilelayout = TILE_WORLD_TILESET_LAYOUT;
-    }
-    else {
-        // Default to Lexy's Labyrinth tileset
-        tilesheet.src = 'tileset-lexy.png';
-        tilesize = 32;
-        tilelayout = LL_TILESET_LAYOUT;
-    }
-    // TODO would be fabulous to not wait on this before creating conductor
-    await tilesheet.decode();
-    let tileset = new Tileset(tilesheet, tilelayout, tilesize, tilesize);
-
-    let conductor = new Conductor(tileset);
+    let conductor = new Conductor();
     window._conductor = conductor;
 
     // Allow putting us in debug mode automatically if we're in development
     if (local && query.has('debug')) {
-        conductor.player.setup_debug();
-        document.querySelector('#header-icon').src = 'icon-debug.png';
+        conductor.player._start_in_debug_mode = true;
     }
 
     // Pick a level (set)

@@ -385,37 +385,16 @@ img.compat-icon,
 
 /* Options dialog */
 .dialog-options {
-    height: 60%;
-    width: 75%;
 }
-.dialog-options > section {
-    flex: 1;
-}
-nav.tabstrip {
+.option-volume {
     display: flex;
-    border-bottom: 1px solid #d0d0d0;
+    gap: 1em;
 }
-nav.tabstrip > a {
-    margin: 0 0.5em;
-    padding: 0.5em 1em;
-    color: inherit;
-    text-decoration: none;
-    border-top-left-radius: 0.5em;
-    border-top-right-radius: 0.5em;
+.option-volume > input[type=range] {
+    flex: auto;
 }
-nav.tabstrip > a:hover {
-    background: #e8e8e8;
-}
-nav.tabstrip > a.--selected {
-    background: #d0d0d0;
-}
-.dialog section.tabblock {
-    display: none;
-    overflow: auto;
-    margin: 0.25em 0.5em;
-}
-.dialog section.tabblock.--selected {
-    display: initial;
+.option-tileset canvas {
+    vertical-align: middle;
 }
 label.option {
     display: flex;
@@ -1170,21 +1149,9 @@ dl.score-chart .-sum {
 
 #player-music {
     grid-area: music;
-    display: flex;
-    gap: 1em;
     margin: 0 1em;
     text-transform: lowercase;
     color: #909090;
-}
-#player-music #player-music-left {
-    /* allow me to wrap if need be */
-    flex: 1 0 0px;
-}
-#player-music #player-music-right {
-    text-align: right;
-}
-#player-music #player-music-volume {
-    width: 8em;
 }
 
 #player .controls {

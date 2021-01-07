@@ -1,6 +1,12 @@
 import { DIRECTIONS } from './defs.js';
 import TILE_TYPES from './tiletypes.js';
 
+const _omit_custom_lexy_vfx = {
+    teleport_flash: null,
+    transmogrify_flash: null,
+    puff: null,
+};
+
 // TODO move the remaining stuff (arrows, overlay i think, probably force floor thing) into specials
 // TODO more explicitly define animations, give them a speed!  maybe fold directions into it
 // TODO relatedly, the push animations are sometimes glitchy depending on when you start?
@@ -10,6 +16,11 @@ import TILE_TYPES from './tiletypes.js';
 // blur with cc2 blobs/walkers, also makes a lot of signatures cleaner (make sure not slower)
 // TODO monsters should only animate while moving?  (not actually how cc2 works...)
 export const CC2_TILESET_LAYOUT = {
+    '#ident': 'cc2',
+    '#name': "Chip's Challenge 2",
+    '#dimensions': [16, 32],
+    '#transparent-color': [0x52, 0xce, 0x6b, 0xff],
+    '#supported-versions': new Set(['cc1', 'cc2']),
     '#wire-width': 1/16,
 
     door_red: [0, 1],
@@ -624,10 +635,16 @@ export const CC2_TILESET_LAYOUT = {
     no_player1_sign: [6, 31],
     hook: [7, 31],
     // misc other stuff
+
+    ..._omit_custom_lexy_vfx,
 };
 
-// XXX need to specify that you can't use this for cc2 levels, somehow
 export const TILE_WORLD_TILESET_LAYOUT = {
+    '#ident': 'tw-static',
+    '#name': "Tile World (static)",
+    '#dimensions': [7, 16],
+    '#transparent-color': [0xff, 0x00, 0xff, 0xff],
+    '#supported-versions': new Set(['cc1']),
     floor: [0, 0],
     wall: [0, 1],
     chip: [0, 2],
@@ -795,9 +812,16 @@ export const TILE_WORLD_TILESET_LAYOUT = {
         exploded: [3, 6],
         failed: [3, 7],
     },
+
+    ..._omit_custom_lexy_vfx,
 };
 
 export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
+    '#ident': 'lexy',
+    '#name': "Lexy's Labyrinth",
+    // TODO dimensions, when this is stable??  might one day rearrange, leave some extra space
+    '#supported-versions': new Set(['cc1', 'cc2', 'll']),
+
     // Completed teeth sprites
     teeth: Object.assign({}, CC2_TILESET_LAYOUT.teeth, {
         north: [[1, 32], [0, 32], [1, 32], [2, 32]],
@@ -900,7 +924,6 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     },
     chip: [[11, 3], [0, 39], [1, 39], [0, 39]],
     green_chip: [[9, 3], [2, 39], [3, 39], [2, 39]],
-    // FIXME make these work with a stock tileset
     player1_exit: [[8, 38], [9, 38], [10, 38], [11, 38]],
     player2_exit: [[12, 38], [13, 38], [14, 38], [15, 38]],
     puff: [[4, 39], [5, 39], [6, 39], [7, 39]],
@@ -917,8 +940,15 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     sand: [10, 41],
 });
 
+export const TILESET_LAYOUTS = {
+    'tw-static': TILE_WORLD_TILESET_LAYOUT,
+    cc2: CC2_TILESET_LAYOUT,
+    lexy: LL_TILESET_LAYOUT,
+};
+
 export class Tileset {
     constructor(image, layout, size_x, size_y) {
+        // XXX curiously, i note that .image is never used within this class
         this.image = image;
         this.layout = layout;
         this.size_x = size_x;
@@ -1256,7 +1286,13 @@ export class Tileset {
     // without it you'll get defaults.
     draw_type(name, tile, tic, perception, blit) {
         let drawspec = this.layout[name];
+        if (drawspec === null) {
+            // This is explicitly never drawn (used for extra visual-only frills that don't exist in
+            // some tilesets)
+            return;
+        }
         if (! drawspec) {
+            // This is just missing
             console.error(`Don't know how to draw tile type ${name}!`);
             return;
         }

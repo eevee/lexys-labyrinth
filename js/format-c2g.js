@@ -790,12 +790,14 @@ const TILE_ENCODING = {
     0xe0: {
         name: 'gift_bow',
         has_next: true,
+        is_extension: true,
     },
     0xe1: {
         name: 'circuit_block',
         has_next: true,
         modifier: modifier_wire,
         extra_args: [arg_direction],
+        is_extension: true,
     },
 };
 const REVERSE_TILE_ENCODING = {};
@@ -914,6 +916,8 @@ export function parse_level(buf, number = 1) {
     }
 
     let level = new format_base.StoredLevel(number);
+    level.format = 'c2m';
+    level.uses_ll_extensions = false;  // we'll update this if it changes
     let extra_hints = [];
     let hint_tiles = [];
     for (let [type, bytes] of read_c2m_sections(buf)) {
@@ -1061,6 +1065,10 @@ export function parse_level(buf, number = 1) {
                         if (! spec.modifier && ! (spec.name instanceof Array)) {
                             console.warn("Got unexpected modifier for tile:", spec.name);
                         }
+                    }
+
+                    if (spec.is_extension) {
+                        level.uses_ll_extensions = true;
                     }
 
                     let name = spec.name;

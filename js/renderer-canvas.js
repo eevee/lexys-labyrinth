@@ -47,6 +47,11 @@ export class CanvasRenderer {
         this.viewport_dirty = true;
     }
 
+    set_tileset(tileset) {
+        this.tileset = tileset;
+        this.viewport_dirty = true;
+    }
+
     cell_coords_from_event(ev) {
         let rect = this.canvas.getBoundingClientRect();
         let scale_x = rect.width / this.canvas.width;

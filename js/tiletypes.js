@@ -264,7 +264,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         on_ready(me, level) {
             if (! level.compat.no_auto_convert_ccl_popwalls &&
-                level.stored_level.use_ccl_compat &&
+                level.stored_level.format === 'ccl' &&
                 me.cell.get_actor())
             {
                 // Fix blocks and other actors on top of popwalls by turning them into double
@@ -305,7 +305,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all_but_ghost,
         on_ready(me, level) {
             if (! level.compat.no_auto_convert_ccl_blue_walls &&
-                level.stored_level.use_ccl_compat &&
+                level.stored_level.format === 'ccl' &&
                 me.cell.get_actor())
             {
                 // Blocks can be pushed off of blue walls in TW Lynx, which only works due to a tiny
