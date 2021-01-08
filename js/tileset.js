@@ -163,6 +163,8 @@ export const CC2_TILESET_LAYOUT = {
         hidden: [12, 5],
         revealed: [13, 5],
     },
+    // FIXME this should just be a visual_state really, but it would need to be able to nest with
+    // perception and that is not currently possible
     popdown_floor_visible: [13, 5],
     no_sign: [14, 5],
     frame_block: {

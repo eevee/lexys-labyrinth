@@ -336,8 +336,15 @@ const TILE_TYPES = {
     popdown_floor: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
+        // FIXME get rid of popdown_floor_visible and use visual_state for this, but requires some
+        // changes to the tileset stuff
+        on_ready(me, level) {
+            // Start out as a visible floor if there's an actor or item on us
+            if (me.cell.get_item() || me.cell.get_actor()) {
+                me.type = TILE_TYPES.popdown_floor_visible;
+            }
+        },
         on_approach(me, level, other) {
-            // FIXME could probably do this with state?  or, eh
             level.transmute_tile(me, 'popdown_floor_visible');
         },
     },
@@ -345,8 +352,9 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         on_depart(me, level, other) {
-            // FIXME possibly changes back too fast, not even visible for a tic for me (much like stepping on a button oops)
-            level.transmute_tile(me, 'popdown_floor');
+            if (! me.cell.get_item()) {
+                level.transmute_tile(me, 'popdown_floor');
+            }
         },
     },
     no_player1_sign: {
