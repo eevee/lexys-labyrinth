@@ -2057,6 +2057,7 @@ const TILE_TYPES = {
         has_inventory: true,
         ignores: new Set([
             'bomb',
+            'water',
             'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
             'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
             // Ghosts don't activate swivels or popwalls
