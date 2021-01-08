@@ -2422,6 +2422,9 @@ class OptionsOverlay extends DialogOverlay {
                     buckets_in_use.add(tilesetdef.ident);
                 }
             }
+            // Clear out _loaded_tilesets first so it no longer refers to any custom tilesets we end
+            // up deleting
+            this.conductor._loaded_tilesets = {};
             for (let [slot_ident, tilesetdef] of Object.entries(chosen_tilesets)) {
                 if (tilesetdef.is_builtin || tilesetdef.is_already_stored) {
                     options.tilesets[slot_ident] = tilesetdef.ident;
@@ -2448,7 +2451,7 @@ class OptionsOverlay extends DialogOverlay {
 
                 // Update the conductor's loaded tilesets
                 this.conductor.tilesets[slot_ident] = tilesetdef.tileset;
-                this.conductor._loaded_tilesets[tilesetdef.ident] = tilesetdef.tileset;
+                this.conductor._loaded_tilesets[options.tilesets[slot_ident]] = tilesetdef.tileset;
             }
             // Delete old custom set URIs
             for (let bucket of CUSTOM_TILESET_BUCKETS) {
@@ -2559,7 +2562,7 @@ class OptionsOverlay extends DialogOverlay {
             mk('br'),
         );
 
-        let tileset_ident = `custom-${this.custom_tileset_counter}`;
+        let tileset_ident = `new-custom-${this.custom_tileset_counter}`;
         let tileset_name = `New custom ${this.custom_tileset_counter}`;
         this.custom_tileset_counter += 1;
         for (let slot of TILESET_SLOTS) {
