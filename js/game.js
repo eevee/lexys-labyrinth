@@ -1560,15 +1560,15 @@ export class Level extends LevelInterface {
                 // Helmet disables this, do nothing
             }
             else if (actor.type.is_real_player && tile.type.is_monster) {
-                this.fail(tile.type.name);
+                this.fail(tile.type.name, actor);
             }
             else if (actor.type.is_monster && tile.type.is_real_player) {
-                this.fail(actor.type.name);
+                this.fail(actor.type.name, tile);
             }
             else if (actor.type.is_block && tile.type.is_real_player && ! actor.is_pulled) {
                 // Note that blocks squish players if they move for ANY reason, even if pushed by
                 // another player!  The only exception is being pulled
-                this.fail('squished');
+                this.fail('squished', tile);
             }
 
             if (tile.type.on_approach) {
@@ -2200,7 +2200,7 @@ export class Level extends LevelInterface {
         }
     }
 
-    fail(reason) {
+    fail(reason, player = null) {
         if (this.state !== 'playing')
             return;
 
@@ -2211,13 +2211,17 @@ export class Level extends LevelInterface {
             this.sfx.play_once('lose');
         }
 
+        if (player === null) {
+            player = this.player;
+        }
+
         this._push_pending_undo(() => {
             this.fail_reason = null;
-            this.player.fail_reason = null;
+            player.fail_reason = null;
         });
         this.state = 'failure';
         this.fail_reason = reason;
-        this.player.fail_reason = reason;
+        player.fail_reason = reason;
     }
 
     win() {

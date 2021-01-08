@@ -641,7 +641,7 @@ const TILE_TYPES = {
                 level.sfx.play_once('splash', me.cell);
             }
             else if (other.type.is_real_player) {
-                level.fail('burned');
+                level.fail('burned', other);
             }
             else {
                 level.transmute_tile(other, 'explosion');
@@ -672,7 +672,7 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'ice');
             }
             else if (other.type.is_real_player) {
-                level.fail('drowned');
+                level.fail('drowned', other);
             }
             else {
                 level.transmute_tile(other, 'splash');
@@ -863,7 +863,7 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'floor');
             }
             else if (other.type.is_real_player) {
-                level.fail('slimed');
+                level.fail('slimed', other);
             }
             else {
                 level.transmute_tile(other, 'splash_slime');
@@ -885,7 +885,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.remove_tile(me);
             if (other.type.is_real_player) {
-                level.fail('exploded');
+                level.fail('exploded', other);
             }
             else {
                 level.sfx.play_once('bomb', me.cell);
@@ -1053,7 +1053,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.remove_tile(me);
             if (other.type.is_real_player) {
-                level.fail('exploded');
+                level.fail('exploded', other);
             }
             else {
                 level.sfx.play_once('bomb', me.cell);
@@ -1110,6 +1110,14 @@ const TILE_TYPES = {
             // Wire activation allows the cloner to try every direction, searching clockwise
             for (let i = 0; i < (aggressive ? 4 : 1); i++) {
                 if (level.attempt_out_of_turn_step(actor, direction)) {
+                    // Surprising edge case: if the actor immediately killed the player, do NOT
+                    // spawn a new template, since the move was actually aborted
+                    // FIXME this is inconsistent.  the move was aborted because of an emergency
+                    // failure handling case in move_to, but that doesn't make the step count as a
+                    // failure.  would this be fixed by making the player block all other actors?
+                    if (level.state === 'failure')
+                        break;
+
                     // FIXME add this underneath, just above the cloner, so the new actor is on top
                     let new_template = new actor.constructor(type, direction);
                     // TODO maybe make a type method for this
@@ -1437,7 +1445,7 @@ const TILE_TYPES = {
                 // TODO would be neat if this understood "ignores anything with fire immunity" but that
                 // might be a bit too high-level for this game
                 if (actor.type.is_real_player) {
-                    level.fail('burned');
+                    level.fail('burned', actor);
                 }
                 else {
                     // TODO should this play a sound?
@@ -2272,7 +2280,7 @@ const TILE_TYPES = {
                         else if (tile.type.is_real_player) {
                             // TODO it would be nice if i didn't have to special-case this every
                             // time
-                            level.fail(me.type.name);
+                            level.fail(me.type.name, tile);
                         }
                         else {
                             // Everything else is destroyed
@@ -2347,7 +2355,7 @@ const TILE_TYPES = {
             if (me.cell.has('cloner'))
                 return;
             if (other.type.is_real_player) {
-                level.fail(me.type.name);
+                level.fail(me.type.name, other);
             }
             else {
                 level.transmute_tile(other, 'explosion');
@@ -2359,7 +2367,7 @@ const TILE_TYPES = {
             // Blow up anything we run into
             if (obstacle && obstacle.type.is_actor) {
                 if (obstacle.type.is_real_player) {
-                    level.fail(me.type.name);
+                    level.fail(me.type.name, obstacle);
                 }
                 else {
                     level.transmute_tile(obstacle, 'explosion');
