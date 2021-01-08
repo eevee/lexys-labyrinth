@@ -149,6 +149,8 @@ class EditorLevelMetaOverlay extends DialogOverlay {
             ),
         );
         this.root.elements['viewport'].value = stored_level.viewport_size;
+        // FIXME this isn't actually saved lol but also it's 24 bytes into the damn options.  also
+        // it should default to 2, the good one
         this.root.elements['blob_behavior'].value = stored_level.blob_behavior;
         // TODO:
         // - chips?
@@ -458,9 +460,9 @@ class PencilOperation extends DrawOperation {
         }
 
         let template = this.editor.palette_selection;
+        let cell = this.cell(x, y);
         if (this.alt_mode) {
             // Erase
-            let cell = this.cell(x, y);
             if (this.modifier === 'shift') {
                 // Aggressive mode: erase the entire cell
                 for (let layer = 0; layer < LAYERS.MAX; layer++) {
@@ -479,7 +481,6 @@ class PencilOperation extends DrawOperation {
                 return;
             if (this.modifier === 'shift') {
                 // Aggressive mode: erase whatever's already in the cell
-                let cell = this.cell(x, y);
                 for (let layer = 0; layer < LAYERS.MAX; layer++) {
                     cell[layer] = null;
                 }
@@ -494,6 +495,7 @@ class PencilOperation extends DrawOperation {
                 this.editor.place_in_cell(x, y, template);
             }
         }
+        this.editor.mark_cell_dirty(cell);
     }
 }
 
@@ -922,8 +924,8 @@ class AdjustOperation extends MouseOperation {
         if (this.modifier === 'ctrl') {
             for (let tile of cell) {
                 if (tile && TILES_WITH_PROPS[tile.type.name] !== undefined) {
-                    // TODO use the tile's bbox, not the mouse position
-                    this.editor.open_tile_prop_overlay(tile, cell, this.mx0, this.my0);
+                    this.editor.open_tile_prop_overlay(
+                        tile, cell, this.editor.renderer.get_cell_rect(cell.x, cell.y));
                     break;
                 }
             }
@@ -2052,9 +2054,11 @@ const SPECIAL_PALETTE_BEHAVIOR = {
             }
         },
         rotate_left(tile) {
+            tile.direction = DIRECTIONS[tile.direction].left;
             tile.arrows = new Set(Array.from(tile.arrows, arrow => DIRECTIONS[arrow].left));
         },
         rotate_right(tile) {
+            tile.direction = DIRECTIONS[tile.direction].right;
             tile.arrows = new Set(Array.from(tile.arrows, arrow => DIRECTIONS[arrow].right));
         },
     },
@@ -2450,9 +2454,6 @@ export class Editor extends PrimaryView {
                 this.mouse_op = new op_type(this, ev);
                 ev.preventDefault();
                 ev.stopPropagation();
-
-                // FIXME eventually this should be automatic
-                this.redraw_entire_level();
             }
             else if (ev.button === 1) {
                 // Middle button: always pan
@@ -2470,8 +2471,6 @@ export class Editor extends PrimaryView {
                 this.mouse_op = new op_type(this, ev);
                 ev.preventDefault();
                 ev.stopPropagation();
-
-                this.redraw_entire_level();
             }
         });
         // Once the mouse is down, we should accept mouse movement anywhere
@@ -2497,9 +2496,6 @@ export class Editor extends PrimaryView {
             }
 
             this.mouse_op.do_mousemove(ev);
-
-            // FIXME !!!
-            this.redraw_entire_level();
         });
         // TODO should this happen for a mouseup anywhere?
         this.viewport_el.addEventListener('mouseup', ev => {
@@ -2524,8 +2520,8 @@ export class Editor extends PrimaryView {
         this.selected_tile_el.id = 'editor-tile';
         this.selected_tile_el.addEventListener('click', ev => {
             if (this.palette_selection && TILES_WITH_PROPS[this.palette_selection.type.name]) {
-                // FIXME use tile bounds
-                this.open_tile_prop_overlay(this.palette_selection, null, ev.clientX, ev.clientY);
+                this.open_tile_prop_overlay(
+                    this.palette_selection, null, this.selected_tile_el.getBoundingClientRect());
             }
         });
         // TODO ones for the palette too??
@@ -2954,6 +2950,7 @@ export class Editor extends PrimaryView {
         // TODO support a game too i guess
         this.stored_level = stored_level;
         this.update_viewport_size();
+        this.update_cell_coordinates();
 
         // Load connections
         this.connections_g.textContent = '';
@@ -2978,6 +2975,13 @@ export class Editor extends PrimaryView {
 
         if (this.save_button) {
             this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
+        }
+    }
+
+    update_cell_coordinates() {
+        // We rely on each StoredCell having .x and .y for partial redrawing
+        for (let [i, cell] of this.stored_level.linear_cells.entries()) {
+            [cell.x, cell.y] = this.stored_level.scalar_to_coords(i);
         }
     }
 
@@ -3158,8 +3162,8 @@ export class Editor extends PrimaryView {
             this.renderer.draw_static_region(
                 this._dirty_rect.left, this._dirty_rect.top,
                 this._dirty_rect.right, this._dirty_rect.bottom);
-            this._schedule_redraw_loop();
         }
+        this._schedule_redraw_loop();
     }
 
     // -- Utility/inspection --
@@ -3188,6 +3192,7 @@ export class Editor extends PrimaryView {
             return;
 
         let cell = this.cell(x, y);
+        this.mark_cell_dirty(cell);
         // Replace whatever's on the same layer
         // TODO should preserve wiring if possible too
         let existing_tile = cell[tile.type.layer];
@@ -3218,6 +3223,7 @@ export class Editor extends PrimaryView {
             tile = this.palette_selection;
         }
 
+        this.mark_cell_dirty(cell);
         let existing_tile = cell[tile.type.layer];
         if (existing_tile) {
             // If we find a tile of the same type as the one being drawn, see if it has custom
@@ -3241,12 +3247,11 @@ export class Editor extends PrimaryView {
         if (tile.type.layer === LAYERS.terrain) {
             cell[LAYERS.terrain] = {type: TILE_TYPES.floor};
         }
-        this.mark_cell_dirty(cell);
     }
 
     // -- Misc?? --
 
-    open_tile_prop_overlay(tile, cell, x0, y0) {
+    open_tile_prop_overlay(tile, cell, rect) {
         this.cancel_mouse_operation();
         // FIXME keep these around, don't recreate them constantly
         let overlay_class = TILES_WITH_PROPS[tile.type.name];
@@ -3256,16 +3261,17 @@ export class Editor extends PrimaryView {
 
         // FIXME move this into TransientOverlay or some other base class
         let root = overlay.root;
+        let spacing = 2;
         // Vertical position: either above or below, preferring the side that has more space
-        if (y0 > document.body.clientHeight / 2) {
+        if (rect.top - 0 > document.body.clientHeight - rect.bottom) {
             // Above
             root.classList.add('--above');
-            root.style.top = `${y0 - root.offsetHeight}px`;
+            root.style.top = `${rect.top - root.offsetHeight - spacing}px`;
         }
         else {
             // Below
             root.classList.remove('--above');
-            root.style.top = `${y0}px`;
+            root.style.top = `${rect.bottom + spacing}px`;
         }
         // Horizontal position: centered, but kept within the screen
         let left;
@@ -3276,10 +3282,10 @@ export class Editor extends PrimaryView {
         }
         else {
             left = Math.max(margin, Math.min(document.body.clientWidth - root.offsetWidth - margin,
-                x0 - root.offsetWidth / 2));
+                (rect.left + rect.right - root.offsetWidth) / 2));
         }
         root.style.left = `${left}px`;
-        root.style.setProperty('--chevron-offset', `${x0 - left}px`);
+        root.style.setProperty('--chevron-offset', `${(rect.left + rect.right) / 2 - left}px`);
     }
 
     cancel_mouse_operation() {
@@ -3301,6 +3307,7 @@ export class Editor extends PrimaryView {
         this.stored_level.size_x = size_x;
         this.stored_level.size_y = size_y;
         this.update_viewport_size();
+        this.update_cell_coordinates();
         this.redraw_entire_level();
     }
 }

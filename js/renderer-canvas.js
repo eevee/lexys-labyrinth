@@ -52,6 +52,18 @@ export class CanvasRenderer {
         this.viewport_dirty = true;
     }
 
+    get_cell_rect(x, y) {
+        let rect = this.canvas.getBoundingClientRect();
+        let scale_x = rect.width / this.canvas.width;
+        let scale_y = rect.height / this.canvas.height;
+        let tile_w = scale_x * this.tileset.size_x;
+        let tile_h = scale_y * this.tileset.size_y;
+        return new DOMRect(
+            rect.x + (x - this.viewport_x) * tile_w,
+            rect.y + (y - this.viewport_y) * tile_h,
+            tile_w, tile_h);
+    }
+
     cell_coords_from_event(ev) {
         let rect = this.canvas.getBoundingClientRect();
         let scale_x = rect.width / this.canvas.width;
