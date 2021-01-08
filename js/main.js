@@ -1474,7 +1474,9 @@ class Player extends PrimaryView {
     // rewinding: playing backwards
     // stopped: level has ended one way or another
     set_state(new_state) {
-        if (new_state === this.state)
+        // Keep going even if we're doing waiting -> waiting, because the overlay contains the level
+        // name and author which may have changed
+        if (new_state === this.state && new_state !== 'waiting')
             return;
 
         this.state = new_state;
@@ -1493,7 +1495,12 @@ class Player extends PrimaryView {
         let overlay_keyhint = '';
         if (this.state === 'waiting') {
             overlay_reason = 'waiting';
+            let stored_level = this.level.stored_level;
+            overlay_top = `#${stored_level.number} ${stored_level.title}`;
             overlay_middle = "Ready!";
+            if (stored_level.author) {
+                overlay_bottom = `by ${stored_level.author}`;
+            }
         }
         else if (this.state === 'paused') {
             overlay_reason = 'paused';
