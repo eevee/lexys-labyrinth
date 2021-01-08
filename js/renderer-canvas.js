@@ -1,6 +1,35 @@
 import { DIRECTIONS, LAYERS } from './defs.js';
 import { mk } from './util.js';
+import { DrawPacket } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
+
+class CanvasRendererDrawPacket extends DrawPacket {
+    constructor(renderer, ctx, tic, perception) {
+        super(tic, perception);
+        this.renderer = renderer;
+        this.ctx = ctx;
+        // Canvas position of the cell being drawn
+        this.x = 0;
+        this.y = 0;
+        // Offset within the cell, for actors in motion
+        this.offsetx = 0;
+        this.offsety = 0;
+    }
+
+    blit(tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) {
+        this.renderer.blit(this.ctx,
+            tx + mx, ty + my,
+            this.x + this.offsetx + mdx, this.y + this.offsety + mdy,
+            mw, mh);
+    }
+
+    blit_aligned(tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) {
+        this.renderer.blit(this.ctx,
+            tx + mx, ty + my,
+            this.x + mdx, this.y + mdy,
+            mw, mh);
+    }
+}
 
 export class CanvasRenderer {
     constructor(tileset, fixed_size = null) {
@@ -92,18 +121,6 @@ export class CanvasRenderer {
             dx * tw, dy * th, w * tw, h * th);
     }
 
-    _make_tileset_blitter(ctx, offsetx = 0, offsety = 0) {
-        // The blit we pass to the tileset has a different signature than our own:
-        // blit(
-        //     source_tile_x, source_tile_y,
-        //     mask_x = 0, mask_y = 0, mask_width = 1, mask_height = mask_width,
-        //     mask_dx = mask_x, mask_dy = mask_y)
-        // This makes it easier to use in the extremely common case of drawing part of one tile atop
-        // another tile, but still aligned to the grid.
-        return (tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) =>
-            this.blit(ctx, tx + mx, ty + my, offsetx + mdx, offsety + mdy, mw, mh);
-    }
-
     _adjust_viewport_if_dirty() {
         if (! this.viewport_dirty)
             return;
@@ -171,6 +188,7 @@ export class CanvasRenderer {
         // Tiles in motion (i.e., actors) don't want to be overdrawn by neighboring tiles' terrain,
         // so draw in three passes: everything below actors, actors, and everything above actors
         // neighboring terrain
+        let packet = new CanvasRendererDrawPacket(this, this.ctx, tic, this.perception);
         for (let x = xf0; x <= x1; x++) {
             for (let y = yf0; y <= y1; y++) {
                 let cell = this.level.cell(x, y);
@@ -179,9 +197,9 @@ export class CanvasRenderer {
                     if (! tile)
                         continue;
 
-                    this.tileset.draw(
-                        tile, tic, this.perception,
-                        this._make_tileset_blitter(this.ctx, x - x0, y - y0));
+                    packet.x = x - x0;
+                    packet.y = y - y0;
+                    this.tileset.draw(tile, packet);
                 }
             }
         }
@@ -199,24 +217,30 @@ export class CanvasRenderer {
                 vy = Math.floor(vy * th + 0.5) / th;
 
                 // For blocks, perception only applies if there's something of interest underneath
-                let perception = this.perception;
-                if (perception !== 'normal' && actor.type.is_block &&
+                if (this.perception !== 'normal' && actor.type.is_block &&
                     ! cell.some(t => t && t.type.layer < LAYERS.actor && ! (
                         t.type.name === 'floor' && (t.wire_directions | t.wire_tunnel_directions) === 0)))
                 {
-                    perception = 'normal';
+                    packet.perception = 'normal';
+                }
+                else {
+                    packet.perception = this.perception;
                 }
 
-                let blit = this._make_tileset_blitter(this.ctx, vx - x0, vy - y0);
+                packet.x = x - x0;
+                packet.y = y - y0;
+                packet.offsetx = vx - x;
+                packet.offsety = vy - y;
 
                 // Draw the active player background
                 if (actor === this.active_player) {
-                    this.tileset.draw_type('#active-player-background', null, tic, perception, blit);
+                    this.tileset.draw_type('#active-player-background', null, packet);
                 }
 
-                this.tileset.draw(actor, tic, perception, blit);
+                this.tileset.draw(actor, packet);
             }
         }
+        packet.perception = this.perception;
         for (let x = xf0; x <= x1; x++) {
             for (let y = yf0; y <= y1; y++) {
                 let cell = this.level.cell(x, y);
@@ -225,9 +249,7 @@ export class CanvasRenderer {
                     if (! tile)
                         continue;
 
-                    this.tileset.draw(
-                        tile, tic, this.perception,
-                        this._make_tileset_blitter(this.ctx, x - x0, y - y0));
+                    this.tileset.draw(tile, packet);
                 }
             }
         }
@@ -270,6 +292,7 @@ export class CanvasRenderer {
     draw_static_region(x0, y0, x1, y1, destx = x0, desty = y0) {
         this._adjust_viewport_if_dirty();
 
+        let packet = new CanvasRendererDrawPacket(this, this.ctx, 0.0, this.perception);
         for (let x = x0; x <= x1; x++) {
             for (let y = y0; y <= y1; y++) {
                 let cell = this.level.cell(x, y);
@@ -283,9 +306,11 @@ export class CanvasRenderer {
 
                     // For actors (i.e., blocks), perception only applies if there's something
                     // of potential interest underneath
-                    let perception = this.perception;
-                    if (perception !== 'normal' && tile.type.is_actor && ! seen_anything_interesting) {
-                        perception = 'normal';
+                    if (this.perception !== 'normal' && tile.type.is_block && ! seen_anything_interesting) {
+                        packet.perception = 'normal';
+                    }
+                    else {
+                        packet.perception = this.perception;
                     }
 
                     if (tile.type.layer < LAYERS.actor && ! (
@@ -294,9 +319,9 @@ export class CanvasRenderer {
                         seen_anything_interesting = true;
                     }
 
-                    this.tileset.draw(
-                        tile, 0, perception,
-                        this._make_tileset_blitter(this.ctx, destx + x - x0, desty + y - y0));
+                    packet.x = destx + x - x0;
+                    packet.y = desty + y - y0;
+                    this.tileset.draw(tile, packet);
                 }
             }
         }
@@ -305,8 +330,10 @@ export class CanvasRenderer {
     create_tile_type_canvas(name, tile = null) {
         let canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
         let ctx = canvas.getContext('2d');
+
         // Individual tile types always reveal what they are
-        this.tileset.draw_type(name, tile, 0, 'palette', this._make_tileset_blitter(ctx));
+        let packet = new CanvasRendererDrawPacket(this, ctx, 0.0, 'palette');
+        this.tileset.draw_type(name, tile, packet);
         return canvas;
     }
 }

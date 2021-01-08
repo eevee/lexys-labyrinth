@@ -948,6 +948,26 @@ export const TILESET_LAYOUTS = {
     lexy: LL_TILESET_LAYOUT,
 };
 
+
+// Bundle of arguments for drawing a tile, containing some standard state about the game
+export class DrawPacket {
+    constructor(tic = 0, perception = 'normal') {
+        this.tic = tic;
+        this.perception = 'normal';
+    }
+
+    // Draw a tile (or region) from the tileset.  The caller is presumed to know where the tile
+    // goes, so the arguments here are only about how to find the tile on the sheet.
+    // tx, ty: Tile coordinates (from the tileset, measured in cells)
+    // mx, my, mw, mh: Optional mask to use for drawing a subset of a tile (or occasionally tiles)
+    // mdx, mdy: Where to draw the masked part; defaults to drawing aligned with the tile
+    blit(tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) {}
+
+    // Same, but do not interpolate the position of an actor in motion; always draw it exactly in
+    // the cell it claims to be in
+    blit_aligned(tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) {}
+}
+
 export class Tileset {
     constructor(image, layout, size_x, size_y) {
         // XXX curiously, i note that .image is never used within this class
@@ -958,15 +978,15 @@ export class Tileset {
         this.animation_slowdown = 2;
     }
 
-    draw(tile, tic, perception, blit) {
-        this.draw_type(tile.type.name, tile, tic, perception, blit);
+    draw(tile, packet) {
+        this.draw_type(tile.type.name, tile, packet);
     }
 
     // Draw a "standard" drawspec, which is either:
     // - a single tile: [x, y]
     // - an animation: [[x0, y0], [x1, y1], ...]
     // - a directional tile: { north: T, east: T, ... } where T is either of the above
-    _draw_standard(drawspec, tile, tic, blit, mask = []) {
+    _draw_standard(drawspec, tile, packet) {
         // If we have an object, it must be a table of directions
         let coords = drawspec;
         if (!(coords instanceof Array)) {
@@ -975,14 +995,11 @@ export class Tileset {
 
         // Deal with animation
         if (coords[0] instanceof Array) {
-            if (tic === null) {
-                coords = coords[0];
-            }
-            else if (tile && tile.movement_speed) {
+            if (tile && tile.movement_speed) {
                 // This tile reports its own animation timing (in frames), so trust that, and use
                 // the current tic's fraction.  If we're between tics, interpolate.
                 // FIXME if the game ever runs every frame we will have to adjust the interpolation
-                let p = ((tile.movement_speed - tile.movement_cooldown) + tic % 1 * 3) / tile.movement_speed;
+                let p = ((tile.movement_speed - tile.movement_cooldown) + packet.tic % 1 * 3) / tile.movement_speed;
                 if (this.animation_slowdown > 1 && ! tile.type.ttl) {
                     // The players have full walk animations, but they look very silly when squeezed
                     // into the span of a single step, so instead we only play half at a time.  The
@@ -993,7 +1010,7 @@ export class Tileset {
                     // offset us into which half to play, then divide by 2 to renormalize.
                     // Which half to use is determined by when the animation /started/, as measured
                     // in animation lengths.
-                    let start_time = (tic * 3 / tile.movement_speed) - p;
+                    let start_time = (packet.tic * 3 / tile.movement_speed) - p;
                     // Rounding smooths out float error (assuming the framerate never exceeds 1000)
                     let segment = Math.floor(Math.round(start_time * 1000) / 1000 % this.animation_slowdown);
                     p = (p + segment) / this.animation_slowdown;
@@ -1012,21 +1029,21 @@ export class Tileset {
             }
             else {
                 // This tile animates on a global timer, one cycle every quarter of a second
-                coords = coords[Math.floor(tic / this.animation_slowdown % 5 / 5 * coords.length)];
+                coords = coords[Math.floor(packet.tic / this.animation_slowdown % 5 / 5 * coords.length)];
             }
         }
 
-        blit(coords[0], coords[1], ...mask);
+        packet.blit(coords[0], coords[1]);
     }
 
-    _draw_letter(drawspec, tile, tic, blit) {
-        this._draw_standard(drawspec.base, tile, tic, blit);
+    _draw_letter(drawspec, tile, packet) {
+        this._draw_standard(drawspec.base, tile, packet);
 
         let glyph = tile ? tile.overlaid_glyph : "?";
         if (drawspec.letter_glyphs[glyph]) {
             let [x, y] = drawspec.letter_glyphs[glyph];
             // XXX size is hardcoded here, but not below, meh
-            blit(x, y, 0, 0, 0.5, 0.5, 0.25, 0.25);
+            packet.blit(x, y, 0, 0, 0.5, 0.5, 0.25, 0.25);
         }
         else {
             // Look for a range
@@ -1036,7 +1053,7 @@ export class Tileset {
                     let t = u - rangedef.range[0];
                     let x = rangedef.x0 + rangedef.w * (t % rangedef.columns);
                     let y = rangedef.y0 + rangedef.h * Math.floor(t / rangedef.columns);
-                    blit(x, y, 0, 0, rangedef.w, rangedef.h,
+                    packet.blit(x, y, 0, 0, rangedef.w, rangedef.h,
                         (1 - rangedef.w) / 2, (1 - rangedef.h) / 2);
                     break;
                 }
@@ -1044,65 +1061,65 @@ export class Tileset {
         }
     }
 
-    _draw_thin_walls(drawspec, tile, tic, blit) {
+    _draw_thin_walls(drawspec, tile, packet) {
         let edges = tile ? tile.edges : 0x0f;
 
         // TODO it would be /extremely/ cool to join corners diagonally, but i can't do that without
         // access to the context, which defeats the whole purpose of this scheme.  damn
         if (edges & DIRECTIONS['north'].bit) {
-            blit(...drawspec.thin_walls_ns, 0, 0, 1, 0.5);
+            packet.blit(...drawspec.thin_walls_ns, 0, 0, 1, 0.5);
         }
         if (edges & DIRECTIONS['east'].bit) {
-            blit(...drawspec.thin_walls_ew, 0.5, 0, 0.5, 1);
+            packet.blit(...drawspec.thin_walls_ew, 0.5, 0, 0.5, 1);
         }
         if (edges & DIRECTIONS['south'].bit) {
-            blit(...drawspec.thin_walls_ns, 0, 0.5, 1, 0.5);
+            packet.blit(...drawspec.thin_walls_ns, 0, 0.5, 1, 0.5);
         }
         if (edges & DIRECTIONS['west'].bit) {
-            blit(...drawspec.thin_walls_ew, 0, 0, 0.5, 1);
+            packet.blit(...drawspec.thin_walls_ew, 0, 0, 0.5, 1);
         }
     }
 
-    _draw_thin_walls_cc1(drawspec, tile, tic, blit) {
+    _draw_thin_walls_cc1(drawspec, tile, packet) {
         let edges = tile ? tile.edges : 0x0f;
 
         // This is kinda best-effort since the tiles are opaque and not designed to combine
         if (edges === (DIRECTIONS['south'].bit | DIRECTIONS['east'].bit)) {
-            blit(...drawspec.southeast);
+            packet.blit(...drawspec.southeast);
         }
         else if (edges & DIRECTIONS['north'].bit) {
-            blit(...drawspec.north);
+            packet.blit(...drawspec.north);
         }
         else if (edges & DIRECTIONS['east'].bit) {
-            blit(...drawspec.east);
+            packet.blit(...drawspec.east);
         }
         else if (edges & DIRECTIONS['south'].bit) {
-            blit(...drawspec.south);
+            packet.blit(...drawspec.south);
         }
         else {
-            blit(...drawspec.west);
+            packet.blit(...drawspec.west);
         }
     }
 
-    _draw_bomb_fuse(drawspec, tile, tic, blit) {
+    _draw_bomb_fuse(drawspec, tile, packet) {
         // Draw the base bomb
-        this._draw_standard(drawspec.bomb, tile, tic, blit);
+        this._draw_standard(drawspec.bomb, tile, packet);
 
         // The fuse is made up of four quarter-tiles and animates...  um...  at a rate.  I cannot
         // tell.  I have spent over an hour poring over this and cannot find a consistent pattern.
         // It might be random!  I'm gonna say it loops every 0.3 seconds = 18 frames, so 4.5 frames
         // per cel, I guess.  No one will know.  (But...  I'll know.)
         // Also it's drawn in the upper right, that's important.
-        let cel = Math.floor(tic / 0.3 * 4) % 4;
-        blit(...drawspec.fuse, 0.5 * (cel % 2), 0.5 * Math.floor(cel / 2), 0.5, 0.5, 0.5, 0);
+        let cel = Math.floor(packet.tic / 0.3 * 4) % 4;
+        packet.blit(...drawspec.fuse, 0.5 * (cel % 2), 0.5 * Math.floor(cel / 2), 0.5, 0.5, 0.5, 0);
     }
 
-    _draw_double_size_monster(drawspec, tile, tic, blit) {
+    _draw_double_size_monster(drawspec, tile, packet) {
         // CC2's tileset has double-size art for blobs and walkers that spans the tile they're
         // moving from AND the tile they're moving into.
         // First, of course, this only happens if they're moving at all.
         if (! tile || ! tile.movement_speed) {
-            this._draw_standard(drawspec.base, tile, tic, blit);
+            this._draw_standard(drawspec.base, tile, packet);
             return;
         }
 
@@ -1118,6 +1135,7 @@ export class Tileset {
         else if (tile.direction === 'south') {
             axis_cels = drawspec.vertical;
             h = 2;
+            y = -1;
         }
         else if (tile.direction === 'west') {
             axis_cels = drawspec.horizontal;
@@ -1127,32 +1145,28 @@ export class Tileset {
         else if (tile.direction === 'east') {
             axis_cels = drawspec.horizontal;
             w = 2;
+            x = -1;
         }
 
         // FIXME lexy is n to 1, cc2 n-1 to 0, and this mixes them
         let p = tile.movement_speed - tile.movement_cooldown;
-        p = (p + tic % 1 * 3) / tile.movement_speed;
+        p = (p + packet.tic % 1 * 3) / tile.movement_speed;
         p = Math.min(p, 0.999);  // FIXME hack for differing movement counters
         let index = Math.floor(p * (axis_cels.length + 1));
         if (index === 0 || index > axis_cels.length) {
-            this._draw_standard(drawspec.base, tile, tic, blit);
+            this._draw_standard(drawspec.base, tile, packet);
         }
         else {
-            // Tragically we have to counter the renderer's attempts to place the tile at its visual
-            // position
-            // FIXME this gets off the pixel grid because the value already baked into blit() has
-            // already been rounded.  i don't know how to fix this
-            let [vx, vy] = tile.visual_position(tic % 1);
             let cel = reverse ? axis_cels[axis_cels.length - index] : axis_cels[index - 1];
-            blit(...cel, 0, 0, w, h, x - vx % 1, y - vy % 1);
+            packet.blit_aligned(...cel, 0, 0, w, h, x, y);
         }
     }
 
-    _draw_rover(drawspec, tile, tic, blit) {
+    _draw_rover(drawspec, tile, packet) {
         // Rovers draw fairly normally (with their visual_state giving the monster they're copying),
         // but they also have an overlay indicating their direction
         let state = tile ? tile.type.visual_state(tile) : 'inert';
-        this._draw_standard(drawspec[state], tile, tic, blit);
+        this._draw_standard(drawspec[state], tile, packet);
 
         if (! tile)
             return;
@@ -1163,68 +1177,68 @@ export class Tileset {
         let index = {north: 0, east: 1, west: 2, south: 3}[tile.direction];
         if (index === undefined)
             return;
-        blit(
+        packet.blit(
             ...drawspec.direction,
             0.5 * (index % 2), 0.5 * Math.floor(index / 2), 0.5, 0.5,
             overlay_position[0], overlay_position[1]);
     }
 
-    _draw_logic_gate(drawspec, tile, tic, blit) {
+    _draw_logic_gate(drawspec, tile, packet) {
         // Layer 1: wiring state
         // Always draw the unpowered wire base
         let unpowered_coords = this.layout['#unpowered'];
         let powered_coords = this.layout['#powered'];
-        blit(...unpowered_coords);
+        packet.blit(...unpowered_coords);
         if (tile && tile.cell) {
             // What goes on top varies a bit...
             let r = this.layout['#wire-width'] / 2;
             if (tile.gate_type === 'not' || tile.gate_type === 'counter') {
-                this._draw_fourway_tile_power(tile, 0x0f, blit);
+                this._draw_fourway_tile_power(tile, 0x0f, packet);
             }
             else {
                 if (tile.powered_edges & DIRECTIONS[tile.direction].bit) {
                     // Output (on top)
                     let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0, 0.5 + r, 0.5);
-                    blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+                    packet.blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
                 }
                 if (tile.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].right].bit) {
                     // Right input, which includes the middle
                     // This actually covers the entire lower right corner, for bent inputs.
                     let [x0, y0, x1, y1] = this._rotate(tile.direction, 0.5 - r, 0.5 - r, 1, 1);
-                    blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+                    packet.blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
                 }
                 if (tile.powered_edges & DIRECTIONS[DIRECTIONS[tile.direction].left].bit) {
                     // Left input, which does not include the middle
                     // This actually covers the entire lower left corner, for bent inputs.
                     let [x0, y0, x1, y1] = this._rotate(tile.direction, 0, 0.5 - r, 0.5 - r, 1);
-                    blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
+                    packet.blit(powered_coords[0], powered_coords[1], x0, y0, x1 - x0, y1 - y0);
                 }
             }
         }
 
         // Layer 2: the tile itself
-        this._draw_standard(drawspec.logic_gate_tiles[tile.gate_type], tile, tic, blit);
+        this._draw_standard(drawspec.logic_gate_tiles[tile.gate_type], tile, packet);
 
         // Layer 3: counter number
         if (tile.gate_type === 'counter') {
-            blit(0, 3, tile.memory * 0.75, 0, 0.75, 1, 0.125, 0);
+            packet.blit(0, 3, tile.memory * 0.75, 0, 0.75, 1, 0.125, 0);
         }
     }
 
-    _draw_fourway_tile_power(tile, wires, blit) {
+    _draw_fourway_tile_power(tile, wires, packet) {
         // Draw the unpowered tile underneath, if any edge is unpowered (and in fact if /none/ of it
         // is powered then we're done here)
         let powered = (tile.cell ? tile.powered_edges : 0) & wires;
         if (! tile.cell || powered !== tile.wire_directions) {
-            this._draw_fourway_power_underlay(this.layout['#unpowered'], wires, blit);
+            this._draw_fourway_power_underlay(this.layout['#unpowered'], wires, packet);
             if (! tile.cell || powered === 0)
                 return;
         }
 
-        this._draw_fourway_power_underlay(this.layout['#powered'], powered, blit);
+        this._draw_fourway_power_underlay(this.layout['#powered'], powered, packet);
     }
 
-    _draw_fourway_power_underlay(drawspec, bits, blit) {
+    _draw_fourway_power_underlay(drawspec, bits, packet) {
         // Draw the part as a single rectangle, initially just a small dot in the center, but
         // extending out to any edge that has a bit present
         let wire_radius = this.layout['#wire-width'] / 2;
@@ -1244,13 +1258,13 @@ export class Tileset {
         if (bits & DIRECTIONS['west'].bit) {
             x0 = 0;
         }
-        blit(drawspec[0], drawspec[1], x0, y0, x1 - x0, y1 - y0);
+        packet.blit(drawspec[0], drawspec[1], x0, y0, x1 - x0, y1 - y0);
     }
 
-    _draw_railroad(drawspec, tile, tic, blit) {
+    _draw_railroad(drawspec, tile, packet) {
         // All railroads have regular gravel underneath
         // TODO would be nice to disambiguate since it's possible to have nothing visible
-        this._draw_standard(this.layout['gravel'], tile, tic, blit);
+        this._draw_standard(this.layout['gravel'], tile, packet);
 
         // FIXME what do i draw if there's no tile?
         let part_order = ['ne', 'se', 'sw', 'nw', 'ew', 'ns'];
@@ -1267,26 +1281,26 @@ export class Tileset {
 
         let has_switch = (tile && tile.track_switch !== null);
         for (let part of visible_parts) {
-            this._draw_standard(drawspec.railroad_ties[part], tile, tic, blit);
+            this._draw_standard(drawspec.railroad_ties[part], tile, packet);
         }
         let tracks = has_switch ? drawspec.railroad_inactive : drawspec.railroad_active;
         for (let part of visible_parts) {
             if (part !== topmost_part) {
-                this._draw_standard(tracks[part], tile, tic, blit);
+                this._draw_standard(tracks[part], tile, packet);
             }
         }
 
         if (topmost_part) {
-            this._draw_standard(drawspec.railroad_active[topmost_part], tile, tic, blit);
+            this._draw_standard(drawspec.railroad_active[topmost_part], tile, packet);
         }
         if (has_switch) {
-            this._draw_standard(drawspec.railroad_switch, tile, tic, blit);
+            this._draw_standard(drawspec.railroad_switch, tile, packet);
         }
     }
 
     // Draws a tile type, given by name.  Passing in a tile is optional, but
     // without it you'll get defaults.
-    draw_type(name, tile, tic, perception, blit) {
+    draw_type(name, tile, packet) {
         let drawspec = this.layout[name];
         if (drawspec === null) {
             // This is explicitly never drawn (used for extra visual-only frills that don't exist in
@@ -1305,13 +1319,13 @@ export class Tileset {
             // the overlay (either a type name or a regular draw spec).
             // TODO chance of infinite recursion here
             if (typeof drawspec.base === 'string') {
-                this.draw_type(drawspec.base, tile, tic, perception, blit);
+                this.draw_type(drawspec.base, tile, packet);
             }
             else {
-                this._draw_standard(drawspec.base, tile, tic, blit);
+                this._draw_standard(drawspec.base, tile, packet);
             }
             if (typeof drawspec.overlay === 'string') {
-                this.draw_type(drawspec.overlay, tile, tic, perception, blit);
+                this.draw_type(drawspec.overlay, tile, packet);
                 return;
             }
             else {
@@ -1322,31 +1336,31 @@ export class Tileset {
         // TODO shift everything to use this style, this is ridiculous
         if (drawspec.special) {
             if (drawspec.special === 'letter') {
-                this._draw_letter(drawspec, tile, tic, blit);
+                this._draw_letter(drawspec, tile, packet);
                 return;
             }
             else if (drawspec.special === 'thin_walls') {
-                this._draw_thin_walls(drawspec, tile, tic, blit);
+                this._draw_thin_walls(drawspec, tile, packet);
                 return;
             }
             else if (drawspec.special === 'thin_walls_cc1') {
-                this._draw_thin_walls_cc1(drawspec, tile, tic, blit);
+                this._draw_thin_walls_cc1(drawspec, tile, packet);
                 return;
             }
             else if (drawspec.special === 'bomb-fuse') {
-                this._draw_bomb_fuse(drawspec, tile, tic, blit);
+                this._draw_bomb_fuse(drawspec, tile, packet);
                 return;
             }
             else if (drawspec.special === 'double-size-monster') {
-                this._draw_double_size_monster(drawspec, tile, tic, blit);
+                this._draw_double_size_monster(drawspec, tile, packet);
                 return;
             }
             else if (drawspec.special === 'rover') {
-                this._draw_rover(drawspec, tile, tic, blit);
+                this._draw_rover(drawspec, tile, packet);
                 return;
             }
             else if (drawspec.special === 'perception') {
-                if (drawspec.modes.has(perception)) {
+                if (drawspec.modes.has(packet.perception)) {
                     drawspec = drawspec.revealed;
                 }
                 else {
@@ -1354,11 +1368,11 @@ export class Tileset {
                 }
             }
             else if (drawspec.special === 'logic-gate') {
-                this._draw_logic_gate(drawspec, tile, tic, blit);
+                this._draw_logic_gate(drawspec, tile, packet);
                 return;
             }
             else if (drawspec.special === 'railroad') {
-                this._draw_railroad(drawspec, tile, tic, blit);
+                this._draw_railroad(drawspec, tile, packet);
                 return;
             }
         }
@@ -1371,9 +1385,9 @@ export class Tileset {
             // TODO circuit block in motion doesn't inherit cell's power
             if (tile && tile.wire_directions) {
                 // Draw the base tile
-                blit(drawspec.base[0], drawspec.base[1]);
+                packet.blit(drawspec.base[0], drawspec.base[1]);
 
-                this._draw_fourway_tile_power(tile, tile.wire_directions, blit);
+                this._draw_fourway_tile_power(tile, tile.wire_directions, packet);
 
                 // Then draw the wired tile on top of it all
                 if (tile.wire_directions === 0x0f && drawspec.wired_cross) {
@@ -1392,7 +1406,7 @@ export class Tileset {
                     coords = drawspec.base;
                 }
                 else {
-                    blit(drawspec.base[0], drawspec.base[1]);
+                    packet.blit(drawspec.base[0], drawspec.base[1]);
                     coords = drawspec.wired;
                 }
             }
@@ -1405,7 +1419,7 @@ export class Tileset {
             // Force floors animate their...  cutout, I guess?
             let [x, y] = drawspec.base;
             let duration = 3 * this.animation_slowdown;
-            x += drawspec.animate_width * (tic % duration / duration);
+            x += drawspec.animate_width * (packet.tic % duration / duration);
             // Round to tile width
             x = Math.floor(x * this.size_x + 0.5) / this.size_x;
             coords = [x, y];
@@ -1414,7 +1428,7 @@ export class Tileset {
             // Same, but along the other axis
             let [x, y] = drawspec.base;
             let duration = 3 * this.animation_slowdown;
-            y += drawspec.animate_height * (tic % duration / duration);
+            y += drawspec.animate_height * (packet.tic % duration / duration);
             // Round to tile height
             y = Math.floor(y * this.size_y + 0.5) / this.size_y;
             coords = [x, y];
@@ -1437,7 +1451,7 @@ export class Tileset {
             }
         }
 
-        this._draw_standard(coords, tile, tic, blit);
+        this._draw_standard(coords, tile, packet);
 
         // Wired tiles may also have tunnels, drawn on top of everything else
         if (drawspec.wired && tile && tile.wire_tunnel_directions) {
@@ -1446,19 +1460,19 @@ export class Tileset {
             let tunnel_length = 12/32;
             let tunnel_offset = (1 - tunnel_width) / 2;
             if (tile.wire_tunnel_directions & DIRECTIONS['north'].bit) {
-                blit(tunnel_coords[0], tunnel_coords[1],
+                packet.blit(tunnel_coords[0], tunnel_coords[1],
                     tunnel_offset, 0, tunnel_width, tunnel_length);
             }
             if (tile.wire_tunnel_directions & DIRECTIONS['south'].bit) {
-                blit(tunnel_coords[0], tunnel_coords[1],
+                packet.blit(tunnel_coords[0], tunnel_coords[1],
                     tunnel_offset, 1 - tunnel_length, tunnel_width, tunnel_length);
             }
             if (tile.wire_tunnel_directions & DIRECTIONS['west'].bit) {
-                blit(tunnel_coords[0], tunnel_coords[1],
+                packet.blit(tunnel_coords[0], tunnel_coords[1],
                     0, tunnel_offset, tunnel_length, tunnel_width);
             }
             if (tile.wire_tunnel_directions & DIRECTIONS['east'].bit) {
-                blit(tunnel_coords[0], tunnel_coords[1],
+                packet.blit(tunnel_coords[0], tunnel_coords[1],
                     1 - tunnel_length, tunnel_offset, tunnel_length, tunnel_width);
             }
         }
@@ -1480,7 +1494,7 @@ export class Tileset {
             if (tile.arrows.has('west')) {
                 x0 = 0;
             }
-            blit(x, y, x0, y0, x1 - x0, y1 - y0);
+            packet.blit(x, y, x0, y0, x1 - x0, y1 - y0);
         }
     }
 
