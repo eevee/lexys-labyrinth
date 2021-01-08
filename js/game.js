@@ -1655,9 +1655,6 @@ export class Level extends LevelInterface {
             else if (actor.slide_mode === 'force') {
                 this.sfx.play_once('slide-force');
             }
-            else if (terrain.type.name === 'floor') {
-                this.sfx.play_once('step-floor');
-            }
             else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad') {
                 this.sfx.play_once('step-gravel');
             }
@@ -1676,6 +1673,9 @@ export class Level extends LevelInterface {
             }
             else if (terrain.type.slide_mode === 'ice') {
                 this.sfx.play_once('step-ice');
+            }
+            else {
+                this.sfx.play_once('step-floor');
             }
         }
     }
