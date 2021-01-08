@@ -567,7 +567,7 @@ class SelectOperation extends MouseOperation {
 class ForceFloorOperation extends DrawOperation {
     start() {
         // Begin by placing an all-way force floor under the mouse
-        this.editor.place_in_cell(x, y, 'force_floor_all');
+        this.editor.place_in_cell(this.gx0, this.gy0, {type: TILE_TYPES.force_floor_all});
     }
     step(mx, my, gxf, gyf) {
         // Walk the mouse movement and change each we touch to match the direction we
@@ -608,7 +608,7 @@ class ForceFloorOperation extends DrawOperation {
             if (i === 2) {
                 let prevcell = this.editor.cell(prevx, prevy);
                 if (prevcell[LAYERS.terrain].type.name.startsWith('force_floor_')) {
-                    prevcell[LAYERS.terrain].type = TILE_TYPES[name];
+                    this.editor.place_in_cell(prevcell.x, prevcell.y, {type: TILE_TYPES[name]});
                 }
             }
 
@@ -620,7 +620,7 @@ class ForceFloorOperation extends DrawOperation {
             {
                 name = 'ice';
             }
-            this.editor.place_in_cell(x, y, name);
+            this.editor.place_in_cell(x, y, {type: TILE_TYPES[name]});
 
             prevx = x;
             prevy = y;
