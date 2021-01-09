@@ -938,11 +938,12 @@ ol.packtest-summary > li {
     grid-area: level;
 
     position: relative;
-    border: 0.125em solid black;
+    border: 2px solid black;
 }
 .level canvas {
     display: block;
     width: calc(var(--viewport-width) * var(--tile-width) * var(--scale));
+    height: calc(var(--viewport-height) * var(--tile-height) * var(--scale));
     --viewport-width: 9;
     --viewport-height: 9;
 }
@@ -950,14 +951,21 @@ ol.packtest-summary > li {
     grid-area: level;
     place-self: stretch;
 
+    position: relative;
     display: grid;
     grid-template-rows: 2fr 6fr 2fr 1fr;
     justify-content: center;
     align-items: center;
+    /* Prevent blowout; force using the canvas's height */
+    height: 0;
+    min-height: 100%;
+    box-sizing: border-box;
+    /* Copy the canvas's border width too */
+    border: 2px solid transparent;
 
     z-index: 2;
     font-size: calc(0.5 * var(--tile-width) * var(--scale));
-    padding: 2%;
+    padding: 2% 5%;
     background: #0009;
     color: white;
     text-align: center;
@@ -991,6 +999,43 @@ body.--debug .overlay-message {
 #player .overlay-message[data-reason=success] {
     background: hsla(225, 50%, 25%, 0.5);
     box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(225, 50%, 25%);
+}
+#player .overlay-message[data-reason=ended] {
+    /* Shove the middle + bottom parts down so they don't overlay the busiest part of the ending image */
+    grid-template-rows: 8fr 4fr 2fr 0;
+    overflow: hidden;
+    color: black;
+    background: url(ending.png) no-repeat center center / cover;
+    box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(225, 50%, 25%);
+    text-shadow: 0 0 2px white, 0 2px 2px white;
+}
+#player .overlay-message[data-reason=ended] .-top,
+#player .overlay-message[data-reason=ended] .-bottom {
+    font-size: 1.5em;
+}
+@supports (mask-image: none) or (-webkit-mask-image: none) {
+    /* Do this complicated rotating sunburst thing only if masks work */
+    #player .overlay-message[data-reason=ended]::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        top: -50%;
+        bottom: -50%;
+        left: -50%;
+        right: -50%;
+        background: repeating-conic-gradient(at center, #fbf8ad 0turn 0.025turn, #f6d87e 0.025turn 0.075turn, #fbf8ad 0.075turn 0.1turn);
+        animation: ending-spinner 10s linear infinite;
+        -webkit-mask-image: radial-gradient(at center, #0000 0%, #0006 50%);
+        mask-image: radial-gradient(at center, #0000 0%, #0006 50%);
+    }
+}
+@keyframes ending-spinner {
+    0% {
+        transform: rotate(0turn);
+    }
+    100% {
+        transform: rotate(1turn);
+    }
 }
 dl.score-chart {
     display: grid;
