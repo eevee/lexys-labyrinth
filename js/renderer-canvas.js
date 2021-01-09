@@ -241,6 +241,8 @@ export class CanvasRenderer {
             }
         }
         packet.perception = this.perception;
+        packet.offsetx = 0;
+        packet.offsety = 0;
         for (let x = xf0; x <= x1; x++) {
             for (let y = yf0; y <= y1; y++) {
                 let cell = this.level.cell(x, y);
@@ -249,6 +251,8 @@ export class CanvasRenderer {
                     if (! tile)
                         continue;
 
+                    packet.x = x - x0;
+                    packet.y = y - y0;
                     this.tileset.draw(tile, packet);
                 }
             }
