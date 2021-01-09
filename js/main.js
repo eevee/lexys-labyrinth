@@ -1666,7 +1666,7 @@ class Player extends PrimaryView {
             // time, say something if you skipped levels...
             // TODO disable most of the ui here?  probably??
             overlay_reason = 'ended';
-            overlay_middle = "You made your way through a bunch of weird escape rooms!  Time to improve your score, or try a new set!";
+            overlay_middle = "Congratulations!  You solved a whole set of funny escape rooms.  But is that the best score you can manage...?";
             let savefile = this.conductor.current_pack_savefile;
             overlay_bottom = `FINAL SCORE: ${savefile.total_score.toLocaleString()}`;
             // TODO press spacebar to...  restart from level 1??  or what
