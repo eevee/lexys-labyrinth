@@ -484,9 +484,15 @@ class Player extends PrimaryView {
                 }
                 else if (this.state === 'stopped') {
                     if (this.level.state === 'success') {
-                        // Advance to the next level
-                        // TODO game ending?
-                        this.conductor.change_level(this.conductor.level_index + 1);
+                        // Advance to the next level, if any
+                        if (this.conductor.level_index < this.conductor.stored_game.level_metadata.length - 1) {
+                            this.conductor.change_level(this.conductor.level_index + 1);
+                        }
+                        else {
+                            // TODO for CCLs, by default, this is also at level 144
+                            this.set_state('ended');
+                            this.update_ui();
+                        }
                     }
                     else {
                         // Restart
@@ -1473,6 +1479,7 @@ class Player extends PrimaryView {
     // paused: um, paused
     // rewinding: playing backwards
     // stopped: level has ended one way or another
+    // ended: final level has been completed
     set_state(new_state) {
         // Keep going even if we're doing waiting -> waiting, because the overlay contains the level
         // name and author which may have changed
@@ -1652,6 +1659,18 @@ class Player extends PrimaryView {
                     mk('dd', savefile.total_score),
                 );
             }
+        }
+        else if (this.state === 'ended') {
+            // TODO spruce this up considerably!  animate?  what's in the background?  this text is
+            // long and clunky?  final score is not interesting.  could show other stats, total
+            // time, say something if you skipped levels...
+            // TODO disable most of the ui here?  probably??
+            overlay_reason = 'ended';
+            overlay_top = "The End";
+            overlay_middle = "You did it!  You completed a full set of funny little escape rooms.  Nothing to do now but bask in glory...  then either try to improve your score, or try out a new pack!";
+            let savefile = this.conductor.current_pack_savefile;
+            overlay_bottom = `FINAL SCORE: ${savefile.total_score.toLocaleString()}`;
+            // TODO press spacebar to...  restart from level 1??  or what
         }
         this.overlay_message_el.setAttribute('data-reason', overlay_reason);
         this.overlay_message_el.querySelector('.-top').textContent = overlay_top;
