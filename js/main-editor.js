@@ -520,6 +520,8 @@ class SelectOperation extends MouseOperation {
             if (! this.has_moved) {
                 if (this.make_copy) {
                     // FIXME support directly making a copy of a copy
+                    // FIXME currently the floating preview isn't right because there's no redraw
+                    // between these steps
                     this.editor.selection.defloat();
                     this.editor.selection.enfloat(true);
                 }
@@ -701,6 +703,7 @@ class TrackOperation extends DrawOperation {
                     // Draw
                     terrain.tracks |= bit;
                 }
+                this.editor.mark_cell_dirty(cell);
             }
             else if (! this.alt_mode) {
                 terrain = { type: TILE_TYPES['railroad'] };
@@ -754,6 +757,7 @@ class WireOperation extends DrawOperation {
                 else {
                     terrain.wire_tunnel_directions |= bit;
                 }
+                this.editor.mark_cell_dirty(cell);
             }
             return;
         }
@@ -2366,8 +2370,11 @@ class Selection {
         let i = 0;
         for (let [x, y] of this.iter_cells()) {
             let n = stored_level.coords_to_scalar(x, y);
-            stored_level.linear_cells[n] = this.floated_cells[i];
-            this.editor.mark_cell_dirty(stored_level.linear_cells[n]);
+            let cell = this.floated_cells[i];
+            cell.x = x;
+            cell.y = y;
+            stored_level.linear_cells[n] = cell;
+            this.editor.mark_cell_dirty(cell);
             i += 1;
         }
         this.floated_element.remove();
