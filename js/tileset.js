@@ -953,7 +953,7 @@ export const TILESET_LAYOUTS = {
 export class DrawPacket {
     constructor(tic = 0, perception = 'normal') {
         this.tic = tic;
-        this.perception = 'normal';
+        this.perception = perception;
     }
 
     // Draw a tile (or region) from the tileset.  The caller is presumed to know where the tile
