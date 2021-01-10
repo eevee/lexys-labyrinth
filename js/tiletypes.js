@@ -1448,7 +1448,7 @@ const TILE_TYPES = {
                     level.fail('burned', actor);
                 }
                 else {
-                    // TODO should this play a sound?
+                    level.sfx.play_once('bomb', me.cell);
                     level.transmute_tile(actor, 'explosion');
                 }
             }
@@ -1636,7 +1636,6 @@ const TILE_TYPES = {
         },
     },
     button_gray: {
-        // TODO only partially implemented
         layer: LAYERS.terrain,
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
