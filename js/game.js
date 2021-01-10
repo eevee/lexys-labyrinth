@@ -2279,6 +2279,13 @@ export class Level extends LevelInterface {
 
     spawn_animation(cell, name) {
         let type = TILE_TYPES[name];
+        // Spawned VFX erase any existing VFX
+        if (type.layer === LAYERS.vfx) {
+            let vfx = cell[type.layer];
+            if (vfx) {
+                this.remove_tile(vfx);
+            }
+        }
         let tile = new Tile(type);
         // Co-opt movement_cooldown/speed for these despite that they aren't moving, since those
         // properties are also used to animate everything else anyway.  Decrement the cooldown
