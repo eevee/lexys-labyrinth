@@ -2082,6 +2082,7 @@ class Splash extends PrimaryView {
         // Editor interface
         // (this has to be handled here because we need to examine the editor,
         // which hasn't yet been created in our constructor)
+        // FIXME add a new one when creating a new pack; update and reorder when saving
         // Bind to "create" buttons
         this.root.querySelector('#splash-create-pack').addEventListener('click', ev => {
             this.conductor.editor.create_pack();
@@ -2094,26 +2095,53 @@ class Splash extends PrimaryView {
         let pack_keys = Object.keys(packs);
         pack_keys.sort((a, b) => packs[b].last_modified - packs[a].last_modified);
         let editor_section = this.root.querySelector('#splash-your-levels');
-        let editor_list = editor_section;
+        let editor_list = mk('ul.played-pack-list');
+        editor_section.append(editor_list);
+        let next_midnight = new Date;
+        if (next_midnight.getHours() >= 4) {
+            next_midnight.setDate(next_midnight.getDate() + 1);
+        }
+        next_midnight.setHours(4);
+        next_midnight.setMinutes(0);
+        next_midnight.setSeconds(0);
+        next_midnight.setMilliseconds(0);
         for (let key of pack_keys) {
             let pack = packs[key];
-            let button = mk('button.button-big.level-pack-button', {type: 'button'},
-                mk('h3', pack.title),
-                // TODO whether it's yours or not?
-                // TODO number of levels?
+            let li = mk('li');
+            let button = mk('button.button-big', {type: 'button'}, pack.title);
+            let modified = new Date(pack.last_modified);
+            let days_ago = Math.floor((next_midnight - modified) / (1000 * 60 * 60 * 24));
+            let timestamp_text;
+            if (days_ago === 0) {
+                timestamp_text = "today";
+            }
+            else if (days_ago === 1) {
+                timestamp_text = "yesterday";
+            }
+            else if (days_ago <= 12) {
+                timestamp_text = `${days_ago} days ago`;
+            }
+            else {
+                timestamp_text = modified.toISOString().split('T')[0];
+            }
+            li.append(
+                button,
+                mk('div.-editor-status',
+                    mk('div.-level-count', pack.level_count === 1 ? "1 level" : `${pack.level_count} levels`),
+                    mk('div.-timestamp', "edited " + timestamp_text),
+                ),
             );
             // TODO make a container so this can be 1 event
             button.addEventListener('click', ev => {
                 this.conductor.editor.load_editor_pack(key);
             });
-            editor_list.append(button);
+            editor_list.append(li);
         }
     }
 
     _create_pack_element(ident, packdef = null) {
         let title = packdef ? packdef.title : ident;
-        let button = mk('button.button-big.level-pack-button', {type: 'button'},
-            mk('h3', title));
+        let button = mk('button.button-big', {type: 'button'}, title);
         if (packdef) {
             button.addEventListener('click', ev => {
                 this.conductor.fetch_pack(packdef.path, packdef.title);

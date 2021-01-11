@@ -703,6 +703,7 @@ pre.stack-trace {
     margin-bottom: 1em;
 }
 .played-pack-list p {
+    margin: 0 0.5em;
     color: #e8e8e8;
 }
 .played-pack-list .-progress {
@@ -714,6 +715,24 @@ pre.stack-trace {
 .played-pack-list > li.--unplayed .-progress {
     display: none;
 }
+.played-pack-list > li > button {
+    font-size: 1.25em;
+    padding: 0.5em;
+    margin: 0.25em 0;
+    text-transform: none;
+    text-align: left;
+    /* this also forces the button to be 1 line of text high even for empty title */
+    white-space: pre-wrap;
+}
+.played-pack-list > li > button:enabled {
+    background: hsl(225, 30%, 25%);
+    box-shadow:
+        inset 0 0 0 1px hsl(225, 30%, 33%),
+        0 1px 1px hsl(225, 10%, 10%);
+}
+.played-pack-list > li > button:enabled:hover {
+    background: hsl(225, 40%, 30%);
+}
 .played-pack-list .-progress > .-score,
 .played-pack-list .-progress > .-time,
 .played-pack-list .-progress > .-levels {
@@ -722,40 +741,17 @@ pre.stack-trace {
 .played-pack-list .-progress > button {
     flex: 1;
 }
-button.level-pack-button {
-    display: grid;
-    grid:
-        "title  score"
-        "desc   desc"
-        / 1fr min-content
-    ;
-
-    padding: 0.5em;
-    text-align: left;
+.played-pack-list .-editor-status {
+    display: flex;
+    gap: 0.5em;
+    margin: 0 0.5em;
 }
-button.level-pack-button:enabled {
-    background: hsl(225, 30%, 25%);
-    box-shadow:
-        inset 0 0 0 1px hsl(225, 30%, 33%),
-        0 1px 1px hsl(225, 10%, 10%);
+.played-pack-list .-editor-status > .-level-count {
+    flex: auto;
 }
-button.level-pack-button:enabled:hover {
-    background: hsl(225, 40%, 30%);
-}
-button.level-pack-button h3 {
-    grid-area: title;
-}
-button.level-pack-button .-score {
-    grid-area: score;
-    font-style: italic;
-    color: #c0c0c0;
+.played-pack-list .-editor-status > .-timestamp {
+    flex: auto;
     text-align: right;
-}
-button.level-pack-button p {
-    grid-area: desc;
-    font-size: 0.833em;
-    font-style: italic;
-    color: #c0c0c0;
 }
 
 /* "Bulk test" button, only available in debug mode */
