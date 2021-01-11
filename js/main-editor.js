@@ -521,7 +521,7 @@ class SelectOperation extends MouseOperation {
                 if (this.make_copy) {
                     if (this.editor.selection.is_floating) {
                         // Stamp the floating selection but keep it floating
-                        this.editor.selection.stamp_float();
+                        this.editor.selection.stamp_float(true);
                     }
                     else {
                         this.editor.selection.enfloat(true);
@@ -2363,7 +2363,7 @@ class Selection {
         this.svg_group.append(this.floated_element);
     }
 
-    stamp_float() {
+    stamp_float(copy = false) {
         if (! this.floated_element)
             return;
 
@@ -2373,6 +2373,9 @@ class Selection {
         for (let [x, y] of this.iter_cells()) {
             let n = stored_level.coords_to_scalar(x, y);
             let cell = this.floated_cells[i];
+            if (copy) {
+                cell = cell.map(tile => tile ? {...tile} : null);
+            }
             cell.x = x;
             cell.y = y;
             stored_level.linear_cells[n] = cell;
