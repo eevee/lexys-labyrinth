@@ -1843,6 +1843,11 @@ class Player extends PrimaryView {
 
 
 const BUILTIN_LEVEL_PACKS = [{
+    path: 'levels/lexys-lessons.zip',
+    ident: "Lexy's Lessons",
+    title: "Lexy's Lessons (WIP)",
+    desc: "A set of beginner levels that introduces every mechanic in Chip's Challenge 2, made specifically for Lexy's Labyrinth!",
+}, {
     path: 'levels/CC2LP1.zip',
     ident: 'Chips Challenge 2 Level Pack 1',
     title: "Chip's Challenge 2 Level Pack 1",
@@ -2167,7 +2172,11 @@ class Splash extends PrimaryView {
             }).open();
         });
         if (packdef) {
-            li.append(mk('p', packdef.desc, "  ", mk('a', {href: packdef.url}, "More...")));
+            let p = mk('p', packdef.desc);
+            if (packdef.url) {
+                p.append("  ", mk('a', {href: packdef.url}, "More..."));
+            }
+            li.append(p);
         }
         li.append(mk('div.-progress',
             mk('span.-score'),
