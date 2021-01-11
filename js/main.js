@@ -46,25 +46,44 @@ const OBITUARIES = {
     drowned: [
         "you tried out water cooling",
         "you fell into the c",
+        "water disaster",
+        "you sank like a rock",
+        "your stack overflowed",
     ],
     burned: [
         "your core temp got too high",
         "your plans went up in smoke",
+        "you got roasted",
+        "you really blazed through that one",
+        "you turned up the heat",
+    ],
+    slimed: [
+        "what an oozefest",
+        "quite a sticky situation",
+        "you got dunked in the gunk",
+        "that'll leave a stain",
+        "what a waste",
     ],
     exploded: [
-        "watch where you step",
+        //"
         "looks like you're having a blast",
         "you tripped over something of mine",
         "you were blown to bits",
+        "you will surely be mist",
     ],
     squished: [
         "that block of ram was too much for you",
         "you became two-dimensional",
+        "you're a little flat, not too sharp",
+        "nice compression ratio",
+        //"
     ],
     time: [
         "you tried to overclock",
-        "your time ran out",
+        "you lost track of time",
         "your speedrun went badly",
+        "you're feeling quite alarmed",
+        //"
     ],
     generic: [
         "you had a bad time",
@@ -74,47 +93,130 @@ const OBITUARIES = {
     ball: [
         "you're having a ball",
         "you'll bounce back from this",
+        "should've gone the other way",
+        //"
+        //"
     ],
     walker: [
         "you let it walk all over you",
         "step into, step over, step out",
+        "don't just wander around at random",
+        //"
+        //"
     ],
     fireball: [
         "you had a meltdown",
         "you haven't been flamed like that since usenet",
+        //"
+        //"
+        //"
     ],
     glider: [
         "your ship came in",
         "don't worry, everything's fin now",
+        "should've given it a wider berth",
+        "watch out for that skipper",
+        //"
     ],
     tank_blue: [
         "you didn't watch where they tread",
         "please and tank blue",
+        "should've reversed course",
+        "you strayed from the straight and narrow",
+        //"
     ],
     tank_yellow: [
         "you let things get out of control",
         "you need more direction in your life",
         "your chances of surviving that were remote",
+        //"
+        //"
     ],
     bug: [
         "you got ants in your pants",
-        "there's a bug in your code",
         "time for some debugging",
+        //"
+        //"
+        //"
     ],
     paramecium: [
         "you got the creepy crawlies",
         "you couldn't wriggle out of that one",
+        "you better leg it next time",
+        //"
+        //"
     ],
     teeth: [
         "you got a mega bite",
         "you got a little nybble",
         "you're quite a mouthful",
-        "if it helps, apparently you're delicious",
+        "you passed the taste test",
+        //"
+    ],
+    teeth_timid: [
+        "you got a killer byte",
+        //"
+        "you got a tongue-lashing",
+        //"
+        //"
     ],
     blob: [
-        "gooed job there",
-        "blame the rng for that one",
+        "gooed job on that one",
+        "the rng manipulated you",
         "goo another way next time",
+        //"
+        //"
+    ],
+    doppelganger1: [
+        "you were outfoxed",
+        "sometimes a copy beats the original",
+        "better reflect on what went wrong",
+        "you've been duped",
+        //"
+    ],
+    doppelganger2: [
+        "your plans just didn't gel",
+        "bet that makes you hopping mad",
+        //"
+        //"
+        //"
+    ],
+    rover: [
+        "should've given it more roomba",
+        "exterminate.  exterminate.",
+        "your space was invaded",
+        "red rover, red rover, this playthrough is over",
+        "defeated by a confused frisbee",
+    ],
+    ghost: [
+        "you were scared to death",
+        "that wasn't very friendly",
+        "now you're both ghosts",
+        //"
+        //"
+    ],
+    floor_mimic: [
+        "you never saw that coming",
+        "you were absolutely floored",
+        "this seems fu-tile",
+        "watch your step",
+        //"
+    ],
+
+    // Misc
+    dynamite_lit: [
+        "you've got a short fuse",
+        "you failed to put the pin back in",
+        //"
+        //"
+        //"
+    ],
+    rolling_ball: [
+        "you were bowled over",
+        "you found some head cannon",
+        "strike one!",
+        "down for the ten-count",
+        "watch out, pinhead",
     ],
 };
 // Helper class used to let the game play sounds without knowing too much about the Player
