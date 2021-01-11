@@ -341,7 +341,7 @@ class SFXPlayer {
                 return;
             }
             else {
-                this.mmf_cooldown = 4;
+                this.mmf_cooldown = 8;
             }
         }
 
