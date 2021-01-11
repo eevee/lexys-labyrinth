@@ -519,11 +519,13 @@ class SelectOperation extends MouseOperation {
         if (this.mode === 'float') {
             if (! this.has_moved) {
                 if (this.make_copy) {
-                    // FIXME support directly making a copy of a copy
-                    // FIXME currently the floating preview isn't right because there's no redraw
-                    // between these steps
-                    this.editor.selection.defloat();
-                    this.editor.selection.enfloat(true);
+                    if (this.editor.selection.is_floating) {
+                        // Stamp the floating selection but keep it floating
+                        this.editor.selection.stamp_float();
+                    }
+                    else {
+                        this.editor.selection.enfloat(true);
+                    }
                 }
                 else if (! this.editor.selection.is_floating) {
                     this.editor.selection.enfloat();
@@ -2361,7 +2363,7 @@ class Selection {
         this.svg_group.append(this.floated_element);
     }
 
-    defloat() {
+    stamp_float() {
         if (! this.floated_element)
             return;
 
@@ -2377,6 +2379,13 @@ class Selection {
             this.editor.mark_cell_dirty(cell);
             i += 1;
         }
+    }
+
+    defloat() {
+        if (! this.floated_element)
+            return;
+
+        this.stamp_float();
         this.floated_element.remove();
         this.floated_element = null;
         this.floated_cells = null;
