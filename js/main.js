@@ -1672,6 +1672,7 @@ class Player extends PrimaryView {
                             savefile.aidless_levels = (savefile.aidless_levels ?? 0) + 1;
                         }
 
+                        savefile.total_levels = this.conductor.stored_game.level_metadata.length;
                         savefile.scorecards[level_index] = scorecard;
                         this.conductor.save_savefile();
                     }
