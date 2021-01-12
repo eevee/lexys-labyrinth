@@ -5,6 +5,7 @@ html {
 body {
     height: 100%;
     margin: 0;
+    box-sizing: border-box;
 
     display: flex;
     flex-direction: column;
@@ -201,8 +202,8 @@ svg.svg-icon {
 .radio-faux-button-set > label > input:checked + span {
     background: hsl(225, 80%, 50%);
     box-shadow:
-        inset 0 1px 0 1px hsl(225, 10%, 20%),
-        inset 0 -0em 2em 0.5em hsl(225, 50%, 30%),
+        inset 0 0 1px 1px hsl(225, 50%, 40%),
+        inset 0 -0.125em 0.5em 0.25em hsl(225, 50%, 30%),
         0 1px 1px hsl(225, 10%, 10%);
 }
 
@@ -433,7 +434,7 @@ body > header {
     align-items: center;
     gap: 0.5em;
 
-    padding: 0.5em;
+    padding: 0.25em 0.5em;
     line-height: 1.125;
 }
 body > header h1 {
@@ -453,6 +454,7 @@ body > header > nav {
 }
 body > header button {
     font-size: 0.75em;
+    white-space: nowrap;
 }
 body > header h1 a {
     color: inherit !important;
@@ -899,15 +901,149 @@ ol.packtest-summary > li {
      * debug panel can use that to sit against the right edge; absolute positioning excludes
      * margins, so if it were positioned as a child of THIS element, it would be stuffed into the
      * game area (oops!) */
-    display: flex;
-    flex-direction: column;
+    /* It does also make auto-sizing easier! */
+    /* Default to a landscape layout, with the buttons on the left */
+    display: grid;
+    grid:
+        "buttons    game    actions"
+        "buttons    game    actions"
+        ".          music   music"
+        / 1fr auto 1fr
+    ;
     justify-content: stretch;
     gap: 0.5em;
     margin: auto;  /* center in both directions baby */
 }
+#player-controls,
+#player-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25em;
+}
+#player-controls {
+    grid-area: buttons;
+    align-self: start;
+}
+#player-controls button,
+#player-actions button svg {
+    font-size: 1.5em;
+}
+#player-controls button {
+    padding: 0.5em;
+    line-height: 1;
+}
+#player-controls .radio-faux-button-set {
+    margin: 0;
+}
+#player-actions {
+    grid-area: actions;
+    align-self: end;
+}
+#player-actions button {
+    text-align: center;
+}
+#player-actions button svg {
+    display: block;
+    margin: 0.125em auto;
+}
+#player-music {
+    grid-area: music;
+    margin: 0 calc(var(--tile-width) * var(--scale) / 4);
+    text-transform: lowercase;
+    color: #909090;
+}
+/* Key hints are placed on the sides */
+#player button {
+    position: relative;
+}
+#player button .keyhint {
+    font-size: 1rem;
+    position: absolute;
+    top: 1.25em;
+    margin: auto;
+    color: #404040;
+}
+#player-controls button .keyhint {
+    left: -2em;
+}
+#player-actions button .keyhint {
+    right: -2em;
+}
+#player button:disabled .keyhint {
+    display: none;
+}
+@media (orientation: portrait) {
+    /* On a portrait screen, put the controls on top */
+    #player-main {
+        grid:
+            "buttons    actions"
+            "game       game"
+            "music      music"
+        ;
+    }
+    #player-controls,
+    #player-actions {
+        flex-direction: row;
+        white-space: nowrap;
+    }
+    #player-controls button,
+    #player-actions button svg {
+        font-size: 1em;
+    }
+    #player-controls button {
+        padding: 0.25em 0.5em;
+        line-height: 1.33;
+    }
+    /* Hackily remove the <br>s in "turn based mode" */
+    #player-controls .radio-faux-button-set br {
+        display: none;
+    }
+    #player-actions {
+        justify-content: end;
+    }
+    #player-actions button svg {
+        display: inline-block;
+        margin: 0.125em;
+    }
+    #player button .keyhint {
+        top: -2em;
+        left: 0;
+        right: 0;
+    }
+}
+@media (orientation: portrait) and (max-width: 800px) {
+    /* On a /small/ portrait screen, also put the controls in two rows */
+    #player-main {
+        grid:
+            "buttons"
+            "actions"
+            "game"
+            "music"
+        ;
+    }
+    #player-controls,
+    #player-actions {
+        justify-content: center;
+    }
+    #player .keyhint {
+        /* Hide key hints; there's nowhere to put them and they take up surprisingly a lot of space */
+        display: none;
+    }
+}
+@media (max-width: 800px) {
+    #player-music {
+        font-size: 0.875em;
+    }
+}
+
 #player-game-area {
+    grid-area: game;
+    /* don't stretch if the buttons or music blow out somehow */
+    justify-self: center;
+    align-self: center;
+
     isolation: isolate;
-    align-self: center;  /* don't stretch if the buttons or music blow out somehow */
     display: grid;
     align-items: center;
     grid:
@@ -919,22 +1055,19 @@ ol.packtest-summary > li {
         /* Need explicit min-content to force the hint to wrap */
         / min-content min-content
     ;
-    column-gap: 2em;
-    row-gap: 0.5em;
+    column-gap: calc(var(--tile-width) * var(--scale) / 4);
+    row-gap: calc(var(--tile-height) * var(--scale) / 4);
 
-    padding: 1em;
+    padding: calc(var(--tile-height) * var(--scale) / 4) calc(var(--tile-width) * var(--scale) / 4);
     background: hsl(225, 10%, 20%);
     box-shadow: 0 0.25em 1em black;
-}
-#player > .controls {
-    order: -1;
 }
 
 .level {
     grid-area: level;
 
     position: relative;
-    border: 2px solid black;
+    outline: 2px solid black;
 }
 .level canvas {
     display: block;
@@ -956,8 +1089,6 @@ ol.packtest-summary > li {
     height: 0;
     min-height: 100%;
     box-sizing: border-box;
-    /* Copy the canvas's border width too */
-    border: 2px solid transparent;
 
     z-index: 2;
     font-size: calc(0.5 * var(--tile-width) * var(--scale));
@@ -1080,7 +1211,7 @@ dl.score-chart .-sum {
 .time h3,
 .bonus h3 {
     flex: 1;
-    font-size: 1.25em;
+    font-size: 1.5em;
     line-height: 1;
     color: hsl(225, 20%, 90%);
 }
@@ -1148,6 +1279,8 @@ dl.score-chart .-sum {
      * parent happens to be.  Magic! */
     height: 0;
     min-height: 100%;
+    width: 0;
+    min-width: 100%;
 }
 #player-game-area > .player-hint-wrapper.--visible {
     display: initial;
@@ -1185,50 +1318,29 @@ dl.score-chart .-sum {
     background: #0009;
     color: white;
 }
-#player .actions {
-    display: flex;
-    gap: 0.5em;
-}
-#player .actions button {
-    flex: 1;
-    white-space: nowrap;
-}
 
-#player-music {
-    grid-area: music;
-    margin: 0 1em;
-    text-transform: lowercase;
-    color: #909090;
-}
-
-#player .controls {
-    grid-area: controls;
-    display: flex;
-    gap: 0.25em;
-    justify-content: space-between;
-}
-#player button {
-    position: relative;
-}
-#player button .keyhint {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: -2em;
-    margin: auto;
-    color: #404040;
-}
-#player button:disabled .keyhint {
-    display: none;
-}
-
-.play-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.25em;
-}
-.play-controls {
-    align-self: start;
+@media (orientation: portrait) {
+    #player-game-area {
+        /* Rearrange the grid to be vertical */
+        grid:
+            "level      level"
+            "chips      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            "time       inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            "bonus      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            / 1fr min-content
+        ;
+    }
+    #player .inventory {
+        /* stick me in the center right */
+        place-self: center end;
+    }
+    #player-game-area > .player-hint-wrapper {
+        /* Overlay hints on the inventory area */
+        grid-row: chips / bonus;
+        grid-column: level;
+        z-index: 1;
+        font-size: calc(var(--tile-height) * var(--scale) / 2.5);
+    }
 }
 
 /* Debug stuff */
@@ -1410,56 +1522,6 @@ body.--debug #player-debug {
 }
 #player.--replay-recording #player-debug .-replay-status > .-recording {
     display: flex;
-}
-
-
-@media (max-width: 800px) {
-    #player {
-        /* sentinel for js */
-        --is-portrait: 1;
-        /* The play area isn't necessarily the biggest thing any more, and it's ugly when stretched */
-        align-items: center;
-    }
-    #player .controls {
-        flex-direction: column;
-    }
-    #player-game-area {
-        /* Rearrange the grid to be vertical */
-        grid:
-            "level      level"
-            "chips      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "time       inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "bonus      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            /* FIXME ideally the first column would be 1fr so the hearts/time have space, but that
-             * allows hints to grow to the entire width of the window, which incredibly sucks.  i
-             * don't know how to get around this except by giving the grid a fixed width, which i
-             * guess wouldn't be that hard */
-            / min-content min-content
-        ;
-        row-gap: 0.5em;
-        column-gap: 1em;
-
-        padding: 0.5em;
-    }
-    #player .inventory {
-        /* stick me in the center right */
-        place-self: center end;
-    }
-    #player-game-area > .player-hint-wrapper {
-        /* Overlay hints on the inventory area */
-        grid-row: chips / bonus;
-        grid-column: level;
-        z-index: 1;
-        font-size: calc(var(--tile-height) * var(--scale) / 2.5);
-    }
-    #player .keyhint {
-        /* Hide key hints, they take up surprisingly a lot of space */
-        display: none;
-    }
-    #player-music {
-        /* Stack the title/artist on the volume, since they don't fit well side by side */
-        font-size: 0.875em;
-    }
 }
 
 

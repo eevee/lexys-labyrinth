@@ -414,7 +414,7 @@ class Player extends PrimaryView {
         // 1: turn-based mode, at the start of a tic
         // 2: turn-based mode, in mid-tic, with the game frozen waiting for input
         this.turn_mode = 0;
-        this.turn_based_checkbox = this.root.querySelector('.controls .control-turn-based');
+        this.turn_based_checkbox = this.root.querySelector('.control-turn-based');
         this.turn_based_checkbox.checked = false;
         this.turn_based_checkbox.addEventListener('change', ev => {
             if (this.turn_based_checkbox.checked) {
@@ -432,19 +432,19 @@ class Player extends PrimaryView {
         });
 
         // Bind buttons
-        this.pause_button = this.root.querySelector('.controls .control-pause');
+        this.pause_button = this.root.querySelector('.control-pause');
         this.pause_button.addEventListener('click', ev => {
             this.toggle_pause();
             ev.target.blur();
         });
-        this.restart_button = this.root.querySelector('.controls .control-restart');
+        this.restart_button = this.root.querySelector('.control-restart');
         this.restart_button.addEventListener('click', ev => {
             new ConfirmOverlay(this.conductor, "Abandon this attempt and try again?", () => {
                 this.restart_level();
             }).open();
             ev.target.blur();
         });
-        this.undo_button = this.root.querySelector('.controls .control-undo');
+        this.undo_button = this.root.querySelector('.control-undo');
         this.undo_button.addEventListener('click', ev => {
             let player_cell = this.level.player.cell;
             // Keep undoing until (a) we're on another cell and (b) we're not sliding, i.e. we're
@@ -469,7 +469,7 @@ class Player extends PrimaryView {
             this._redraw();
             ev.target.blur();
         });
-        this.rewind_button = this.root.querySelector('.controls .control-rewind');
+        this.rewind_button = this.root.querySelector('.control-rewind');
         this.rewind_button.addEventListener('click', ev => {
             if (this.state === 'rewinding') {
                 this.set_state('playing');
@@ -480,19 +480,19 @@ class Player extends PrimaryView {
         });
         // Game actions
         // TODO do these need buttons??  feel like they're not discoverable otherwise
-        this.drop_button = this.root.querySelector('.actions .action-drop');
+        this.drop_button = this.root.querySelector('#player-actions .action-drop');
         this.drop_button.addEventListener('click', ev => {
             // Use the set of "buttons pressed between tics" because it's cleared automatically;
             // otherwise these will stick around forever
             this.current_keys_new.add('q');
             ev.target.blur();
         });
-        this.cycle_button = this.root.querySelector('.actions .action-cycle');
+        this.cycle_button = this.root.querySelector('#player-actions .action-cycle');
         this.cycle_button.addEventListener('click', ev => {
             this.current_keys_new.add('e');
             ev.target.blur();
         });
-        this.swap_button = this.root.querySelector('.actions .action-swap');
+        this.swap_button = this.root.querySelector('#player-actions .action-swap');
         this.swap_button.addEventListener('click', ev => {
             this.current_keys_new.add('c');
             ev.target.blur();
@@ -1878,58 +1878,41 @@ class Player extends PrimaryView {
         if (style['display'] === 'none')
             return;
 
-        let is_portrait = !! style.getPropertyValue('--is-portrait');
+        let is_portrait = window.matchMedia('(orientation: portrait)').matches;
         // The base size is the size of the canvas, i.e. the viewport size times the tile size --
-        // but note that we have 2x4 extra tiles for the inventory depending on layout
+        // but note that we have 2x4 extra tiles for the inventory depending on layout, plus half a
+        // tile's worth of padding around the game area, plus a quarter tile spacing
         let base_x, base_y;
         if (is_portrait) {
-            base_x = this.renderer.tileset.size_x * this.renderer.viewport_size_x;
-            base_y = this.renderer.tileset.size_y * (this.renderer.viewport_size_y + 2);
+            base_x = this.renderer.tileset.size_x * (this.renderer.viewport_size_x + 0.5);
+            base_y = this.renderer.tileset.size_y * (this.renderer.viewport_size_y + 2.75);
         }
         else {
-            base_x = this.renderer.tileset.size_x * (this.renderer.viewport_size_x + 4);
-            base_y = this.renderer.tileset.size_y * this.renderer.viewport_size_y;
+            base_x = this.renderer.tileset.size_x * (this.renderer.viewport_size_x + 4.75);
+            base_y = this.renderer.tileset.size_y * (this.renderer.viewport_size_y + 0.5);
         }
-        // Unfortunately, finding the available space is a little tricky.  The container is a CSS
-        // flex item, and the flex cell doesn't correspond directly to any element, so there's no
-        // way for us to query its size directly.  We also have various stuff up top and down below
-        // that shouldn't count as available space.  So instead we take a rough guess by adding up:
-        // - the space currently taken up by the canvas
-        let avail_x = this.renderer.canvas.offsetWidth;
-        let avail_y = this.renderer.canvas.offsetHeight;
-        // - the space currently taken up by the inventory, depending on orientation
-        if (is_portrait) {
-            avail_y += this.inventory_el.offsetHeight;
-        }
-        else {
-            avail_x += this.inventory_el.offsetWidth;
-        }
-        // - the difference between the size of the play area and the size of our root (which will
-        //   add in any gap around the player, e.g. if the controls stretch the root to be wider)
-        let root_rect = this.root.getBoundingClientRect();
-        let player_rect = this.root.querySelector('#player-game-area').getBoundingClientRect();
-        avail_x += root_rect.width - player_rect.width;
-        avail_y += root_rect.height - player_rect.height;
+        // The element hierarchy is: the root is a wrapper that takes up the entire flex cell;
+        // within that is the main player element which contains everything; and within that is the
+        // game area which is the part we can scale.  The available space is the size of the root,
+        // but minus the size of the controls and whatnot placed around it, which are the difference
+        // between the player container and the game area
+        let player = this.root.querySelector('#player-main');
+        let game_area = this.root.querySelector('#player-game-area');
+        let avail_x = this.root.offsetWidth - (player.offsetWidth - game_area.offsetWidth);
+        let avail_y = this.root.offsetHeight - (player.offsetHeight - game_area.offsetHeight);
         // ...minus the width of the debug panel, if visible
         if (this.debug.enabled) {
             avail_x -= this.root.querySelector('#player-debug').getBoundingClientRect().width;
         }
-        // - the margins around our root, which consume all the extra space
-        let margin_x = parseFloat(style['margin-left']) + parseFloat(style['margin-right']);
-        let margin_y = parseFloat(style['margin-top']) + parseFloat(style['margin-bottom']);
-        avail_x += margin_x;
-        avail_y += margin_y;
-        // If those margins are zero, by the way, we risk being too big for the viewport already,
-        // and we need to subtract any extra scroll on the body
-        if (margin_x === 0 || margin_y === 0) {
-            avail_x -= document.body.scrollWidth - document.body.clientWidth;
-            avail_y -= document.body.scrollHeight - document.body.clientHeight;
-        }
+        // If there's already a scrollbar, the extra scrolled space is unavailable
+        avail_x -= Math.max(0, document.body.scrollWidth - document.body.clientWidth);
+        avail_y -= Math.max(0, document.body.scrollHeight - document.body.clientHeight);
 
         let dpr = window.devicePixelRatio || 1.0;
-        // Divide to find the biggest scale that still fits.  But don't exceed 90% of the available
-        // space, or it'll feel cramped (except on small screens, where being too small HURTS).
-        let maxfrac = is_portrait ? 1 : 0.9;
+        // Divide to find the biggest scale that still fits.  Leave a LITTLE wiggle room for pixel
+        // rounding and breathing (except on small screens, where being too small REALLY hurts), but
+        // not too much since there's already a flex gap between the game and header/footer
+        let maxfrac = is_portrait ? 1 : 0.99;
         let scale = Math.floor(maxfrac * dpr * Math.min(avail_x / base_x, avail_y / base_y));
         if (scale <= 1) {
             scale = 1;
@@ -3534,9 +3517,9 @@ class Conductor {
         if (this.current) {
             this.current.deactivate();
         }
-        this.splash.activate();
         this.current = this.splash;
         document.body.setAttribute('data-mode', 'splash');
+        this.splash.activate();
     }
 
     switch_to_editor() {
@@ -3547,9 +3530,9 @@ class Conductor {
             this.editor.load_level(this.stored_level);
             this.loaded_in_editor = true;
         }
-        this.editor.activate();
         this.current = this.editor;
         document.body.setAttribute('data-mode', 'editor');
+        this.editor.activate();
     }
 
     switch_to_player() {
@@ -3560,9 +3543,11 @@ class Conductor {
             this.player.load_level(this.stored_level);
             this.loaded_in_player = true;
         }
-        this.player.activate();
         this.current = this.player;
         document.body.setAttribute('data-mode', 'player');
+        // Activate last, so any DOM inspection (ahem, auto-scaling) already sees the effects of
+        // data-mode revealing the header
+        this.player.activate();
     }
 
     reload_all_options() {
