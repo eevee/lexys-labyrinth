@@ -1266,7 +1266,6 @@ dl.score-chart .-sum {
 
     display: none;
     font-size: calc(var(--tile-height) * var(--scale) / 3);
-    padding: 0.25em 0.5em;
     font-family: serif;
     font-style: italic;
     color: hsl(45, 100%, 60%);
@@ -1277,10 +1276,12 @@ dl.score-chart .-sum {
     overflow: auto;
     /* Set our inherent height or whatever to zero, but then force us to expand to whatever size our
      * parent happens to be.  Magic! */
+    box-sizing: border-box;
     height: 0;
     min-height: 100%;
     width: 0;
     min-width: 100%;
+    padding: 0.25em 0.5em;
 }
 #player-game-area > .player-hint-wrapper.--visible {
     display: initial;
