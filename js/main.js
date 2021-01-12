@@ -544,10 +544,23 @@ class Player extends PrimaryView {
         key_target.addEventListener('keydown', ev => {
             if (! this.active)
                 return;
-            // Ignore IME composition and repeat events
-            if (ev.isComposing || ev.keyCode === 229 || ev.repeat)
-                return;
             this.using_touch = false;
+
+            // Ignore IME composition
+            if (ev.isComposing || ev.keyCode === 229)
+                return;
+
+            // For key repeat of keys we're listening to, we still want to preventDefault, but we
+            // don't actually want to do anything.  That would be really hard except the only keys
+            // we care about preventDefaulting are action ones
+            // TODO what if a particular browser does something for p/,/.?
+            if (ev.repeat) {
+                if (this.key_mapping[ev.key]) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                }
+                return;
+            }
 
             if (ev.key === 'p' || ev.key === 'Pause') {
                 this.toggle_pause();
@@ -602,7 +615,6 @@ class Player extends PrimaryView {
                             this.restart_level();
                         }
                     }
-                    return;
                 }
                 // Don't scroll pls
                 ev.preventDefault();
