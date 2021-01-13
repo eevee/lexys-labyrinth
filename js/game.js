@@ -1052,12 +1052,6 @@ export class Level extends LevelInterface {
         if (actor.last_extra_cooldown_tic === this.tic_counter)
             return;
 
-        if (actor.cooldown_delay_hack) {
-            // See the extensive comment in attempt_out_of_turn_step
-            actor.cooldown_delay_hack += 1;
-            return;
-        }
-
         this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - cooldown));
 
         if (actor.movement_cooldown <= 0) {
@@ -1085,9 +1079,6 @@ export class Level extends LevelInterface {
         let p = 0;
         for (let i = 0, l = this.actors.length; i < l; i++) {
             let actor = this.actors[i];
-            // While we're here, delete this guy
-            delete actor.cooldown_delay_hack;
-
             if (actor.cell) {
                 if (p !== i) {
                     this.actors[p] = actor;
@@ -1509,53 +1500,19 @@ export class Level extends LevelInterface {
     }
 
     attempt_out_of_turn_step(actor, direction) {
-        if (this.compat.use_lynx_loop) {
-            let success = this._do_actor_movement(actor, direction);
-            if (success) {
-                this._do_actor_cooldown(actor, this.compat.emulate_60fps ? 1 : 3);
-            }
-            return success;
-        }
-
-        if (this.attempt_step(actor, direction)) {
+        let success = this.attempt_step(actor, direction);
+        if (success) {
             this._do_extra_cooldown(actor);
-            // Here's the problem.
-            // In CC2, cooldown is measured in frames, not tics, and it decrements every frame, not
-            // every tic.  You usually don't notice because actors can only initiate moves every
-            // three frames (= 1 tic), so the vast majority of the game is tic-aligned.
-            // This is where it leaks.  If actor X's cooldown causes them to press a button which
-            // then initiates an out-of-turn move (i.e. the forced move from a clone or trap
-            // ejection) for actor Y, and actor Y comes later in the actor order, then actor Y will
-            // decrement its cooldown during that same cooldown phase, putting it /between/ tics.
-            // If I copy this behavior and decrement by an entire tic, then actor Y will stay a full
-            // tic ahead indefinitely, whereas in CC2 it would only be a frame ahead and would
-            // eventually have to wait a frame before it could move again.  If I ignore this
-            // behavior wholesale and don't let actor Y decrement at all, then a player being
-            // ejected from a trap could still have her tail bitten.  So here's the compromise: I
-            // set this turn-local flag on actor Y; then if they do have a cooldown later, it's
-            // ignored BUT the flag is incremented; and then if the flag is 2, the actor is exempt
-            // from tail-biting.  (I am reasonably confident that tail-biting is the only possible
-            // side effect here, since actor Y has left the cell even if they haven't visibly moved
-            // yet, and tail-biting is the sole effect that looks "back in time".)
-            // XXX that's still not perfect; if actor X is tic-misaligned, like if there's a chain
-            // of 3 or more actors cloning directly onto red buttons for other cloners, then this
-            // cannot possibly work
-            // TODO now that i have steam-strict mode this is largely pointless, just do what seems
-            // correct
-            // FIXME remove this once i'm sure that it doesn't break cloners OR that cc1 tail-bite
-            // trap
-            //actor.cooldown_delay_hack = 1;
-            return true;
         }
-        else {
-            return false;
-        }
+        return success;
     }
 
     _do_extra_cooldown(actor) {
         this._do_actor_cooldown(actor, this.compat.emulate_60fps ? 1 : 3);
-        // FIXME not for lynx i /think/?
-        this._set_tile_prop(actor, 'last_extra_cooldown_tic', this.tic_counter);
+        // Only Lexy has double-cooldown protection
+        if (! this.compat.use_lynx_loop) {
+            this._set_tile_prop(actor, 'last_extra_cooldown_tic', this.tic_counter);
+        }
     }
 
     // Move the given actor to the given position and perform any appropriate
@@ -1641,9 +1598,7 @@ export class Level extends LevelInterface {
         if (actor.type.is_monster && goal_cell === this.player.previous_cell &&
             // Player has decided to leave their cell, but hasn't actually taken a step yet
             this.player.movement_cooldown === this.player.movement_speed &&
-            ! actor.has_item('helmet') && ! this.player.has_item('helmet') &&
-            // See the extensive comment in attempt_out_of_turn_step
-            this.player.cooldown_delay_hack !== 2)
+            ! actor.has_item('helmet') && ! this.player.has_item('helmet'))
         {
             this.fail(actor.type.name);
         }
