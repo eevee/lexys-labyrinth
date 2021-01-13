@@ -141,6 +141,16 @@ function player_visual_state(me) {
     }
 }
 
+function button_visual_state(me) {
+    if (me && me.cell) {
+        let actor = me.cell.get_actor();
+        if (actor && ! actor.movement_cooldown) {
+            return 'pressed';
+        }
+    }
+    return 'released';
+};
+
 // Logic for chasing after the player (or running away); shared by both teeth and mimics
 function pursue_player(me, level) {
     // Teeth can only move the first 4 of every 8 tics, and mimics only the first 4 of every 16,
@@ -336,25 +346,11 @@ const TILE_TYPES = {
     popdown_floor: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
-        // FIXME get rid of popdown_floor_visible and use visual_state for this, but requires some
-        // changes to the tileset stuff
-        on_ready(me, level) {
-            // Start out as a visible floor if there's an actor or item on us
-            if (me.cell.get_item() || me.cell.get_actor()) {
-                me.type = TILE_TYPES.popdown_floor_visible;
+        visual_state(me) {
+            if (me && me.cell && (me.cell.get_item() || me.cell.get_actor())) {
+                return 'depressed';
             }
-        },
-        on_approach(me, level, other) {
-            level.transmute_tile(me, 'popdown_floor_visible');
-        },
-    },
-    popdown_floor_visible: {
-        layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
-        on_depart(me, level, other) {
-            if (! me.cell.get_item()) {
-                level.transmute_tile(me, 'popdown_floor');
-            }
+            return 'normal';
         },
     },
     no_player1_sign: {
@@ -1015,6 +1011,35 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'arrows', new_arrows);
         },
     },
+    glass_block: {
+        layer: LAYERS.actor,
+        collision_mask: COLLISION.block_cc2,
+        blocks_collision: COLLISION.all,
+        is_actor: true,
+        is_block: true,
+        can_reveal_walls: true,
+        can_reverse_on_railroad: true,
+        movement_speed: 4,
+        allows_push(me, direction) {
+            return me.arrows && me.arrows.has(direction);
+        },
+        pushes: {
+            dirt_block: true,
+            ice_block: true,
+            frame_block: true,
+        },
+        on_clone(me, original) {
+            me.arrows = new Set(original.arrows);
+        },
+        on_rotate(me, level, turn) {
+            // We rotate when turned on railroads
+            let new_arrows = new Set;
+            for (let arrow of me.arrows) {
+                new_arrows.add(DIRECTIONS[arrow][turn]);
+            }
+            level._set_tile_prop(me, 'arrows', new_arrows);
+        },
+    },
     green_floor: {
         layer: LAYERS.terrain,
         on_gray_button(me, level) {
@@ -1240,6 +1265,12 @@ const TILE_TYPES = {
             // No need to do anything, we just need this here as a signal that our .powered_edges
             // needs to be updated
         },
+        // FIXME don't animate when inactive, but that required inspecting the level!
+        /*
+        visual_state(me) {
+            return this._is_active(me) ? 'active' : 'inactive';
+        },
+        */
     },
     teleport_blue: {
         layer: LAYERS.terrain,
@@ -1361,10 +1392,10 @@ const TILE_TYPES = {
                 }
             }
         },
-        // TODO inactive ones don't animate; transmogrifiers too
+        // FIXME don't animate when inactive, but that required inspecting the level!
         /*
         visual_state(me) {
-            return this._is_active(me) ? 'active' : 'inactive';
+            return me && this._is_active(me) ? 'active' : 'inactive';
         },
         */
     },
@@ -1475,6 +1506,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
         },
+        visual_state: button_visual_state,
     },
     button_yellow: {
         layer: LAYERS.terrain,
@@ -1520,6 +1552,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
         },
+        visual_state: button_visual_state,
     },
     button_brown: {
         layer: LAYERS.terrain,
@@ -1551,6 +1584,7 @@ const TILE_TYPES = {
                 trap.type.remove_press(trap, level);
             }
         },
+        visual_state: button_visual_state,
     },
     button_red: {
         layer: LAYERS.terrain,
@@ -1567,6 +1601,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
         },
+        visual_state: button_visual_state,
     },
     button_orange: {
         layer: LAYERS.terrain,
@@ -1592,6 +1627,7 @@ const TILE_TYPES = {
 
             me.type._toggle_flame_jet(me, level, other);
         },
+        visual_state: button_visual_state,
     },
     button_pink: {
         layer: LAYERS.terrain,
@@ -1613,6 +1649,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
         },
+        visual_state: button_visual_state,
     },
     button_black: {
         layer: LAYERS.terrain,
@@ -1634,6 +1671,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
         },
+        visual_state: button_visual_state,
     },
     button_gray: {
         layer: LAYERS.terrain,
@@ -1658,6 +1696,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
         },
+        visual_state: button_visual_state,
     },
     // Logic gates, all consolidated into a single tile type
     logic_gate: {
