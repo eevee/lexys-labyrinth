@@ -2805,6 +2805,10 @@ const COMPAT_FLAGS = [{
     label: "Don't fix populated blue walls in CC1 levels",
     rulesets: new Set(['steam-strict', 'lynx']),
 }, {
+    key: 'no_immediate_detonate_bombs',
+    label: "Don't immediately detonate populated mines",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
     key: 'sliding_tanks_ignore_button',
     label: "Blue tanks ignore blue buttons while sliding",
     // TODO ms?
@@ -2814,9 +2818,10 @@ const COMPAT_FLAGS = [{
     label: "Blue tanks on cloners respond to blue buttons",
     rulesets: new Set(['steam-strict']),
 }, {
-    key: 'no_immediate_detonate_bombs',
-    label: "Don't immediately detonate populated mines",
-    rulesets: new Set(['lynx', 'ms']),
+    key: 'use_legacy_hooking',
+    label: "Player pulls blocks at decision time",
+    // TODO maybe steam as well?
+    rulesets: new Set(['steam-strict']),
 }, {
     // XXX this is goofy
     key: 'tiles_react_instantly',

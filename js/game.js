@@ -137,6 +137,18 @@ export class Tile {
         return tile.cell.try_leaving(tile, direction);
     }
 
+    can_pull(tile, direction) {
+        // FIXME starting to think fx should not count as actors
+        if (tile.type.ttl)
+            return false;
+
+        // FIXME i don't actually know the precise rules here.  dirt blocks and ghosts can pull
+        // other blocks even though they can't usually push them.  given the existence of monster
+        // hooking, i suspect /anything/ can be hooked but on monsters it has a weird effect?
+        // figure this out?
+        return (! tile.type.allows_push || tile.type.allows_push(tile, direction));
+    }
+
     // Inventory stuff
     has_item(name) {
         if (TILE_TYPES[name].is_key) {
@@ -1404,38 +1416,20 @@ export class Level extends LevelInterface {
             dest_cell.try_entering(actor, direction, this, push_mode));
 
         // If we have the hook, pull anything behind us, now that we're out of the way.
-        // This has to happen here to make hook-slapping work and allow hooking a moving block to
-        // stop us, and it has to use pending decisions rather than an immediate move because we're
-        // still in the way (so the block can't move) and also to prevent a block from being able to
-        // follow us through a swivel (which we haven't actually swiveled at decision time).
-        // FIXME so, we shouldn't be able to pull a block through a swivel, but the swivel doesn't
-        // turn until on_depart, which is after this because we have to know we can actually move
-        // first.  but also, hooking can stop us from moving, but it /does/ still allow us to push.
-        // also this all seems to apply exactly the same to monsters, except of course they can't
-        // hook slap.  so where the hell does this actually go?
-        if (success && actor.has_item('hook')) {
+        // In CC2, this has to happen here to make hook-slapping work and allow hooking a moving
+        // block to stop us, and it has to use pending decisions rather than an immediate move
+        // because we're still in the way (so the block can't move) and also to prevent a block from
+        // being able to follow us through a swivel (which we haven't swiveled at decision time).
+        if (this.compat.use_legacy_hooking && success && actor.has_item('hook')) {
             let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
-                // FIXME starting to think fx should not count as actors
-                if (behind_actor && ! behind_actor.type.ttl &&
-                    // FIXME i don't actually know the precise rules here.  dirt blocks and ghosts
-                    // can pull other blocks even though they can't usually push them.  given the
-                    // existence of monster hooking, i suspect /anything/ can be hooked but on
-                    // monsters it has a weird effect?  figure this out?
-                    (! behind_actor.type.allows_push || behind_actor.type.allows_push(behind_actor, direction)))
-                {
+                if (behind_actor && actor.can_pull(behind_actor, direction)) {
                     if (behind_actor.movement_cooldown) {
-                        // FIXME this sucks actually, make it not default behavior
                         return false;
                     }
                     else if (behind_actor.type.is_block && push_mode === 'push') {
                         this._set_tile_prop(behind_actor, 'is_pulled', true);
-                        // FIXME i am pretty sure lexy benefits immensely from doing an immediate
-                        // move, which also makes it match pushing, but that only works if this
-                        // happens at movement time, which prevents hook slapping, which is nonsense
-                        // anyway
-                        //this.attempt_out_of_turn_step(behind_actor, direction);
                         this._set_tile_prop(behind_actor, 'pending_push', direction);
                         behind_actor.decision = direction;
                     }
@@ -1492,6 +1486,20 @@ export class Level extends LevelInterface {
         this._set_tile_prop(actor, 'movement_cooldown', speed * 3);
         this._set_tile_prop(actor, 'movement_speed', speed * 3);
         this.move_to(actor, goal_cell, speed);
+
+        // Do Lexy-style hooking here: only attempt to pull things just after we've actually moved
+        // successfully, which means the hook can never stop us from moving and hook slapping is not
+        // a thing, and also make them a real move rather than a weird pending thing
+        if (! this.compat.use_legacy_hooking && actor.has_item('hook')) {
+            let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
+            if (behind_cell) {
+                let behind_actor = behind_cell.get_actor();
+                if (behind_actor && actor.can_pull(behind_actor, direction) && behind_actor.type.is_block) {
+                    this._set_tile_prop(behind_actor, 'is_pulled', true);
+                    this.attempt_out_of_turn_step(behind_actor, direction);
+                }
+            }
+        }
 
         return true;
     }
