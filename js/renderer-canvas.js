@@ -141,6 +141,9 @@ export class CanvasRenderer {
         this._adjust_viewport_if_dirty();
 
         let tic = (this.level.tic_counter ?? 0) + tic_offset;
+        let packet = new CanvasRendererDrawPacket(this, this.ctx, tic, this.perception);
+        packet.update_rate = this.level.compat.emulate_60fps ? 1 : 3;
+
         let tw = this.tileset.size_x;
         let th = this.tileset.size_y;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -149,7 +152,7 @@ export class CanvasRenderer {
         // TODO what about levels smaller than the viewport...?  shrink the canvas in set_level?
         let xmargin = (this.viewport_size_x - 1) / 2;
         let ymargin = (this.viewport_size_y - 1) / 2;
-        let [px, py] = this.level.player.visual_position(tic_offset);
+        let [px, py] = this.level.player.visual_position(tic_offset, packet.update_rate);
         // Figure out where to start drawing
         // TODO support overlapping regions better
         let x0 = px - xmargin;
@@ -188,7 +191,6 @@ export class CanvasRenderer {
         // Tiles in motion (i.e., actors) don't want to be overdrawn by neighboring tiles' terrain,
         // so draw in three passes: everything below actors, actors, and everything above actors
         // neighboring terrain
-        let packet = new CanvasRendererDrawPacket(this, this.ctx, tic, this.perception);
         for (let x = xf0; x <= x1; x++) {
             for (let y = yf0; y <= y1; y++) {
                 let cell = this.level.cell(x, y);
@@ -211,7 +213,7 @@ export class CanvasRenderer {
                     continue;
 
                 // Handle smooth scrolling
-                let [vx, vy] = actor.visual_position(tic_offset);
+                let [vx, vy] = actor.visual_position(tic_offset, packet.update_rate);
                 // Round this to the pixel grid too!
                 vx = Math.floor(vx * tw + 0.5) / tw;
                 vy = Math.floor(vy * th + 0.5) / th;
@@ -265,7 +267,7 @@ export class CanvasRenderer {
                     let actor = this.level.cell(x, y).get_actor();
                     if (! actor)
                         continue;
-                    let [vx, vy] = actor.visual_position(tic_offset);
+                    let [vx, vy] = actor.visual_position(tic_offset, packet.update_rate);
                     // Don't round to the pixel grid; we want to know if the bbox is misaligned!
                     this.ctx.fillRect((vx - x0) * tw, (vy - y0) * th, 1 * tw, 1 * th);
                 }

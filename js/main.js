@@ -479,7 +479,6 @@ class Player extends PrimaryView {
             }
         });
         // Game actions
-        // TODO do these need buttons??  feel like they're not discoverable otherwise
         this.drop_button = this.root.querySelector('#player-actions .action-drop');
         this.drop_button.addEventListener('click', ev => {
             // Use the set of "buttons pressed between tics" because it's cleared automatically;

@@ -954,6 +954,11 @@ export class DrawPacket {
     constructor(tic = 0, perception = 'normal') {
         this.tic = tic;
         this.perception = perception;
+
+        // Distinguishes between interpolation of 20tps and 60fps; 3 means 20tps, 1 means 60fps
+        // XXX this isn't actually about update /rate/; it's about how many "frames" of cooldown
+        // pass between a decision and the end of a tic
+        this.update_rate = 3;
     }
 
     // Draw a tile (or region) from the tileset.  The caller is presumed to know where the tile
@@ -999,7 +1004,7 @@ export class Tileset {
                 // This tile reports its own animation timing (in frames), so trust that, and use
                 // the current tic's fraction.  If we're between tics, interpolate.
                 // FIXME if the game ever runs every frame we will have to adjust the interpolation
-                let p = ((tile.movement_speed - tile.movement_cooldown) + packet.tic % 1 * 3) / tile.movement_speed;
+                let p = tile.movement_progress(packet.tic % 1, packet.update_rate);
                 if (this.animation_slowdown > 1 && ! tile.type.ttl) {
                     // The players have full walk animations, but they look very silly when squeezed
                     // into the span of a single step, so instead we only play half at a time.  The
@@ -1148,9 +1153,7 @@ export class Tileset {
             x = -1;
         }
 
-        // FIXME lexy is n to 1, cc2 n-1 to 0, and this mixes them
-        let p = tile.movement_speed - tile.movement_cooldown;
-        p = (p + packet.tic % 1 * 3) / tile.movement_speed;
+        let p = tile.movement_progress(packet.tic % 1, packet.update_rate);
         p = Math.min(p, 0.999);  // FIXME hack for differing movement counters
         let index = Math.floor(p * (axis_cels.length + 1));
         if (index === 0 || index > axis_cels.length) {

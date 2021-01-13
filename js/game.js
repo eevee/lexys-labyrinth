@@ -30,8 +30,13 @@ export class Tile {
         return Object.assign(tile, tile_template);
     }
 
+    movement_progress(tic_offset, interpolate_backwards_by = 3) {
+        // FIXME this will need altering if 60fps actually updates at 60fps
+        return ((this.movement_speed - this.movement_cooldown - interpolate_backwards_by) + tic_offset * 3) / this.movement_speed;
+    }
+
     // Gives the effective position of an actor in motion, given smooth scrolling
-    visual_position(tic_offset = 0) {
+    visual_position(tic_offset = 0, interpolate_backwards_by = 0) {
         let x = this.cell.x;
         let y = this.cell.y;
         if (! this.previous_cell || this.movement_speed === null) {
@@ -40,7 +45,7 @@ export class Tile {
         else {
             // For a movement speed of N, the cooldown is set to N during the tic an actor starts
             // moving, and we interpolate it from there to N - 1 over the course of the duration
-            let p = ((this.movement_speed - this.movement_cooldown) + tic_offset * 3) / this.movement_speed;
+            let p = this.movement_progress(tic_offset, interpolate_backwards_by);
             return [
                 (1 - p) * this.previous_cell.x + p * x,
                 (1 - p) * this.previous_cell.y + p * y,
@@ -783,8 +788,11 @@ export class Level extends LevelInterface {
         }
     }
 
-    // Only the Lexy-style loop has a notion of "finishing" a tic, since (unlike the Lynx loop) the
-    // decision phase happens in the /middle/
+    // FIXME merge this a bit more with the lynx loop, which should be more in finish_tic anyway
+    // FIXME fix turn-based mode
+    // FIXME you are now not synched with something coming out of a trap or cloner, but i don't know
+    // how to fix that with this loop
+    // Finish a tic, i.e., apply input just before the player can make a decision and then do it
     finish_tic(p1_input) {
         this.p1_input = p1_input;
         this.p1_released |= ~p1_input;  // Action keys released since we last checked them
@@ -807,27 +815,6 @@ export class Level extends LevelInterface {
             this._do_actor_movement(actor, actor.decision);
         }
 
-        this._do_cleanup_phase();
-    }
-
-    // Lexy-style loop, the one I stumbled upon accidentally.  Here, cooldowns happen /first/ as
-    // their own phase, then decisions are made, then movement happens.  This approach has several
-    // advantages: there's no cooldown on the same tic that movement begins, which lets the renderer
-    // interpolate between tics more easily; there's no jitter when pushing a block, as is seen in
-    // CC2; and generally more things happen in parallel, which improves the illusion that all the
-    // game objects are acting simultaneously.
-    _begin_tic_lexy() {
-        // CC2 wiring runs every frame, not every tic, so we need to do it three times, but dealing
-        // with it is delicate.  We want the result of a button press to draw, but not last longer
-        // than intended, so we only want one update between the end of the cooldown pass and the
-        // end of the tic.  That means the other two have to go here.  When a level starts, there
-        // are only two wiring updates before everything gets its first chance to move, so we skip
-        // the very first one here.
-        if (this.tic_counter !== 0) {
-            this._do_wire_phase();
-        }
-        this._do_wire_phase();
-
         // Advance everyone's cooldowns
         // Note that we iterate in reverse order, DESPITE keeping dead actors around with null
         // cells, to match the Lynx and CC2 behavior.  This is actually important in some cases;
@@ -840,7 +827,9 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
-            this._do_actor_cooldown(actor, 3);
+            if (! actor.type.ttl) {
+                this._do_actor_cooldown(actor, 3);
+            }
         }
 
         // Mini extra pass: deal with teleporting separately.  Otherwise, actors may have been in
@@ -860,6 +849,22 @@ export class Level extends LevelInterface {
         this._do_wire_phase();
         // TODO should this also happen three times?
         this._do_static_phase();
+
+        this._do_cleanup_phase();
+    }
+
+    // Lexy-style loop, similar to Lynx but with some things split out into separate phases
+    _begin_tic_lexy() {
+        // CC2 wiring runs every frame, not every tic, so we need to do it three times, but dealing
+        // with it is delicate.  We want the result of a button press to draw, but not last longer
+        // than intended, so we only want one update between the end of the cooldown pass and the
+        // end of the tic.  That means the other two have to go here.  When a level starts, there
+        // are only two wiring updates before everything gets its first chance to move, so we skip
+        // the very first one here.
+        if (this.tic_counter !== 0) {
+            this._do_wire_phase();
+        }
+        this._do_wire_phase();
     }
 
     // Lynx-style loop: everyone decides, then everyone moves/cools.
@@ -909,8 +914,24 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
+            if (actor.type.ttl) {
+                // Animations, bizarrely, do their cooldown at decision time, so they're removed
+                // early on the tic that they expire
+                this._do_actor_cooldown(actor, this.compat.emulate_60fps ? 1 : 3);
+                continue;
+            }
+
             if (actor.movement_cooldown > 0)
                 continue;
+
+            // Erase old traces of movement now
+            if (actor.movement_speed) {
+                this._set_tile_prop(actor, 'previous_cell', null);
+                this._set_tile_prop(actor, 'movement_speed', null);
+                if (actor.is_pulled) {
+                    this._set_tile_prop(actor, 'is_pulled', false);
+                }
+            }
 
             if (! forced_only && actor.type.on_tic) {
                 actor.type.on_tic(actor, this);
@@ -935,6 +956,9 @@ export class Level extends LevelInterface {
                 continue;
 
             this._do_actor_movement(actor, actor.decision);
+            if (actor.type.ttl)
+                continue;
+
             this._do_actor_cooldown(actor, cooldown);
             if (actor.just_stepped_on_teleporter) {
                 this.attempt_teleport(actor);
@@ -1009,6 +1033,9 @@ export class Level extends LevelInterface {
         if (actor.movement_cooldown <= 0)
             return;
 
+        if (actor.last_extra_cooldown_tic === this.tic_counter)
+            return;
+
         if (actor.cooldown_delay_hack) {
             // See the extensive comment in attempt_out_of_turn_step
             actor.cooldown_delay_hack += 1;
@@ -1027,17 +1054,11 @@ export class Level extends LevelInterface {
             if (! this.compat.tiles_react_instantly) {
                 this.step_on_cell(actor, actor.cell);
             }
-            // Erase any trace of being in mid-movement, however:
-            // - This has to happen after stepping on cells, because some effects care about
-            // the cell we're arriving from
-            // - Don't do it if stepping on the cell caused us to move again
-            if (actor.movement_cooldown <= 0) {
-                this._set_tile_prop(actor, 'previous_cell', null);
-                this._set_tile_prop(actor, 'movement_speed', null);
-                if (actor.is_pulled) {
-                    this._set_tile_prop(actor, 'is_pulled', false);
-                }
-            }
+            // Note that we don't erase the movement bookkeeping until next decision phase, because
+            // the renderer interpolates back in time and needs to know to draw us finishing the
+            // move; this should be fine since everything checks for "in motion" by looking at
+            // movement_cooldown, which is already zero.  (Also saves some undo budget, since
+            // movement_speed is never null for an actor in constant motion.)
         }
     }
 
@@ -1485,6 +1506,7 @@ export class Level extends LevelInterface {
         }
 
         if (this.attempt_step(actor, direction)) {
+            this._do_extra_cooldown(actor);
             // Here's the problem.
             // In CC2, cooldown is measured in frames, not tics, and it decrements every frame, not
             // every tic.  You usually don't notice because actors can only initiate moves every
@@ -1508,12 +1530,20 @@ export class Level extends LevelInterface {
             // cannot possibly work
             // TODO now that i have steam-strict mode this is largely pointless, just do what seems
             // correct
-            actor.cooldown_delay_hack = 1;
+            // FIXME remove this once i'm sure that it doesn't break cloners OR that cc1 tail-bite
+            // trap
+            //actor.cooldown_delay_hack = 1;
             return true;
         }
         else {
             return false;
         }
+    }
+
+    _do_extra_cooldown(actor) {
+        this._do_actor_cooldown(actor, this.compat.emulate_60fps ? 1 : 3);
+        // FIXME not for lynx i /think/?
+        this._set_tile_prop(actor, 'last_extra_cooldown_tic', this.tic_counter);
     }
 
     // Move the given actor to the given position and perform any appropriate
@@ -2292,7 +2322,8 @@ export class Level extends LevelInterface {
         // immediately, as Lynx does; note that Lynx also ticks /and destroys/ animations early in
         // the decision phase, but this seems to work out just as well
         this._set_tile_prop(tile, 'movement_speed', tile.type.ttl);
-        this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl - 1);
+        this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl);
+        this._do_extra_cooldown(tile);
         cell._add(tile);
         this.actors.push(tile);
         this._push_pending_undo(() => {
@@ -2328,7 +2359,8 @@ export class Level extends LevelInterface {
             }
             this._set_tile_prop(tile, 'previous_cell', null);
             this._set_tile_prop(tile, 'movement_speed', tile.type.ttl);
-            this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl - 1);
+            this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl);
+            this._do_extra_cooldown(tile);
         }
     }
 
