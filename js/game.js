@@ -296,7 +296,14 @@ export class Cell extends Array {
             if (push_mode === null)
                 return false;
 
-            if (! actor.can_push(tile, direction)) {
+            if (actor.can_push(tile, direction) || (
+                level.compat.tanks_teeth_push_ice_blocks && tile.type.name === 'ice_block' &&
+                (actor.type.name === 'teeth' || actor.type.name === 'teeth_timid' || actor.type.name === 'tank_blue')
+            )) {
+                // Collect pushables for later, so we don't inadvertently push through a wall
+                pushable_tiles.push(tile);
+            }
+            else {
                 // It's in our way and we can't push it, so we're done here
                 if (push_mode === 'push') {
                     if (actor.type.on_blocked) {
@@ -305,9 +312,6 @@ export class Cell extends Array {
                 }
                 return false;
             }
-
-            // Collect pushables for later, so we don't inadvertently push through a wall
-            pushable_tiles.push(tile);
         }
 
         // If we got this far, all that's left is to deal with pushables

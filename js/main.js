@@ -2809,6 +2809,10 @@ const COMPAT_FLAGS = [{
     label: "Don't immediately detonate populated mines",
     rulesets: new Set(['lynx', 'ms']),
 }, {
+    key: 'tanks_teeth_push_ice_blocks',
+    label: "Blue tanks and teeth can push ice blocks",
+    rulesets: new Set(['ms']),
+}, {
     key: 'sliding_tanks_ignore_button',
     label: "Blue tanks ignore blue buttons while sliding",
     // TODO ms?
