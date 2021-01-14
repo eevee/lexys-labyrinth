@@ -1640,11 +1640,6 @@ export class Level extends LevelInterface {
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
-
-                if (actor.type.ttl) {
-                    // If we were just turned into an explosion or something, stop here!
-                    break;
-                }
             }
         }
 
@@ -2306,6 +2301,13 @@ export class Level extends LevelInterface {
     }
 
     transmute_tile(tile, name) {
+        if (tile.type.ttl) {
+            // If this is already an animation, don't turn it into a different one; this can happen
+            // if a block is pushed onto a cell containing both a mine and slime, both of which try
+            // to destroy it
+            return;
+        }
+
         let old_type = tile.type;
         let new_type = TILE_TYPES[name];
         if (old_type.layer !== new_type.layer) {
