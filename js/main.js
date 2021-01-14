@@ -2338,13 +2338,12 @@ class Splash extends PrimaryView {
         let level_el = progress.querySelector('.-levels');
         if (packinfo.total_levels === undefined) {
             // This stuff isn't available in old saves
-            progress.querySelector('.-time').textContent = "";
-            progress.querySelector('.-levels').textContent = "";
+            progress.querySelector('.-time').textContent = "???";
+            level_el.textContent = "(old save; load pack to fill stats)";
         }
         else {
             progress.querySelector('.-time').textContent = util.format_duration(packinfo.total_abstime / TICS_PER_SECOND, 2);
-            let levels = `${packinfo.cleared_levels}/${packinfo.total_levels}`;
-            levels = `cleared ${packinfo.cleared_levels} of ${packinfo.total_levels} levels, ${packinfo.aidless_levels}★ without aid`;
+            let levels = `cleared ${packinfo.cleared_levels} of ${packinfo.total_levels} levels, ${packinfo.aidless_levels}★ without aid`;
             level_el.textContent = levels;
             level_el.style.setProperty('--cleared', packinfo.cleared_levels / packinfo.total_levels);
             level_el.style.setProperty('--aidless', packinfo.aidless_levels / packinfo.total_levels);
