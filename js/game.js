@@ -1640,6 +1640,11 @@ export class Level extends LevelInterface {
             }
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
+
+                if (actor.type.ttl) {
+                    // If we were just turned into an explosion or something, stop here!
+                    break;
+                }
             }
         }
 
