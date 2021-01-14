@@ -1669,17 +1669,15 @@ class Player extends PrimaryView {
                         savefile.total_score = savefile.total_score ?? 0;
                         if (old_scorecard) {
                             savefile.total_score -= old_scorecard.score;
-                            savefile.total_time -= old_scorecard.time;
                             savefile.total_abstime -= old_scorecard.abstime;
                         }
                         savefile.total_score += scorecard.score;
-                        savefile.total_time += scorecard.time;
                         savefile.total_abstime += scorecard.abstime;
 
                         if (! old_scorecard) {
                             savefile.cleared_levels = (savefile.cleared_levels ?? 0) + 1;
                         }
-                        else if (old_scorecard.aid > 0 && scorecard.aid === 0) {
+                        if ((! old_scorecard || old_scorecard.aid > 0) && scorecard.aid === 0) {
                             savefile.aidless_levels = (savefile.aidless_levels ?? 0) + 1;
                         }
 
@@ -3369,7 +3367,6 @@ class LevelBrowserOverlay extends DialogOverlay {
 // Main storage:
 //   packs:
 //     total_score
-//     total_time  -- FIXME this is nonsense lol, it's time left on the clock
 //     total_abstime
 //     total_levels
 //     cleared_levels
@@ -3624,14 +3621,12 @@ class Conductor {
                 if (! this.current_pack_savefile.__version__) {
                     // Populate some more recently added fields
                     this.current_pack_savefile.total_levels = stored_game.level_metadata.length;
-                    this.current_pack_savefile.total_time = 0;
                     this.current_pack_savefile.total_abstime = 0;
                     this.current_pack_savefile.cleared_levels = 0;
                     this.current_pack_savefile.aidless_levels = 0;
                     for (let scorecard of this.current_pack_savefile.scorecards) {
                         if (! scorecard)
                             continue;
-                        this.current_pack_savefile.total_time += scorecard.time;
                         this.current_pack_savefile.total_abstime += scorecard.abstime;
                         this.current_pack_savefile.cleared_levels += 1;
                         if (scorecard.aid === 0) {
@@ -3641,6 +3636,20 @@ class Conductor {
                     this.current_pack_savefile.__version__ = 1;
                     changed = true;
                 }
+                else if (this.current_pack_savefile.__version__ === 1) {
+                    // I forgot to count a level as aidless on your first playthrough.  Also,
+                    // total_time is not a useful field, since 'time' is just where the clock was
+                    delete this.current_pack_savefile.total_time;
+                    this.current_pack_savefile.aidless_levels = 0;
+                    for (let scorecard of this.current_pack_savefile.scorecards) {
+                        if (! scorecard)
+                            continue;
+                        if (scorecard.aid === 0) {
+                            this.current_pack_savefile.aidless_levels += 1;
+                        }
+                    }
+                    this.current_pack_savefile.__version__ = 2;
+                }
                 if (changed) {
                     this.save_savefile();
                 }
@@ -3648,9 +3657,8 @@ class Conductor {
         }
         if (! this.current_pack_savefile) {
             this.current_pack_savefile = {
-                __version__: 1,
+                __version__: 2,
                 total_score: 0,
-                total_time: 0,
                 total_abstime: 0,
                 current_level: 1,
                 highest_level: 1,
@@ -3745,7 +3753,7 @@ class Conductor {
             packinfo = {};
             this.stash.packs[this._pack_identifier] = packinfo;
         }
-        let keys = ['total_score', 'total_time', 'total_abstime', 'total_levels', 'cleared_levels', 'aidless_levels'];
+        let keys = ['total_score', 'total_abstime', 'total_levels', 'cleared_levels', 'aidless_levels'];
         if (keys.some(key => packinfo[key] !== this.current_pack_savefile[key])) {
             for (let key of keys) {
                 packinfo[key] = this.current_pack_savefile[key];
