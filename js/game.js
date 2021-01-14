@@ -2235,6 +2235,7 @@ export class Level extends LevelInterface {
             return null;
         }
 
+        // FIXME should probably remember tics here, not just seconds?
         let time = Math.ceil((this.time_remaining ?? 0) / TICS_PER_SECOND);
         return {
             time: time,

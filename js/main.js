@@ -1656,35 +1656,54 @@ class Player extends PrimaryView {
                 let level_index = level_number - 1;
                 let scorecard = this.level.get_scorecard();
                 let savefile = this.conductor.current_pack_savefile;
-                let old_scorecard;
+                let old_scorecard = savefile.scorecards[level_index];
                 if (! this.debug.enabled) {
-                    if (! savefile.scorecards[level_index] ||
-                        savefile.scorecards[level_index].score < scorecard.score ||
-                        (savefile.scorecards[level_index].score === scorecard.score &&
-                            savefile.scorecards[level_index].aid > scorecard.aid))
-                    {
-                        old_scorecard = savefile.scorecards[level_index];
+                    // Merge any improved stats into the old scorecard, and update the totals.  All
+                    // four of these stats are tracked independently: least aid, best score, highest
+                    // clock, lowest real time
+                    let new_scorecard = old_scorecard ? { ...old_scorecard } : {};
 
-                        // Adjust the total score
+                    if (! old_scorecard) {
+                        savefile.cleared_levels = (savefile.cleared_levels ?? 0) + 1;
+                    }
+
+                    // Aid
+                    if (! old_scorecard || scorecard.aid < old_scorecard.aid) {
+                        new_scorecard.aid = scorecard.aid;
+                        if (scorecard.aid === 0) {
+                            savefile.aidless_levels = (savefile.aidless_levels ?? 0) + 1;
+                        }
+                    }
+
+                    // Score
+                    if (! old_scorecard || scorecard.score > old_scorecard.score) {
+                        new_scorecard.score = scorecard.score;
                         savefile.total_score = savefile.total_score ?? 0;
                         if (old_scorecard) {
                             savefile.total_score -= old_scorecard.score;
-                            savefile.total_abstime -= old_scorecard.abstime;
                         }
                         savefile.total_score += scorecard.score;
-                        savefile.total_abstime += scorecard.abstime;
-
-                        if (! old_scorecard) {
-                            savefile.cleared_levels = (savefile.cleared_levels ?? 0) + 1;
-                        }
-                        if ((! old_scorecard || old_scorecard.aid > 0) && scorecard.aid === 0) {
-                            savefile.aidless_levels = (savefile.aidless_levels ?? 0) + 1;
-                        }
-
-                        savefile.total_levels = this.conductor.stored_game.level_metadata.length;
-                        savefile.scorecards[level_index] = scorecard;
-                        this.conductor.save_savefile();
                     }
+
+                    // Real time
+                    if (! old_scorecard || scorecard.abstime < old_scorecard.abstime) {
+                        new_scorecard.abstime = scorecard.abstime;
+                        savefile.total_abstime = savefile.total_abstime ?? 0;
+                        if (old_scorecard) {
+                            savefile.total_abstime -= old_scorecard.abstime;
+                        }
+                        savefile.total_abstime += scorecard.abstime;
+                    }
+
+                    // Clock time
+                    if (! old_scorecard || scorecard.time > old_scorecard.time) {
+                        new_scorecard.time = scorecard.time;
+                        // There's no running total of clock times
+                    }
+
+                    savefile.total_levels = this.conductor.stored_game.level_metadata.length;
+                    savefile.scorecards[level_index] = new_scorecard;
+                    this.conductor.save_savefile();
                 }
 
                 overlay_reason = 'success';
@@ -1733,9 +1752,9 @@ class Player extends PrimaryView {
 
                 overlay_middle = mk('dl.score-chart',
                     mk('dt', "base score"),
-                    mk('dd', base),
+                    mk('dd', base.toLocaleString()),
                     mk('dt', "time bonus"),
-                    mk('dd', `+ ${time}`),
+                    mk('dd', `+ ${time.toLocaleString()}`),
                 );
                 // It should be impossible to ever have a bonus and then drop back to 0 with CC2
                 // rules; thieves can halve it, but the amount taken is rounded down.
@@ -1743,7 +1762,7 @@ class Player extends PrimaryView {
                 if (this.level.bonus_points) {
                     overlay_middle.append(
                         mk('dt', "score bonus"),
-                        mk('dd', `+ ${this.level.bonus_points}`),
+                        mk('dd', `+ ${this.level.bonus_points.toLocaleString()}`),
                     );
                 }
                 else {
@@ -1753,13 +1772,13 @@ class Player extends PrimaryView {
                 // TODO show your time, bold time...?
                 overlay_middle.append(
                     mk('dt.-sum', "level score"),
-                    mk('dd.-sum', `${scorecard.score} ${scorecard.aid === 0 ? '★' : ''}`),
+                    mk('dd.-sum', `${scorecard.score.toLocaleString()} ${scorecard.aid === 0 ? '★' : ''}`),
                 );
 
-                if (old_scorecard) {
+                if (old_scorecard && old_scorecard.score < scorecard.score) {
                     overlay_middle.append(
                         mk('dt', "improvement"),
-                        mk('dd', `+ ${scorecard.score - old_scorecard.score}`),
+                        mk('dd', `+ ${(scorecard.score - old_scorecard.score).toLocaleString()}`),
                     );
                 }
                 else {
@@ -1768,7 +1787,7 @@ class Player extends PrimaryView {
 
                 overlay_middle.append(
                     mk('dt', "total score"),
-                    mk('dd', savefile.total_score),
+                    mk('dd', savefile.total_score.toLocaleString()),
                 );
             }
         }
@@ -3269,37 +3288,67 @@ class LevelBrowserOverlay extends DialogOverlay {
         let thead = mk('thead', mk('tr',
             mk('th', ""),
             mk('th', "Level"),
-            mk('th', "Your time"),
-            mk('th', mk('abbr', {
+            mk('th.-time', mk('abbr', {
+                title: "Time left on the clock when you finished; doesn't exit for untimed levels",
+            }, "Best clock")),
+            mk('th.-time', mk('abbr', {
                 title: "Actual time it took you to play the level, even on untimed levels, and ignoring any CC2 clock altering effects",
-            }, "Real time")),
-            mk('th', "Your score"),
+            }, "Best real time")),
+            mk('th.-score', "Best score"),
+            mk('th'),
+            mk('th'),
         ));
         let tbody = mk('tbody');
         let table = mk('table.level-browser', thead, tbody);
         this.main.append(table);
         let savefile = conductor.current_pack_savefile;
-        // TODO if i stop eagerloading everything in a .DAT then this will not make sense any more
+        let total_abstime = 0, total_score = 0;
         for (let [i, meta] of conductor.stored_game.level_metadata.entries()) {
             let scorecard = savefile.scorecards[i];
-            let score = "—", time = "—", abstime = "—";
+            let score = "—", time = "—", abstime = "—", aid = "";
+            let button;
             if (scorecard) {
                 score = scorecard.score.toLocaleString();
                 if (scorecard.aid === 0) {
-                    score += '★';
+                    aid = '★';
                 }
 
-                if (scorecard.time === 0) {
-                    // This level is untimed
-                    time = "n/a";
-                }
-                else {
+                // 0 means untimed level
+                if (scorecard.time !== 0) {
                     time = String(scorecard.time);
                 }
 
-                // Express absolute time as mm:ss, with two decimals on the seconds (which should be
-                // able to exactly count a number of tics)
                 abstime = util.format_duration(scorecard.abstime / TICS_PER_SECOND, 2);
+
+                total_abstime += scorecard.abstime;
+                total_score += scorecard.score;
+
+                button = util.mk_button('forget', ev => {
+                    new ConfirmOverlay(this.conductor, "Erase these records?  This cannot be undone!", () => {
+                        let savefile = this.conductor.current_pack_savefile;
+                        let scorecard = savefile.scorecards[i];
+                        if (! scorecard)
+                            return;
+
+                        savefile.total_abstime -= scorecard.abstime;
+                        savefile.total_score -= scorecard.score;
+                        savefile.cleared_levels -= 1;
+                        if (savefile.aid === 0) {
+                            savefile.aidless_levels -= 1;
+                        }
+                        savefile.scorecards[i] = null;
+                        this.conductor.save_savefile();
+
+                        let tr = ev.target.closest('table.level-browser tr');
+                        for (let td of tr.querySelectorAll('td.-time, td.-score')) {
+                            td.textContent = "—";
+                        }
+                        tr.querySelector('td.-aid').textContent = "";
+                        tr.querySelector('td.-button').textContent = "";
+                        // TODO update totals row?  ugh
+                    }).open();
+                    ev.stopPropagation();  // don't trigger row click handler
+                });
             }
 
             let title = meta.title;
@@ -3317,6 +3366,8 @@ class LevelBrowserOverlay extends DialogOverlay {
                 mk('td.-time', time),
                 mk('td.-time', abstime),
                 mk('td.-score', score),
+                mk('td.-aid', aid),
+                mk('td.-button', button ?? ''),
                 // TODO show your time?  include 999 times for untimed levels (which i don't know at
                 // this point whoops but i guess if the time is zero then that answers that)?  show
                 // your wallclock time also?
@@ -3350,6 +3401,16 @@ class LevelBrowserOverlay extends DialogOverlay {
         });
 
         this.tbody = tbody;
+
+        table.append(mk('tfoot', mk('tr',
+            mk('th'),
+            mk('th', "Total"),
+            mk('th'),
+            mk('th.-time', util.format_duration(total_abstime / TICS_PER_SECOND, 2)),
+            mk('th.-score', total_score.toLocaleString()),
+            mk('th'),
+            mk('th'),
+        )));
 
         this.add_button("nevermind", ev => {
             this.close();
@@ -3633,10 +3694,10 @@ class Conductor {
                             this.current_pack_savefile.aidless_levels += 1;
                         }
                     }
-                    this.current_pack_savefile.__version__ = 1;
+                    this.current_pack_savefile.__version__ = 2;
                     changed = true;
                 }
-                else if (this.current_pack_savefile.__version__ === 1) {
+                if (this.current_pack_savefile.__version__ <= 1) {
                     // I forgot to count a level as aidless on your first playthrough.  Also,
                     // total_time is not a useful field, since 'time' is just where the clock was
                     delete this.current_pack_savefile.total_time;

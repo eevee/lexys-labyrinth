@@ -323,6 +323,15 @@ table.level-browser thead {
 table.level-browser thead tr th {
     border-bottom: 2px solid hsl(225, 20%, 60%);
 }
+table.level-browser tfoot {
+    position: sticky;
+    bottom: -1em;
+    background: #f4f4f4;  /* match dialog background */
+}
+table.level-browser tfoot tr th {
+    border-top: 2px solid hsl(225, 20%, 60%);
+    text-align: right;
+}
 table.level-browser td {
     padding: 0.25em;
 }
@@ -330,11 +339,14 @@ table.level-browser td.-number {
     color: #404040;
     text-align: right;
 }
-table.level-browser td.-time {
-    text-align: right;
-}
+table.level-browser th.-time,
+table.level-browser th.-score,
+table.level-browser td.-time,
 table.level-browser td.-score {
     text-align: right;
+}
+table.level-browser button {
+    font-size: 0.833em;
 }
 table.level-browser tr.--current {
     background: var(--generic-bg-selected-on-white);
