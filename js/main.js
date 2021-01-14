@@ -588,13 +588,18 @@ class Player extends PrimaryView {
             }
 
             if (ev.key === ' ') {
+                // Don't scroll pls
+                ev.preventDefault();
+
                 if (this.state === 'waiting') {
                     // Start without moving
                     this.set_state('playing');
+                    return;
                 }
                 else if (this.state === 'paused') {
                     // Turns out I do this an awful lot expecting it to work, so
                     this.set_state('playing');
+                    return;
                 }
                 else if (this.state === 'stopped') {
                     if (this.level.state === 'success') {
@@ -614,9 +619,8 @@ class Player extends PrimaryView {
                             this.restart_level();
                         }
                     }
+                    return;
                 }
-                // Don't scroll pls
-                ev.preventDefault();
             }
 
             if (ev.key === 'z') {
