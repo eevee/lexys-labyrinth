@@ -1407,6 +1407,11 @@ class Player extends PrimaryView {
             // at all in that case??)
             tic_offset = 0.999;
         }
+        else if (this.state === 'stopped') {
+            // Once the game is over, interpolating backwards makes less sense
+            // FIXME this /appears/ to skip a whole tic of movement though.  hm.
+            tic_offset = 0.999;
+        }
         else if (this.use_interpolation) {
             tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
             if (this.state === 'rewinding') {
@@ -1435,9 +1440,8 @@ class Player extends PrimaryView {
     // interpolate (because we're probably paused)
     _redraw(tic_offset = null) {
         if (tic_offset === null) {
-            // Default to drawing the "end" state of the tic when we're paused; it matches
-            // turn-based mode's "waiting" behavior, and it makes tic-by-tic navigation make a lot
-            // more sense visually
+            // Default to drawing the "end" state of the tic when we're paused; the renderer
+            // interpolates backwards, so this will show the actual state of the game
             if (this.state === 'paused') {
                 tic_offset = 0.999;
             }
