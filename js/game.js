@@ -2235,7 +2235,7 @@ export class Level extends LevelInterface {
             return null;
         }
 
-        let time = Math.ceil((this.time_remaining ?? 0) / 20);
+        let time = Math.ceil((this.time_remaining ?? 0) / TICS_PER_SECOND);
         return {
             time: time,
             abstime: this.tic_counter,

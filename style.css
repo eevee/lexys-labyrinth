@@ -208,12 +208,15 @@ svg.svg-icon {
 }
 
 .button-row {
-    display: flex;
+    display: grid;
+    /* Put the buttons in a row most of the time, but change to a column when out of space */
+    grid: auto-flow auto / repeat(auto-fit, minmax(10em, 1fr));
     gap: 0.5em;
     align-items: stretch;
+    margin: 0.5em 0;
 }
 .button-row > button {
-    flex: 1;
+    margin: 0;
 }
 
 /* Overlay styling */
@@ -556,12 +559,12 @@ pre.stack-trace {
         "header header"
         "links  links"
         "stock  yours"
-        / 1fr 1fr
+        / 3fr minmax(18em, 1fr)
     ;
     gap: 1em;
 
     position: relative;
-    padding: 1em 10%;
+    padding: 1em 7.5%;
     margin: auto 0;
     overflow: auto;
 }
@@ -701,21 +704,17 @@ pre.stack-trace {
 .played-pack-list {
 
 }
-.played-pack-list > li {
-    margin-bottom: 1em;
+#splash-stock-levels .played-pack-list {
+    display: grid;
+    grid: auto-flow auto / repeat(auto-fill, minmax(320px, 1fr));  /* 10x10 */
+    gap: 1em;
+    margin: 1em 0;
 }
-.played-pack-list p {
-    margin: 0 0.5em;
-    color: #e8e8e8;
-}
-.played-pack-list .-progress {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
-    text-align: right;
-}
-.played-pack-list > li.--unplayed .-progress {
-    display: none;
+.played-pack-list .-preview {
+    display: block;
+    height: 320px;
+    margin: auto;
+    object-fit: none;
 }
 .played-pack-list > li > button {
     font-size: 1.25em;
@@ -735,18 +734,72 @@ pre.stack-trace {
 .played-pack-list > li > button:enabled:hover {
     background: hsl(225, 40%, 30%);
 }
-.played-pack-list .-progress > .-score,
-.played-pack-list .-progress > .-time,
-.played-pack-list .-progress > .-levels {
-    flex: 2;
+.played-pack-list p {
+    color: #c0c0c0;
+    font-style: italic;
 }
-.played-pack-list .-progress > button {
-    flex: 1;
+.played-pack-list .-progress {
+    display: grid;
+    grid:
+        "levels levels  levels"
+        "score  time    button"
+        / 2fr 2fr 1fr
+    ;
+    gap: 0.5em;
+    margin: 0.5em 0;
+    align-items: center;
+}
+.played-pack-list > li.--unplayed .-progress {
+    display: none;
+}
+.played-pack-list .-progress > .-levels {
+    grid-area: levels;
+
+    position: relative;
+    z-index: 1;
+    padding: 0.25em;
+    border: 1px solid hsl(225, 25%, 40%);
+    text-shadow: 0 1px 1px black;
+    text-align: center;
+}
+.played-pack-list .-progress > .-levels::before,
+.played-pack-list .-progress > .-levels::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    bottom: 0;
+    left: 0;
+}
+.played-pack-list .-progress > .-levels::before {
+    width: calc(var(--cleared) * 100%);
+    background: hsl(225, 25%, 30%);
+}
+.played-pack-list .-progress > .-levels::after {
+    width: calc(var(--aidless) * 100%);
+    background: hsl(225, 25%, 40%);
+}
+.played-pack-list .-progress > .-score {
+    grid-area: score;
+}
+.played-pack-list .-progress > .-time {
+    grid-area: time;
+}
+.played-pack-list .-progress > .-levels {
+    grid-area: levels;
+}
+.played-pack-list .-progress > .-score::before {
+    content: "Score: ";
+    color: #909090;
+}
+.played-pack-list .-progress > .-time::before {
+    content: "Time: ";
+    color: #909090;
 }
 .played-pack-list .-editor-status {
     display: flex;
     gap: 0.5em;
-    margin: 0 0.5em;
+    margin: 0.5em 0 1em;
 }
 .played-pack-list .-editor-status > .-level-count {
     flex: auto;
@@ -1777,7 +1830,7 @@ body.--debug #player-debug {
 
 .editor-level-browser {
     display: grid;
-    grid: auto-flow auto / repeat(auto-fill, minmax(13em, 1fr));  /* 12em preview wdith + padding */
+    grid: auto-flow auto / repeat(auto-fill, minmax(13em, 1fr));  /* 12em preview width + padding */
     gap: 0.5em;
     width: 70vw;
     /* seems to go into the parent's right padding fsr, i guess because the scrollbar is there */

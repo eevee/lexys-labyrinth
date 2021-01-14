@@ -1941,35 +1941,41 @@ class Player extends PrimaryView {
 
 const BUILTIN_LEVEL_PACKS = [{
     path: 'levels/lexys-lessons.zip',
+    preview: 'levels/previews/lexys-lessons.png',
     ident: "Lexy's Lessons",
     title: "Lexy's Lessons (WIP)",
     desc: "A set of beginner levels that introduces every mechanic in Chip's Challenge 2, made specifically for Lexy's Labyrinth!",
 }, {
     path: 'levels/CC2LP1.zip',
+    preview: 'levels/previews/cc2lp1.png',
     ident: 'Chips Challenge 2 Level Pack 1',
     title: "Chip's Challenge 2 Level Pack 1",
     desc: "Thoroughly demonstrates what Chip's Challenge 2 is capable of.  Fair, but doesn't hold your hand; you'd better have at least a passing familiarity with the CC2 elements.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_2_Level_Pack_1',
 }, {
     path: 'levels/CCLP1.ccl',
+    preview: 'levels/previews/cclp1.png',
     ident: 'cclp1',
     title: "Chip's Challenge Level Pack 1",
     desc: "Designed like a direct replacement for Chip's Challenge 1, with introductory levels for new players and a gentle difficulty curve.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1',
 }, {
     path: 'levels/CCLP4.ccl',
+    preview: 'levels/previews/cclp4.png',
     ident: 'cclp4',
     title: "Chip's Challenge Level Pack 4",
     desc: "Moderately difficult, but not unfair.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_4',
 }, {
     path: 'levels/CCLXP2.ccl',
+    preview: 'levels/previews/cclxp2.png',
     ident: 'cclxp2',
     title: "Chip's Challenge Level Pack 2-X",
     desc: "The first community pack released, tricky and rough around the edges.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_2_(Lynx)',
 }, {
     path: 'levels/CCLP3.ccl',
+    preview: 'levels/previews/cclp3.png',
     ident: 'cclp3',
     title: "Chip's Challenge Level Pack 3",
     desc: "A tough challenge, by and for veteran players.",
@@ -2253,7 +2259,12 @@ class Splash extends PrimaryView {
             button.disabled = true;
         }
 
-        let li = mk('li.--unplayed', {'data-ident': ident}, button);
+        let li = mk('li.--unplayed', {'data-ident': ident});
+        if (packdef && packdef.preview) {
+            li.append(mk('img.-preview', {src: packdef.preview}));
+        }
+        li.append(button);
+
         let forget_button = mk('button.-forget', {type: 'button'}, "Forget");
         forget_button.addEventListener('click', ev => {
             new ConfirmOverlay(this.conductor, `Clear all your progress for ${title}?  This can't be undone.`, () => {
@@ -2268,6 +2279,13 @@ class Splash extends PrimaryView {
                 }
             }).open();
         });
+        li.append(mk('div.-progress',
+            mk('div.-levels'),
+            mk('span.-score'),
+            mk('span.-time'),
+            forget_button,
+        ));
+
         if (packdef) {
             let p = mk('p', packdef.desc);
             if (packdef.url) {
@@ -2275,12 +2293,7 @@ class Splash extends PrimaryView {
             }
             li.append(p);
         }
-        li.append(mk('div.-progress',
-            mk('span.-score'),
-            mk('span.-time'),
-            mk('span.-levels'),
-            forget_button,
-        ));
+
         this.played_pack_elements[ident] = li;
         return li;
     }
@@ -2322,19 +2335,19 @@ class Splash extends PrimaryView {
         }
         progress.querySelector('.-score').textContent = score;
 
-        // This stuff isn't available in old saves
+        let level_el = progress.querySelector('.-levels');
         if (packinfo.total_levels === undefined) {
+            // This stuff isn't available in old saves
             progress.querySelector('.-time').textContent = "";
             progress.querySelector('.-levels').textContent = "";
         }
         else {
-            // TODO not used: total_abstime, aidless_levels
-            progress.querySelector('.-time').textContent = util.format_duration(packinfo.total_time);
+            progress.querySelector('.-time').textContent = util.format_duration(packinfo.total_abstime / TICS_PER_SECOND, 2);
             let levels = `${packinfo.cleared_levels}/${packinfo.total_levels}`;
-            if (packinfo.cleared_levels === packinfo.total_levels) {
-                levels += '★';
-            }
-            progress.querySelector('.-levels').textContent = levels;
+            levels = `cleared ${packinfo.cleared_levels} of ${packinfo.total_levels} levels, ${packinfo.aidless_levels}★ without aid`;
+            level_el.textContent = levels;
+            level_el.style.setProperty('--cleared', packinfo.cleared_levels / packinfo.total_levels);
+            level_el.style.setProperty('--aidless', packinfo.aidless_levels / packinfo.total_levels);
         }
     }
 
@@ -3354,7 +3367,8 @@ class LevelBrowserOverlay extends DialogOverlay {
 // Main storage:
 //   packs:
 //     total_score
-//     total_time
+//     total_time  -- FIXME this is nonsense lol, it's time left on the clock
+//     total_abstime
 //     total_levels
 //     cleared_levels
 //     aidless_levels
