@@ -260,6 +260,17 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
             }
         });
 
+        // FIXME it would be super swell if i could load this lazily
+        /*
+        <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+        this.sortable = new Sortable(this.list, {
+            group: 'editor-levels',
+            onEnd: ev => {
+                // FIXME rearrange the levels for realsies
+            },
+        });
+        */
+
         this.add_button("new level", ev => {
             this.conductor.editor.append_new_level();
             this.close();

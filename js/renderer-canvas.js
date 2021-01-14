@@ -50,6 +50,8 @@ export class CanvasRenderer {
         this.canvas = mk('canvas', {width: tileset.size_x * this.viewport_size_x, height: tileset.size_y * this.viewport_size_y});
         this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
         this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
+        this.canvas.style.setProperty('--tile-width', `${tileset.size_x}px`);
+        this.canvas.style.setProperty('--tile-height', `${tileset.size_y}px`);
         this.ctx = this.canvas.getContext('2d');
         this.viewport_x = 0;
         this.viewport_y = 0;
@@ -130,6 +132,8 @@ export class CanvasRenderer {
         this.canvas.setAttribute('height', this.tileset.size_y * this.viewport_size_y);
         this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
         this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
+        this.canvas.style.setProperty('--tile-width', `${this.tileset.size_x}px`);
+        this.canvas.style.setProperty('--tile-height', `${this.tileset.size_y}px`);
     }
 
     draw(tic_offset = 0) {

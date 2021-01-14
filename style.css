@@ -1612,14 +1612,18 @@ body.--debug #player-debug {
 #editor .editor-canvas {
     grid-area: level;
     overflow: auto;
+    position: relative;
     /* Flex layout to center the canvas and overlay together */
     display: flex;
     /* This isn't supported in Chrome (still!!), so use auto margins on the child instead
     align-items: safe center;
     justify-content: safe center;
     */
-    background: #202020;
+    background: #101010;
     border: 0.125em solid black;
+    /* FIXME would love if this were above the canvas too, but can't figure out how to do that
+     * easily in a scrolling element */
+    box-shadow: inset 0 0 3px black;
 }
 #editor .editor-canvas .-container {
     position: relative;
@@ -1635,6 +1639,7 @@ body.--debug #player-debug {
     width: calc(var(--viewport-width) * var(--tile-width) * var(--scale));
     --viewport-width: 9;
     --viewport-height: 9;
+    --scale: 1;
 }
 /* SVG overlays */
 #editor svg.level-editor-overlay {
