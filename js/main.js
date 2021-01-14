@@ -3289,7 +3289,7 @@ class LevelBrowserOverlay extends DialogOverlay {
             mk('th', ""),
             mk('th', "Level"),
             mk('th.-time', mk('abbr', {
-                title: "Time left on the clock when you finished; doesn't exit for untimed levels",
+                title: "Time left on the clock when you finished; doesn't exist for untimed levels",
             }, "Best clock")),
             mk('th.-time', mk('abbr', {
                 title: "Actual time it took you to play the level, even on untimed levels, and ignoring any CC2 clock altering effects",

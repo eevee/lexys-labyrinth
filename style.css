@@ -332,6 +332,7 @@ table.level-browser tfoot tr th {
     border-top: 2px solid hsl(225, 20%, 60%);
     text-align: right;
 }
+table.level-browser th,
 table.level-browser td {
     padding: 0.25em;
 }
