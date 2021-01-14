@@ -1,4 +1,4 @@
-import * as fflate from 'https://unpkg.com/fflate/esm/index.mjs';
+import * as fflate from 'https://unpkg.com/fflate@0.4.8/esm/index.mjs';
 
 import { DIRECTIONS, LAYERS, TICS_PER_SECOND } from './defs.js';
 import { TILES_WITH_PROPS } from './editor-tile-overlays.js';

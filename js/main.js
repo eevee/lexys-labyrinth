@@ -1,6 +1,6 @@
 // TODO bugs and quirks i'm aware of:
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
-import * as fflate from 'https://unpkg.com/fflate/esm/index.mjs';
+import * as fflate from 'https://unpkg.com/fflate@0.4.8/esm/index.mjs';
 
 import { DIRECTIONS, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
 import * as c2g from './format-c2g.js';

@@ -1,4 +1,4 @@
-import * as fflate from 'https://unpkg.com/fflate/esm/index.mjs';
+import * as fflate from 'https://unpkg.com/fflate@0.4.8/esm/index.mjs';
 
 // Base class for custom errors
 export class LLError extends Error {}
