@@ -2314,7 +2314,7 @@ class Splash extends PrimaryView {
         if (packdef) {
             let p = mk('p', packdef.desc);
             if (packdef.url) {
-                p.append("  ", mk('a', {href: packdef.url}, "More..."));
+                p.append("  ", mk('a', {href: packdef.url}, "About..."));
             }
             li.append(p);
         }
