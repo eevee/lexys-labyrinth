@@ -3668,7 +3668,7 @@ class Conductor {
         return this.tilesets['ll'];
     }
 
-    load_game(stored_game, identifier = null) {
+    load_game(stored_game, identifier = null, level_index = null) {
         this.stored_game = stored_game;
         this._pack_test_dialog = null;
 
@@ -3742,7 +3742,7 @@ class Conductor {
         this.player.load_game(stored_game);
         this.editor.load_game(stored_game);
 
-        return this.change_level((this.current_pack_savefile.current_level ?? 1) - 1);
+        return this.change_level(level_index ?? (this.current_pack_savefile.current_level ?? 1) - 1);
     }
 
     change_level(level_index) {

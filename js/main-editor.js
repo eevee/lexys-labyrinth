@@ -4,7 +4,7 @@ import { DIRECTIONS, LAYERS, TICS_PER_SECOND } from './defs.js';
 import { TILES_WITH_PROPS } from './editor-tile-overlays.js';
 import * as format_base from './format-base.js';
 import * as c2g from './format-c2g.js';
-import { PrimaryView, TransientOverlay, DialogOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
+import { PrimaryView, TransientOverlay, DialogOverlay, AlertOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
 import { SVG_NS, mk, mk_button, mk_svg, string_from_buffer_ascii, bytestring_to_buffer, walk_grid } from './util.js';
@@ -285,7 +285,7 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
         this.add_button("create", ev => {
             let index = this.selection + 1;
             let stored_level = this.conductor.editor._make_empty_level(index + 1, 32, 32);
-            this.conductor.editor.insert_level(stored_level, index);
+            this.conductor.editor.move_level(stored_level, index);
             this._after_insert_level(stored_level, index);
 
             this.undo_stack.push(() => {
@@ -303,10 +303,10 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
             });
             this.undo_button.disabled = false;
         });
-        this.add_button("delete", ev => {
+        this.delete_button = this.add_button("delete", ev => {
             let index = this.selection;
             if (index === this.conductor.level_index) {
-                // FIXME complain, or disable button
+                new AlertOverlay(this.conductor, "You can't delete the level you have open.").open();
                 return;
             }
 
@@ -320,7 +320,7 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
             this.undo_stack.push(() => {
                 let stored_level = meta.stored_level ?? c2g.parse_level(
                     bytestring_to_buffer(serialized_level), index + 1);
-                this.conductor.editor.insert_level(stored_level, index);
+                this.conductor.editor.move_level(stored_level, index);
                 if (this.selection >= index) {
                     this.selection += 1;
                 }
@@ -328,6 +328,7 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
             });
             this.undo_button.disabled = false;
         });
+        this._update_delete_button();
 
         // Right buttons
         this.add_button_gap();
@@ -381,6 +382,11 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
         this.list.childNodes[this.selection].classList.remove('--selected');
         this.selection = index;
         this.list.childNodes[this.selection].classList.add('--selected');
+        this._update_delete_button();
+    }
+
+    _update_delete_button() {
+        this.delete_button.disabled = !! (this.selection === this.conductor.level_index);
     }
 
     schedule_level_render() {
@@ -421,7 +427,7 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
 
     _delete_level(index) {
         let num_levels = this.conductor.stored_game.level_metadata.length;
-        let stored_level = this.conductor.editor.delete_level(index);
+        let stored_level = this.conductor.editor.move_level(index, null);
 
         this.list.childNodes[this.selection].classList.remove('--selected');
         this.list.childNodes[index].remove();
@@ -457,6 +463,7 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
         else {
             this.selection = selection;
         }
+        this._update_delete_button();
     }
 }
 
@@ -2983,7 +2990,7 @@ export class Editor extends PrimaryView {
         return stored_level;
     }
 
-    _save_pack_to_stash(stored_pack, current_level) {
+    _save_pack_to_stash(stored_pack) {
         if (! stored_pack.editor_metadata) {
             console.error("Asked to save a stored pack that's not part of the editor", stored_pack);
             return;
@@ -2997,9 +3004,7 @@ export class Editor extends PrimaryView {
         this.stash.packs[pack_key] = {
             title: stored_pack.title,
             level_count: stored_pack.level_metadata.length,
-            // FIXME i want to update current_level on browse but don't want to affect last_modified
             last_modified: Date.now(),
-            current_level: current_level,
         };
         save_json_to_storage("Lexy's Labyrinth editor", this.stash);
     }
@@ -3052,7 +3057,7 @@ export class Editor extends PrimaryView {
         });
         this.conductor.load_game(stored_pack);
 
-        this._save_pack_to_stash(stored_pack, 0);
+        this._save_pack_to_stash(stored_pack);
 
         save_json_to_storage(pack_key, {
             levels: [{
@@ -3060,6 +3065,7 @@ export class Editor extends PrimaryView {
                 title: stored_level.title,
                 last_modified: Date.now(),
             }],
+            current_level_index: 0,
         });
 
         this._save_level_to_storage(stored_level);
@@ -3092,7 +3098,7 @@ export class Editor extends PrimaryView {
                 number: i + 1,
             });
         }
-        this.conductor.load_game(stored_pack);
+        this.conductor.load_game(stored_pack, null, pack_stash.current_level_index);
 
         this.conductor.switch_to_editor();
     }
@@ -3101,7 +3107,7 @@ export class Editor extends PrimaryView {
     // source is a number, it's an index; otherwise, it's a level, assumed to be newly-created, and
     // will be given a new key and saved to localStorage.  (Passing null and a level will,
     // of course, do nothing.  Passing an out of bounds source index will also do nothing.)
-    _move_level(source, dest_index) {
+    move_level(source, dest_index) {
         let stored_pack = this.conductor.stored_game;
         if (! stored_pack.editor_metadata) {
             return;
@@ -3171,8 +3177,6 @@ export class Editor extends PrimaryView {
             stored_pack.level_metadata.splice(dest_index, 0, level_metadata);
             pack_stash.levels.splice(dest_index, 0, pack_stash_entry);
         }
-        // This is done with now; the pack stash has no numbering
-        save_json_to_storage(stored_pack.editor_metadata.key, pack_stash);
 
         // Renumber levels as necessary
         let delta, start_index, end_index;
@@ -3216,7 +3220,10 @@ export class Editor extends PrimaryView {
             // FIXME refuse to delete the current level
             this.conductor.level_index = dest_index;
         }
-        else if (start_index <= this.conductor.level_index && this.conductor.level_index <= end_index) {
+        else if (
+            this.conductor.level_index === dest_index ||
+            (start_index <= this.conductor.level_index && this.conductor.level_index <= end_index))
+        {
             this.conductor.level_index += delta;
             // Update the current level if it's not stored in the metadata yet
             if (! stored_level) {
@@ -3229,18 +3236,12 @@ export class Editor extends PrimaryView {
         this.conductor.update_level_title();
         this.conductor.update_nav_buttons();
 
-        // Save the pack to the editor stash, and we should be done!
-        this._save_pack_to_stash(stored_pack, this.conductor.level_index);
+        // Save the pack stash and editor stash, and we should be done!
+        pack_stash.current_level_index = this.conductor.level_index;
+        save_json_to_storage(stored_pack.editor_metadata.key, pack_stash);
+        this._save_pack_to_stash(stored_pack);
 
         return stored_level;
-    }
-
-    insert_level(stored_level, index) {
-        return this._move_level(stored_level, index);
-    }
-
-    move_level(from_index, to_index) {
-        return this._move_level(from_index, to_index);
     }
 
     duplicate_level(index) {
@@ -3248,10 +3249,6 @@ export class Editor extends PrimaryView {
         // TODO with autosave this shouldn't be necessary, just copy the existing serialization
         let stored_level = c2g.parse_level(c2g.synthesize_level(this.conductor.stored_game.load_level(index)), index + 2);
         return this._move_level(stored_level, index + 1);
-    }
-
-    delete_level(index) {
-        return this._move_level(index, null);
     }
 
     save_level() {
@@ -3275,7 +3272,7 @@ export class Editor extends PrimaryView {
         // out of sync
         this._save_level_to_storage(this.stored_level);
         save_json_to_storage(pack_key, pack_stash);
-        this._save_pack_to_stash(stored_pack, this.conductor.level_index);
+        this._save_pack_to_stash(stored_pack);
     }
 
     // Level loading
@@ -3288,6 +3285,14 @@ export class Editor extends PrimaryView {
         this.stored_level = stored_level;
         this.update_viewport_size();
         this.update_cell_coordinates();
+
+        // Remember current level for an editor level
+        if (this.conductor.stored_game.editor_metadata) {
+            let pack_key = this.conductor.stored_game.editor_metadata.key;
+            let pack_stash = load_json_from_storage(pack_key);
+            pack_stash.current_level_index = this.conductor.level_index;
+            save_json_to_storage(pack_key, pack_stash);
+        }
 
         // Load connections
         this.connections_g.textContent = '';

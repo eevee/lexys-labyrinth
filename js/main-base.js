@@ -183,22 +183,31 @@ export class DialogOverlay extends Overlay {
     }
 }
 
+// Informational popup dialog
+export class AlertOverlay extends DialogOverlay {
+    constructor(conductor, message, title = "heads up") {
+        super(conductor);
+        this.set_title(title);
+        this.main.append(mk('p', {}, message));
+        this.add_button("a'ight", ev => {
+            this.close();
+        });
+    }
+}
+
 // Yes/no popup dialog
 export class ConfirmOverlay extends DialogOverlay {
     constructor(conductor, message, what) {
         super(conductor);
         this.set_title("just checking");
         this.main.append(mk('p', {}, message));
-        let yes = mk('button', {type: 'button'}, "yep");
-        let no = mk('button', {type: 'button'}, "nope");
-        yes.addEventListener('click', ev => {
+        this.add_button("yep", ev => {
             this.close();
             what();
         });
-        no.addEventListener('click', ev => {
+        this.add_button("nope", ev => {
             this.close();
         });
-        this.footer.append(yes, no);
     }
 }
 
