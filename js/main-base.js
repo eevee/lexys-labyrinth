@@ -175,6 +175,11 @@ export class DialogOverlay extends Overlay {
         let button = mk('button', {type: 'button'}, label);
         button.addEventListener('click', onclick);
         this.footer.append(button);
+        return button;
+    }
+
+    add_button_gap() {
+        this.footer.append(mk('div.-spacer'));
     }
 }
 

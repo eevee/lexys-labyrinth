@@ -20,8 +20,9 @@ body {
     --panel-bg-color: hsl(225, 10%, 15%);
     --button-bg-color: hsl(225, 10%, 25%);
     --button-bg-hover-color: hsl(225, 15%, 30%);
-    --generic-bg-hover-on-white: hsl(225, 60%, 85%);
-    --generic-bg-selected-on-white: hsl(225, 60%, 90%);
+    --generic-bg-hover-on-white: hsl(225, 60%, 90%);
+    --generic-bg-selected-on-white: hsl(225, 60%, 85%);
+    --generic-border-selected-on-white: hsl(225, 60%, 75%);
 }
 
 /* Generic element styling */
@@ -266,6 +267,9 @@ svg.svg-icon {
     padding: 0.5em;
     background: #d0d0d0;
 }
+.dialog > footer > .-spacer {
+    flex: 1;
+}
 .dialog > header:empty,
 .dialog > footer:empty {
     display: none;
@@ -351,6 +355,7 @@ table.level-browser button {
 }
 table.level-browser tr.--current {
     background: var(--generic-bg-selected-on-white);
+    outline: 1px solid var(--generic-border-selected-on-white);
 }
 table.level-browser tr.--unvisited {
     color: #606060;
@@ -1865,8 +1870,12 @@ body.--debug #player-debug {
     gap: 0.25em;
     padding: 0.5em;
 }
+.editor-level-browser li.--selected {
+    background: var(--generic-bg-selected-on-white);
+    outline: 1px solid var(--generic-border-selected-on-white);
+}
 .editor-level-browser li:hover {
-    background: hsl(225, 60%, 85%);
+    background: var(--generic-bg-hover-on-white);
 }
 .editor-level-browser li > .-preview {
     grid-area: preview;
