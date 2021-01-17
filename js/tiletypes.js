@@ -2346,6 +2346,8 @@ const TILE_TYPES = {
 
                         if (tile.type.name === 'canopy') {
                             // Canopy protects everything else
+                            actor = null;
+                            terrain = null;
                             break;
                         }
                     }
