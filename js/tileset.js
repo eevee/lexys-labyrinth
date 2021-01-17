@@ -423,18 +423,19 @@ export const CC2_TILESET_LAYOUT = {
     },
     teleport_green: [[4, 19], [5, 19], [6, 19], [7, 19]],
     teleport_yellow: [[8, 19], [9, 19], [10, 19], [11, 19]],
-    transmogrifier: [[12, 19], [13, 19], [14, 19], [15, 19]],
+    transmogrifier: {
+        __special__: 'visual-state',
+        active: [[12, 19], [13, 19], [14, 19], [15, 19]],
+        inactive: [12, 19],
+    },
     teleport_red: {
         __special__: 'wires',
         base: [0, 2],
-        wired: [[4, 20], [5, 20], [6, 20], [7, 20]],
-        /* FIXME don't animate when disabled, but that requires inspecting the level
         wired: {
             __special__: 'visual-state',
             active: [[4, 20], [5, 20], [6, 20], [7, 20]],
             inactive: [4, 20],
         },
-        */
     },
     slime: [[8, 20], [9, 20], [10, 20], [11, 20], [12, 20], [13, 20], [14, 20], [15, 20]],
 

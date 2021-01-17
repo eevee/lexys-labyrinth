@@ -639,6 +639,11 @@ export class Level extends LevelInterface {
                             }
                         }
                         add_to_edge_map(circuit.tiles, tile, edges);
+                        if (tile.type.on_power) {
+                            // Red teleporters contain wires and /also/ have an on_power
+                            // FIXME this isn't quite right since there's seemingly a 1-frame delay
+                            wired_outputs.add(tile);
+                        }
 
                         if (tile.type.is_power_source) {
                             // TODO could just do this in a pass afterwards
@@ -1681,7 +1686,7 @@ export class Level extends LevelInterface {
         let teleporter = actor.just_stepped_on_teleporter;
         delete actor.just_stepped_on_teleporter;
 
-        if (teleporter.type.name === 'teleport_red' && ! teleporter.type._is_active(teleporter, this)) {
+        if (teleporter.type.name === 'teleport_red' && ! teleporter.is_active) {
             // Curious special-case red teleporter behavior: if you pass through a wired but
             // inactive one, you keep sliding indefinitely.  Players can override out of it, but
             // other actors cannot.  (Normally, a teleport slide ends after one decision phase.)

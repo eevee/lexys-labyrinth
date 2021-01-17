@@ -1240,12 +1240,17 @@ const TILE_TYPES = {
             teeth_timid: 'teeth',
         },
         _blob_mogrifications: ['glider', 'paramecium', 'fireball', 'bug', 'walker', 'ball', 'teeth', 'tank_blue', 'teeth_timid'],
+        on_begin(me, level) {
+            // TODO if wire destruction is ever allowed, this will need to update somehow
+            me.is_wired = level.is_tile_wired(me, false);
+            me.is_active = ! me.is_wired;
+        },
         on_arrive(me, level, other) {
             // Note: Transmogrifiers technically contain wires the way teleports do, and CC2 uses
             // the presence and poweredness of those wires to determine whether the transmogrifier
             // should appear to be on or off, but the /functionality/ is controlled entirely by
             // whether an adjoining cell carries current to our edge, like a railroad or cloner
-            if (level.is_tile_wired(me, false) && ! me.powered_edges)
+            if (! me.is_active)
                 return;
             let name = other.type.name;
             if (me.type._mogrifications[name]) {
@@ -1262,15 +1267,18 @@ const TILE_TYPES = {
             level.sfx.play_once('transmogrify', me.cell);
         },
         on_power(me, level) {
-            // No need to do anything, we just need this here as a signal that our .powered_edges
-            // needs to be updated
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
         },
-        // FIXME don't animate when inactive, but that required inspecting the level!
-        /*
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
         visual_state(me) {
-            return this._is_active(me) ? 'active' : 'inactive';
+            return ! me || me.is_active ? 'active' : 'inactive';
         },
-        */
     },
     teleport_blue: {
         layer: LAYERS.terrain,
@@ -1358,11 +1366,13 @@ const TILE_TYPES = {
         slide_mode: 'teleport',
         wire_propagation_mode: 'none',
         teleport_allow_override: true,
-        _is_active(me, level) {
+        on_begin(me, level) {
+            // TODO if wire destruction is ever allowed, this will need to update somehow
             // FIXME must be connected to something that can convey current: a wire, a switch, a
             // blue teleporter, etc; NOT nothing, a wall, a transmogrifier, a force floor, etc.
             // this is also how blue teleporters, transmogrifiers, and railroads work!
-            return me.powered_edges || ! level.is_tile_wired(me);
+            me.is_wired = level.is_tile_wired(me);
+            me.is_active = ! me.is_wired;
         },
         *teleport_dest_order(me, level, other) {
             // Wired red teleporters can be turned off, which disconnects them from every other red
@@ -1371,7 +1381,7 @@ const TILE_TYPES = {
             // has the bizarre behavior of NOT considering a red teleporter wired if none of its
             // wires are directly connected to another neighboring wire.
             let iterable;
-            if (this._is_active(me, level)) {
+            if (me.is_active) {
                 iterable = level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
             }
             else {
@@ -1384,7 +1394,7 @@ const TILE_TYPES = {
                 if (tile === me) {
                     yield [tile, exit_direction];
                 }
-                else if (this._is_active(tile, level)) {
+                else if (tile.is_active) {
                     yield [tile, exit_direction];
                     yield [tile, DIRECTIONS[exit_direction].right];
                     yield [tile, DIRECTIONS[exit_direction].opposite];
@@ -1392,12 +1402,19 @@ const TILE_TYPES = {
                 }
             }
         },
-        // FIXME don't animate when inactive, but that required inspecting the level!
-        /*
-        visual_state(me) {
-            return me && this._is_active(me) ? 'active' : 'inactive';
+        on_power(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
         },
-        */
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
+        visual_state(me) {
+            return ! me || me.is_active ? 'active' : 'inactive';
+        },
     },
     teleport_green: {
         layer: LAYERS.terrain,
