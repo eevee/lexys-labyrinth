@@ -49,13 +49,12 @@ function blocks_leaving_thin_walls(me, actor, direction) {
 function _define_door(key) {
     return {
         layer: LAYERS.terrain,
-        // Doors can be opened by ice blocks, but not dirt blocks
-        blocks_collision: COLLISION.block_cc1,
+        // Doors can be opened by ice blocks, but not dirt blocks or monsters
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         blocks(me, level, other) {
             if (other.type.name === 'ghost')
                 return false;
-            return ! (other.type.has_inventory &&
-                (other.has_item(key) || other.has_item('skeleton_key')));
+            return ! ((other.has_item(key) || other.has_item('skeleton_key')));
         },
         on_arrive(me, level, other) {
             if (level.take_key_from_actor(other, key) ||
@@ -71,13 +70,12 @@ function _define_door(key) {
 function _define_gate(key) {
     return {
         layer: LAYERS.item,
-        // Doors can be opened by ice blocks, but not dirt blocks
-        blocks_collision: COLLISION.block_cc1,
+        // Doors can be opened by ice blocks, but not dirt blocks or monsters
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         blocks(me, level, other) {
             if (other.type.name === 'ghost')
                 return false;
-            return ! (other.type.has_inventory &&
-                (other.has_item(key) || other.has_item('skeleton_key')));
+            return ! ((other.has_item(key) || other.has_item('skeleton_key')));
         },
         on_arrive(me, level, other) {
             if (level.take_key_from_actor(other, key) ||
