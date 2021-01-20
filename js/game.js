@@ -1657,6 +1657,9 @@ export class Level extends LevelInterface {
             else if (actor.slide_mode === 'force') {
                 this.sfx.play_once('slide-force');
             }
+            else if (terrain.type.name === 'popdown_floor') {
+                this.sfx.play_once('step-popdown');
+            }
             else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad') {
                 this.sfx.play_once('step-gravel');
             }
@@ -2176,9 +2179,17 @@ export class Level extends LevelInterface {
     }
 
     collect_chip() {
-        this.sfx.play_once('get-chip');
         if (this.chips_remaining > 0) {
+            if (this.chips_remaining > 1) {
+                this.sfx.play_once('get-chip');
+            }
+            else {
+                this.sfx.play_once('get-chip-last');
+            }
             this.chips_remaining--;
+        }
+        else {
+            this.sfx.play_once('get-chip-extra');
         }
     }
 

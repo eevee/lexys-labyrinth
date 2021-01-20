@@ -248,16 +248,25 @@ class SFXPlayer {
             door: 'sfx/door.ogg',
             // https://jummbus.bitbucket.io/#j3N04dropn100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o2T0v0pL0OaD0Ou00q1d1f4y2z9C0w2c0h0b4p1bGqKHGjner00
             drop: 'sfx/drop.ogg',
+            // https://jummbus.bitbucket.io/#j3N0afake-floorn110s0k0l00e00t3Mm2a3g00j07i0r1O_U00o40T0v0zL0OaD0Ou10q0d0f8y0z1C2w2c0Gc0h0T2v05L0OaD0Ou02q1d7f4y1z3C1w1h0b4gp190apu0zzM0
+            'fake-floor': 'sfx/fake-floor.ogg',
             // https://jummbus.bitbucket.io/#j3N09get-bonusn100s1k0l00e00t50mba3g00j07i0r1O_U0o4T0v0pL0OaD0Ou00q1d5f8y0z2C1w0c0h8b4p1iFyWAxoHwmacOem8s60
             'get-bonus': 'sfx/get-bonus.ogg',
+            // https://jummbus.bitbucket.io/#j3N0aget-bonus2n100s1k0l00e00t50mba3g00j07i0r1O_U0o4T0v0pL0OaD0Ou00q1d5f8y0z2C1w0c0h8b4p1lFyWAxoHwmapK2cOeq6qU0
+            'get-bonus2': 'sfx/get-bonus2.ogg',
             // https://jummbus.bitbucket.io/#j2N08get-chipn100s0k0l00e00t3Mmca3g00j07i0r1O_U0o4T0v0zL0OD0Ou00q1d1f6y1z2C0wac0h0b4p1dFyW7czgUK7aw0
             'get-chip': 'sfx/get-chip.ogg',
+            // https://jummbus.bitbucket.io/#j3N0eget-chip-extran100s0k0l00e00t3Mmca3g00j07i0r1O_U0o4T0v0zL0OaD0Ou00q1d1f6y1z2C0wac0h0b4p1cFyW6p6xXel00
+            'get-chip-extra': 'sfx/get-chip-extra.ogg',
+            // https://jummbus.bitbucket.io/#j3N0eget-chip-extran100s0k0l00e00t3Mm5a3g00j07i0r1O_U0o4T0v0zL0OaD0Ou00q1d1f6y1z2C0wac0h0b4p1cFyW6p6xXel00
+            'get-chip-last': 'sfx/get-chip-last.ogg',
             // https://jummbus.bitbucket.io/#j2N07get-keyn100s0k0l00e00t3Mmfa3g00j07i0r1O_U0o5T0v0pL0OD0Ou00q1d5f8y0z2C0w1c0h0b4p1dFyW85CbwwzBg0
             'get-key': 'sfx/get-key.ogg',
             // https://jummbus.bitbucket.io/#j2N08get-tooln100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o2T0v0pL0OD0Ou00q1d1f4y2z9C0w2c0h0b4p1bGqKNW4isVk0
             'get-tool': 'sfx/get-tool.ogg',
+            // https://jummbus.bitbucket.io/#j3N07popwalln110s0k0l00e00t3Mm2a3g00j07i0r1O_U00o40T0v0zL0OaD0Ou10q0d0f8y0z1C2w2c0Gc0h0T2v0aL0OaD0Ou02q1d5f1y0z3C1w1h0b4gp190ap6Ker00
+            popwall: 'sfx/popwall.ogg',
             // https://jummbus.bitbucket.io/#j3N04pushn110s0k0l00e00t3Mm3a3g00j07i0r1O_U00o30T5v0pL0OaD0Ou50q1d5f8y1z6C1c0h0H-JJAArrqiih999T2v01L0OaD0Ou02q2d2f6y1zhC0w0h0b4gp1f0bkoUzCcqy1FMo0
-            // TODO less sure about this one
             push: 'sfx/push.ogg',
             // https://jummbus.bitbucket.io/#j2N06socketn110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T5v0pL0OD0Ou05q1d1f8y1z7C1c0h0HU7000U0006000ET2v0pL0OD0Ou02q1d6f5y3z2C0w0b4gp1xGoKHGhFBcn2FyPkxk0rE2AGcNCQyHwUY0
             socket: 'sfx/socket.ogg',
@@ -281,12 +290,16 @@ class SFXPlayer {
             'step-gravel': 'sfx/step-gravel.ogg',
             // https://jummbus.bitbucket.io/#j3N08step-icen100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o5T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0b4p1aLp719LjCM0
             'step-ice': 'sfx/step-ice.ogg',
+            // https://jummbus.bitbucket.io/#j3N0cstep-popdownn100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o1T0v05L0OaD0Ou00q0d1f1y1z2C1wac0h0b4p1aJcnlAkwsS0
+            'step-popdown': 'sfx/step-popdown.ogg',
             // https://jummbus.bitbucket.io/#j3N0astep-watern100s0k0l00e00t3Mm2a3g00j07i0r1O_U0o3T0v0kL0OaD0Ou00q1d6f2y0z0C1w9c0h3b4p1dJ5moMMAa16sG0
             'step-water': 'sfx/step-water.ogg',
             // https://jummbus.bitbucket.io/#j2N08teleportn110s1k0l00e00t3Mm7a3g00j07i0r1O_U00o50T0v0pL0OD0Ou00q1d1f8y4z6C2w5c4h0T2v0kL0OD0Ou02q1d7f8y4z3C1w4b4gp1wF2Uzh5wdC18yHH4hhBhHwaATXu0Asds0
             teleport: 'sfx/teleport.ogg',
             // https://jummbus.bitbucket.io/#j2N05thiefn100s1k0l00e00t3Mm3a3g00j07i0r1O_U0o1T0v0pL0OD0Ou00q1d1f5y1z8C2w2c0h0b4p1fFyUBBr9mGkKKds0
             thief: 'sfx/thief.ogg',
+            // https://jummbus.bitbucket.io/#j3N0bthief-briben100s1k0l00e00t50mba3g00j07i0r1O_U0o5T0v0pL0OaD0Ou00q1d5fay0z2C1w2c0h3b4p1fF2G7P8YmgeBxNU0
+            'thief-bribe': 'sfx/thief-bribe.ogg',
             // https://jummbus.bitbucket.io/#j3N0ctransmogrifyn110s1k0l00e00t3Mm7a3g00j07i0r1O_U00o50T0v0pL0OaD0Ou00q1d0f8y4z6C1w1c1h0T2v05L0OaD0Ou02q1d7f8y4zcC1w4h0b4gp1BINp2j8mhPcn1R8xQSAb8oyUiPt0l9LOYq0qU0
             transmogrify: 'sfx/transmogrify.ogg',
 

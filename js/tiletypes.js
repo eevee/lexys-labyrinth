@@ -283,6 +283,9 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             level.spawn_animation(me.cell, 'puff');
             level.transmute_tile(me, 'wall');
+            if (other === level.player) {
+                level.sfx.play_once('popwall', me.cell);
+            }
         },
     },
     // LL specific tile that can only be stepped on /twice/, originally used to repair differences
@@ -334,6 +337,9 @@ const TILE_TYPES = {
             if (other.type.can_reveal_walls) {
                 level.spawn_animation(me.cell, 'puff');
                 level.transmute_tile(me, 'floor');
+                if (other === level.player) {
+                    level.sfx.play_once('fake-floor', me.cell);
+                }
             }
         },
     },
@@ -851,7 +857,6 @@ const TILE_TYPES = {
                 return;
             }
 
-
             level.sfx.play_once('splash-slime', me.cell);
             if (other.type.name === 'dirt_block' || other.type.name === 'ice_block') {
                 level.transmute_tile(me, 'floor');
@@ -892,7 +897,9 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
             if (level.take_tool_from_actor(other, 'bribe')) {
-                // TODO bribe sound
+                if (other === level.player) {
+                    level.sfx.play_once('thief-bribe', me.cell);
+                }
                 return;
             }
             if (! other.type.is_real_player)
@@ -913,7 +920,9 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         on_arrive(me, level, other) {
             if (level.take_tool_from_actor(other, 'bribe')) {
-                // TODO bribe sound
+                if (other === level.player) {
+                    level.sfx.play_once('thief-bribe', me.cell);
+                }
                 return;
             }
             if (! other.type.is_real_player)
@@ -2678,7 +2687,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.adjust_bonus(0, 2);
-                level.sfx.play_once('get-bonus', me.cell);
+                level.sfx.play_once('get-bonus2', me.cell);
             }
             if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
                 level.remove_tile(me);
