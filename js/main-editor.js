@@ -392,29 +392,43 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
     schedule_level_render() {
         if (this._handle)
             return;
-        this._handle = setTimeout(() => { this.render_level() }, 100);
+        this._handle = setTimeout(() => { this.render_level() }, 50);
     }
 
     render_level() {
         this._handle = null;
-        if (this.awaiting_renders.length === 0)
-            return;
 
-        let index = this.awaiting_renders.shift();
-        let element = this.list.childNodes[index];
-        let stored_level = this.conductor.stored_game.load_level(index);
-        this.renderer.set_level(stored_level);
-        this.renderer.set_viewport_size(stored_level.size_x, stored_level.size_y);
-        this.renderer.draw_static_region(0, 0, stored_level.size_x, stored_level.size_y);
-        let canvas = mk('canvas', {
-            width: stored_level.size_x * this.renderer.tileset.size_x / 4,
-            height: stored_level.size_y * this.renderer.tileset.size_y / 4,
-        });
-        canvas.getContext('2d').drawImage(this.renderer.canvas, 0, 0, canvas.width, canvas.height);
-        element.querySelector('.-preview').append(canvas);
-        element.classList.add('--rendered');
+        let t0 = performance.now();
+        while (true) {
+            if (this.awaiting_renders.length === 0)
+                return;
+
+            let index = this.awaiting_renders.shift();
+            let element = this.list.childNodes[index];
+            // FIXME levels may have been renumbered since this was queued, whoops
+            let stored_level = this.conductor.stored_game.load_level(index);
+            this.renderer.set_level(stored_level);
+            this.renderer.set_viewport_size(stored_level.size_x, stored_level.size_y);
+            this.renderer.draw_static_region(0, 0, stored_level.size_x, stored_level.size_y);
+            let canvas = mk('canvas', {
+                width: stored_level.size_x * this.renderer.tileset.size_x / 4,
+                height: stored_level.size_y * this.renderer.tileset.size_y / 4,
+            });
+            canvas.getContext('2d').drawImage(this.renderer.canvas, 0, 0, canvas.width, canvas.height);
+            element.querySelector('.-preview').append(canvas);
+            element.classList.add('--rendered');
+
+            if (performance.now() - t0 > 10)
+                break;
+        }
 
         this.schedule_level_render();
+    }
+
+    expire(index) {
+        let li = this.list.childNodes[index];
+        li.classList.remove('--rendered');
+        li.querySelector('.-preview').textContent = '';
     }
 
     _after_insert_level(stored_level, index) {
@@ -3273,11 +3287,16 @@ export class Editor extends PrimaryView {
         this._save_level_to_storage(this.stored_level);
         save_json_to_storage(pack_key, pack_stash);
         this._save_pack_to_stash(stored_pack);
+
+        if (this._level_browser) {
+            this._level_browser.expire(this.conductor.level_index);
+        }
     }
 
     // Level loading
 
     load_game(stored_game) {
+        this._level_browser = null;
     }
 
     load_level(stored_level) {
@@ -3333,7 +3352,10 @@ export class Editor extends PrimaryView {
     }
 
     open_level_browser() {
-        new EditorLevelBrowserOverlay(this.conductor).open();
+        if (! this._level_browser) {
+            this._level_browser = new EditorLevelBrowserOverlay(this.conductor);
+        }
+        this._level_browser.open();
     }
 
     select_tool(tool) {
