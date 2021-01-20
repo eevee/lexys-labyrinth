@@ -2215,7 +2215,7 @@ const TILE_TYPES = {
             // actors who aren't supposed to have an inventory
             // TODO make this a...  flag?  i don't know?
             // TODO major difference from lynx...
-            if (other.type.name !== 'ice_block' && other.type.name !== 'frame_block') {
+            if (other.type.name !== 'ice_block' && other.type.name !== 'frame_block' && ! level.compat.blue_keys_not_edible) {
                 level.attempt_take(other, me);
             }
         },

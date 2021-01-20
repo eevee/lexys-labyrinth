@@ -2891,6 +2891,11 @@ const COMPAT_FLAGS = [{
     // TODO maybe steam as well?
     rulesets: new Set(['steam-strict']),
 }, {
+    key: 'blue_keys_not_edible',
+    label: "Monsters do not eat blue keys",
+    // TODO wonder if this should also remove the special behavior of red keys
+    rulesets: new Set(['ms']),
+}, {
     // XXX this is goofy
     key: 'tiles_react_instantly',
     label: "Tiles react instantly",
@@ -2910,6 +2915,10 @@ const COMPAT_FLAGS = [{
     key: 'use_lynx_loop',
     label: "Use Lynx-style update loop",
     rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
+}, {
+    key: 'no_early_push',
+    label: "Player doesn't push at decision time",
+    rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'emulate_60fps',
     label: "Run at 60 FPS",

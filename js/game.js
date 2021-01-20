@@ -1266,6 +1266,7 @@ export class Level extends LevelInterface {
             // At this point, we have exactly 1 or 2 directions, and deciding between them requires
             // checking which ones are blocked.  Note that we do this even if only one direction is
             // requested, meaning that we get to push blocks before anything else has moved!
+            let push_mode = this.compat.no_early_push ? 'bump' : 'push';
             let open;
             if (dir2 === null) {
                 // Only one direction is held, but for consistency, "check" it anyway
