@@ -3262,7 +3262,7 @@ export class Editor extends PrimaryView {
         // The most reliable way to clone a level is to reserialize its current state
         // TODO with autosave this shouldn't be necessary, just copy the existing serialization
         let stored_level = c2g.parse_level(c2g.synthesize_level(this.conductor.stored_game.load_level(index)), index + 2);
-        return this._move_level(stored_level, index + 1);
+        return this.move_level(stored_level, index + 1);
     }
 
     save_level() {
