@@ -1244,6 +1244,7 @@ body.--debug .overlay-message {
 dl.score-chart {
     display: grid;
     grid-auto-columns: 1fr 1fr;
+    grid-auto-rows: 1.33em;
     margin: auto 10%;
     font-weight: normal;
 }
@@ -1256,10 +1257,17 @@ dl.score-chart dd {
     margin: 0;
     text-align: right;
 }
+dl.score-chart .-component {
+    color: #d8d8d8;
+}
 dl.score-chart .-sum {
-    margin-bottom: 0.5em;
     border-top: 1px solid white;
+}
+dl.score-chart .-total {
     color: hsl(40, 75%, 80%);
+}
+dl.score-chart .-star {
+    position: absolute;
 }
 
 .chips {

@@ -1759,44 +1759,55 @@ class Player extends PrimaryView {
                 }
 
                 overlay_middle = mk('dl.score-chart',
-                    mk('dt', "base score"),
-                    mk('dd', base.toLocaleString()),
-                    mk('dt', "time bonus"),
-                    mk('dd', `+ ${time.toLocaleString()}`),
+                    mk('dt.-component', "base score"),
+                    mk('dd.-component', base.toLocaleString()),
+                    mk('dt.-component', "time bonus"),
+                    mk('dd.-component', `+ ${time.toLocaleString()}`),
                 );
-                // It should be impossible to ever have a bonus and then drop back to 0 with CC2
-                // rules; thieves can halve it, but the amount taken is rounded down.
-                // That is to say, I don't need to track whether we ever got a score bonus
                 if (this.level.bonus_points) {
                     overlay_middle.append(
-                        mk('dt', "score bonus"),
-                        mk('dd', `+ ${this.level.bonus_points.toLocaleString()}`),
+                        mk('dt.-component', "score bonus"),
+                        mk('dd.-component', `+ ${this.level.bonus_points.toLocaleString()}`),
                     );
                 }
-                else {
-                    overlay_middle.append(mk('dt', ""), mk('dd', ""));
-                }
 
-                // TODO show your time, bold time...?
+                // TODO show your time, time improvement...?
+                let score_dd = mk('dd.-sum', scorecard.score.toLocaleString());
+                if (scorecard.aid === 0) {
+                    score_dd.append(mk('span.-star', "★"));
+                }
+                overlay_middle.append(mk('dt.-sum', "level score"), score_dd);
+
                 overlay_middle.append(
-                    mk('dt.-sum', "level score"),
-                    mk('dd.-sum', `${scorecard.score.toLocaleString()} ${scorecard.aid === 0 ? '★' : ''}`),
+                    mk('dt.-total', "total score"),
+                    mk('dd.-total', savefile.total_score.toLocaleString()),
                 );
 
                 if (old_scorecard && old_scorecard.score < scorecard.score) {
                     overlay_middle.append(
-                        mk('dt', "improvement"),
-                        mk('dd', `+ ${(scorecard.score - old_scorecard.score).toLocaleString()}`),
+                        mk('dd.-total', `(+ ${(scorecard.score - old_scorecard.score).toLocaleString()})`),
                     );
                 }
                 else {
-                    overlay_middle.append(mk('dt', ""), mk('dd', ""));
+                    overlay_middle.append(mk('dd', ""));
                 }
 
                 overlay_middle.append(
-                    mk('dt', "total score"),
-                    mk('dd', savefile.total_score.toLocaleString()),
+                    mk('dd', ""),
+                    mk('dt', "real time"),
+                    mk('dd', util.format_duration(scorecard.abstime / TICS_PER_SECOND, 2)),
+                    mk('dt.-total', "total time"),
+                    mk('dd.-total', util.format_duration(savefile.total_abstime / TICS_PER_SECOND, 2)),
                 );
+
+                if (old_scorecard && old_scorecard.abstime > scorecard.abstime) {
+                    overlay_middle.append(
+                        mk('dd.-total', `(− ${util.format_duration((old_scorecard.abstime - scorecard.abstime) / TICS_PER_SECOND, 2)})`),
+                    );
+                }
+                else {
+                    overlay_middle.append(mk('dd', ""));
+                }
             }
         }
         else if (this.state === 'ended') {
