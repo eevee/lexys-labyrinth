@@ -2018,11 +2018,11 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     flame_jet_off: {
         name: "Flame jet (off)",
-        desc: "No effect.  Turned on while an orange button is held or while receiving power.  Turned on permanently by a gray button.",
+        desc: "No effect.  Turned on while a linked orange button is held.  Toggled permanently by a pulse or a gray button.",
     },
     flame_jet_on: {
         name: "Flame jet (on)",
-        desc: "Destroys almost anything that passes over it, except dirt blocks, fireballs, and anything wearing fire boots.  Turned off while an orange button is held or while receiving power.  Turned off permanently by a gray button.",
+        desc: "Destroys almost anything that passes over it, except dirt blocks, fireballs, and anything wearing fire boots.  Turned off while a linked orange button is held.  Toggled permanently by a pulse or a gray button.",
     },
     transmogrifier: {
         name: "Transmogrifier",
