@@ -1189,16 +1189,21 @@ export class Tileset {
             // Draw the base tile
             packet.blit(drawspec.base[0], drawspec.base[1]);
 
-            this._draw_fourway_tile_power(tile, tile.wire_directions, packet);
-
-            // Then draw the wired tile on top of it all
-            if (tile.wire_directions === 0x0f && drawspec.wired_cross) {
-                // FIXME oopsydaisy, order matters for the cross part
-                this.draw_drawspec(drawspec.wired_cross, name, tile, packet);
+            let is_crossed = (tile.wire_directions === 0x0f && drawspec.wired_cross);
+            if (is_crossed && tile.powered_edges && tile.powered_edges !== 0x0f) {
+                // For crossed wires with different power, order matters; horizontal is on top
+                // TODO note that this enforces the CC2 wire order
+                let vert = tile.powered_edges & 0x05, horiz = tile.powered_edges & 0x0a;
+                this._draw_fourway_power_underlay(
+                    vert ? this.layout['#powered'] : this.layout['#unpowered'], 0x05, packet);
+                this._draw_fourway_power_underlay(
+                    horiz ? this.layout['#powered'] : this.layout['#unpowered'], 0x0a, packet);
             }
             else {
-                this.draw_drawspec(drawspec.wired, name, tile, packet);
+                this._draw_fourway_tile_power(tile, tile.wire_directions, packet);
             }
+            // Then draw the wired tile on top of it all
+            this.draw_drawspec(is_crossed ? drawspec.wired_cross : drawspec.wired, name, tile, packet);
         }
         else {
             // There's no wiring here, so just draw the base and then draw the wired part on top
