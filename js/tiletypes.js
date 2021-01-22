@@ -2777,36 +2777,38 @@ const TILE_TYPES = {
         },
     },
     // New VFX (not in CC2, so they don't block to avoid altering gameplay)
-    // TODO would like these to play faster but the first frame is often skipped due to other bugs
+    // Note that these need to NOT have a duration that's an even number of tics, or the last frame
+    // will be skipped when playing at 20fps; the cooldown will be 3, then decremented to 0, and the
+    // tile will immediately be removed!
     player1_exit: {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
-        ttl: 8 * 3,
+        ttl: 8 * 3 + 1,
     },
     player2_exit: {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
-        ttl: 8 * 3,
+        ttl: 8 * 3 + 1,
     },
     teleport_flash: {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
-        ttl: 8 * 3,
+        ttl: 8 * 3 + 1,
     },
     transmogrify_flash: {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
-        ttl: 4 * 3,
+        ttl: 4 * 3 + 1,
     },
     puff: {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
-        ttl: 4 * 3,
+        ttl: 4 * 3 + 1,
     },
 
     // Invalid tiles that appear in some CCL levels because community level

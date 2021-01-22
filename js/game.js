@@ -37,20 +37,18 @@ export class Tile {
 
     // Gives the effective position of an actor in motion, given smooth scrolling
     visual_position(tic_offset = 0, interpolate_backwards_by = 0) {
-        let x = this.cell.x;
-        let y = this.cell.y;
         if (! this.previous_cell || this.movement_speed === null) {
-            return [x, y];
+            return [this.cell.x, this.cell.y];
         }
-        else {
-            // For a movement speed of N, the cooldown is set to N during the tic an actor starts
-            // moving, and we interpolate it from there to N - 1 over the course of the duration
-            let p = this.movement_progress(tic_offset, interpolate_backwards_by);
-            return [
-                (1 - p) * this.previous_cell.x + p * x,
-                (1 - p) * this.previous_cell.y + p * y,
-            ];
-        }
+
+        let cell = this.destination_cell ?? this.cell;
+        // For a movement speed of N, the cooldown is set to N during the tic an actor starts
+        // moving, and we interpolate it from there to N - 1 over the course of the duration
+        let p = this.movement_progress(tic_offset, interpolate_backwards_by);
+        return [
+            (1 - p) * this.previous_cell.x + p * cell.x,
+            (1 - p) * this.previous_cell.y + p * cell.y,
+        ];
     }
 
     // TODO don't love that the arg order is different here vs tile type, but also don't love that
@@ -931,6 +929,10 @@ export class Level extends LevelInterface {
             // Clear any old decisions ASAP.  Note that this prop is only used internally within a
             // single tic, so it doesn't need to be undoable
             actor.decision = null;
+            // This is a renderer prop and only exists between two loops
+            if (actor.destination_cell) {
+                this._set_tile_prop(actor, 'destination_cell', null);
+            }
 
             if (! actor.cell)
                 continue;
@@ -1690,6 +1692,10 @@ export class Level extends LevelInterface {
         let teleporter = actor.just_stepped_on_teleporter;
         delete actor.just_stepped_on_teleporter;
 
+        // We're about to abruptly move the actor, and the renderer needs to know to interpolate its
+        // movement towards the teleporter it just stepped on, not the teleporter it's moved to
+        this._set_tile_prop(actor, 'destination_cell', actor.cell);
+
         if (teleporter.type.name === 'teleport_red' && ! teleporter.is_active) {
             // Curious special-case red teleporter behavior: if you pass through a wired but
             // inactive one, you keep sliding indefinitely.  Players can override out of it, but
@@ -2352,6 +2358,11 @@ export class Level extends LevelInterface {
             this._set_tile_prop(tile, 'previous_cell', null);
             this._set_tile_prop(tile, 'movement_speed', tile.type.ttl);
             this._set_tile_prop(tile, 'movement_cooldown', tile.type.ttl);
+            // This is effectively a completely new object, so remove double cooldown prevention;
+            // this cooldown MUST happen, because the renderer can't handle cooldown == speed
+            if (tile.last_extra_cooldown_tic) {
+                this._set_tile_prop(tile, 'last_extra_cooldown_tic', null);
+            }
             this._do_extra_cooldown(tile);
         }
     }
