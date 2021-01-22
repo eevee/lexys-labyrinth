@@ -57,6 +57,7 @@ export class CanvasRenderer {
         this.viewport_y = 0;
         this.viewport_dirty = false;
         this.show_actor_bboxes = false;
+        this.show_actor_order = false;
         this.use_rewind_effect = false;
         this.perception = 'normal';  // normal, xray, editor, palette
         this.active_player = null;
@@ -264,6 +265,11 @@ export class CanvasRenderer {
             }
         }
 
+        if (this.use_rewind_effect) {
+            this.draw_rewind_effect(tic);
+        }
+
+        // Debug overlays
         if (this.show_actor_bboxes) {
             this.ctx.fillStyle = '#f004';
             for (let x = xf0; x <= x1; x++) {
@@ -277,9 +283,27 @@ export class CanvasRenderer {
                 }
             }
         }
+        if (this.show_actor_order) {
+            this.ctx.fillStyle = '#fff';
+            this.ctx.strokeStyle = '#000';
+            this.ctx.lineWidth = 3;
+            this.ctx.font = '16px monospace';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            for (let [n, actor] of this.level.actors.entries()) {
+                let cell = actor.cell;
+                if (! cell)
+                    continue;
+                if (cell.x < xf0 || cell.x > x1 || cell.y < yf0 || cell.y > y1)
+                    continue;
 
-        if (this.use_rewind_effect) {
-            this.draw_rewind_effect(tic);
+                let [vx, vy] = actor.visual_position(tic_offset, packet.update_rate);
+                let x = (vx + 0.5 - x0) * tw;
+                let y = (vy + 0.5 - y0) * th;
+                let label = String(this.level.actors.length - 1 - n);
+                this.ctx.strokeText(label, x, y);
+                this.ctx.fillText(label, x, y);
+            }
         }
     }
 

@@ -515,18 +515,6 @@ class Player extends PrimaryView {
         this.renderer = new CanvasRenderer(this.conductor.tilesets['ll']);
         this._loaded_tileset = false;
         this.level_el.append(this.renderer.canvas);
-        this.renderer.canvas.addEventListener('auxclick', ev => {
-            if (ev.button !== 1)
-                return;
-            if (! this.debug.enabled)
-                return;
-
-            let [x, y] = this.renderer.cell_coords_from_event(ev);
-            this.level.move_to(this.level.player, this.level.cell(x, y), 1);
-            // TODO this behaves a bit weirdly when paused (doesn't redraw even with a force), i
-            // think because we're still claiming a speed of 1 so time has to pass before the move
-            // actually "happens"
-        });
 
         // Populate a skeleton inventory
         this.inventory_key_nodes = {};
@@ -864,10 +852,9 @@ class Player extends PrimaryView {
             }),
         );
         // Hook up play speed
-        let speed_el = debug_el.elements.speed;
-        speed_el.value = "1";
-        speed_el.addEventListener('change', ev => {
-            let speed = ev.target.value;
+        debug_el.elements.speed.value = "1";
+        debug_el.querySelector('#player-debug-speed').addEventListener('change', ev => {
+            let speed = debug_el.elements.speed.value;
             let [numer, denom] = speed.split('/');
             this.play_speed = parseInt(numer, 10) / parseInt(denom ?? '1', 10);
         });
@@ -877,9 +864,10 @@ class Player extends PrimaryView {
         let inventory_el = debug_el.querySelector('.-inventory');
         for (let name of [
             'key_blue', 'key_red', 'key_yellow', 'key_green',
+            'xray_eye', 'foil', 'lightning_bolt', 'hook',
             'flippers', 'fire_boots', 'cleats', 'suction_boots',
-            'bribe', 'railroad_sign', 'hiking_boots', 'speed_boots',
-            'xray_eye', 'helmet', 'foil', 'lightning_bolt',
+            'hiking_boots', 'speed_boots', 'railroad_sign', 'helmet',
+            'bribe', 'bowling_ball', 'dynamite',
         ]) {
             inventory_el.append(make_button(
                 mk('img', {src: this.render_inventory_tile(name)}),
@@ -1067,6 +1055,31 @@ class Player extends PrimaryView {
             this.renderer.show_actor_bboxes = ev.target.checked;
             this._redraw();
         });
+        wire_checkbox('show_actor_order', ev => {
+            this.renderer.show_actor_order = ev.target.checked;
+            this._redraw();
+        });
+        wire_checkbox('show_actor_tooltips', ev => {
+            if (ev.target.checked) {
+                let element = mk('div.player-debug-actor-tooltip');
+                let header = mk('h3');
+                let dl = mk('dl');
+                let props = {};
+                for (let key of ['direction', 'movement_speed', 'movement_cooldown']) {
+                    let dd = mk('dd');
+                    props[key] = dd;
+                    dl.append(mk('dt', key), dd);
+                }
+                let inventory = mk('p');
+                element.append(header, dl, inventory);
+                this.debug.actor_tooltip = {element, header, props, inventory};
+                document.body.append(element);
+            }
+            else if (this.debug.actor_tooltip) {
+                this.debug.actor_tooltip.element.remove();
+                this.debug.actor_tooltip = null;
+            }
+        });
         wire_checkbox('disable_interpolation', ev => {
             this.use_interpolation = ! ev.target.checked;
             this._redraw();
@@ -1081,6 +1094,60 @@ class Player extends PrimaryView {
                 this._redraw();
             }),
         );
+
+        // Bind some debug events on the canvas
+        this.renderer.canvas.addEventListener('auxclick', ev => {
+            if (ev.button !== 1)
+                return;
+
+            let [x, y] = this.renderer.cell_coords_from_event(ev);
+            this.level.move_to(this.level.player, this.level.cell(x, y), 1);
+            // TODO this behaves a bit weirdly when paused (doesn't redraw even with a force), i
+            // think because we're still claiming a speed of 1 so time has to pass before the move
+            // actually "happens"
+        });
+        this.renderer.canvas.addEventListener('mousemove', ev => {
+            let tooltip = this.debug.actor_tooltip;
+            if (! tooltip)
+                return;
+
+            // FIXME this doesn't work so well for actors in motion  :S
+            // TODO show bounding box for hovered actor?
+            let [x, y] = this.renderer.cell_coords_from_event(ev);
+            // TODO should update the tooltip if the game advances but the mouse doesn't move
+            let cell = this.level.cell(x, y);
+            let actor = cell.get_actor();
+            tooltip.element.classList.toggle('--visible', actor);
+            if (! actor)
+                return;
+
+            tooltip.element.style.left = `${ev.clientX}px`;
+            tooltip.element.style.top = `${ev.clientY}px`;
+            tooltip.header.textContent = actor.type.name;
+            for (let [key, element] of Object.entries(tooltip.props)) {
+                element.textContent = String(actor[key] ?? "—");
+            }
+
+            // TODO it would be cool to use icons and whatever for this, but that would be tricky to
+            // do without serious canvas churn
+            let inv = [];
+            if (actor.keyring) {
+                for (let [key, count] of Object.entries(actor.keyring)) {
+                    inv.push(`${key} ×${count}`);
+                }
+            }
+            if (actor.toolbelt) {
+                for (let tool of actor.toolbelt) {
+                    inv.push(tool);
+                }
+            }
+            tooltip.inventory.textContent = inv.join(', ');
+        });
+        this.renderer.canvas.addEventListener('mouseout', ev => {
+            if (this.debug.actor_tooltip) {
+                this.debug.actor_tooltip.element.classList.remove('--visible');
+            }
+        });
 
         this.adjust_scale();
         if (this.level) {
@@ -1869,8 +1936,7 @@ class Player extends PrimaryView {
 
     confirm_game_interruption(question, action) {
         if (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding') {
-            new ConfirmOverlay(this.conductor, "Restart this level and watch the replay?", action)
-                .open();
+            new ConfirmOverlay(this.conductor, question, action).open();
         }
         else {
             action();

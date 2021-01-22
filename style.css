@@ -1490,7 +1490,7 @@ body.--debug #player-debug {
 #player-debug .-inventory {
     display: grid;
     margin: 0 auto;
-    grid: auto-fill var(--tile-height) / repeat(8, var(--tile-width));
+    grid: auto-flow min-content / repeat(8, min-content);
     gap: 2px;
 }
 #player-debug > .-inventory > button {
@@ -1500,7 +1500,7 @@ body.--debug #player-debug {
     display: block;
 }
 #player-debug > .-inventory > button.-wide {
-    grid-column: span 8;
+    grid-column: span 5;
     padding: 0.25em;
 }
 #player-debug .-buttons {
@@ -1602,6 +1602,45 @@ body.--debug #player-debug {
 }
 #player.--replay-recording #player-debug .-replay-status > .-recording {
     display: flex;
+}
+
+.player-debug-actor-tooltip {
+    position: absolute;
+    display: none;
+
+    /* similar to editor tooltip */
+    padding: 0.33em 0.75em;
+    border: 1px solid black;
+    color: #d8d8d8;
+    background: hsl(225, 10%, 20%);
+    box-shadow: 0 1px 2px 1px #0004;
+
+    opacity: 0.9;
+    font-family: monospace;
+    pointer-events: none;
+}
+.player-debug-actor-tooltip.--visible {
+    display: block;
+}
+.player-debug-actor-tooltip h3 {
+    font-size: 1.25em;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid currentColor;
+    color: white;
+}
+.player-debug-actor-tooltip dl {
+    display: grid;
+    grid: auto-flow min-content / auto auto;
+    align-items: baseline;
+    gap: 0.25em 1em;
+    margin: 0;
+}
+.player-debug-actor-tooltip dl > dt {
+    grid-column: 1;
+}
+.player-debug-actor-tooltip dl > dd {
+    grid-column: 2;
+    margin: 0;
 }
 
 

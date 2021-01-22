@@ -221,22 +221,18 @@
             <div class="-buttons" id="player-debug-time-buttons">
                 <!-- populated in js -->
             </div>
-            <p>Game speed:
-                <select name="speed">
-                    <option value="100">100× faster</option>
-                    <option value="50">50× faster</option>
-                    <option value="20">20× faster</option>
-                    <option value="10">10× faster</option>
-                    <option value="5">5× faster</option>
-                    <option value="3">3× faster</option>
-                    <option value="2">2× faster</option>
-                    <option value="3/2">1½× faster</option>
-                    <option value="1" selected>Normal speed</option>
-                    <option value="1/2">2× slower</option>
-                    <option value="1/3">3× slower</option>
-                    <option value="1/4">4× slower</option>
-                </select>
-            </p>
+            <div id="player-debug-speed" class="radio-faux-button-set">
+                <label><input type="radio" name="speed" value="100"><span class="-button">100</span></label>
+                <label><input type="radio" name="speed" value="25"><span class="-button">25</span></label>
+                <label><input type="radio" name="speed" value="10"><span class="-button">10</span></label>
+                <label><input type="radio" name="speed" value="5"><span class="-button">5</span></label>
+                <label><input type="radio" name="speed" value="3"><span class="-button">3</span></label>
+                <label><input type="radio" name="speed" value="2"><span class="-button">2</span></label>
+                <label><input type="radio" name="speed" value="1"><span class="-button"><strong>1×</strong></span></label>
+                <label><input type="radio" name="speed" value="1/2"><span class="-button">½</span></label>
+                <label><input type="radio" name="speed" value="1/3"><span class="-button">⅓</span></label>
+                <label><input type="radio" name="speed" value="1/4"><span class="-button">¼</span></label>
+            </div>
 
             <h3>Inventory</h3>
             <div class="-inventory">
@@ -280,10 +276,11 @@
                 </select>
             </p>
             <ul>
-                <li><label><input type="checkbox" name="show_actor_bboxes"> Show actor bounding boxes</label></li>
                 <li><label><input type="checkbox" name="disable_interpolation"> Disable interpolation</label></li>
+                <li><label><input type="checkbox" name="show_actor_bboxes"> Show actor bounding boxes</label></li>
+                <li><label><input type="checkbox" name="show_actor_order"> Show actor order</label></li>
+                <li><label><input type="checkbox" name="show_actor_tooltips"> Show actor tooltips</label></li>
                 <!--
-                <li><label><input type="checkbox" disabled> Show actor info</label></li>
                 <li><label><input type="checkbox" disabled> Freeze time for everything else</label></li>
                 <li><label><input type="checkbox" disabled> Player is immortal</label></li>
                 <li><label><input type="checkbox" disabled> Player ignores collision</label></li>
