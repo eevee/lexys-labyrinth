@@ -1287,6 +1287,7 @@ class Player extends PrimaryView {
         this.time_el.classList.remove('--frozen');
         this.time_el.classList.remove('--danger');
         this.time_el.classList.remove('--warning');
+        this.hint_el.parentNode.classList.remove('--visible');
         this.root.classList.remove('--replay-playback');
         this.root.classList.remove('--replay-recording');
         this.root.classList.remove('--bonus-visible');
@@ -1557,9 +1558,7 @@ class Player extends PrimaryView {
 
         // TODO can we do this only if they actually changed?
         this.chips_el.textContent = this.level.chips_remaining;
-        if (this.level.chips_remaining === 0) {
-            this.chips_el.classList.add('--done');
-        }
+        this.chips_el.classList.toggle('--done', this.level.chips_remaining === 0);
 
         this.time_el.classList.toggle('--frozen', this.level.time_remaining === null || this.level.timer_paused);
         if (this.level.time_remaining === null) {

@@ -1346,10 +1346,9 @@ dl.score-chart .-star {
     display: none;
     font-size: calc(var(--tile-height) * var(--scale) / 3);
     font-family: serif;
-    font-style: italic;
     color: hsl(45, 100%, 60%);
     background: #080808;
-    border: 1px inset #202020;
+    border: 2px inset #202020;
 }
 #player-game-area > .player-hint-wrapper > .player-hint {
     overflow: auto;
