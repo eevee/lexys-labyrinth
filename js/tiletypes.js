@@ -2569,17 +2569,7 @@ const TILE_TYPES = {
             key_green: true,
         },
         decide_movement(me, level) {
-            if (level.player.type.name === 'player') {
-                if (level.player.movement_cooldown || level.player.is_blocked) {
-                    return [level.player.direction];
-                }
-                else {
-                    return [level.player.decision];
-                }
-            }
-            else {
-                return null;
-            }
+            return level.player1_move ? [level.player1_move] : null;
         },
         //visual_state: doppelganger_visual_state,
     },
@@ -2604,17 +2594,7 @@ const TILE_TYPES = {
             key_yellow: true,
         },
         decide_movement(me, level) {
-            if (level.player.type.name === 'player2') {
-                if (level.player.movement_cooldown || level.player.is_blocked) {
-                    return [level.player.direction];
-                }
-                else {
-                    return [level.player.decision];
-                }
-            }
-            else {
-                return null;
-            }
+            return level.player2_move ? [level.player2_move] : null;
         },
         //visual_state: doppelganger_visual_state,
     },

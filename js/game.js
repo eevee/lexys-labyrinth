@@ -504,6 +504,9 @@ export class Level extends LevelInterface {
             }
         }
         // TODO complain if no player
+        // Used for doppelgängers
+        this.player1_move = null;
+        this.player2_move = null;
 
         // Connect buttons and teleporters
         let num_cells = this.width * this.height;
@@ -783,7 +786,7 @@ export class Level extends LevelInterface {
                     '_rng1', '_rng2', '_blob_modifier', 'force_floor_direction',
                     'tic_counter', 'time_remaining', 'timer_paused',
                     'chips_remaining', 'bonus_points', 'state',
-                    'remaining_players', 'player',
+                    'player1_move', 'player2_move', 'remaining_players', 'player',
             ]) {
                 this.pending_undo.level_props[key] = this[key];
             }
@@ -865,6 +868,8 @@ export class Level extends LevelInterface {
             }
         }
 
+        this._swap_players();
+
         this._do_wire_phase();
         // TODO should this also happen three times?
         this._do_static_phase();
@@ -923,6 +928,18 @@ export class Level extends LevelInterface {
 
     // Decision phase: all actors decide on their movement "simultaneously"
     _do_decision_phase(forced_only = false) {
+        // Before decisions happen, remember the player's /current/ direction, which may be affected
+        // by sliding.  This will be used by doppelgängers earlier in actor order than the player.
+        if (! forced_only) {
+            // Check whether the player is /attempting/ to move: either they did, or they're blocked
+            if (this.player.movement_cooldown > 0 || this.player.is_blocked) {
+                this.remember_player_move(this.player.direction);
+            }
+            else {
+                this.remember_player_move(null);
+            }
+        }
+
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
 
@@ -987,6 +1004,8 @@ export class Level extends LevelInterface {
                 this.attempt_teleport(actor);
             }
         }
+
+        this._swap_players();
     }
 
     // Have an actor attempt to move
@@ -1079,34 +1098,23 @@ export class Level extends LevelInterface {
         }
     }
 
-    _do_cleanup_phase() {
-        // Strip out any destroyed actors from the acting order
-        // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
-        // necessary, either; maybe only do it every few tics?
-        let p = 0;
-        for (let i = 0, l = this.actors.length; i < l; i++) {
-            let actor = this.actors[i];
-            if (actor.cell) {
-                if (p !== i) {
-                    this.actors[p] = actor;
-                }
-                p++;
-            }
-            else {
-                let local_p = p;
-                this._push_pending_undo(() => this.actors.splice(local_p, 0, actor));
-            }
+    _swap_players() {
+        if (this.remaining_players <= 0) {
+            this.win();
         }
-        this.actors.length = p;
 
         // Possibly switch players
         // FIXME cc2 has very poor interactions between this feature and cloners; come up with some
         // better rules as a default
         if (this.swap_player1) {
+            this.swap_player1 = false;
             // Reset the set of keys released since last tic (but not the swap key, or holding it
             // will swap us endlessly)
             // FIXME this doesn't even quite work, it just swaps less aggressively?  wtf
             this.p1_released = 0xff & ~INPUT_BITS.swap;
+            // Clear remembered moves
+            this.player1_move = null;
+            this.player2_move = null;
 
             // Iterate backwards over the actor list looking for a viable next player to control
             let i0 = this.actors.indexOf(this.player);
@@ -1132,10 +1140,27 @@ export class Level extends LevelInterface {
                 }
             }
         }
+    }
 
-        if (this.remaining_players <= 0) {
-            this.win();
+    _do_cleanup_phase() {
+        // Strip out any destroyed actors from the acting order
+        // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
+        // necessary, either; maybe only do it every few tics?
+        let p = 0;
+        for (let i = 0, l = this.actors.length; i < l; i++) {
+            let actor = this.actors[i];
+            if (actor.cell) {
+                if (p !== i) {
+                    this.actors[p] = actor;
+                }
+                p++;
+            }
+            else {
+                let local_p = p;
+                this._push_pending_undo(() => this.actors.splice(local_p, 0, actor));
+            }
         }
+        this.actors.length = p;
 
         // Advance the clock
         // TODO i suspect cc2 does this at the beginning of the tic, but even if you've won?  if you
@@ -1331,6 +1356,9 @@ export class Level extends LevelInterface {
                 this._set_tile_prop(actor, 'last_move_was_force', false);
             }
         }
+
+        // Remember our decision so doppelgängers can copy it
+        this.remember_player_move(actor.decision);
     }
 
     make_actor_decision(actor, forced_only = false) {
@@ -1765,6 +1793,17 @@ export class Level extends LevelInterface {
         // Now physically move the actor, but their movement waits until next decision phase
         this.remove_tile(actor);
         this.add_tile(actor, dest.cell);
+    }
+
+    remember_player_move(direction) {
+        if (this.player.type.name === 'player') {
+            this.player1_move = direction;
+            this.player2_move = null;
+        }
+        else {
+            this.player1_move = null;
+            this.player2_move = direction;
+        }
     }
 
     cycle_inventory(actor) {
