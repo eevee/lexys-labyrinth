@@ -270,6 +270,7 @@ class EditorLevelBrowserOverlay extends DialogOverlay {
             },
         });
 
+        // FIXME ring buffer?
         this.undo_stack = [];
 
         // Left buttons
@@ -647,11 +648,8 @@ class PencilOperation extends DrawOperation {
         if (this.alt_mode) {
             // Erase
             if (this.modifier === 'shift') {
-                // Aggressive mode: erase the entire cell
-                for (let layer = 0; layer < LAYERS.MAX; layer++) {
-                    cell[layer] = null;
-                }
-                cell[LAYERS.terrain] = {type: TILE_TYPES.floor};
+                let new_cell = this.editor.make_blank_cell(x, y);
+                this.editor.replace_cell(cell, new_cell);
             }
             else if (template) {
                 // Erase whatever's on the same layer
@@ -664,24 +662,26 @@ class PencilOperation extends DrawOperation {
                 return;
             if (this.modifier === 'shift') {
                 // Aggressive mode: erase whatever's already in the cell
-                for (let layer = 0; layer < LAYERS.MAX; layer++) {
-                    cell[layer] = null;
-                }
-                let type = this.editor.palette_selection.type;
-                if (type.layer !== LAYERS.terrain) {
-                    cell[LAYERS.terrain] = {type: TILE_TYPES.floor};
-                }
-                this.editor.place_in_cell(x, y, template);
+                let new_cell = this.editor.make_blank_cell(x, y);
+                new_cell[template.type.layer] = {...template};
+                this.editor.replace_cell(cell, new_cell);
             }
             else {
                 // Default operation: only erase whatever's on the same layer
-                this.editor.place_in_cell(x, y, template);
+                this.editor.place_in_cell(cell, template);
             }
         }
-        this.editor.mark_cell_dirty(cell);
+    }
+
+    cleanup() {
+        this.editor.commit_undo();
     }
 }
 
+// TODO also, delete
+// TODO also, non-rectangular selections
+// TODO also, better marching ants, hard to see on gravel
+// TODO press esc to cancel pending selection
 class SelectOperation extends MouseOperation {
     start() {
         if (! this.editor.selection.is_empty && this.editor.selection.contains(this.gx0, this.gy0)) {
@@ -700,26 +700,27 @@ class SelectOperation extends MouseOperation {
     }
     step(mx, my, gxf, gyf, gx, gy) {
         if (this.mode === 'float') {
-            if (! this.has_moved) {
-                if (this.make_copy) {
-                    if (this.editor.selection.is_floating) {
-                        // Stamp the floating selection but keep it floating
-                        this.editor.selection.stamp_float(true);
-                    }
-                    else {
-                        this.editor.selection.enfloat(true);
-                    }
+            if (this.has_moved) {
+                this.editor.selection.move_by(Math.floor(gx - this.gx1), Math.floor(gy - this.gy1));
+                return;
+            }
+
+            if (this.make_copy) {
+                if (this.editor.selection.is_floating) {
+                    // Stamp the floating selection but keep it floating
+                    this.editor.selection.stamp_float(true);
                 }
-                else if (! this.editor.selection.is_floating) {
-                    this.editor.selection.enfloat();
+                else {
+                    this.editor.selection.enfloat(true);
                 }
             }
-            this.editor.selection.move_by(Math.floor(gx - this.gx1), Math.floor(gy - this.gy1));
+            else if (! this.editor.selection.is_floating) {
+                this.editor.selection.enfloat();
+            }
         }
         else {
             this.update_pending_selection();
         }
-
         this.has_moved = true;
     }
 
@@ -729,8 +730,20 @@ class SelectOperation extends MouseOperation {
 
     commit() {
         if (this.mode === 'float') {
+            // Make selection move undoable
+            let dx = Math.floor(this.gx1 - this.gx0);
+            let dy = Math.floor(this.gy1 - this.gy0);
+            if (dx || dy) {
+                this.editor._done(
+                    () => this.editor.selection.move_by(dx, dy),
+                    () => this.editor.selection.move_by(-dx, -dy),
+                );
+            }
         }
         else {
+            // If there's an existing floating selection (which isn't what we're operating on),
+            // commit it before doing anything else
+            this.editor.selection.defloat();
             if (! this.has_moved) {
                 // Plain click clears selection
                 this.pending_selection.discard();
@@ -740,10 +753,11 @@ class SelectOperation extends MouseOperation {
                 this.pending_selection.commit();
             }
         }
+        this.editor.commit_undo();
     }
     abort() {
         if (this.mode === 'float') {
-            // Nothing to do really
+            // FIXME revert the move?
         }
         else {
             this.pending_selection.discard();
@@ -754,7 +768,7 @@ class SelectOperation extends MouseOperation {
 class ForceFloorOperation extends DrawOperation {
     start() {
         // Begin by placing an all-way force floor under the mouse
-        this.editor.place_in_cell(this.gx0, this.gy0, {type: TILE_TYPES.force_floor_all});
+        this.editor.place_in_cell(this.cell(this.gx0, this.gy0), {type: TILE_TYPES.force_floor_all});
     }
     step(mx, my, gxf, gyf) {
         // Walk the mouse movement and change each we touch to match the direction we
@@ -795,7 +809,7 @@ class ForceFloorOperation extends DrawOperation {
             if (i === 2) {
                 let prevcell = this.editor.cell(prevx, prevy);
                 if (prevcell[LAYERS.terrain].type.name.startsWith('force_floor_')) {
-                    this.editor.place_in_cell(prevcell.x, prevcell.y, {type: TILE_TYPES[name]});
+                    this.editor.place_in_cell(prevcell, {type: TILE_TYPES[name]});
                 }
             }
 
@@ -807,11 +821,14 @@ class ForceFloorOperation extends DrawOperation {
             {
                 name = 'ice';
             }
-            this.editor.place_in_cell(x, y, {type: TILE_TYPES[name]});
+            this.editor.place_in_cell(cell, {type: TILE_TYPES[name]});
 
             prevx = x;
             prevy = y;
         }
+    }
+    cleanup() {
+        this.editor.commit_undo();
     }
 }
 
@@ -878,29 +895,33 @@ class TrackOperation extends DrawOperation {
             let cell = this.cell(prevx, prevy);
             let terrain = cell[0];
             if (terrain.type.name === 'railroad') {
+                let new_terrain = {...terrain};
                 if (this.alt_mode) {
                     // Erase
                     // TODO fix track switch?
                     // TODO if this leaves tracks === 0, replace with floor?
-                    terrain.tracks &= ~bit;
+                    new_terrain.tracks &= ~bit;
                 }
                 else {
                     // Draw
-                    terrain.tracks |= bit;
+                    new_terrain.tracks |= bit;
                 }
-                this.editor.mark_cell_dirty(cell);
+                this.editor.place_in_cell(cell, new_terrain);
             }
             else if (! this.alt_mode) {
                 terrain = { type: TILE_TYPES['railroad'] };
                 terrain.type.populate_defaults(terrain);
                 terrain.tracks |= bit;
-                this.editor.place_in_cell(prevx, prevy, terrain);
+                this.editor.place_in_cell(cell, terrain);
             }
 
             prevx = x;
             prevy = y;
             this.entry_direction = DIRECTIONS[exit_direction].opposite;
         }
+    }
+    cleanup() {
+        this.editor.commit_undo();
     }
 }
 
@@ -936,15 +957,16 @@ class WireOperation extends DrawOperation {
 
             let terrain = cell[LAYERS.terrain];
             if (terrain.type.name === 'floor') {
+                terrain = {...terrain};
                 if (this.alt_mode) {
                     terrain.wire_tunnel_directions &= ~bit;
                 }
                 else {
                     terrain.wire_tunnel_directions |= bit;
                 }
-                this.editor.mark_cell_dirty(cell);
+                this.editor.place_in_cell(cell, terrain);
+                this.editor.commit_undo();
             }
-            return;
         }
     }
     step(mx, my, gxf, gyf) {
@@ -1053,6 +1075,7 @@ class WireOperation extends DrawOperation {
                 if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block'].indexOf(tile.type.name) < 0)
                     continue;
 
+                tile = {...tile};
                 tile.wire_directions = tile.wire_directions ?? 0;
                 if (this.alt_mode) {
                     // Erase
@@ -1062,13 +1085,16 @@ class WireOperation extends DrawOperation {
                     // Draw
                     tile.wire_directions |= DIRECTIONS[wire_direction].bit;
                 }
-                this.editor.mark_cell_dirty(cell);
+                this.editor.place_in_cell(cell, tile);
                 break;
             }
 
             prevqx = qx;
             prevqy = qy;
         }
+    }
+    cleanup() {
+        this.editor.commit_undo();
     }
 }
 
@@ -1098,6 +1124,7 @@ const ADJUST_TOGGLES_CCW = {};
         ['no_player1_sign', 'no_player2_sign'],
         ['flame_jet_off', 'flame_jet_on'],
         ['light_switch_off', 'light_switch_on'],
+        ['stopwatch_bonus', 'stopwatch_penalty'],
     ])
     {
         for (let [i, tile] of cycle.entries()) {
@@ -1127,6 +1154,7 @@ class AdjustOperation extends MouseOperation {
                 continue;
 
             let rotated;
+            tile = {...tile}; // TODO little inefficient
             if (this.alt_mode) {
                 // Reverse, go counterclockwise
                 rotated = this.editor.rotate_tile_left(tile);
@@ -1135,7 +1163,8 @@ class AdjustOperation extends MouseOperation {
                 rotated = this.editor.rotate_tile_right(tile);
             }
             if (rotated) {
-                this.editor.mark_cell_dirty(cell);
+                this.editor.place_in_cell(cell, tile);
+                this.editor.commit_undo();
                 break;
             }
 
@@ -1143,7 +1172,8 @@ class AdjustOperation extends MouseOperation {
             let other = (this.alt_mode ? ADJUST_TOGGLES_CCW : ADJUST_TOGGLES_CW)[tile.type.name];
             if (other) {
                 tile.type = TILE_TYPES[other];
-                this.editor.mark_cell_dirty(cell);
+                this.editor.place_in_cell(cell, tile);
+                this.editor.commit_undo();
                 break;
             }
         }
@@ -1154,6 +1184,8 @@ class AdjustOperation extends MouseOperation {
 }
 
 // FIXME currently allows creating outside the map bounds and moving beyond the right/bottom, sigh
+// FIXME undo
+// TODO view is not especially visible
 class CameraOperation extends MouseOperation {
     start(ev) {
         this.offset_x = 0;
@@ -2464,12 +2496,26 @@ class Selection {
     }
 
     create_pending() {
-        this.defloat();
-
         return new PendingSelection(this);
     }
 
     set_from_rect(rect) {
+        let old_rect = this.rect;
+        this.editor._do(
+            () => this._set_from_rect(rect),
+            () => {
+                if (old_rect) {
+                    this._set_from_rect(old_rect);
+                }
+                else {
+                    this._clear();
+                }
+            },
+            false,
+        );
+    }
+
+    _set_from_rect(rect) {
         this.rect = rect;
         this.element.classList.add('--visible');
         this.element.setAttribute('x', this.rect.x);
@@ -2495,28 +2541,42 @@ class Selection {
     }
 
     clear() {
-        this.defloat();
+        let rect = this.rect;
+        if (! rect)
+            return;
 
+        this.editor._do(
+            () => this._clear(),
+            () => this._set_from_rect(rect),
+            false,
+        );
+    }
+
+    _clear() {
         this.rect = null;
         this.element.classList.remove('--visible');
     }
 
-    *iter_cells() {
+    *iter_coords() {
         if (! this.rect)
             return;
 
+        let stored_level = this.editor.stored_level;
         for (let x = this.rect.left; x < this.rect.right; x++) {
             for (let y = this.rect.top; y < this.rect.bottom; y++) {
-                yield [x, y];
+                let n = stored_level.coords_to_scalar(x, y);
+                yield [x, y, n];
             }
         }
     }
 
+    // Convert this selection into a floating selection, plucking all the selected cells from the
+    // level and replacing them with blank cells.
     enfloat(copy = false) {
         if (this.floated_cells)
             console.error("Trying to float a selection that's already floating");
 
-        this.floated_cells = [];
+        let floated_cells = [];
         let tileset = this.editor.renderer.tileset;
         let stored_level = this.editor.stored_level;
         let bbox = this.rect;
@@ -2526,24 +2586,33 @@ class Selection {
             this.editor.renderer.canvas,
             bbox.x * tileset.size_x, bbox.y * tileset.size_y, bbox.width * tileset.size_x, bbox.height * tileset.size_y,
             0, 0, bbox.width * tileset.size_x, bbox.height * tileset.size_y);
-        for (let [x, y] of this.iter_cells()) {
-            let n = stored_level.coords_to_scalar(x, y);
+        for (let [x, y, n] of this.iter_coords()) {
+            let cell = stored_level.linear_cells[n];
             if (copy) {
-                this.floated_cells.push(stored_level.linear_cells[n].map(tile => tile ? {...tile} : null));
+                floated_cells.push(cell.map(tile => tile ? {...tile} : null));
             }
             else {
-                this.floated_cells.push(stored_level.linear_cells[n]);
-                stored_level.linear_cells[n] = this.editor._make_cell(x, y);
-                this.editor.mark_cell_dirty(stored_level.linear_cells[n]);
+                floated_cells.push(cell);
+                this.editor.replace_cell(cell, this.editor.make_blank_cell(x, y));
             }
         }
-        this.floated_element = mk_svg('g', mk_svg('foreignObject', {
+        let floated_element = mk_svg('g', mk_svg('foreignObject', {
             x: 0, y: 0,
             width: canvas.width, height: canvas.height,
             transform: `scale(${1/tileset.size_x} ${1/tileset.size_y})`,
         }, canvas));
-        this.floated_element.setAttribute('transform', `translate(${bbox.x} ${bbox.y})`);
-        this.svg_group.append(this.floated_element);
+        floated_element.setAttribute('transform', `translate(${bbox.x} ${bbox.y})`);
+
+        // FIXME far more memory efficient to recreate the canvas in the redo, rather than hold onto
+        // it forever
+        this.editor._do(
+            () => {
+                this.floated_element = floated_element;
+                this.floated_cells = floated_cells;
+                this.svg_group.append(floated_element);
+            },
+            () => this._defloat(),
+        );
     }
 
     stamp_float(copy = false) {
@@ -2553,16 +2622,14 @@ class Selection {
         let bbox = this.rect;
         let stored_level = this.editor.stored_level;
         let i = 0;
-        for (let [x, y] of this.iter_cells()) {
-            let n = stored_level.coords_to_scalar(x, y);
+        for (let [x, y, n] of this.iter_coords()) {
             let cell = this.floated_cells[i];
             if (copy) {
                 cell = cell.map(tile => tile ? {...tile} : null);
             }
             cell.x = x;
             cell.y = y;
-            stored_level.linear_cells[n] = cell;
-            this.editor.mark_cell_dirty(cell);
+            this.editor.replace_cell(stored_level.linear_cells[n], cell);
             i += 1;
         }
     }
@@ -2572,6 +2639,21 @@ class Selection {
             return;
 
         this.stamp_float();
+
+        let element = this.floated_element;
+        let cells = this.floated_cells;
+        this.editor._do(
+            () => this._defloat(),
+            () => {
+                this.floated_cells = cells;
+                this.floated_element = element;
+                this.svg_group.append(element);
+            },
+            false,
+        );
+    }
+
+    _defloat() {
         this.floated_element.remove();
         this.floated_element = null;
         this.floated_cells = null;
@@ -2801,6 +2883,12 @@ export class Editor extends PrimaryView {
             button_container.append(button);
             return button;
         };
+        this.undo_button = _make_button("Undo", ev => {
+            this.undo();
+        });
+        this.redo_button = _make_button("Redo", ev => {
+            this.redo();
+        });
         _make_button("Pack properties...", ev => {
             new EditorPackMetaOverlay(this.conductor, this.conductor.stored_game).open();
         });
@@ -2965,6 +3053,8 @@ export class Editor extends PrimaryView {
         this.select_palette('floor', true);
 
         this.selection = new Selection(this);
+
+        this.reset_undo();
     }
 
     activate() {
@@ -2981,9 +3071,10 @@ export class Editor extends PrimaryView {
         super.deactivate();
     }
 
+    // ------------------------------------------------------------------------------------------------
     // Level creation, management, and saving
 
-    _make_cell(x, y) {
+    make_blank_cell(x, y) {
         let cell = new format_base.StoredCell;
         cell.x = x;
         cell.y = y;
@@ -2998,7 +3089,7 @@ export class Editor extends PrimaryView {
         stored_level.size_y = size_y;
         stored_level.viewport_size = 10;
         for (let i = 0; i < size_x * size_y; i++) {
-            stored_level.linear_cells.push(this._make_cell(...stored_level.scalar_to_coords(i)));
+            stored_level.linear_cells.push(this.make_blank_cell(...stored_level.scalar_to_coords(i)));
         }
         stored_level.linear_cells[0][LAYERS.actor] = {type: TILE_TYPES['player'], direction: 'south'};
         return stored_level;
@@ -3240,6 +3331,8 @@ export class Editor extends PrimaryView {
         {
             this.conductor.level_index += delta;
             // Update the current level if it's not stored in the metadata yet
+            // FIXME if you delete the level before the current one, this gets decremented twice?
+            // can't seem to reproduce
             if (! stored_level) {
                 this.conductor.stored_level.index += delta;
                 this.conductor.stored_level.number += delta;
@@ -3293,6 +3386,7 @@ export class Editor extends PrimaryView {
         }
     }
 
+    // ------------------------------------------------------------------------------------------------
     // Level loading
 
     load_game(stored_game) {
@@ -3314,6 +3408,7 @@ export class Editor extends PrimaryView {
         }
 
         // Load connections
+        // TODO cloners too
         this.connections_g.textContent = '';
         for (let [src, dest] of Object.entries(this.stored_level.custom_trap_wiring)) {
             let [sx, sy] = this.stored_level.scalar_to_coords(src);
@@ -3337,6 +3432,11 @@ export class Editor extends PrimaryView {
         if (this.save_button) {
             this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
         }
+
+        if (this._done_setup) {
+            // XXX this doesn't work yet if setup hasn't run because the undo button won't exist
+            this.reset_undo();
+        }
     }
 
     update_cell_coordinates() {
@@ -3350,6 +3450,8 @@ export class Editor extends PrimaryView {
         this.renderer.set_viewport_size(this.stored_level.size_x, this.stored_level.size_y);
         this.svg_overlay.setAttribute('viewBox', `0 0 ${this.stored_level.size_x} ${this.stored_level.size_y}`);
     }
+
+    // ------------------------------------------------------------------------------------------------
 
     open_level_browser() {
         if (! this._level_browser) {
@@ -3478,7 +3580,8 @@ export class Editor extends PrimaryView {
         this.palette_actor_direction = DIRECTIONS[this.palette_actor_direction].left;
     }
 
-    // -- Drawing --
+    // ------------------------------------------------------------------------------------------------
+    // Drawing
 
     redraw_palette_selection() {
         // FIXME should redraw in an existing canvas
@@ -3488,24 +3591,28 @@ export class Editor extends PrimaryView {
     }
 
     mark_cell_dirty(cell) {
+        this.mark_point_dirty(cell.x, cell.y);
+    }
+
+    mark_point_dirty(x, y) {
         if (! this._dirty_rect) {
-            this._dirty_rect = new DOMRect(cell.x, cell.y, 1, 1);
+            this._dirty_rect = new DOMRect(x, y, 1, 1);
         }
         else {
             let rect = this._dirty_rect;
-            if (cell.x < rect.left) {
-                rect.width = rect.right - cell.x;
-                rect.x = cell.x;
+            if (x < rect.left) {
+                rect.width = rect.right - x;
+                rect.x = x;
             }
-            else if (cell.x >= rect.right) {
-                rect.width = cell.x - rect.left + 1;
+            else if (x >= rect.right) {
+                rect.width = x - rect.left + 1;
             }
-            if (cell.y < rect.top) {
-                rect.height = rect.bottom - cell.y;
-                rect.y = cell.y;
+            if (y < rect.top) {
+                rect.height = rect.bottom - y;
+                rect.y = y;
             }
-            else if (cell.y >= rect.bottom) {
-                rect.height = cell.y - rect.top + 1;
+            else if (y >= rect.bottom) {
+                rect.height = y - rect.top + 1;
             }
         }
     }
@@ -3530,7 +3637,8 @@ export class Editor extends PrimaryView {
         this._schedule_redraw_loop();
     }
 
-    // -- Utility/inspection --
+    // ------------------------------------------------------------------------------------------------
+    // Utility/inspection
 
     is_in_bounds(x, y) {
         return 0 <= x && x < this.stored_level.size_x && 0 <= y && y < this.stored_level.size_y;
@@ -3545,39 +3653,39 @@ export class Editor extends PrimaryView {
         }
     }
 
-    // -- Mutation --
+    // ------------------------------------------------------------------------------------------------
+    // Mutation
 
-    place_in_cell(x, y, tile) {
+    // DOES NOT commit the undo entry!
+    place_in_cell(cell, tile) {
         // TODO weird api?
         if (! tile)
             return;
 
-        if (! this.selection.contains(x, y))
+        if (! this.selection.contains(cell.x, cell.y))
             return;
 
-        let cell = this.cell(x, y);
-        this.mark_cell_dirty(cell);
         // Replace whatever's on the same layer
         // TODO should preserve wiring if possible too
-        let existing_tile = cell[tile.type.layer];
-        if (existing_tile) {
-            // If we find a tile of the same type as the one being drawn, see if it has custom
-            // combine behavior (only the case if it came from the palette)
-            if (existing_tile.type === tile.type &&
-                // FIXME this is hacky garbage
-                tile === this.palette_selection && this.palette_selection_from_palette &&
-                SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
-                SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw)
-            {
-                SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw(tile, existing_tile);
-                return;
-            }
+        let layer = tile.type.layer;
+        let existing_tile = cell[layer];
 
-            // Otherwise erase it
-            cell[tile.type.layer] = null;
+        // If we find a tile of the same type as the one being drawn, see if it has custom combine
+        // behavior (only the case if it came from the palette)
+        if (existing_tile && existing_tile.type === tile.type &&
+            // FIXME this is hacky garbage
+            tile === this.palette_selection && this.palette_selection_from_palette &&
+            SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
+            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw)
+        {
+            let old_tile = {...existing_tile};
+            let new_tile = existing_tile;
+            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw(tile, new_tile);
+            this._assign_tile(cell, layer, new_tile, old_tile);
+            return;
         }
 
-        cell[tile.type.layer] = {...tile};
+        this._assign_tile(cell, layer, {...tile}, existing_tile);
     }
 
     erase_tile(cell, tile = null) {
@@ -3589,31 +3697,168 @@ export class Editor extends PrimaryView {
 
         this.mark_cell_dirty(cell);
         let existing_tile = cell[tile.type.layer];
-        if (existing_tile) {
-            // If we find a tile of the same type as the one being drawn, see if it has custom
-            // combine behavior (only the case if it came from the palette)
-            if (existing_tile.type === tile.type &&
-                // FIXME this is hacky garbage
-                tile === this.palette_selection && this.palette_selection_from_palette &&
-                SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
-                SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase)
-            {
-                let remove = SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase(tile, existing_tile);
-                if (! remove)
-                    return;
-            }
 
-            // Otherwise erase it
-            cell[tile.type.layer] = null;
+        // If we find a tile of the same type as the one being drawn, see if it has custom combine
+        // behavior (only the case if it came from the palette)
+        if (existing_tile && existing_tile.type === tile.type &&
+            // FIXME this is hacky garbage
+            tile === this.palette_selection && this.palette_selection_from_palette &&
+            SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
+            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase)
+        {
+            let remove = SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase(tile, existing_tile);
+            if (! remove)
+                return;
         }
 
-        // Don't allow erasing the floor entirely
+        let new_tile = null;
         if (tile.type.layer === LAYERS.terrain) {
-            cell[LAYERS.terrain] = {type: TILE_TYPES.floor};
+            new_tile = {type: TILE_TYPES.floor};
+        }
+
+        this._assign_tile(cell, tile.type.layer, new_tile, existing_tile);
+    }
+
+    replace_cell(cell, new_cell) {
+        // Save the coordinates so it doesn't matter what they are when undoing
+        let x = cell.x, y = cell.y;
+        let n = this.stored_level.coords_to_scalar(x, y);
+        this._do(
+            () => {
+                this.stored_level.linear_cells[n] = new_cell;
+                new_cell.x = x;
+                new_cell.y = y;
+                this.mark_cell_dirty(new_cell);
+            },
+            () => {
+                this.stored_level.linear_cells[n] = cell;
+                cell.x = x;
+                cell.y = y;
+                this.mark_cell_dirty(cell);
+            },
+        );
+    }
+
+    resize_level(size_x, size_y, x0 = 0, y0 = 0) {
+        let new_cells = [];
+        for (let y = y0; y < y0 + size_y; y++) {
+            for (let x = x0; x < x0 + size_x; x++) {
+                new_cells.push(this.cell(x, y) ?? this.make_blank_cell(x, y));
+            }
+        }
+
+        let original_cells = this.stored_level.linear_cells;
+        let original_size_x = this.stored_level.size_x;
+        let original_size_y = this.stored_level.size_y;
+
+        this._do(() => {
+            this.stored_level.linear_cells = new_cells;
+            this.stored_level.size_x = size_x;
+            this.stored_level.size_y = size_y;
+            this.update_viewport_size();
+            this.update_cell_coordinates();
+            this.redraw_entire_level();
+        }, () => {
+            this.stored_level.linear_cells = original_cells;
+            this.stored_level.size_x = original_size_x;
+            this.stored_level.size_y = original_size_y;
+            this.update_viewport_size();
+            this.update_cell_coordinates();
+            this.redraw_entire_level();
+        });
+        this.commit_undo();
+    }
+
+    // ------------------------------------------------------------------------------------------------
+    // Undo/redo
+
+    _do(redo, undo, modifies = true) {
+        redo();
+        this._done(redo, undo, modifies);
+    }
+
+    _done(redo, undo, modifies = true) {
+        // TODO parallel arrays would be smaller
+        this.undo_entry.push([undo, redo]);
+
+        if (this.redo_stack.length > 0) {
+            this.redo_stack.length = 0;
         }
     }
 
-    // -- Misc?? --
+    _assign_tile(cell, layer, new_tile, old_tile) {
+        this._do(
+            () => {
+                cell[layer] = new_tile;
+                this.mark_cell_dirty(cell);
+            },
+            () => {
+                cell[layer] = old_tile;
+                this.mark_cell_dirty(cell);
+            },
+        );
+    }
+
+    reset_undo() {
+        this.undo_entry = [];
+        this.undo_stack = [];
+        this.redo_stack = [];
+        this._update_undo_redo_enabled();
+    }
+
+    undo() {
+        // We shouldn't really have an uncommitted entry lying around at a time when the user can
+        // click the undo button, but just in case, prefer that to the undo stack
+        let entry;
+        if (this.undo_entry.length > 0) {
+            entry = this.undo_entry;
+            this.undo_entry = [];
+        }
+        else if (this.undo_stack.length > 0) {
+            entry = this.undo_stack.pop();
+            this.redo_stack.push(entry);
+        }
+        else {
+            return;
+        }
+
+        for (let i = entry.length - 1; i >= 0; i--) {
+            entry[i][0]();
+        }
+
+        this._update_undo_redo_enabled();
+    }
+
+    redo() {
+        if (this.redo_stack.length === 0)
+            return;
+
+        this.commit_undo();
+        let entry = this.redo_stack.pop();
+        this.undo_stack.push(entry);
+        for (let [undo, redo] of entry) {
+            redo();
+        }
+
+        this._update_undo_redo_enabled();
+    }
+
+    commit_undo() {
+        if (this.undo_entry.length > 0) {
+            this.undo_stack.push(this.undo_entry);
+            this.undo_entry = [];
+        }
+
+        this._update_undo_redo_enabled();
+    }
+
+    _update_undo_redo_enabled() {
+        this.undo_button.disabled = this.undo_stack.length === 0;
+        this.redo_button.disabled = this.redo_stack.length === 0;
+    }
+
+    // ------------------------------------------------------------------------------------------------
+    // Misc UI stuff
 
     open_tile_prop_overlay(tile, cell, rect) {
         this.cancel_mouse_operation();
@@ -3657,21 +3902,5 @@ export class Editor extends PrimaryView {
             this.mouse_op.do_abort();
             this.mouse_op = null;
         }
-    }
-
-    resize_level(size_x, size_y, x0 = 0, y0 = 0) {
-        let new_cells = [];
-        for (let y = y0; y < y0 + size_y; y++) {
-            for (let x = x0; x < x0 + size_x; x++) {
-                new_cells.push(this.cell(x, y) ?? this._make_cell(x, y));
-            }
-        }
-
-        this.stored_level.linear_cells = new_cells;
-        this.stored_level.size_x = size_x;
-        this.stored_level.size_y = size_y;
-        this.update_viewport_size();
-        this.update_cell_coordinates();
-        this.redraw_entire_level();
     }
 }

@@ -13,17 +13,39 @@ class TileEditorOverlay extends TransientOverlay {
     edit_tile(tile, cell) {
         this.tile = tile;
         this.cell = cell;
+
+        this.needs_undo_entry = false;
     }
 
+    // Please call this BEFORE actually modifying the tile; it's important for undo!
     mark_dirty() {
         if (this.cell) {
+            if (! this.needs_undo_entry) {
+                // We are ABOUT to mutate this tile for the first time; swap it out with a clone in
+                // preparation for making an undo entry when this overlay closes
+                this.pristine_tile = this.tile;
+                this.tile = {...this.tile};
+                this.cell[this.tile.type.layer] = this.tile;
+                this.needs_undo_entry = true;
+            }
             this.editor.mark_cell_dirty(this.cell);
         }
         else {
             // TODO i guess i'm just kind of assuming it's the palette selection, but it doesn't
             // necessarily have to be, if i...  do something later
-            this.editor.redraw_palette_selection();
+            // The change hasn't happened yet!  Don't redraw until we return to the event loop
+            setTimeout(() => this.editor.redraw_palette_selection(), 0);
         }
+    }
+
+    close() {
+        if (this.needs_undo_entry) {
+            // This will be a no-op the first time since the tile was already swapped, but it's
+            // important for redo
+            this.editor._assign_tile(this.cell, this.tile.type.layer, this.tile, this.pristine_tile);
+            this.editor.commit_undo();
+        }
+        super.close();
     }
 
     static configure_tile_defaults(tile) {
@@ -57,8 +79,8 @@ class LetterTileEditor extends TileEditorOverlay {
 
         list.addEventListener('change', ev => {
             if (this.tile) {
-                this.tile.overlaid_glyph = this.root.elements['glyph'].value;
                 this.mark_dirty();
+                this.tile.overlaid_glyph = this.root.elements['glyph'].value;
             }
         });
     }
@@ -150,13 +172,13 @@ class FrameBlockTileEditor extends TileEditorOverlay {
             if (! this.tile)
                 return;
 
+            this.mark_dirty();
             if (ev.target.checked) {
                 this.tile.arrows.add(ev.target.value);
             }
             else {
                 this.tile.arrows.delete(ev.target.value);
             }
-            this.mark_dirty();
         });
         this.root.append(arrow_list);
     }
@@ -201,15 +223,16 @@ class RailroadTileEditor extends TileEditorOverlay {
             track_list.append(mk('li', mk('label', input, svg_icons[i])));
         }
         track_list.addEventListener('change', ev => {
-            if (this.tile) {
-                let bit = 1 << ev.target.value;
-                if (ev.target.checked) {
-                    this.tile.tracks |= bit;
-                }
-                else {
-                    this.tile.tracks &= ~bit;
-                }
-                this.mark_dirty();
+            if (! this.tile)
+                return;
+
+            this.mark_dirty();
+            let bit = 1 << ev.target.value;
+            if (ev.target.checked) {
+                this.tile.tracks |= bit;
+            }
+            else {
+                this.tile.tracks &= ~bit;
             }
         });
         this.root.append(track_list);
@@ -224,8 +247,8 @@ class RailroadTileEditor extends TileEditorOverlay {
         // TODO if they pick a track that's missing it should add it
         switch_list.addEventListener('change', ev => {
             if (this.tile) {
-                this.tile.track_switch = parseInt(ev.target.value, 10);
                 this.mark_dirty();
+                this.tile.track_switch = parseInt(ev.target.value, 10);
             }
         });
         this.root.append(switch_list);
@@ -260,6 +283,6 @@ export const TILES_WITH_PROPS = {
     railroad: RailroadTileEditor,
     // TODO various wireable tiles (hmm not sure how that ui works)
     // TODO initial value of counter
-    // TODO cloner arrows
+    // TODO cloner arrows (should this be automatic unless you set them explicitly?)
     // TODO later, custom floor/wall selection
 };
