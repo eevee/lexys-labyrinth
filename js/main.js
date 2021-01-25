@@ -2938,6 +2938,10 @@ const COMPAT_FLAGS = [{
     label: "Don't immediately detonate populated mines",
     rulesets: new Set(['lynx', 'ms']),
 }, {
+    key: 'detonate_bombs_under_players',
+    label: "Detonate mines populated by players",
+    rulesets: new Set(['steam', 'steam-strict']),
+}, {
     key: 'tanks_teeth_push_ice_blocks',
     label: "Blue tanks and teeth can push ice blocks",
     rulesets: new Set(['ms']),

@@ -878,6 +878,8 @@ const TILE_TYPES = {
             // In CC2, actors on a bomb (but not a green one) are immediately blown up
             let actor = me.cell.get_actor();
             if (actor && ! actor.ignores(this.name)) {
+                if (actor.type.is_real_player && ! level.compat.detonate_bombs_under_players)
+                    return;
                 this.on_arrive(me, level, actor);
             }
         },
