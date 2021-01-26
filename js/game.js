@@ -1221,14 +1221,6 @@ export class Level extends LevelInterface {
             this._set_tile_prop(actor, 'is_blocked', false);
         }
 
-        // If the game has already been won (or lost), don't bother with a move; it'll misalign the
-        // player from their actual position and not accomplish anything gameplay-wise.
-        // (Note this is only necessary because our update order is inverted from CC2, and because
-        // we don't erase the last player when they exit.)
-        // TODO might not be good enough if something else tries to step on us later this tic!
-        if (this.state !== 'playing' || this.remaining_players <= 0)
-            return null;
-
         // TODO player in a cloner can't move (but player in a trap can still turn)
 
         let try_direction = (direction, push_mode) => {
