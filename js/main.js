@@ -316,8 +316,6 @@ class SFXPlayer {
         for (let [name, path] of Object.entries(this.sound_sources)) {
             this.init_sound(name, path);
         }
-
-        this.mmf_cooldown = 0;
     }
 
     async init_sound(name, path) {
@@ -347,17 +345,6 @@ class SFXPlayer {
             return;
         }
 
-        // "Mmf" can technically play every tic since bumping into something doesn't give a movement
-        // cooldown, so give it our own sound cooldown
-        if (name === 'blocked' && this.player_x !== null) {
-            if (this.mmf_cooldown > 0) {
-                return;
-            }
-            else {
-                this.mmf_cooldown = 8;
-            }
-        }
-
         let node = this.ctx.createBufferSource();
         node.buffer = data.audiobuf;
 
@@ -379,13 +366,6 @@ class SFXPlayer {
         node.connect(gain);
         gain.connect(this.compressor_node);
         node.start(this.ctx.currentTime);
-    }
-
-    // Reduce cooldowns
-    advance_tic() {
-        if (this.mmf_cooldown > 0) {
-            this.mmf_cooldown -= 1;
-        }
     }
 }
 class Player extends PrimaryView {
@@ -1370,8 +1350,6 @@ class Player extends PrimaryView {
             if (this.debug && this.debug.replay && this.debug.replay_recording) {
                 this.debug.replay.set(this.level.tic_counter, input);
             }
-
-            this.sfx_player.advance_tic();
 
             // Turn-based mode is considered assistance, but only if the game actually attempts to
             // progress while it's enabled

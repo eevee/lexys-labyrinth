@@ -1064,7 +1064,12 @@ export class Level extends LevelInterface {
 
         // Track whether the player is blocked, both for visual effect and for doppelgangers
         if (actor === this.player && ! success) {
-            this.sfx.play_once('blocked');
+            if (actor.last_blocked_direction !== actor.direction) {
+                // This is only used for checking when to play the mmf sound, doesn't need undoing;
+                // it's cleared when we make a successful move or a null decision
+                actor.last_blocked_direction = actor.direction;
+                this.sfx.play_once('blocked');
+            }
             this._set_tile_prop(actor, 'is_blocked', true);
         }
 
@@ -1357,6 +1362,10 @@ export class Level extends LevelInterface {
             }
         }
 
+        if (actor.decision === null) {
+            actor.last_blocked_direction = null;
+        }
+
         // Remember our decision so doppelgängers can copy it
         this.remember_player_move(actor.decision);
     }
@@ -1530,6 +1539,10 @@ export class Level extends LevelInterface {
                     this.attempt_out_of_turn_step(behind_actor, direction);
                 }
             }
+        }
+
+        if (actor === this.player) {
+            actor.last_blocked_direction = null;
         }
 
         return true;
