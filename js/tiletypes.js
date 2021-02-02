@@ -2120,7 +2120,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all_but_real_player,
         has_inventory: true,
         ignores: new Set([
-            'bomb',
+            'bomb', 'green_bomb',
             'water',
             'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
             'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
