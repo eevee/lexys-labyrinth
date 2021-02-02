@@ -99,6 +99,8 @@ export class Tile {
 
         if (this.toolbelt) {
             for (let item of this.toolbelt) {
+                if (! item)
+                    continue;
                 let item_type = TILE_TYPES[item];
                 if (item_type.item_ignores && item_type.item_ignores.has(name))
                     return true;
@@ -383,6 +385,8 @@ export class Cell extends Array {
 // sitting completely idle, undo consumes about 2 MB every five seconds, so this shouldn't go beyond
 // 12 MB for any remotely reasonable level.
 const UNDO_BUFFER_SIZE = TICS_PER_SECOND * 30;
+// The CC1 inventory has a fixed boot order
+const CC1_INVENTORY_ORDER = ['cleats', 'suction_boots', 'fire_boots', 'flippers'];
 export class Level extends LevelInterface {
     constructor(stored_level, compat = {}) {
         super();
@@ -2427,7 +2431,9 @@ export class Level extends LevelInterface {
         // Thus we have to check whether dropping is possible FIRST, but only place the dropped item
         // AFTER the pickup.
         let dropped_item;
-        if (! tile.type.is_key && actor.toolbelt && actor.toolbelt.length >= 4) {
+        if (! tile.type.is_key && ! this.stored_level.use_cc1_boots &&
+            actor.toolbelt && actor.toolbelt.length >= 4)
+        {
             let oldest_item_type = TILE_TYPES[actor.toolbelt[0]];
             if (oldest_item_type.layer === LAYERS.terrain && cell.get_terrain().type.name !== 'floor') {
                 // This is a yellow teleporter, and we are not standing on floor; abort!
@@ -2465,7 +2471,6 @@ export class Level extends LevelInterface {
 
     // Give an item to an actor, even if it's not supposed to have an inventory
     give_actor(actor, name) {
-        // TODO support use_cc1_boots here -- silently consume dupes, only do cc1 items
         if (! actor.type.is_actor)
             return false;
 
@@ -2483,16 +2488,31 @@ export class Level extends LevelInterface {
                 actor.toolbelt = [];
             }
 
-            // Nothing can hold more than four items, so try to drop one first.  Note that normally,
-            // this should already have happened in attempt_take, so this should only come up when
-            // forcibly given an item via debug tools
-            if (actor.toolbelt.length >= 4) {
-                if (! this.drop_item(actor))
+            if (this.stored_level.use_cc1_boots) {
+                // CC1's boot inventory is different; it has fixed slots, and duplicate items are
+                // silently ignored.  CC2 items cannot be picked up.
+                let i = CC1_INVENTORY_ORDER.indexOf(name);
+                if (i < 0)
                     return false;
-            }
 
-            actor.toolbelt.push(name);
-            this._push_pending_undo(() => actor.toolbelt.pop());
+                if (! actor.toolbelt[i]) {
+                    this._push_pending_undo(() => actor.toolbelt[i] = null);
+                }
+                actor.toolbelt[i] = name;
+            }
+            else {
+                // "Normal" (CC2) inventory mode.
+                // Nothing can hold more than four items, so try to drop one first.  Note that
+                // normally, this should already have happened in attempt_take, so this should only
+                // come up when forcibly given an item via debug tools
+                if (actor.toolbelt.length >= 4) {
+                    if (! this.drop_item(actor))
+                        return false;
+                }
+
+                actor.toolbelt.push(name);
+                this._push_pending_undo(() => actor.toolbelt.pop());
+            }
 
             // FIXME hardcodey, but, this doesn't seem to fit anywhere else
             if (name === 'cleats' && actor.slide_mode === 'ice') {
@@ -2520,6 +2540,7 @@ export class Level extends LevelInterface {
         return false;
     }
 
+    // Note that this doesn't support CC1 mode, but only CC2 and LL tools are individually taken
     take_tool_from_actor(actor, name) {
         if (actor.toolbelt) {
             let index = actor.toolbelt.indexOf(name);
