@@ -1598,6 +1598,8 @@ const EDITOR_PALETTE = [{
         'gate_yellow',
         'gate_green',
         'sand',
+        'terraformer_n',
+        'global_cycler',
     ],
 }];
 
@@ -2171,7 +2173,15 @@ const EDITOR_TILE_DESCRIPTIONS = {
     sand: {
         name: "Sand",
         desc: "Anything walking on it moves at half speed.  Stops all blocks.",
-    }
+    },
+    terraformer_n: {
+        name: "Terraformer",
+        desc: "When activated, copies the terrain and item behind it to the tile in front of it.",
+    },
+    global_cycler: {
+        name: "Global Cycler",
+        desc: "When activated, every terrain/item on the surrounding four tiles in the entire level becomes the terrain/item one clockwise.",
+    },
 };
 
 const SPECIAL_PALETTE_ENTRIES = {
@@ -2418,6 +2428,7 @@ for (let cycle of [
     ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
     ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
     ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
+    ['terraformer_n', 'terraformer_e', 'terraformer_s', 'terraformer_w'],
 ]) {
     for (let [i, name] of cycle.entries()) {
         let left = cycle[(i - 1 + cycle.length) % cycle.length];

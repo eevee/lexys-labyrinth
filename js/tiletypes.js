@@ -89,6 +89,67 @@ function _define_gate(key) {
     };
 }
 
+function activate_terraformer(me, level, dx, dy) {
+    let did_something = false;
+    let old_cell = level.cell(
+    (me.cell.x - dx + level.width) % level.width,
+    (me.cell.y - dy + level.height) % level.height);
+    let new_cell = level.cell(
+    (me.cell.x + dx + level.width) % level.width,
+    (me.cell.y + dy + level.height) % level.height);
+    let old_terrain = old_cell.get_terrain();
+    let new_terrain = new_cell.get_terrain();
+    if (old_terrain.type.name != new_terrain.type.name)
+    {
+        level.transmute_tile(new_cell.get_terrain(), old_terrain.type.name);
+        did_something = true;
+    }
+    let old_item = old_cell.get_item();
+    if (old_item != null)
+    {
+        let new_item = new_cell.get_item();
+        if (new_item != null)
+        {
+            if (old_item.type.name != new_item.type.name)
+            {
+                level.transmute_tile(new_item, old_item.type.name)
+                did_something = true;
+            }
+        }
+        else
+        {
+            let type = TILE_TYPES[old_item.type.name];
+            let tile = new old_item.constructor(type);
+            level.add_tile(tile, new_cell);
+            did_something = true;
+        }
+    }
+    let old_item_mod = old_cell.get_item_mod();
+    if (old_item_mod != null)
+    {
+        let new_item_mod = new_cell.get_item_mod();
+        if (new_item_mod != null)
+        {
+            if (old_item_mod.type.name != new_item_mod.type.name)
+            {
+                level.transmute_tile(new_item_mod, old_item_mod.type.name)
+                did_something = true;
+            }
+        }
+        else
+        {
+            let type = TILE_TYPES[old_item_mod.type.name];
+            let tile = new old_item_mod.constructor(type);
+            level.add_tile(tile, new_cell);
+            did_something = true;
+        }
+    }
+    if (did_something)
+    {
+        level.spawn_animation(new_cell, 'transmogrify_flash');
+    }
+}
+
 function player_visual_state(me) {
     if (! me) {
         return 'normal';
@@ -1509,6 +1570,62 @@ const TILE_TYPES = {
                     level.transmute_tile(actor, 'explosion');
                 }
             }
+        },
+    },
+    terraformer_n: {
+        layer: LAYERS.terrain,
+        blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
+        activate(me, level) {
+            activate_terraformer(me, level, 0, -1);
+        },
+        // Also terraforms on rising pulse or gray button
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
+        },
+    },
+    terraformer_e: {
+        layer: LAYERS.terrain,
+        blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
+        activate(me, level) {
+            activate_terraformer(me, level, 1, 0);
+        },
+        // Also terraforms on rising pulse or gray button
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
+        },
+    },
+    terraformer_s: {
+        layer: LAYERS.terrain,
+        blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
+        activate(me, level) {
+            activate_terraformer(me, level, 0, 1);
+        },
+        // Also terraforms on rising pulse or gray button
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
+        },
+    },
+    terraformer_w: {
+        layer: LAYERS.terrain,
+        blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
+        activate(me, level) {
+            activate_terraformer(me, level, -1, 0);
+        },
+        // Also terraforms on rising pulse or gray button
+        on_power(me, level) {
+            me.type.activate(me, level);
+        },
+        on_gray_button(me, level) {
+            me.type.activate(me, level);
         },
     },
     // Buttons
