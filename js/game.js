@@ -464,6 +464,9 @@ export class Level extends LevelInterface {
         let n = 0;
         let connectables = [];
         this.remaining_players = 0;
+        // If there's exactly one yellow teleporter when the level loads, it cannot be picked up
+        let yellow_teleporter_count = 0;
+        this.allow_taking_yellow_teleporters = false;
         // Speedup for flame jets, which aren't actors but do a thing every tic
         // TODO this won't notice if a new tile with an on_tic is created, but that's impossible
         // atm...  or, at least, it's hacked to still work with flame_jet_off
@@ -503,6 +506,13 @@ export class Level extends LevelInterface {
 
                     if (tile.type.connects_to) {
                         connectables.push(tile);
+                    }
+
+                    if (tile.type.name === 'teleport_yellow' && ! this.allow_taking_yellow_teleporters) {
+                        yellow_teleporter_count += 1;
+                        if (yellow_teleporter_count > 1) {
+                            this.allow_taking_yellow_teleporters = true;
+                        }
                     }
                 }
             }
@@ -1780,9 +1790,10 @@ export class Level extends LevelInterface {
         }
 
         if (! success) {
-            if (actor.type.has_inventory && teleporter.type.name === 'teleport_yellow') {
+            if (actor.type.has_inventory && teleporter.type.name === 'teleport_yellow' &&
+                this.allow_taking_yellow_teleporters)
+            {
                 // Super duper special yellow teleporter behavior: you pick it the fuck up
-                // FIXME not if there's only one in the level?
                 this.make_slide(actor, null);
                 this.attempt_take(actor, teleporter);
                 if (actor === this.player) {
