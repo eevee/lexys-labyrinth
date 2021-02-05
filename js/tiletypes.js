@@ -1633,7 +1633,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
         activate(me, level) {
             //learn about surrounding tiles
-			//some logic: we ignore tiles with a 'no sign' on them. for items, we ignore itemless tiles. if the same terrain/item is twice in a row, it stays the same.
+			//some logic: we ignore tiles with a 'no sign' on them. for items, we ignore itemless tiles. if the same terrain/item is twice in a row, it stays the same. tiles next to global cycles aren't touched.
 			let cells = [level.cell(
 			(me.cell.x + 0 + level.width) % level.width,
 			(me.cell.y - 1 + level.height) % level.height),
@@ -1659,7 +1659,19 @@ const TILE_TYPES = {
 				{
 					for (var j = 0; j < level.height; ++j)
 					{
-						if (Math.abs(me.cell.x - i) + Math.abs(me.cell.y - j) <= 1)
+						let target_safe = [level.cell(
+						(i + 0 + level.width) % level.width,
+						(j - 1 + level.height) % level.height),
+						level.cell(
+						(i + 1 + level.width) % level.width,
+						(j + 0 + level.height) % level.height),
+						level.cell(
+						(i + 0 + level.width) % level.width,
+						(j + 1 + level.height) % level.height),
+						level.cell(
+						(i- 1 + level.width) % level.width,
+						(j + 0 + level.height) % level.height)].filter(x => x.get_terrain().type.name == 'global_cycler');
+						if (target_safe.length > 0)
 						{
 							continue;
 						}
@@ -1685,7 +1697,19 @@ const TILE_TYPES = {
 				{
 					for (var j = 0; j < level.height; ++j)
 					{
-						if (Math.abs(me.cell.x - i) + Math.abs(me.cell.y - j) <= 1)
+						let target_safe = [level.cell(
+						(i + 0 + level.width) % level.width,
+						(j - 1 + level.height) % level.height),
+						level.cell(
+						(i + 1 + level.width) % level.width,
+						(j + 0 + level.height) % level.height),
+						level.cell(
+						(i + 0 + level.width) % level.width,
+						(j + 1 + level.height) % level.height),
+						level.cell(
+						(i- 1 + level.width) % level.width,
+						(j + 0 + level.height) % level.height)].filter(x => x.get_terrain().type.name == 'global_cycler');
+						if (target_safe.length > 0)
 						{
 							continue;
 						}
