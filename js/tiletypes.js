@@ -1659,6 +1659,10 @@ const TILE_TYPES = {
 				{
 					for (var j = 0; j < level.height; ++j)
 					{
+						if (Math.abs(me.cell.x - i) + Math.abs(me.cell.y - j) <= 1)
+						{
+							continue;
+						}
 						let thing = level.cell(i, j).get_terrain();
 						let things = terrains;
 						for (var k = 0; k < things.length; ++k)
@@ -1681,6 +1685,10 @@ const TILE_TYPES = {
 				{
 					for (var j = 0; j < level.height; ++j)
 					{
+						if (Math.abs(me.cell.x - i) + Math.abs(me.cell.y - j) <= 1)
+						{
+							continue;
+						}
 						let thing = level.cell(i, j).get_item();
 						let things = items;
 						if (thing == null)
