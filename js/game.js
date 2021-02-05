@@ -885,6 +885,8 @@ export class Level extends LevelInterface {
         this._swap_players();
 
         this._do_wire_phase();
+        this._do_wire_phase();
+        this._do_wire_phase();
         // TODO should this also happen three times?
         this._do_static_phase();
 
@@ -894,15 +896,14 @@ export class Level extends LevelInterface {
     // Lexy-style loop, similar to Lynx but with some things split out into separate phases
     _begin_tic_lexy() {
         // CC2 wiring runs every frame, not every tic, so we need to do it three times, but dealing
-        // with it is delicate.  We want the result of a button press to draw, but not last longer
-        // than intended, so we only want one update between the end of the cooldown pass and the
-        // end of the tic.  That means the other two have to go here.  When a level starts, there
-        // are only two wiring updates before everything gets its first chance to move, so we skip
-        // the very first one here.
-        if (this.tic_counter !== 0) {
+        // with it is delicate.  Ideally the player would see the current state of the game when
+        // they move, so all the wire updates should be at the end, BUT under CC2 rules, there are
+        // two wire updates at the start of the game before any movement can actually happen.
+        // Do those here, then otherwise do three wire phases when finishing.
+        if (this.tic_counter === 0) {
+            this._do_wire_phase();
             this._do_wire_phase();
         }
-        this._do_wire_phase();
     }
 
     // Lynx-style loop: everyone decides, then everyone moves/cools.
