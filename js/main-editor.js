@@ -2180,7 +2180,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     global_cycler: {
         name: "Global Cycler",
-        desc: "When activated, every terrain/item on the surrounding four tiles in the entire level becomes the terrain/item one clockwise.",
+        desc: "When activated, every terrain/item on the surrounding four tiles in the entire level becomes the terrain/item one clockwise. Adjacent tiles with a 'no sign' on them are ignored. Two of the same tile in a row mean that tile will not be transformed and will stay as-is.",
     },
 };
 
