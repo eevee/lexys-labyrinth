@@ -1659,7 +1659,7 @@ const TILE_TYPES = {
             //learn about surrounding tiles
             //some logic: we ignore tiles with a 'no sign' on them. for items, we ignore itemless tiles. if the same terrain/item is twice in a row, it stays the same. tiles next to global cycles aren't touched.
             let cells = [level.cell(
-			me.cell.x + 0,
+            me.cell.x + 0,
             me.cell.y - 1),
             level.cell(
             me.cell.x + 1,
@@ -1684,6 +1684,9 @@ const TILE_TYPES = {
                     for (var j = 0; j < level.height; ++j)
                     {
                         let target_safe = [level.cell(
+                        i + 0,
+                        j + 0),
+                        level.cell(
                         i + 0,
                         j - 1),
                         level.cell(
