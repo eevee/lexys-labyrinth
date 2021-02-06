@@ -2178,7 +2178,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     terraformer_n: {
         name: "Terraformer",
-        desc: "When activated, copies the terrain and item behind it to the tile in front of it.",
+        desc: "When activated, if there's an item on its tile, copies the item to the tile in front of it. Otherwise, copies the item AND terrain BEHIND it to the tile in front of it.",
     },
     global_cycler: {
         name: "Global Cycler",

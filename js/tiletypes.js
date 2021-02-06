@@ -91,18 +91,30 @@ function _define_gate(key) {
 
 function activate_terraformer(me, level, dx, dy) {
     let did_something = false;
-    let old_cell = level.cell(
+    let item_only = false;
+    let old_cell =  level.cell(me.cell.x, me.cell.y);
+    if (old_cell.get_item() != null)
+    {
+        item_only = true;
+    }
+    else
+    {
+        old_cell = level.cell(
     (me.cell.x - dx + level.width) % level.width,
     (me.cell.y - dy + level.height) % level.height);
+    }
     let new_cell = level.cell(
     (me.cell.x + dx + level.width) % level.width,
     (me.cell.y + dy + level.height) % level.height);
-    let old_terrain = old_cell.get_terrain();
-    let new_terrain = new_cell.get_terrain();
-    if (old_terrain.type.name != new_terrain.type.name)
+    if (!item_only)
     {
-        level.transmute_tile(new_cell.get_terrain(), old_terrain.type.name);
-        did_something = true;
+        let old_terrain = old_cell.get_terrain();
+        let new_terrain = new_cell.get_terrain();
+        if (old_terrain.type.name != new_terrain.type.name)
+        {
+            level.transmute_tile(new_cell.get_terrain(), old_terrain.type.name);
+            did_something = true;
+        }
     }
     let old_item = old_cell.get_item();
     if (old_item != null)
