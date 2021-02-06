@@ -1601,6 +1601,7 @@ const EDITOR_PALETTE = [{
         'terraformer_n',
         'global_cycler',
 		'halo',
+		'fire_sticks',
     ],
 }];
 
@@ -2186,6 +2187,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
 	halo: {
 		name: "Halo",
 		desc: "Protects the player from death once, destroying the would-be killer in the process.",
+	},
+	fire_sticks: {
+		name: "Dormant Lava",
+		desc: "Acts like dirt. However, fireballs will enter it and turn it into Fire in the process.",
 	},
 };
 

@@ -681,6 +681,30 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         speed_factor: 0.5,
     },
+	fire_sticks: {
+        layer: LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover & ~COLLISION.fireball),
+        blocks(me, level, other) {
+            return ((other.type.name === 'player2' || other.type.name === 'doppelganger2') &&
+                ! other.has_item('hiking_boots'));
+        },
+        on_arrive(me, level, other) {
+            // Bizarre interaction
+            if (other.type.name === 'ghost' && ! other.has_item('hiking_boots'))
+                return;
+			if (other.type.name === 'fireball')
+			{
+				level.transmute_tile(me, 'fire');
+			}
+			else
+			{
+				level.transmute_tile(me, 'floor');
+			}
+            if (other === level.player) {
+                level.sfx.play_once('step-gravel', me.cell);
+            }
+        },
+    },
 
     // Hazards
     fire: {
