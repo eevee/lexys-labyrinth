@@ -1659,17 +1659,17 @@ const TILE_TYPES = {
             //learn about surrounding tiles
             //some logic: we ignore tiles with a 'no sign' on them. for items, we ignore itemless tiles. if the same terrain/item is twice in a row, it stays the same. tiles next to global cycles aren't touched.
             let cells = [level.cell(
-            (me.cell.x + 0 + level.width) % level.width,
-            (me.cell.y - 1 + level.height) % level.height),
+			me.cell.x + 0,
+            me.cell.y - 1),
             level.cell(
-            (me.cell.x + 1 + level.width) % level.width,
-            (me.cell.y + 0 + level.height) % level.height),
+            me.cell.x + 1,
+            me.cell.y + 0),
             level.cell(
-            (me.cell.x + 0 + level.width) % level.width,
-            (me.cell.y + 1 + level.height) % level.height),
+            me.cell.x + 0 ,
+            me.cell.y + 1),
             level.cell(
-            (me.cell.x - 1 + level.width) % level.width,
-            (me.cell.y + 0 + level.height) % level.height)].filter(x => x.get_item_mod()?.type.name != 'no_sign');
+            me.cell.x - 1,
+            me.cell.y + 0)].filter(x => x != null && x.get_item_mod()?.type.name != 'no_sign');
             let terrains = cells.map(x => x.get_terrain().type.name);
             let items = cells.map(x => x.get_item()?.type.name ?? null).filter(x => x != null);
             
@@ -1684,17 +1684,17 @@ const TILE_TYPES = {
                     for (var j = 0; j < level.height; ++j)
                     {
                         let target_safe = [level.cell(
-                        (i + 0 + level.width) % level.width,
-                        (j - 1 + level.height) % level.height),
+                        i + 0,
+                        j - 1),
                         level.cell(
-                        (i + 1 + level.width) % level.width,
-                        (j + 0 + level.height) % level.height),
+                        i + 1,
+                        j + 0),
                         level.cell(
-                        (i + 0 + level.width) % level.width,
-                        (j + 1 + level.height) % level.height),
+                        i + 0,
+                        j + 1),
                         level.cell(
-                        (i- 1 + level.width) % level.width,
-                        (j + 0 + level.height) % level.height)].filter(x => x.get_terrain().type.name == 'global_cycler');
+                        i - 1,
+                        j + 0)].filter(x => x != null && x.get_terrain().type.name == 'global_cycler');
                         if (target_safe.length > 0)
                         {
                             continue;
