@@ -2280,7 +2280,7 @@ export class Level extends LevelInterface {
         }
 		
 		if (this.take_tool_from_actor(player, 'halo')) {
-			//play sound?
+			this.sfx.play_once('revive');
 			if (reason === 'time')
 			{
 				this.pause_timer();

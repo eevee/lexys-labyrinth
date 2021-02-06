@@ -311,6 +311,8 @@ class SFXPlayer {
             timeup: 'sfx/timeup.ogg',
             // https://jummbus.bitbucket.io/#j2N03winn200s0k0l00e00t2wm9a3g00j07i0r1O_U00o32T0v0EL0OD0Ou00q1d1f5y1z1C2w1c2h0T0v0pL0OD0Ou00q0d1f2y1z2C0w2c3h0b4gp1xFyW4xo31pe0MaCHCbwLbM5cFDgapBOyY0
             win: 'sfx/win.ogg',
+			//from Ableton Retro Synths
+			'revive': 'sfx/revive.ogg',
         };
 
         for (let [name, path] of Object.entries(this.sound_sources)) {
