@@ -1600,15 +1600,15 @@ export class Level extends LevelInterface {
                 // Helmet disables this, do nothing
             }
             else if (actor.type.is_real_player && tile.type.is_monster) {
-                this.fail(tile.type.name, actor);
+                this.fail(tile.type.name, tile, actor);
             }
             else if (actor.type.is_monster && tile.type.is_real_player) {
-                this.fail(actor.type.name, tile);
+                this.fail(actor.type.name, actor, tile);
             }
             else if (actor.type.is_block && tile.type.is_real_player && ! actor.is_pulled) {
                 // Note that blocks squish players if they move for ANY reason, even if pushed by
                 // another player!  The only exception is being pulled
-                this.fail('squished', tile);
+                this.fail('squished', actor, tile);
             }
 
             if (tile.type.on_approach) {
@@ -1641,7 +1641,7 @@ export class Level extends LevelInterface {
             this.player.movement_cooldown === this.player.movement_speed &&
             ! actor.has_item('helmet') && ! this.player.has_item('helmet'))
         {
-            this.fail(actor.type.name);
+            this.fail(actor.type.name, actor, this.player);
         }
 
         if (this.compat.tiles_react_instantly) {
@@ -2264,7 +2264,7 @@ export class Level extends LevelInterface {
         }
     }
 
-    fail(reason, player = null) {
+    fail(reason, killer = null, player = null) {
         if (this.state !== 'playing')
             return;
 
@@ -2278,6 +2278,26 @@ export class Level extends LevelInterface {
         if (player === null) {
             player = this.player;
         }
+		
+		if (this.take_tool_from_actor(player, 'halo')) {
+			//play sound?
+			if (reason === 'time')
+			{
+				this.pause_timer();
+			}
+			else if (killer !== null)
+			{
+				if (killer.type.is_actor || killer.type.is_item)
+				{
+					this.remove_tile(killer);
+				}
+				else //presumably terrain
+				{
+					this.transmute_tile(killer, 'floor');
+				}
+			}
+			return;
+		}
 
         this._push_pending_undo(() => {
             this.fail_reason = null;

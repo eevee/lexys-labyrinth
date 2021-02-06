@@ -702,7 +702,7 @@ const TILE_TYPES = {
                 level.sfx.play_once('splash', me.cell);
             }
             else if (other.type.is_real_player) {
-                level.fail('burned', other);
+                level.fail('burned', me, other);
             }
             else {
                 level.transmute_tile(other, 'explosion');
@@ -733,7 +733,7 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'ice');
             }
             else if (other.type.is_real_player) {
-                level.fail('drowned', other);
+                level.fail('drowned', me, other);
             }
             else {
                 level.transmute_tile(other, 'splash');
@@ -923,7 +923,7 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'floor');
             }
             else if (other.type.is_real_player) {
-                level.fail('slimed', other);
+                level.fail('slimed', me, other);
             }
             else {
                 level.transmute_tile(other, 'splash_slime');
@@ -947,7 +947,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.remove_tile(me);
             if (other.type.is_real_player) {
-                level.fail('exploded', other);
+                level.fail('exploded', me, other);
             }
             else {
                 level.sfx.play_once('bomb', me.cell);
@@ -1148,7 +1148,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.remove_tile(me);
             if (other.type.is_real_player) {
-                level.fail('exploded', other);
+                level.fail('exploded', me, other);
             }
             else {
                 level.sfx.play_once('bomb', me.cell);
@@ -1563,7 +1563,7 @@ const TILE_TYPES = {
                 // TODO would be neat if this understood "ignores anything with fire immunity" but that
                 // might be a bit too high-level for this game
                 if (actor.type.is_real_player) {
-                    level.fail('burned', actor);
+                    level.fail('burned', me, actor);
                 }
                 else {
                     level.sfx.play_once('bomb', me.cell);
@@ -2573,7 +2573,7 @@ const TILE_TYPES = {
                         else if (tile.type.is_real_player) {
                             // TODO it would be nice if i didn't have to special-case this every
                             // time
-                            level.fail(me.type.name, tile);
+                            level.fail(me.type.name, me, tile);
                         }
                         else {
                             // Everything else is destroyed
@@ -2650,7 +2650,7 @@ const TILE_TYPES = {
             if (me.cell.has('cloner'))
                 return;
             if (other.type.is_real_player) {
-                level.fail(me.type.name, other);
+                level.fail(me.type.name, me, other);
             }
             else {
                 level.transmute_tile(other, 'explosion');
@@ -2662,7 +2662,7 @@ const TILE_TYPES = {
             // Blow up anything we run into
             if (obstacle && obstacle.type.is_actor) {
                 if (obstacle.type.is_real_player) {
-                    level.fail(me.type.name, obstacle);
+                    level.fail(me.type.name, me, obstacle);
                 }
                 else {
                     level.transmute_tile(obstacle, 'explosion');
@@ -2729,6 +2729,12 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
     skeleton_key: {
+        layer: LAYERS.item,
+        is_item: true,
+        is_tool: true,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+    },
+	halo: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,

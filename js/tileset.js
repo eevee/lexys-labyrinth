@@ -1036,6 +1036,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     terraformer_s: [2, 43],
     terraformer_w: [3, 43],
     global_cycler: [4, 43],
+	halo: [5, 43],
     
 });
 
