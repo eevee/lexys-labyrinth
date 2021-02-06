@@ -681,7 +681,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         speed_factor: 0.5,
     },
-	fire_sticks: {
+    fire_sticks: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover & ~COLLISION.fireball),
         blocks(me, level, other) {
@@ -692,14 +692,14 @@ const TILE_TYPES = {
             // Bizarre interaction
             if (other.type.name === 'ghost' && ! other.has_item('hiking_boots'))
                 return;
-			if (other.type.name === 'fireball')
-			{
-				level.transmute_tile(me, 'fire');
-			}
-			else
-			{
-				level.transmute_tile(me, 'floor');
-			}
+            if (other.type.name === 'fireball')
+            {
+                level.transmute_tile(me, 'fire');
+            }
+            else
+            {
+                level.transmute_tile(me, 'floor');
+            }
             if (other === level.player) {
                 level.sfx.play_once('step-gravel', me.cell);
             }
@@ -1652,108 +1652,108 @@ const TILE_TYPES = {
             me.type.activate(me, level);
         },
     },
-	global_cycler: {
-		layer: LAYERS.terrain,
+    global_cycler: {
+        layer: LAYERS.terrain,
         blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
         activate(me, level) {
             //learn about surrounding tiles
-			//some logic: we ignore tiles with a 'no sign' on them. for items, we ignore itemless tiles. if the same terrain/item is twice in a row, it stays the same. tiles next to global cycles aren't touched.
-			let cells = [level.cell(
-			(me.cell.x + 0 + level.width) % level.width,
-			(me.cell.y - 1 + level.height) % level.height),
-			level.cell(
-			(me.cell.x + 1 + level.width) % level.width,
-			(me.cell.y + 0 + level.height) % level.height),
-			level.cell(
-			(me.cell.x + 0 + level.width) % level.width,
-			(me.cell.y + 1 + level.height) % level.height),
-			level.cell(
-			(me.cell.x - 1 + level.width) % level.width,
-			(me.cell.y + 0 + level.height) % level.height)].filter(x => x.get_item_mod()?.type.name != 'no_sign');
-			let terrains = cells.map(x => x.get_terrain().type.name);
-			let items = cells.map(x => x.get_item()?.type.name ?? null).filter(x => x != null);
-			
-			//globally cycle terrain
-			if (terrains[0] != terrains[1]
-			|| terrains[1] != terrains[2]
-			|| terrains[2] != terrains[3]
-			|| terrains[3] != terrains[0])
-			{
-				for (var i = 0; i < level.width; ++i)
-				{
-					for (var j = 0; j < level.height; ++j)
-					{
-						let target_safe = [level.cell(
-						(i + 0 + level.width) % level.width,
-						(j - 1 + level.height) % level.height),
-						level.cell(
-						(i + 1 + level.width) % level.width,
-						(j + 0 + level.height) % level.height),
-						level.cell(
-						(i + 0 + level.width) % level.width,
-						(j + 1 + level.height) % level.height),
-						level.cell(
-						(i- 1 + level.width) % level.width,
-						(j + 0 + level.height) % level.height)].filter(x => x.get_terrain().type.name == 'global_cycler');
-						if (target_safe.length > 0)
-						{
-							continue;
-						}
-						let thing = level.cell(i, j).get_terrain();
-						let things = terrains;
-						for (var k = 0; k < things.length; ++k)
-						{
-							if (thing.type.name == things[k] && thing.type.name != things[(k - 1 + things.length) % things.length])
-							{
-								level.transmute_tile(thing, things[(k + 1) % things.length]);
-								break;
-							}
-						}
-					}
-				}
-			}
-			
-			//globally cycle items
-			//some logic: we skip over itemless spots and if two items in the row are a same, then that item stays the same
-			if (new Set(items).size > 1)
-			{
-				for (var i = 0; i < level.width; ++i)
-				{
-					for (var j = 0; j < level.height; ++j)
-					{
-						let target_safe = [level.cell(
-						(i + 0 + level.width) % level.width,
-						(j - 1 + level.height) % level.height),
-						level.cell(
-						(i + 1 + level.width) % level.width,
-						(j + 0 + level.height) % level.height),
-						level.cell(
-						(i + 0 + level.width) % level.width,
-						(j + 1 + level.height) % level.height),
-						level.cell(
-						(i- 1 + level.width) % level.width,
-						(j + 0 + level.height) % level.height)].filter(x => x.get_terrain().type.name == 'global_cycler');
-						if (target_safe.length > 0)
-						{
-							continue;
-						}
-						let thing = level.cell(i, j).get_item();
-						let things = items;
-						if (thing == null)
-						{
-							continue;
-						}
-						for (var k = 0; k < things.length; ++k)
-						{
-							if (thing.type.name == things[k] && thing.type.name != things[(k - 1 + things.length) % things.length])
-							{
-								level.transmute_tile(thing, things[(k + 1) % things.length]);
-								break;
-							}
-						}
-					}
-				}
-			}
+            //some logic: we ignore tiles with a 'no sign' on them. for items, we ignore itemless tiles. if the same terrain/item is twice in a row, it stays the same. tiles next to global cycles aren't touched.
+            let cells = [level.cell(
+            (me.cell.x + 0 + level.width) % level.width,
+            (me.cell.y - 1 + level.height) % level.height),
+            level.cell(
+            (me.cell.x + 1 + level.width) % level.width,
+            (me.cell.y + 0 + level.height) % level.height),
+            level.cell(
+            (me.cell.x + 0 + level.width) % level.width,
+            (me.cell.y + 1 + level.height) % level.height),
+            level.cell(
+            (me.cell.x - 1 + level.width) % level.width,
+            (me.cell.y + 0 + level.height) % level.height)].filter(x => x.get_item_mod()?.type.name != 'no_sign');
+            let terrains = cells.map(x => x.get_terrain().type.name);
+            let items = cells.map(x => x.get_item()?.type.name ?? null).filter(x => x != null);
+            
+            //globally cycle terrain
+            if (terrains[0] != terrains[1]
+            || terrains[1] != terrains[2]
+            || terrains[2] != terrains[3]
+            || terrains[3] != terrains[0])
+            {
+                for (var i = 0; i < level.width; ++i)
+                {
+                    for (var j = 0; j < level.height; ++j)
+                    {
+                        let target_safe = [level.cell(
+                        (i + 0 + level.width) % level.width,
+                        (j - 1 + level.height) % level.height),
+                        level.cell(
+                        (i + 1 + level.width) % level.width,
+                        (j + 0 + level.height) % level.height),
+                        level.cell(
+                        (i + 0 + level.width) % level.width,
+                        (j + 1 + level.height) % level.height),
+                        level.cell(
+                        (i- 1 + level.width) % level.width,
+                        (j + 0 + level.height) % level.height)].filter(x => x.get_terrain().type.name == 'global_cycler');
+                        if (target_safe.length > 0)
+                        {
+                            continue;
+                        }
+                        let thing = level.cell(i, j).get_terrain();
+                        let things = terrains;
+                        for (var k = 0; k < things.length; ++k)
+                        {
+                            if (thing.type.name == things[k] && thing.type.name != things[(k - 1 + things.length) % things.length])
+                            {
+                                level.transmute_tile(thing, things[(k + 1) % things.length]);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            //globally cycle items
+            //some logic: we skip over itemless spots and if two items in the row are a same, then that item stays the same
+            if (new Set(items).size > 1)
+            {
+                for (var i = 0; i < level.width; ++i)
+                {
+                    for (var j = 0; j < level.height; ++j)
+                    {
+                        let target_safe = [level.cell(
+                        (i + 0 + level.width) % level.width,
+                        (j - 1 + level.height) % level.height),
+                        level.cell(
+                        (i + 1 + level.width) % level.width,
+                        (j + 0 + level.height) % level.height),
+                        level.cell(
+                        (i + 0 + level.width) % level.width,
+                        (j + 1 + level.height) % level.height),
+                        level.cell(
+                        (i- 1 + level.width) % level.width,
+                        (j + 0 + level.height) % level.height)].filter(x => x.get_terrain().type.name == 'global_cycler');
+                        if (target_safe.length > 0)
+                        {
+                            continue;
+                        }
+                        let thing = level.cell(i, j).get_item();
+                        let things = items;
+                        if (thing == null)
+                        {
+                            continue;
+                        }
+                        for (var k = 0; k < things.length; ++k)
+                        {
+                            if (thing.type.name == things[k] && thing.type.name != things[(k - 1 + things.length) % things.length])
+                            {
+                                level.transmute_tile(thing, things[(k + 1) % things.length]);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         },
         // Also activates on rising pulse or gray button
         on_power(me, level) {
@@ -1762,7 +1762,7 @@ const TILE_TYPES = {
         on_gray_button(me, level) {
             me.type.activate(me, level);
         },
-	},
+    },
     // Buttons
     button_blue: {
         layer: LAYERS.terrain,
@@ -2758,7 +2758,7 @@ const TILE_TYPES = {
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
-	halo: {
+    halo: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,

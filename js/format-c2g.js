@@ -799,67 +799,67 @@ const TILE_ENCODING = {
         extra_args: [arg_direction],
         is_extension: true,
     },
-	0xe2: {
+    0xe2: {
         name: 'skeleton_key',
         has_next: true,
         is_extension: true,
     },
-	0xe2: {
+    0xe2: {
         name: 'gate_red',
         has_next: true,
         is_extension: true,
     },
-	0xe3: {
+    0xe3: {
         name: 'gate_blue',
         has_next: true,
         is_extension: true,
     },
-	0xe4: {
+    0xe4: {
         name: 'gate_yellow',
         has_next: true,
         is_extension: true,
     },
-	0xe5: {
+    0xe5: {
         name: 'gate_green',
         has_next: true,
         is_extension: true,
     },
-	0xe6: {
+    0xe6: {
         name: 'sand',
         has_next: true,
         is_extension: true,
     },
-	0xe7: {
+    0xe7: {
         name: 'terraformer_n',
         has_next: true,
         is_extension: true,
     },
-	0xe8: {
+    0xe8: {
         name: 'terraformer_e',
         has_next: true,
         is_extension: true,
     },
-	0xe9: {
+    0xe9: {
         name: 'terraformer_s',
         has_next: true,
         is_extension: true,
     },
-	0xea: {
+    0xea: {
         name: 'terraformer_w',
         has_next: true,
         is_extension: true,
     },
-	0xeb: {
+    0xeb: {
         name: 'global_cycler',
         has_next: true,
         is_extension: true,
     },
-	0xec: {
+    0xec: {
         name: 'halo',
         has_next: true,
         is_extension: true,
     },
-	0xed: {
+    0xed: {
         name: 'fire_sticks',
         has_next: true,
         is_extension: true,

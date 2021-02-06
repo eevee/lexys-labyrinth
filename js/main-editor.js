@@ -1600,8 +1600,8 @@ const EDITOR_PALETTE = [{
         'sand',
         'terraformer_n',
         'global_cycler',
-		'halo',
-		'fire_sticks',
+        'halo',
+        'fire_sticks',
     ],
 }];
 
@@ -2184,14 +2184,14 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "Global Cycler",
         desc: "When activated, every terrain/item on the surrounding four tiles in the entire level becomes the terrain/item one clockwise. Adjacent tiles with a 'no sign' on them are ignored. Two of the same tile in a row mean that tile will not be transformed and will stay as-is. Tiles next to Global Cyclers are not transformed.",
     },
-	halo: {
-		name: "Halo",
-		desc: "Protects the player from death once, destroying the would-be killer in the process.",
-	},
-	fire_sticks: {
-		name: "Dormant Lava",
-		desc: "Acts like dirt. However, fireballs will enter it and turn it into Fire in the process.",
-	},
+    halo: {
+        name: "Halo",
+        desc: "Protects the player from death once, destroying the would-be killer in the process.",
+    },
+    fire_sticks: {
+        name: "Dormant Lava",
+        desc: "Acts like dirt. However, fireballs will enter it and turn it into Fire in the process.",
+    },
 };
 
 const SPECIAL_PALETTE_ENTRIES = {

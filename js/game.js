@@ -2278,26 +2278,26 @@ export class Level extends LevelInterface {
         if (player === null) {
             player = this.player;
         }
-		
-		if (this.take_tool_from_actor(player, 'halo')) {
-			this.sfx.play_once('revive');
-			if (reason === 'time')
-			{
-				this.pause_timer();
-			}
-			else if (killer !== null)
-			{
-				if (killer.type.is_actor || killer.type.is_item)
-				{
-					this.remove_tile(killer);
-				}
-				else //presumably terrain
-				{
-					this.transmute_tile(killer, 'floor');
-				}
-			}
-			return;
-		}
+        
+        if (this.take_tool_from_actor(player, 'halo')) {
+            this.sfx.play_once('revive');
+            if (reason === 'time')
+            {
+                this.pause_timer();
+            }
+            else if (killer !== null)
+            {
+                if (killer.type.is_actor || killer.type.is_item)
+                {
+                    this.remove_tile(killer);
+                }
+                else //presumably terrain
+                {
+                    this.transmute_tile(killer, 'floor');
+                }
+            }
+            return;
+        }
 
         this._push_pending_undo(() => {
             this.fail_reason = null;
