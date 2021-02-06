@@ -135,7 +135,7 @@ function activate_terraformer(me, level, dx, dy) {
     if (old_item_mod != null)
     {
         let new_item_mod = new_cell.get_item_mod();
-        if (new_item_mod != null)
+        if (new_item_mod == null)
         {
             let type = TILE_TYPES[old_item_mod.type.name];
             let tile = new old_item_mod.constructor(type);
