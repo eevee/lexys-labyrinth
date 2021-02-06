@@ -90,6 +90,7 @@ function _define_gate(key) {
 }
 
 function activate_terraformer(me, level, dx, dy) {
+    //decide if we're copying from our own tile (if we have an item) or the tile behind us (otherwise)
     let did_something = false;
     let item_only = false;
     let old_cell =  level.cell(me.cell.x, me.cell.y);
@@ -106,6 +107,7 @@ function activate_terraformer(me, level, dx, dy) {
     let new_cell = level.cell(
     (me.cell.x + dx + level.width) % level.width,
     (me.cell.y + dy + level.height) % level.height);
+    //copy terrain from the tile behind us, if we're looking at that tile
     if (!item_only)
     {
         let old_terrain = old_cell.get_terrain();
@@ -116,19 +118,12 @@ function activate_terraformer(me, level, dx, dy) {
             did_something = true;
         }
     }
+    //copy item from (the tile we chose) but only if the space in front of us is free
     let old_item = old_cell.get_item();
     if (old_item != null)
     {
         let new_item = new_cell.get_item();
-        if (new_item != null)
-        {
-            if (old_item.type.name != new_item.type.name)
-            {
-                level.transmute_tile(new_item, old_item.type.name)
-                did_something = true;
-            }
-        }
-        else
+        if (new_item == null)
         {
             let type = TILE_TYPES[old_item.type.name];
             let tile = new old_item.constructor(type);
@@ -142,20 +137,13 @@ function activate_terraformer(me, level, dx, dy) {
         let new_item_mod = new_cell.get_item_mod();
         if (new_item_mod != null)
         {
-            if (old_item_mod.type.name != new_item_mod.type.name)
-            {
-                level.transmute_tile(new_item_mod, old_item_mod.type.name)
-                did_something = true;
-            }
-        }
-        else
-        {
             let type = TILE_TYPES[old_item_mod.type.name];
             let tile = new old_item_mod.constructor(type);
             level.add_tile(tile, new_cell);
             did_something = true;
         }
     }
+    //animation
     if (did_something)
     {
         level.spawn_animation(new_cell, 'transmogrify_flash');
