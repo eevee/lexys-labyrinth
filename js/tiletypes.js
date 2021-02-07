@@ -1718,6 +1718,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
         activate(me, level) {
+
             //learn about surrounding tiles
             //some logic: we ignore tiles with a 'no sign' on them. for items, we ignore itemless tiles. if the same terrain/item is twice in a row, it stays the same. tiles next to global cycles aren't touched.
             let cells = [level.cell(
@@ -1732,8 +1733,10 @@ const TILE_TYPES = {
             level.cell(
             me.cell.x - 1,
             me.cell.y + 0)].filter(x => x != null && x.get_item_mod()?.type.name != 'no_sign');
+            
             let terrains = cells.map(x => x.get_terrain().type.name).filter(x => x != 'global_cycler');
             let items = cells.map(x => x.get_item()?.type.name ?? null).filter(x => x != null);
+            let actors = cells.map(x => x.get_actor()).filter(x => x != null);
             
             //globally cycle terrain
             if (new Set(terrains).size > 1)
@@ -1784,17 +1787,20 @@ const TILE_TYPES = {
                     for (var j = 0; j < level.height; ++j)
                     {
                         let target_safe = [level.cell(
-                        (i + 0 + level.width) % level.width,
-                        (j - 1 + level.height) % level.height),
+                        i + 0,
+                        j + 0),
                         level.cell(
-                        (i + 1 + level.width) % level.width,
-                        (j + 0 + level.height) % level.height),
+                        i + 0,
+                        j - 1),
                         level.cell(
-                        (i + 0 + level.width) % level.width,
-                        (j + 1 + level.height) % level.height),
+                        i + 1,
+                        j + 0),
                         level.cell(
-                        (i- 1 + level.width) % level.width,
-                        (j + 0 + level.height) % level.height)].filter(x => x.get_terrain().type.name == 'global_cycler');
+                        i + 0,
+                        j + 1),
+                        level.cell(
+                        i - 1,
+                        j + 0)].filter(x => x != null && x.get_terrain().type.name == 'global_cycler');
                         if (target_safe.length > 0)
                         {
                             continue;
@@ -1812,6 +1818,60 @@ const TILE_TYPES = {
                                 level.transmute_tile(thing, things[(k + 1) % things.length]);
                                 break;
                             }
+                        }
+                    }
+                }
+            }
+            
+            //globally cycle... actors???
+            //intended logic: if the same monster exists twice in a row we rotate it it by the relative direction (left, right, flip or do nothing). if it's two different monsters, we do that AND transmute.
+            //this code is slightly different from the previous two blocks!
+            if (actors.length > 1)
+            {
+                for (let a = level.actors.length - 1; a >= 0; a--)
+                {
+                    let thing = level.actors[a];
+                    let i = thing.cell.x;
+                    let j = thing.cell.y;
+                    
+                    let target_safe = [level.cell(
+                        i + 0,
+                        j + 0),
+                        level.cell(
+                        i + 0,
+                        j - 1),
+                        level.cell(
+                        i + 1,
+                        j + 0),
+                        level.cell(
+                        i + 0,
+                        j + 1),
+                        level.cell(
+                        i - 1,
+                        j + 0)].filter(x => x != null && x.get_terrain().type.name == 'global_cycler');
+                    if (target_safe.length > 0)
+                    {
+                        continue;
+                    }
+                    
+                    let things = actors;
+                    
+                    for (var k = 0; k < things.length; ++k)
+                    {
+                        if (thing.type.name == things[k].type.name)
+                        {
+                            let turn = ['right', 'left', 'opposite'].filter(t => {
+                                return DIRECTIONS[things[k].direction][t] === things[(k + 1) % things.length].direction;
+                            })[0]
+                            if (turn !== undefined)
+                            {
+                                thing.direction = DIRECTIONS[thing.direction][turn];
+                            }
+                            if (thing.type.name != things[(k - 1 + things.length) % things.length].type.name)
+                            {
+                                level.transmute_tile(thing, things[(k + 1) % things.length].type.name);
+                            }
+                            break;
                         }
                     }
                 }

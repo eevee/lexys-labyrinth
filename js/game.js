@@ -1566,7 +1566,7 @@ export class Level extends LevelInterface {
         let original_cell = actor.cell;
         // Physically remove the actor first, so that it won't get in the way of e.g. a splash
         // spawned from stepping off of a lilypad
-        this.remove_tile(actor);
+        this.remove_tile(actor, true);
 
         // Announce we're leaving, for the handful of tiles that care about it
         for (let tile of original_cell) {
@@ -1796,7 +1796,7 @@ export class Level extends LevelInterface {
         }
 
         // Now physically move the actor, but their movement waits until next decision phase
-        this.remove_tile(actor);
+        this.remove_tile(actor, true);
         this.add_tile(actor, dest.cell);
     }
 
@@ -1874,7 +1874,7 @@ export class Level extends LevelInterface {
                 // already in this cell's actor layer.  But we also know for sure that there's no
                 // item in this cell, so we'll cheat a little: remove the dropping actor, set the
                 // item moving, then put the dropping actor back before anyone notices.
-                this.remove_tile(dropping_actor);
+                this.remove_tile(dropping_actor, true);
                 this.add_tile(tile, cell);
                 if (! this.attempt_out_of_turn_step(tile, dropping_actor.direction)) {
                     // It was unable to move, so there's nothing we can do but destroy it
@@ -2279,7 +2279,7 @@ export class Level extends LevelInterface {
             player = this.player;
         }
         
-        if (this.take_tool_from_actor(player, 'halo')) {
+        if (player != null && reason !== 'nonexistence' && this.take_tool_from_actor(player, 'halo')) {
             this.sfx.play_once('revive');
             if (reason === 'time')
             {
@@ -2301,11 +2301,11 @@ export class Level extends LevelInterface {
 
         this._push_pending_undo(() => {
             this.fail_reason = null;
-            player.fail_reason = null;
+            if (player != null) { player.fail_reason = null; }
         });
         this.state = 'failure';
         this.fail_reason = reason;
-        player.fail_reason = reason;
+        if (player != null) { player.fail_reason = reason; }
     }
 
     win() {
@@ -2346,7 +2346,12 @@ export class Level extends LevelInterface {
     // have things stacked in a weird order though
     // TODO would be nice to make these not be closures but order matters much more here
 
-    remove_tile(tile) {
+    remove_tile(tile, temporary = false) {
+        if (!temporary && tile == this.player)
+        {
+            this.fail('nonexistence');
+            return;
+        }
         let cell = tile.cell;
         cell._remove(tile);
         this._push_pending_undo(() => cell._add(tile));
