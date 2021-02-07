@@ -1736,10 +1736,7 @@ const TILE_TYPES = {
             let items = cells.map(x => x.get_item()?.type.name ?? null).filter(x => x != null);
             
             //globally cycle terrain
-            if (terrains[0] != terrains[1]
-            || terrains[1] != terrains[2]
-            || terrains[2] != terrains[3]
-            || terrains[3] != terrains[0])
+            if (new Set(terrains).size > 1)
             {
                 for (var i = 0; i < level.width; ++i)
                 {
