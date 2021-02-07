@@ -1602,6 +1602,8 @@ const EDITOR_PALETTE = [{
         'global_cycler',
         'halo',
         'fire_sticks',
+        'turntable_cw',
+        'turntable_ccw',
     ],
 }];
 
@@ -2192,6 +2194,14 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "Dormant Lava",
         desc: "Acts like dirt. However, fireballs will enter it and turn it into Fire in the process.",
     },
+    turntable_cw: {
+        name: "Turntable (Clockwise)",
+        desc: "Rotates anything entering this tile clockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
+    },
+    turntable_ccw: {
+        name: "Turntable (Counterclockwise)",
+        desc: "Rotates anything entering this tile counterclockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
+    },
 };
 
 const SPECIAL_PALETTE_ENTRIES = {
@@ -2439,6 +2449,7 @@ for (let cycle of [
     ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
     ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
     ['terraformer_n', 'terraformer_e', 'terraformer_s', 'terraformer_w'],
+    ['turntable_cw', 'turntable_ccw'],
 ]) {
     for (let [i, name] of cycle.entries()) {
         let left = cycle[(i - 1 + cycle.length) % cycle.length];

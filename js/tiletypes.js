@@ -705,6 +705,68 @@ const TILE_TYPES = {
             }
         },
     },
+    turntable_cw: {
+        layer: LAYERS.terrain,
+        //note: should be wireable in exactly the same way as a transmogrifier
+        wire_propagation_mode: 'none',
+        on_begin(me, level) {
+            // TODO if wire destruction is ever allowed, this will need to update somehow
+            me.is_wired = level.is_tile_wired(me, false);
+            me.is_active = ! me.is_wired;
+        },
+        on_arrive(me, level, other) {
+            if (! me.is_active)
+                return;
+            other.direction = DIRECTIONS[other.direction].right;
+            if (other.type.on_rotate) {
+                other.type.on_rotate(other, level, 'right');
+            }
+        },
+        on_power(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
+        },
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
+        visual_state(me) {
+            return ! me || me.is_active ? 'active' : 'inactive';
+        },
+    },
+    turntable_ccw: {
+        layer: LAYERS.terrain,
+        //note: should be wireable in exactly the same way as a transmogrifier
+        wire_propagation_mode: 'none',
+        on_begin(me, level) {
+            // TODO if wire destruction is ever allowed, this will need to update somehow
+            me.is_wired = level.is_tile_wired(me, false);
+            me.is_active = ! me.is_wired;
+        },
+        on_arrive(me, level, other) {
+            if (! me.is_active)
+                return;
+            other.direction = DIRECTIONS[other.direction].left;
+            if (other.type.on_rotate) {
+                other.type.on_rotate(other, level, 'left');
+            }
+        },
+        on_power(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
+        },
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
+        visual_state(me) {
+            return ! me || me.is_active ? 'active' : 'inactive';
+        },
+    },
 
     // Hazards
     fire: {

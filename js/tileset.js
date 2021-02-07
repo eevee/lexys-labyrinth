@@ -1038,7 +1038,16 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     global_cycler: [4, 43],
     halo: [5, 43],
     fire_sticks: [6, 43],
-    
+    turntable_cw: {
+        __special__: 'visual-state',
+        active: [7, 43],
+        inactive: [9, 43],
+    },
+    turntable_ccw: {
+        __special__: 'visual-state',
+        active: [8, 43],
+        inactive: [10, 43],
+    },
 });
 
 export const TILESET_LAYOUTS = {

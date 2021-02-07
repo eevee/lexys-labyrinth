@@ -857,6 +857,14 @@ const TILE_ENCODING = {
         name: 'fire_sticks',
         is_extension: true,
     },
+    0xef: {
+        name: 'turntable_cw',
+        is_extension: true,
+    },
+    0xf0: {
+        name: 'turntable_ccw',
+        is_extension: true,
+    },
 };
 const REVERSE_TILE_ENCODING = {};
 for (let [tile_byte, spec] of Object.entries(TILE_ENCODING)) {
