@@ -1670,7 +1670,7 @@ const TILE_TYPES = {
             level.cell(
             me.cell.x - 1,
             me.cell.y + 0)].filter(x => x != null && x.get_item_mod()?.type.name != 'no_sign');
-            let terrains = cells.map(x => x.get_terrain().type.name);
+            let terrains = cells.map(x => x.get_terrain().type.name).filter(x => x != 'global_cycler');
             let items = cells.map(x => x.get_item()?.type.name ?? null).filter(x => x != null);
             
             //globally cycle terrain
