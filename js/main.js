@@ -25,6 +25,33 @@ function format_replay_duration(t) {
     return `${t} tics (${util.format_duration(t / TICS_PER_SECOND)})`;
 }
 
+function simplify_number(number) {
+    if (number < 1e6)
+    {
+        return number.toString();
+    }
+    else if (number < 1e9)
+    {
+        return (number/1e6).toPrecision(4) + "M";
+    }
+    else if (number < 1e12)
+    {
+        return (number/1e9).toPrecision(4) + "B";
+    }
+    else if (number < 1e15)
+    {
+        return (number/1e12).toPrecision(4) + "T";
+    }
+    else if (number < 1e18)
+    {
+        return (number/1e15).toPrecision(4) + "Q";
+    }
+    else
+    {
+        return number.toPrecision(2).replace("+","")
+    }
+}
+
 // TODO:
 // - level password, if any
 const ACTION_LABELS = {
@@ -1568,7 +1595,7 @@ class Player extends PrimaryView {
             this.time_el.classList.toggle('--danger', this.level.time_remaining < 10 * TICS_PER_SECOND);
         }
 
-        this.bonus_el.textContent = this.level.bonus_points;
+        this.bonus_el.textContent = simplify_number(this.level.bonus_points);
         if (this.level.bonus_points > 0) {
             this.root.classList.add('--bonus-visible');
         }

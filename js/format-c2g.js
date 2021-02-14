@@ -803,6 +803,11 @@ const TILE_ENCODING = {
         name: 'cracked_ice',
         is_extension: true,
     },
+    0xd4: {
+        name: 'score_5x',
+        has_next: true,
+        is_extension: true,
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,

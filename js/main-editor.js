@@ -1608,6 +1608,7 @@ const EDITOR_PALETTE = [{
         'hole',
         'cracked_floor',
         'cracked_ice',
+        'score_5x'
     ],
 }];
 
@@ -2221,6 +2222,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
     cracked_ice: {
         name: "Cracked Ice",
         desc: "Turns into water when something steps off of it (except ghosts).",
+    },
+    score_5x: {
+        name: "×5 bonus",
+        desc: "Quintuples the player's current bonus points.  Can be collected by doppelgangers, rovers, and bowling balls, but will not grant bonus points.",
     },
 };
 

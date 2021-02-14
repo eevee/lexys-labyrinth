@@ -3151,6 +3151,19 @@ const TILE_TYPES = {
             }
         },
     },
+    score_5x: {
+        layer: LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        on_arrive(me, level, other) {
+            if (other.type.is_real_player) {
+                level.adjust_bonus(0, 5);
+                level.sfx.play_once('get-bonus2', me.cell);
+            }
+            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
+                level.remove_tile(me);
+            }
+        },
+    },
 
     hint: {
         layer: LAYERS.terrain,
