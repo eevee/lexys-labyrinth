@@ -2766,7 +2766,8 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        item_slide_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']),
+        item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', ]),
+		item_slide_ignores: new Set(['cracked_ice']),
     },
     suction_boots: {
         layer: LAYERS.item,
