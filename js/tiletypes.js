@@ -837,6 +837,7 @@ const TILE_TYPES = {
             else if (other.type.name === 'circuit_block') {
                 level.transmute_tile(me, 'floor');
                 me.wire_directions = other.wire_directions;
+                level.recalculate_circuitry();
                 level.transmute_tile(other, 'splash');
                 
             }
@@ -2428,7 +2429,10 @@ const TILE_TYPES = {
         movement_speed: 4,
         on_clone(me, original) {
             me.wire_directions = original.wire_directions;
-        }
+        },
+        on_finishing_move(me, level) {
+            level.recalculate_circuitry();
+        },
     },
 
     // Time alteration
