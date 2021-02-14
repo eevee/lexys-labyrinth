@@ -1607,6 +1607,7 @@ const EDITOR_PALETTE = [{
         'electrified_floor',
         'hole',
         'cracked_floor',
+        'cracked_ice',
     ],
 }];
 
@@ -2216,6 +2217,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
     cracked_floor: {
         name: "Cracked Floor",
         desc: "Turns into a hole when something steps off of it (except ghosts).",
+    },
+    cracked_ice: {
+        name: "Cracked Ice",
+        desc: "Turns into water when something steps off of it (except ghosts).",
     },
 };
 

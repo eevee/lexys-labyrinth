@@ -841,6 +841,16 @@ const TILE_TYPES = {
             level.sfx.play_once('splash', me.cell);
         },
     },
+    cracked_ice: {
+        layer: LAYERS.terrain,
+        slide_mode: 'ice',
+        speed_factor: 2,
+        on_depart(me, level, other) {
+            level.transmute_tile(me, 'water');
+            level.spawn_animation(me.cell, 'splash');
+            level.sfx.play_once('splash', me.cell);
+        },
+    },
     ice: {
         layer: LAYERS.terrain,
         slide_mode: 'ice',
@@ -2579,7 +2589,7 @@ const TILE_TYPES = {
         ignores: new Set([
             'bomb',
             'water',
-            'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
+            'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice',
             'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
             // Ghosts don't activate swivels or popwalls
             'popwall', 'swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw',
@@ -2700,7 +2710,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        item_slide_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']),
     },
     suction_boots: {
         layer: LAYERS.item,
@@ -3004,7 +3014,7 @@ const TILE_TYPES = {
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']),
         pushes: {
             dirt_block: true,
             ice_block: true,
@@ -3050,7 +3060,7 @@ const TILE_TYPES = {
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']),
         pushes: {
             dirt_block: true,
             ice_block: true,

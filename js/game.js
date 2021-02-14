@@ -107,6 +107,21 @@ export class Tile {
 
         return false;
     }
+    
+    slide_ignores(name) {
+        if (this.type.slide_ignores && this.type.slide_ignores.has(name))
+            return true;
+
+        if (this.toolbelt) {
+            for (let item of this.toolbelt) {
+                let item_type = TILE_TYPES[item];
+                if (item_type.item_slide_ignores && item_type.item_slide_ignores.has(name))
+                    return true;
+            }
+        }
+
+        return false;
+    }
 
     can_push(tile, direction) {
         // This tile already has a push queued, sorry
@@ -1509,7 +1524,7 @@ export class Level extends LevelInterface {
         if (actor.has_item('speed_boots')) {
             speed /= 2;
         }
-        else if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name)) {
+        else if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)) {
             speed /= terrain.type.speed_factor;
         }
 
@@ -1593,6 +1608,8 @@ export class Level extends LevelInterface {
             if (tile === actor)
                 continue;
             if (actor.ignores(tile.type.name))
+                continue;
+            if (actor.slide_ignores(tile.type.name))
                 continue;
 
             // Possibly kill a player
