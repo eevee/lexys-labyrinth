@@ -2250,6 +2250,7 @@ const TILE_TYPES = {
         // gate_type: not, and, or, xor, nand, latch-cw, latch-ccw, counter, bogus
         _gate_types: {
             not: ['out0', null, 'in0', null],
+            diode: ['out0', null, 'in0', null],
             and: ['out0', 'in0', null, 'in1'],
             or: ['out0', 'in0', null, 'in1'],
             xor: ['out0', 'in0', null, 'in1'],
@@ -2303,6 +2304,9 @@ const TILE_TYPES = {
 
             if (me.gate_type === 'not') {
                 output0 = ! input0;
+            }
+            else if (me.gate_type === 'diode') {
+                output0 = input0;
             }
             else if (me.gate_type === 'and') {
                 output0 = input0 && input1;
@@ -2409,6 +2413,9 @@ const TILE_TYPES = {
         is_block: true,
         can_reverse_on_railroad: true,
         movement_speed: 4,
+        on_clone(me, original) {
+            me.wire_directions = original.wire_directions;
+        }
     },
 
     // Time alteration

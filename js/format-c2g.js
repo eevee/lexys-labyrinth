@@ -530,8 +530,8 @@ const TILE_ENCODING = {
                 else {
                     tile.direction = DIRECTION_ORDER[modifier & 0x03];
                     let type = modifier >> 2;
-                    if (type < 6) {
-                        tile.gate_type = ['not', 'and', 'or', 'xor', 'latch-cw', 'nand'][type];
+                    if (type < 7) {
+                        tile.gate_type = ['not', 'and', 'or', 'xor', 'latch-cw', 'nand', 'diode'][type];
                     }
                     else if (type === 16) {
                         tile.gate_type = 'latch-ccw';
@@ -560,6 +560,9 @@ const TILE_ENCODING = {
                 }
                 else if (tile.gate_type === 'nand') {
                     return 20 + direction_offset;
+                }
+                else if (tile.gate_type === 'diode') {
+                    return 24 + direction_offset;
                 }
                 else if (tile.gate_type === 'counter') {
                     return 30 + tile.memory;

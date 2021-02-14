@@ -1611,6 +1611,7 @@ const EDITOR_PALETTE = [{
         'score_5x',
         'spikes',
         'boulder',
+        'logic_gate/diode',
     ],
 }];
 
@@ -2107,6 +2108,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "NOT gate",
         desc: "Emits power only when not receiving power.",
     },
+    'logic_gate/diode': {
+        name: "Diode",
+        desc: "Emits power only when receiving power. (Effectively, this delays power by one frame.)",
+    },
     'logic_gate/and': {
         name: "AND gate",
         desc: "Emits power while both inputs are receiving power.",
@@ -2252,6 +2257,7 @@ const SPECIAL_PALETTE_ENTRIES = {
     'railroad/curve':       { name: 'railroad', tracks: 1 << 0, track_switch: null, entered_direction: 'north' },
     'railroad/switch':      { name: 'railroad', tracks: 0, track_switch: 0, entered_direction: 'north' },
     'logic_gate/not':       { name: 'logic_gate', direction: 'north', gate_type: 'not' },
+     'logic_gate/diode':       { name: 'logic_gate', direction: 'north', gate_type: 'diode' },
     'logic_gate/and':       { name: 'logic_gate', direction: 'north', gate_type: 'and' },
     'logic_gate/or':        { name: 'logic_gate', direction: 'north', gate_type: 'or' },
     'logic_gate/xor':       { name: 'logic_gate', direction: 'north', gate_type: 'xor' },

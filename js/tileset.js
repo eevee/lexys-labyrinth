@@ -548,6 +548,12 @@ export const CC2_TILESET_LAYOUT = {
                 south: [2, 25],
                 west: [3, 25],
             },
+            diode: {
+                north: [0, 41],
+                east: [1, 41],
+                south: [2, 41],
+                west: [3, 41],
+            },
             and: {
                 north: [4, 25],
                 east: [5, 25],
@@ -1507,7 +1513,7 @@ export class Tileset {
         if (tile && tile.cell) {
             // What goes on top varies a bit...
             let r = this.layout['#wire-width'] / 2;
-            if (tile.gate_type === 'not' || tile.gate_type === 'counter') {
+            if (tile.gate_type === 'not' || tile.gate_type === 'counter' || tile.gate_type === 'diode') {
                 this._draw_fourway_tile_power(tile, 0x0f, packet);
             }
             else {
