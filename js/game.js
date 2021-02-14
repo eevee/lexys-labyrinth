@@ -526,62 +526,7 @@ export class Level extends LevelInterface {
         // Connect buttons and teleporters
         let num_cells = this.width * this.height;
         for (let connectable of connectables) {
-            let cell = connectable.cell;
-            let x = cell.x;
-            let y = cell.y;
-            // FIXME this is a single string for red/brown buttons (to match iter_tiles_in_RO) but a
-            // set for orange buttons (because flame jet states are separate tiles), which sucks ass
-            let goals = connectable.type.connects_to;
-
-            // Check for custom wiring, for MSCC .DAT levels
-            // TODO would be neat if this applied to orange buttons too
-            if (this.stored_level.has_custom_connections) {
-                let n = this.stored_level.coords_to_scalar(x, y);
-                let target_cell_n = null;
-                if (connectable.type.name === 'button_brown') {
-                    target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
-                }
-                else if (connectable.type.name === 'button_red') {
-                    target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
-                }
-                if (target_cell_n && target_cell_n < this.width * this.height) {
-                    let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
-                    for (let tile of this.cell(tx, ty)) {
-                        if (tile && goals === tile.type.name) {
-                            connectable.connection = tile;
-                            break;
-                        }
-                    }
-                }
-                continue;
-            }
-
-            // Orange buttons do a really weird diamond search
-            if (connectable.type.connect_order === 'diamond') {
-                for (let cell of this.iter_cells_in_diamond(connectable.cell)) {
-                    let target = null;
-                    for (let tile of cell) {
-                        if (tile && goals.has(tile.type.name)) {
-                            target = tile;
-                            break;
-                        }
-                    }
-                    if (target !== null) {
-                        connectable.connection = target;
-                        break;
-                    }
-                }
-                continue;
-            }
-
-            // Otherwise, look in reading order
-            for (let tile of this.iter_tiles_in_reading_order(cell, goals)) {
-                // TODO ideally this should be a weak connection somehow, since dynamite can destroy
-                // empty cloners and probably traps too
-                connectable.connection = tile;
-                // Just grab the first
-                break;
-            }
+            this.connect_button(connectable);
         }
 
         // Build circuits out of connected wires
@@ -715,6 +660,92 @@ export class Level extends LevelInterface {
         }
         // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
         this.pending_undo = this.create_undo_entry();
+    }
+    
+    connect_button(connectable) {
+        let cell = connectable.cell;
+        let x = cell.x;
+        let y = cell.y;
+        // FIXME this is a single string for red/brown buttons (to match iter_tiles_in_RO) but a
+        // set for orange buttons (because flame jet states are separate tiles), which sucks ass
+        let goals = connectable.type.connects_to;
+
+        // Check for custom wiring, for MSCC .DAT levels
+        // TODO would be neat if this applied to orange buttons too
+        if (this.stored_level.has_custom_connections) {
+            let n = this.stored_level.coords_to_scalar(x, y);
+            let target_cell_n = null;
+            if (connectable.type.name === 'button_brown') {
+                target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
+            }
+            else if (connectable.type.name === 'button_red') {
+                target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
+            }
+            if (target_cell_n && target_cell_n < this.width * this.height) {
+                let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
+                for (let tile of this.cell(tx, ty)) {
+                    if (tile && goals === tile.type.name) {
+                        connectable.connection = tile;
+                        break;
+                    }
+                }
+            }
+			return;
+        }
+
+        // Orange buttons do a really weird diamond search
+        if (connectable.type.connect_order === 'diamond') {
+            for (let cell of this.iter_cells_in_diamond(connectable.cell)) {
+                let target = null;
+                for (let tile of cell) {
+                    if (tile && goals.has(tile.type.name)) {
+                        target = tile;
+                        break;
+                    }
+                }
+                if (target !== null) {
+					connectable.connection = target;
+                    break;
+                }
+            }
+            return;
+        }
+
+        // Otherwise, look in reading order
+        for (let tile of this.iter_tiles_in_reading_order(cell, goals)) {
+            // TODO ideally this should be a weak connection somehow, since dynamite can destroy
+            // empty cloners and probably traps too
+            connectable.connection = tile;
+            // Just grab the first
+            break;
+        }
+    }
+    
+    connect_buttons_to(tile) {
+        //iterate all terrain in the level for things that can connect to this
+        //if they didn't before and now do, commit and make an undo for it.
+        //otherwise, change it back (so we don't accidentally rewire other things)
+         for (var i = 0; i < this.width; ++i)
+        {
+            for (var j = 0; j < this.height; ++j)
+            {
+                let terrain = this.cell(i, j).get_terrain();
+                if (terrain.type.name === tile.type.connected_from)
+                {
+                    let old_connection = terrain.connection;
+                    this.connect_button(terrain);
+                    if (terrain.connection === tile)
+                    {
+                        terrain.connection = old_connection;
+                        this._set_tile_prop(terrain, 'connection', tile);
+                    }
+                    else
+                    {
+                        terrain.connection = old_connection;
+                    }
+                }
+            }
+        }
     }
 
     can_accept_input() {
@@ -2478,9 +2509,19 @@ export class Level extends LevelInterface {
                 //add to end of array
                 this.static_on_tic_tiles.push(tile);
             }
+            
+            //if we made a button or something that's buttonable, update accordingly
+            if (new_type.connects_to)
+            {
+                this.connect_button(tile);
+            }
+            else if (new_type.connected_from)
+            {
+                this.connect_buttons_to(tile);
+            }
+            
+            //TODO: update circuit networks?
         }
-        
-        //TODO: update circuit networks?
     }
 
     // Have an actor try to pick up a particular tile; it's prevented if there's a no sign, and the

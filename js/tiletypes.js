@@ -1376,6 +1376,7 @@ const TILE_TYPES = {
     cloner: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
+        connected_from: 'button_red',
         traps(me, actor) {
             return ! actor._clone_release;
         },
@@ -1428,6 +1429,7 @@ const TILE_TYPES = {
     },
     trap: {
         layer: LAYERS.terrain,
+        connected_from: 'button_brown',
         add_press_ready(me, level, other) {
             // Same as below, but without ejection
             me.presses = (me.presses ?? 0) + 1;
@@ -1721,6 +1723,7 @@ const TILE_TYPES = {
     // - Gray button toggles it permanently
     flame_jet_off: {
         layer: LAYERS.terrain,
+        connected_from: 'button_orange',
         activate(me, level) {
             level.transmute_tile(me, 'flame_jet_on');
             // Do NOT immediately nuke anything on us, or it'd be impossible to push a block off an
@@ -1738,6 +1741,7 @@ const TILE_TYPES = {
     },
     flame_jet_on: {
         layer: LAYERS.terrain,
+        connected_from: 'button_orange',
         activate(me, level) {
             level.transmute_tile(me, 'flame_jet_off');
         },
