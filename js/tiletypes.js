@@ -834,6 +834,12 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'gravel');
             }
+            else if (other.type.name === 'circuit_block') {
+                level.transmute_tile(me, 'floor');
+                me.wire_directions = other.wire_directions;
+                level.transmute_tile(other, 'splash');
+                
+            }
             else if (other.type.is_real_player) {
                 level.fail('drowned', me, other);
             }
