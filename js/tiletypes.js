@@ -1974,7 +1974,11 @@ const TILE_TYPES = {
                             }
                             if (thing.type.name != things[(k - 1 + things.length) % things.length].type.name)
                             {
-                                level.transmute_tile(thing, things[(k + 1) % things.length].type.name);
+                                let old_thing = things[(k + 1) % things.length];
+                                level.transmute_tile(thing, old_thing.type.name);
+                                if (old_thing.type.on_clone) {
+                                    old_thing.type.on_clone(thing, old_thing);
+                                }
                             }
                             break;
                         }
