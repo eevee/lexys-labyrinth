@@ -97,6 +97,12 @@ const OBITUARIES = {
         "inadequate insulation",
         "rode the lightning",
     ],
+    fell: [
+        "some say she's still falling",
+        "look before you leap",
+        "where's my ladder",
+        "it's dark down here",
+    ],
     generic: [
         "you had a bad time",
     ],

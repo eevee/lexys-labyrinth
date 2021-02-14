@@ -1605,6 +1605,8 @@ const EDITOR_PALETTE = [{
         'turntable_cw',
         'turntable_ccw',
         'electrified_floor',
+        'hole',
+        'cracked_floor',
     ],
 }];
 
@@ -2206,6 +2208,14 @@ const EDITOR_TILE_DESCRIPTIONS = {
     electrified_floor: {
         name: "Electrified Floor",
         desc: "Conducts power (like a blue teleporter). While powered, destroys anything not wearing lightning boots (except dirt blocks).",
+    },
+    hole: {
+        name: "Hole",
+        desc: "A bottomless pit. Destroys everything (except ghosts).",
+    },
+    cracked_floor: {
+        name: "Cracked Floor",
+        desc: "Turns into a hole when something steps off of it (except ghosts).",
     },
 };
 

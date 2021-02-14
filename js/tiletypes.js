@@ -172,6 +172,9 @@ function player_visual_state(me) {
     else if (me.fail_reason === 'electrocuted') {
         return 'burned'; //same gfx for now
     }
+    else if (me.fail_reason === 'fell') {
+        return 'fell';
+    }
     else if (me.fail_reason) {
         return 'failed';
     }
@@ -1041,6 +1044,45 @@ const TILE_TYPES = {
             else {
                 level.sfx.play_once('bomb', me.cell);
                 level.transmute_tile(other, 'explosion');
+            }
+        },
+    },
+    hole: {
+        layer: LAYERS.terrain,
+        on_begin(me, level) {
+            var one_north = level.cell(me.cell.x, me.cell.y - 1);
+            if (one_north === null || one_north.get_terrain().type.name != 'hole') {
+                level._set_tile_prop(me, 'visual_state', 'north');
+            }
+            else {
+                level._set_tile_prop(me, 'visual_state', 'open');
+            }
+        },
+        on_arrive(me, level, other) {
+            if (other.type.is_real_player) {
+                level.fail('fell', me, other);
+            }
+            else {
+                level.transmute_tile(other, 'puff');
+            }
+        },
+        visual_state(me) {
+            return (me && me.visual_state) ?? 'open';
+        },
+    },
+    cracked_floor: {
+        layer: LAYERS.terrain,
+        on_depart(me, level, other) {
+            level.spawn_animation(me.cell, 'puff');
+            level.transmute_tile(me, 'hole');
+            if (other === level.player) {
+                level.sfx.play_once('popwall', me.cell);
+            }
+            //update hole visual state
+            me.type.on_begin(me, level);
+            var one_south = level.cell(me.cell.x, me.cell.y + 1);
+            if (one_south !== null && one_south.get_terrain().type.name == 'hole') {
+                me.type.on_begin(one_south.get_terrain(), level);
             }
         },
     },
@@ -2541,6 +2583,7 @@ const TILE_TYPES = {
             'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
             // Ghosts don't activate swivels or popwalls
             'popwall', 'swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw',
+            'hole', 'cracked_floor',
         ]),
         movement_speed: 4,
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief

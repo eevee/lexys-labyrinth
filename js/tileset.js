@@ -496,6 +496,7 @@ export const CC2_TILESET_LAYOUT = {
         burned: [1, 5],
         exploded: [1, 5],
         failed: [1, 5],
+        fell: [5, 39],
     },
     // Do a quick spin I guess??
     player1_exit: [[0, 22], [8, 22], [0, 23], [8, 23]],
@@ -627,6 +628,7 @@ export const CC2_TILESET_LAYOUT = {
         burned: [1, 5],
         exploded: [1, 5],
         failed: [1, 5],
+        fell: [5, 39],
     },
     player2_exit: [[0, 27], [8, 27], [0, 28], [8, 28]],
     fire: [
@@ -1053,6 +1055,12 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
         active: [[5, 41], [6, 41], [7, 41]],
         inactive: [4, 41],
     },
+    hole: {
+        __special__: 'visual-state',
+        north: [8, 41],
+        open: [9, 41],
+    },
+    cracked_floor: [11, 43],
 });
 
 export const TILESET_LAYOUTS = {

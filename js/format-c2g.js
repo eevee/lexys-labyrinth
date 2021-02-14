@@ -791,6 +791,14 @@ const TILE_ENCODING = {
         name: 'electrified_floor',
         is_extension: true,
     },
+    0xd1: {
+        name: 'hole',
+        is_extension: true,
+    },
+    0xd2: {
+        name: 'cracked_floor',
+        is_extension: true,
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,
