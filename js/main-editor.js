@@ -1604,6 +1604,7 @@ const EDITOR_PALETTE = [{
         'fire_sticks',
         'turntable_cw',
         'turntable_ccw',
+        'electrified_floor',
     ],
 }];
 
@@ -2201,6 +2202,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
     turntable_ccw: {
         name: "Turntable (Counterclockwise)",
         desc: "Rotates anything entering this tile counterclockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
+    },
+    electrified_floor: {
+        name: "Electrified Floor",
+        desc: "Conducts power (like a blue teleporter). While powered, destroys anything not wearing lightning boots (except dirt blocks).",
     },
 };
 

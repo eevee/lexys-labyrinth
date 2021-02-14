@@ -787,6 +787,10 @@ const TILE_ENCODING = {
     },
 
     // LL-specific tiles
+    0xd0: {
+        name: 'electrified_floor',
+        is_extension: true,
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,

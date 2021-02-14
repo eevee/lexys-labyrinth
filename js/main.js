@@ -91,6 +91,12 @@ const OBITUARIES = {
         "no place to be",
         "on a trip to nowhere",
     ],
+    electrocuted: [
+        "a shocking revelation",
+        "danger: high voltage",
+        "inadequate insulation",
+        "rode the lightning",
+    ],
     generic: [
         "you had a bad time",
     ],

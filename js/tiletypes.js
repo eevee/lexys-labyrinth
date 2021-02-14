@@ -169,6 +169,9 @@ function player_visual_state(me) {
     else if (me.fail_reason === 'slimed') {
         return 'slimed';
     }
+    else if (me.fail_reason === 'electrocuted') {
+        return 'burned'; //same gfx for now
+    }
     else if (me.fail_reason) {
         return 'failed';
     }
@@ -1108,7 +1111,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all,
         is_actor: true,
         is_block: true,
-        ignores: new Set(['fire', 'flame_jet_on']),
+        ignores: new Set(['fire', 'flame_jet_on', 'electrified_floor']),
         can_reverse_on_railroad: true,
         movement_speed: 4,
     },
@@ -1885,6 +1888,44 @@ const TILE_TYPES = {
             me.type.activate(me, level);
         },
     },
+    electrified_floor: {
+        layer: LAYERS.terrain,
+        wire_propagation_mode: 'all',
+        on_begin(me, level) {
+            // TODO if wire destruction is ever allowed, this will need to update somehow
+            me.is_wired = level.is_tile_wired(me, false);
+            me.is_active = ! me.is_wired;
+        },
+        on_tic(me, level) {
+            if (me.is_active)
+            {
+                let actor = me.cell.get_actor();
+                if (actor && actor.movement_cooldown <= 0 && ! actor.ignores(me.type.name)) {
+                    if (actor.type.is_real_player) {
+                        level.fail('electrocuted', me, actor);
+                    }
+                    else {
+                        level.sfx.play_once('bomb', me.cell);
+                        level.transmute_tile(actor, 'explosion');
+                    }
+                }
+                }
+        },
+        on_power(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
+        },
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
+        visual_state(me) {
+            return ! me || me.is_active ? 'active' : 'inactive';
+        },
+    },
+    
     // Buttons
     button_blue: {
         layer: LAYERS.terrain,
@@ -2855,6 +2896,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_ignores: new Set(['electrified_floor']),
     },
     speed_boots: {
         layer: LAYERS.item,

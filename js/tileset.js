@@ -1048,6 +1048,11 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
         active: [8, 43],
         inactive: [10, 43],
     },
+    electrified_floor: {
+        __special__: 'visual-state',
+        active: [[5, 41], [6, 41], [7, 41]],
+        inactive: [4, 41],
+    },
 });
 
 export const TILESET_LAYOUTS = {
