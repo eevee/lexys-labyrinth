@@ -690,7 +690,7 @@ export class Level extends LevelInterface {
                     }
                 }
             }
-			return;
+            return;
         }
 
         // Orange buttons do a really weird diamond search
@@ -704,7 +704,7 @@ export class Level extends LevelInterface {
                     }
                 }
                 if (target !== null) {
-					connectable.connection = target;
+                    connectable.connection = target;
                     break;
                 }
             }
@@ -2511,13 +2511,19 @@ export class Level extends LevelInterface {
             }
             
             //if we made a button or something that's buttonable, update accordingly
-            if (new_type.connects_to)
+            if (new_type.connects_to && (new_type.connects_to !== old_type.connects_to))
             {
                 this.connect_button(tile);
             }
-            else if (new_type.connected_from)
+            else if (new_type.connected_from && (new_type.connected_from !== old_type.connected_from))
             {
                 this.connect_buttons_to(tile);
+            }
+            
+            //ready the tile
+            if (new_type.on_begin)
+            {
+                new_type.on_begin(tile, this);
             }
             
             //TODO: update circuit networks?

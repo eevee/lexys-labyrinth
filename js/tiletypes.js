@@ -1430,13 +1430,16 @@ const TILE_TYPES = {
     trap: {
         layer: LAYERS.terrain,
         connected_from: 'button_brown',
+        on_begin(me, level) {
+            me.presses = 0;
+        },
         add_press_ready(me, level, other) {
             // Same as below, but without ejection
-            me.presses = (me.presses ?? 0) + 1;
+            me.presses = me.presses + 1;
         },
         // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
         add_press(me, level, is_wire = false) {
-            level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
+            level._set_tile_prop(me, 'presses', me.presses + 1);
             // TODO weird cc2 case that may or may not be a bug: actors aren't ejected if the trap
             // opened because of wiring
             if (me.presses === 1 && ! is_wire) {
@@ -1450,7 +1453,7 @@ const TILE_TYPES = {
             }
         },
         remove_press(me, level) {
-            level._set_tile_prop(me, 'presses', me.presses - 1);
+            level._set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
             if (me._initially_open) {
                 level._set_tile_prop(me, '_initially_open', false);
             }
