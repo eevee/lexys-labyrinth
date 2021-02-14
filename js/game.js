@@ -2458,22 +2458,26 @@ export class Level extends LevelInterface {
         
         //update static_on_tic_tiles
         //TODO: if which on_tic happens first ever matters, this will introduce a time travel bug where the order is changed by changing tiles then undoing that. hmm
-        if (old_type.on_tic && !new_type.on_tic)
+        //ignore actors (because e.g. lit_dynamite gets called every tic because it's an actor)
+        if (!new_type.is_actor)
         {
-            //search array and remove
-            for (let i = 0; i < this.static_on_tic_tiles.length; ++i)
+            if (old_type.on_tic && !new_type.on_tic)
             {
-                if (this.static_on_tic_tiles[i] == tile)
+                //search array and remove
+                for (let i = 0; i < this.static_on_tic_tiles.length; ++i)
                 {
-                    this.static_on_tic_tiles.splice(i, 1);
-                    break;
+                    if (this.static_on_tic_tiles[i] == tile)
+                    {
+                        this.static_on_tic_tiles.splice(i, 1);
+                        break;
+                    }
                 }
             }
-        }
-        else if (!old_type.on_tic && new_type.on_tic)
-        {
-            //add to end of array
-            this.static_on_tic_tiles.push(tile);
+            else if (!old_type.on_tic && new_type.on_tic)
+            {
+                //add to end of array
+                this.static_on_tic_tiles.push(tile);
+            }
         }
         
         //TODO: update circuit networks?
