@@ -1063,6 +1063,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     cracked_floor: [11, 43],
     cracked_ice: [7, 40],
     score_5x: [10, 40],
+    spikes: [5, 40],
 });
 
 export const TILESET_LAYOUTS = {

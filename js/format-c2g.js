@@ -808,6 +808,10 @@ const TILE_ENCODING = {
         has_next: true,
         is_extension: true,
     },
+    0xd5: {
+        name: 'spikes',
+        is_extension: true,
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,
