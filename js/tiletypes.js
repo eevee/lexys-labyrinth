@@ -259,7 +259,7 @@ const TILE_TYPES = {
     floor: {
         layer: LAYERS.terrain,
         on_approach(me, level, other) {
-            if (other.type.name === 'blob') {
+            if (other.type.name === 'blob' || other.type.name === 'boulder') {
                 // Blobs spread slime onto floor
                 if (other.previous_cell && other.previous_cell.has('slime')) {
                     level.transmute_tile(me, 'slime');
@@ -830,6 +830,10 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'ice');
             }
+            else if (other.type.name === 'boulder') {
+                level.transmute_tile(other, 'splash');
+                level.transmute_tile(me, 'gravel');
+            }
             else if (other.type.is_real_player) {
                 level.fail('drowned', me, other);
             }
@@ -1021,7 +1025,7 @@ const TILE_TYPES = {
     slime: {
         layer: LAYERS.terrain,
         on_arrive(me, level, other) {
-            if (other.type.name === 'ghost' || other.type.name === 'blob') {
+            if (other.type.name === 'ghost' || other.type.name === 'blob' || other.type.name === 'boulder') {
                 // No effect
                 return;
             }
@@ -1185,6 +1189,7 @@ const TILE_TYPES = {
         pushes: {
             ice_block: true,
             frame_block: true,
+            boulder: true,
         },
         on_bumped(me, level, other) {
             // Fireballs melt ice blocks on regular floor FIXME and water!
@@ -1215,6 +1220,7 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             frame_block: true,
+            boulder: true,
         },
         on_clone(me, original) {
             me.arrows = new Set(original.arrows);
@@ -1226,6 +1232,43 @@ const TILE_TYPES = {
                 new_arrows.add(DIRECTIONS[arrow][turn]);
             }
             level._set_tile_prop(me, 'arrows', new_arrows);
+        },
+    },
+    boulder: {
+        layer: LAYERS.actor,
+        collision_mask: COLLISION.block_cc2,
+        blocks_collision: COLLISION.all,
+        is_actor: true,
+        is_block: true,
+        can_reveal_walls: true,
+        pushes: {
+            ice_block: true,
+            frame_block: true,
+            //boulders don't push each other; instead on_bumped will chain through them
+        },
+        ignores: new Set(['fire', 'flame_jet_on', 'electrified_floor']),
+        can_reverse_on_railroad: true,
+        movement_speed: 4,
+        decide_movement(me, level) {
+            if (me.rolling) {
+                level._set_tile_prop(me, 'rolling', false);
+                return [me.direction, null];
+            }
+            else {
+                return null;
+            }
+        },
+        on_bumped(me, level, other) {
+            if (other.type.name === 'boulder') {
+                level._set_tile_prop(me, 'rolling', true);
+                level._set_tile_prop(me, 'direction', other.direction);
+                level._set_tile_prop(other, 'rolling', false);
+            }
+        },
+        on_starting_move(me, level) {
+            if (!me.rolling) {
+                level._set_tile_prop(me, 'rolling', true);
+            }
         },
     },
     glass_block: {
@@ -1244,6 +1287,7 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             frame_block: true,
+            boulder: true,
         },
         on_clone(me, original) {
             me.arrows = new Set(original.arrows);
@@ -2490,6 +2534,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
         },
         movement_speed: 4,
         decide_movement(me, level) {
@@ -2641,6 +2686,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
         },
         on_ready(me, level) {
             me.current_emulatee = 0;
@@ -3004,6 +3050,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
         },
         infinite_items: {
             key_green: true,
@@ -3026,6 +3073,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
         },
         infinite_items: {
             key_yellow: true,
@@ -3047,6 +3095,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
         },
         infinite_items: {
             key_green: true,
@@ -3072,6 +3121,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
         },
         infinite_items: {
             key_yellow: true,

@@ -1609,7 +1609,8 @@ const EDITOR_PALETTE = [{
         'cracked_floor',
         'cracked_ice',
         'score_5x',
-        'spikes'
+        'spikes',
+        'boulder',
     ],
 }];
 
@@ -2231,6 +2232,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
     spikes: {
         name: "Spikes",
         desc: "Stops players (and doppelgangers) unless they have hiking boots. Everything else can pass.",
+    },
+    boulder: {
+        name: "Boulder",
+        desc: "Similar to a dirt block, but rolls when pushed. Boulders transfer momentum to each other. Has ice block/frame block collision. Turns into gravel in water. Spreads slime.",
     },
 };
 

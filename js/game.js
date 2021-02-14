@@ -1577,6 +1577,10 @@ export class Level extends LevelInterface {
     move_to(actor, goal_cell, speed) {
         if (actor.cell === goal_cell)
             return;
+        
+        if (actor.type.on_starting_move) {
+            actor.type.on_starting_move(actor, this);
+        }
 
         let original_cell = actor.cell;
         // Physically remove the actor first, so that it won't get in the way of e.g. a splash

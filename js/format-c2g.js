@@ -812,6 +812,11 @@ const TILE_ENCODING = {
         name: 'spikes',
         is_extension: true,
     },
+    0xd6: {
+        name: 'boulder',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,
