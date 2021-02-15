@@ -1598,20 +1598,20 @@ const EDITOR_PALETTE = [{
         'gate_yellow',
         'gate_green',
         'sand',
-        'terraformer_n',
-        'global_cycler',
-        'halo',
+        'spikes',
+        'cracked_ice',
+        'hole',
+        'cracked_floor',
         'fire_sticks',
         'turntable_cw',
         'turntable_ccw',
         'electrified_floor',
-        'hole',
-        'cracked_floor',
-        'cracked_ice',
+        'halo',
         'score_5x',
-        'spikes',
         'boulder',
         'logic_gate/diode',
+        'terraformer_n',
+        'global_cycler',
     ],
 }];
 
@@ -2172,7 +2172,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     // Experimental
     circuit_block: {
         name: "Circuit block",
-        desc: "(Currently non-functional.)  May contain wires, which will connect to any adjacent wires and conduct power as normal.",
+        desc: "May contain wires, which will connect to any adjacent wires and conduct power as normal. When pushed into water, turns into floor with the same wires.",
     },
     gift_bow: {
         name: "Gift bow",
