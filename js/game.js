@@ -530,6 +530,7 @@ export class Level extends LevelInterface {
         }
 
         this.force_next_wire_phase = false;
+        this.undid_past_recalculate_circuitry = false;
         this.recalculate_circuitry(true);
 
         // Finally, let all tiles do custom init behavior...  but backwards, to match actor order
@@ -606,7 +607,7 @@ export class Level extends LevelInterface {
         }
     }
     
-    recalculate_circuitry(first_time = false) {
+    recalculate_circuitry(first_time = false, undoing = false) {
         // Build circuits out of connected wires
         // TODO document this idea
         
@@ -638,7 +639,7 @@ export class Level extends LevelInterface {
 
             let actor = cell.get_actor();
             let wire_directions = terrain.wire_directions;
-            if (actor?.wire_directions ?? null !== null)
+            if ((actor?.wire_directions ?? null !== null) && (actor.movement_cooldown === 0 || this.compat.tiles_react_instantly))
             {
                 wire_directions = actor.wire_directions;
             }
@@ -743,10 +744,11 @@ export class Level extends LevelInterface {
         
         if (!first_time) {
             this.force_next_wire_phase = true;
+            if (!undoing) {
+                this._push_pending_undo(() => this.undid_past_recalculate_circuitry = true);
+            }
         }
     }
-    
-    
 
     can_accept_input() {
         // We can accept input anytime the player can move, i.e. when they're not already moving and
@@ -2229,6 +2231,11 @@ export class Level extends LevelInterface {
         }
         this._undo_entry(this.undo_buffer[this.undo_buffer_index]);
         this.undo_buffer[this.undo_buffer_index] = null;
+        
+        if (this.undid_past_recalculate_circuitry) {
+            this.recalculate_circuitry(false, true);
+            this.undid_past_recalculate_circuitry = false;
+        }
     }
 
     // Reverse a single undo entry

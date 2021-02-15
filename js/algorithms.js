@@ -18,7 +18,7 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
                 
             let actor = cell.get_actor();
             let wire_directions = terrain.wire_directions;
-            if (actor?.wire_directions ?? null !== null)
+            if ((actor?.wire_directions ?? null !== null) && (actor.movement_cooldown === 0 || level.compat.tiles_react_instantly))
             {
                 wire_directions = actor.wire_directions;
             }
