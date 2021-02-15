@@ -1489,11 +1489,11 @@ const TILE_TYPES = {
     trap: {
         layer: LAYERS.terrain,
         on_begin(me, level) {
-            me.presses = 0;
+            level._set_tile_prop(me, 'presses', 0);
         },
         add_press_ready(me, level, other) {
             // Same as below, but without ejection
-            me.presses = me.presses + 1;
+            level._set_tile_prop(me, 'presses', me.presses + 1);
         },
         // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
         add_press(me, level, is_wire = false) {
