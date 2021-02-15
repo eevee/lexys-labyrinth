@@ -529,6 +529,7 @@ export class Level extends LevelInterface {
             this.connect_button(connectable);
         }
 
+        this.force_next_wire_phase = false;
         this.recalculate_circuitry(true);
 
         // Finally, let all tiles do custom init behavior...  but backwards, to match actor order
@@ -674,7 +675,7 @@ export class Level extends LevelInterface {
                     continue;
 
                 let circuit = {
-                    is_powered: false,
+                    is_powered: first_time ? false : null,
                     tiles: new Map,
                     inputs: new Map,
                 };
@@ -739,7 +740,13 @@ export class Level extends LevelInterface {
         }
         this.wired_outputs = Array.from(wired_outputs);
         this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
+        
+        if (!first_time) {
+            this.force_next_wire_phase = true;
+        }
     }
+    
+    
 
     can_accept_input() {
         // We can accept input anytime the player can move, i.e. when they're not already moving and
@@ -2012,8 +2019,14 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (! any_changed)
-            return;
+        if (! any_changed) {
+            if (this.force_next_wire_phase) {
+                this.force_next_wire_phase = false;
+            }
+            else {
+                return;
+            }
+        }
 
         for (let tile of this.wired_outputs) {
             // This is only used within this function, no need to undo
