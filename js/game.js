@@ -605,33 +605,6 @@ export class Level extends LevelInterface {
         }
     }
     
-    connect_buttons_to(tile) {
-        //iterate all terrain in the level for things that can connect to this
-        //if they didn't before and now do, commit and make an undo for it.
-        //otherwise, change it back (so we don't accidentally rewire other things)
-         for (var i = 0; i < this.width; ++i)
-        {
-            for (var j = 0; j < this.height; ++j)
-            {
-                let terrain = this.cell(i, j).get_terrain();
-                if (terrain.type.name === tile.type.connected_from)
-                {
-                    let old_connection = terrain.connection;
-                    this.connect_button(terrain);
-                    if (terrain.connection === tile)
-                    {
-                        terrain.connection = old_connection;
-                        this._set_tile_prop(terrain, 'connection', tile);
-                    }
-                    else
-                    {
-                        terrain.connection = old_connection;
-                    }
-                }
-            }
-        }
-    }
-    
     recalculate_circuitry(first_time = false) {
         // Build circuits out of connected wires
         // TODO document this idea
@@ -2534,14 +2507,10 @@ export class Level extends LevelInterface {
                 this.static_on_tic_tiles.push(tile);
             }
             
-            //if we made a button or something that's buttonable, update accordingly
+            //if we made a button, update accordingly
             if (new_type.connects_to && (new_type.connects_to !== old_type.connects_to))
             {
                 this.connect_button(tile);
-            }
-            else if (new_type.connected_from && (new_type.connected_from !== old_type.connected_from))
-            {
-                this.connect_buttons_to(tile);
             }
             
             //ready the tile
