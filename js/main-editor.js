@@ -1607,6 +1607,7 @@ const EDITOR_PALETTE = [{
         'turntable_ccw',
         'electrified_floor',
         'halo',
+        'item_lock',
         'score_5x',
         'boulder',
         'logic_gate/diode',
@@ -2241,6 +2242,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
     boulder: {
         name: "Boulder",
         desc: "Similar to a dirt block, but rolls when pushed. Boulders transfer momentum to each other. Has ice block/frame block collision. Turns into gravel in water. Spreads slime.",
+    },
+    item_lock: {
+        name: "Item Lock",
+        desc: "When placed atop an item, you must have that item to enter the tile. When you do, pay the item and destroy the item lock. Also can be placed on top of a bonus, and you must pay that amount of bonus to enter.",
     },
 };
 

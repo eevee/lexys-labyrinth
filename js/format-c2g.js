@@ -820,6 +820,11 @@ const TILE_ENCODING = {
         has_next: true,
         extra_args: [arg_direction],
     },
+    0xd7: {
+        name: 'item_lock',
+        has_next: true,
+        is_extension: true,
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,

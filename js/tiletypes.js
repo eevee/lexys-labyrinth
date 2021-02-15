@@ -1171,6 +1171,60 @@ const TILE_TYPES = {
         layer: LAYERS.item_mod,
         item_modifier: 'pickup',
     },
+    item_lock: {
+        layer: LAYERS.item_mod,
+        item_modifier: 'ignore',
+        blocks(me, level, other) {
+            let item = me.cell.get_item();
+            if (item === null) {
+                return false;
+            }
+            if (item.type.name == 'score_10') {
+                return !(other.type.is_real_player && level.bonus_points >= 10);
+            }
+            else if (item.type.name == 'score_100') {
+                return !(other.type.is_real_player && level.bonus_points >= 100);
+            }
+            else if (item.type.name == 'score_1000') {
+                return !(other.type.is_real_player && level.bonus_points >= 1000);
+            }
+            else if (item.type.name == 'score_2x') {
+                return !(other.type.is_real_player && level.bonus_points >= 1);
+            }
+            else if (item.type.name == 'score_5x') {
+                return !(other.type.is_real_player && level.bonus_points >= 1);
+            }
+            return !other.has_item(item.type.name);
+        },
+        on_arrive(me, level, other) {
+            let item = me.cell.get_item();
+            if (item === null) {
+                return;
+            }
+            if (item.type.name == 'score_10') {
+                level.adjust_bonus(-10);
+            }
+            else if (item.type.name == 'score_100') {
+                level.adjust_bonus(-100);
+            }
+            else if (item.type.name == 'score_1000') {
+                level.adjust_bonus(-1000);
+            }
+            else if (item.type.name == 'score_2x') {
+                level.adjust_bonus(0, 1/2);
+            }
+            else if (item.type.name == 'score_5x') {
+                level.adjust_bonus(0, 1/5);
+            }
+            else {
+                level.take_key_from_actor(other, item.type.name, true) || level.take_tool_from_actor(other, item.type.name);
+            }
+            level.sfx.play_once('door', me.cell);
+            level.spawn_animation(me.cell, 'puff');
+            level.remove_tile(me);
+            level.remove_tile(item);
+        },
+    },
 
     // Mechanisms
     dirt_block: {

@@ -1071,6 +1071,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     score_5x: [10, 40],
     spikes: [5, 40],
     boulder: [8, 40],
+    item_lock: [12, 43],
 });
 
 export const TILESET_LAYOUTS = {

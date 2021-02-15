@@ -2646,9 +2646,9 @@ export class Level extends LevelInterface {
         return true;
     }
 
-    take_key_from_actor(actor, name) {
+    take_key_from_actor(actor, name, ignore_infinity = false) {
         if (actor.keyring && (actor.keyring[name] ?? 0) > 0) {
-            if (actor.type.infinite_items && actor.type.infinite_items[name]) {
+            if (!ignore_infinity && actor.type.infinite_items && actor.type.infinite_items[name]) {
                 // Some items can't be taken away normally, by which I mean, green or yellow keys
                 return true;
             }
