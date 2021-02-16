@@ -2250,7 +2250,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     dash_floor: {
         name: "Dash Floor",
-        desc: "Anything walking on it moves at double speed.",
+        desc: "Anything walking on it moves at double speed. Stacks with speed shoes!",
     },
 };
 
