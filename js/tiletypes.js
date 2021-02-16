@@ -711,6 +711,10 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         speed_factor: 0.5,
     },
+	dash_floor: {
+        layer: LAYERS.terrain,
+        speed_factor: 2,
+    },
     spikes: {
         layer: LAYERS.terrain,
         blocks(me, level, other) {

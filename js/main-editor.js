@@ -1598,6 +1598,7 @@ const EDITOR_PALETTE = [{
         'gate_yellow',
         'gate_green',
         'sand',
+        'dash_floor',
         'spikes',
         'cracked_ice',
         'hole',
@@ -2246,6 +2247,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
     item_lock: {
         name: "Item Lock",
         desc: "When placed atop an item, you must have that item to enter the tile. When you do, pay the item and destroy the item lock. Also can be placed on top of a bonus, and you must pay that amount of bonus to enter.",
+    },
+    dash_floor: {
+        name: "Dash Floor",
+        desc: "Anything walking on it moves at double speed.",
     },
 };
 
