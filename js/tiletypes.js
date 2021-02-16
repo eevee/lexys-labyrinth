@@ -112,9 +112,33 @@ function activate_terraformer(me, level, dx, dy) {
     {
         let old_terrain = old_cell.get_terrain();
         let new_terrain = new_cell.get_terrain();
-        if (old_terrain.type.name != new_terrain.type.name)
+        if (old_terrain.type.name != new_terrain.type.name
+        || (old_terrain.type.name == 'railroad' && old_terrain.tracks !== new_terrain.track)
+        || (old_terrain.type.name == 'logic_gate' && (old_terrain.gate_type !== new_terrain.gate_type || old_terrain.direction !== new_terrain.direction))
+        || old_terrain.wire_directions !== new_terrain.wire_directions
+        )
         {
-            level.transmute_tile(new_cell.get_terrain(), old_terrain.type.name);
+            let changed_wiring_properties = false;
+            //hardcode-change some extended terrain properties before we transmute and call on_begin
+            //TODO: would be nice to have a per-type 'on_clone' and 'equality_check'
+            if (old_terrain.type.name == 'railroad') {
+                level._set_tile_prop(new_terrain, 'tracks', old_terrain.tracks);
+                level._set_tile_prop(new_terrain, 'track_switch', old_terrain.track_switch);
+            }
+            if (old_terrain.type.name == 'logic_gate') {
+                level._set_tile_prop(new_terrain, 'gate_type', old_terrain.gate_type);
+                level._set_tile_prop(new_terrain, 'direction', old_terrain.direction);
+                changed_wiring_properties = true;
+            }
+            if (old_terrain.wire_directions !== new_terrain.wire_directions) {
+                level._set_tile_prop(new_terrain, 'wire_directions', old_terrain.wire_directions);
+                changed_wiring_properties = true;
+            }
+            
+            level.transmute_tile(new_terrain, old_terrain.type.name);
+            if (changed_wiring_properties) {
+                level.recalculate_circuitry();
+            }
             did_something = true;
         }
     }
