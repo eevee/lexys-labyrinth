@@ -1072,7 +1072,7 @@ class WireOperation extends DrawOperation {
                 // TODO probably a better way to do this
                 if (! tile)
                     continue;
-                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block', 'teleport_blue_exit'].indexOf(tile.type.name) < 0)
+                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block', 'teleport_blue_exit', 'turntable_cw', 'turntable_ccw'].indexOf(tile.type.name) < 0)
                     continue;
 
                 tile = {...tile};

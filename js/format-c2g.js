@@ -906,10 +906,12 @@ const TILE_ENCODING = {
     },
     0xef: {
         name: 'turntable_cw',
+        modifier: modifier_wire,
         is_extension: true,
     },
     0xf0: {
         name: 'turntable_ccw',
+        modifier: modifier_wire,
         is_extension: true,
     },
 };

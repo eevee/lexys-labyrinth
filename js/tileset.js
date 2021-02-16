@@ -1047,14 +1047,22 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     halo: [5, 43],
     fire_sticks: [6, 43],
     turntable_cw: {
-        __special__: 'visual-state',
-        active: [7, 43],
-        inactive: [9, 43],
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: [7, 43],
+            inactive: [9, 43],
+        }
     },
     turntable_ccw: {
-        __special__: 'visual-state',
-        active: [8, 43],
-        inactive: [10, 43],
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: [8, 43],
+            inactive: [10, 43],
+        }
     },
     electrified_floor: {
         __special__: 'visual-state',

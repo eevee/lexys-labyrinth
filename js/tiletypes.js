@@ -747,8 +747,7 @@ const TILE_TYPES = {
     },
     turntable_cw: {
         layer: LAYERS.terrain,
-        //note: should be wireable in exactly the same way as a transmogrifier
-        wire_propagation_mode: 'none',
+        wire_propagation_mode: 'all',
         on_begin(me, level) {
             // TODO if wire destruction is ever allowed, this will need to update somehow
             me.is_wired = level.is_tile_wired(me, false);
@@ -778,8 +777,7 @@ const TILE_TYPES = {
     },
     turntable_ccw: {
         layer: LAYERS.terrain,
-        //note: should be wireable in exactly the same way as a transmogrifier
-        wire_propagation_mode: 'none',
+        wire_propagation_mode: 'all',
         on_begin(me, level) {
             // TODO if wire destruction is ever allowed, this will need to update somehow
             me.is_wired = level.is_tile_wired(me, false);
