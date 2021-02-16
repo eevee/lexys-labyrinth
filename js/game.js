@@ -2156,7 +2156,7 @@ export class Level extends LevelInterface {
     }
     
     //same as above, but accepts multiple tiles
-    *iter_tiles_in_reading_order(start_cell, names, reverse = false) {
+    *iter_tiles_in_reading_order_multiple(start_cell, names, reverse = false) {
         let i = this.coords_to_scalar(start_cell.x, start_cell.y);
         let index = TILE_TYPES[names[0]].layer;
         while (true) {

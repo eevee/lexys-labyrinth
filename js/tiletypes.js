@@ -1647,7 +1647,7 @@ const TILE_TYPES = {
                 // TODO cc2 has a bug where, once it wraps around to the bottom right, it seems to
                 // forget that it was ever looking for an unwired teleport and will just grab the
                 // first one it sees
-                for (let dest of level.iter_tiles_in_reading_order(me.cell, ['teleport_blue', 'teleport_blue_exit'], true)) {
+                for (let dest of level.iter_tiles_in_reading_order_multiple(me.cell, ['teleport_blue', 'teleport_blue_exit'], true)) {
                     if (! dest.wire_directions) {
                         yield [dest, exit_direction];
                     }
