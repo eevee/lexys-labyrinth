@@ -743,6 +743,19 @@ export class Level extends LevelInterface {
         this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
         
         if (!first_time) {
+			//update wireables
+			 for (var i = 0; i < this.width; ++i)
+			{
+				for (var j = 0; j < this.height; ++j)
+				{
+					let terrain = this.cell(i, j).get_terrain();
+					if (terrain.is_wired !== undefined)
+					{
+						terrain.type.on_begin(terrain, this);
+					}
+				}
+			}
+			
             this.force_next_wire_phase = true;
             if (!undoing) {
                 this._push_pending_undo(() => this.undid_past_recalculate_circuitry = true);
