@@ -89,6 +89,30 @@ function _define_gate(key) {
     };
 }
 
+function update_wireable(me, level) {
+    if (me.is_wired === undefined) {
+        //start of the level/first time, then
+        me.is_wired = level.is_tile_wired(me, false);
+        me.is_active = !me.is_wired;
+    }
+    else {
+        let new_is_wired = level.is_tile_wired(me, false);
+        if (new_is_wired && !me.is_wired)
+        {
+            //connected
+            level._set_tile_prop(me, 'is_wired', true);
+            //TODO: it'll always get on_power called later if it's wired to something already given power, right?
+            level._set_tile_prop(me, 'is_active', false);
+        }
+        else if (!new_is_wired && me.is_wired)
+        {
+            //disconnected
+            level._set_tile_prop(me, 'is_wired', false);
+            level._set_tile_prop(me, 'is_active', true);
+        }
+    }
+}
+
 function activate_terraformer(me, level, dx, dy) {
     //decide if we're copying from our own tile (if we have an item) or the tile behind us (otherwise)
     let did_something = false;
@@ -137,7 +161,7 @@ function activate_terraformer(me, level, dx, dy) {
             
             level.transmute_tile(new_terrain, old_terrain.type.name);
             if (changed_wiring_properties) {
-                level.recalculate_circuitry();
+                level.recalculate_circuitry_next_wire_phase = true;
             }
             did_something = true;
         }
@@ -749,9 +773,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
         on_begin(me, level) {
-            // TODO if wire destruction is ever allowed, this will need to update somehow
-            me.is_wired = level.is_tile_wired(me, false);
-            me.is_active = ! me.is_wired;
+            update_wireable(me, level);
         },
         on_arrive(me, level, other) {
             if (! me.is_active)
@@ -779,9 +801,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
         on_begin(me, level) {
-            // TODO if wire destruction is ever allowed, this will need to update somehow
-            me.is_wired = level.is_tile_wired(me, false);
-            me.is_active = ! me.is_wired;
+            update_wireable(me, level);
         },
         on_arrive(me, level, other) {
             if (! me.is_active)
@@ -864,7 +884,7 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'floor');
                 level._set_tile_prop(me, 'wire_directions', other.wire_directions);
                 level.transmute_tile(other, 'splash');
-                level.recalculate_circuitry();
+                level.recalculate_circuitry_next_wire_phase = true;
             }
             else if (other.type.is_real_player) {
                 level.fail('drowned', me, other);
@@ -1593,9 +1613,7 @@ const TILE_TYPES = {
         },
         _blob_mogrifications: ['glider', 'paramecium', 'fireball', 'bug', 'walker', 'ball', 'teeth', 'tank_blue', 'teeth_timid'],
         on_begin(me, level) {
-            // TODO if wire destruction is ever allowed, this will need to update somehow
-            me.is_wired = level.is_tile_wired(me, false);
-            me.is_active = ! me.is_wired;
+            update_wireable(me, level);
         },
         on_arrive(me, level, other) {
             // Note: Transmogrifiers technically contain wires the way teleports do, and CC2 uses
@@ -1723,12 +1741,10 @@ const TILE_TYPES = {
         wire_propagation_mode: 'none',
         teleport_allow_override: true,
         on_begin(me, level) {
-            // TODO if wire destruction is ever allowed, this will need to update somehow
             // FIXME must be connected to something that can convey current: a wire, a switch, a
             // blue teleporter, etc; NOT nothing, a wall, a transmogrifier, a force floor, etc.
             // this is also how blue teleporters, transmogrifiers, and railroads work!
-            me.is_wired = level.is_tile_wired(me);
-            me.is_active = ! me.is_wired;
+            update_wireable(me, level);
         },
         *teleport_dest_order(me, level, other) {
             // Wired red teleporters can be turned off, which disconnects them from every other red
@@ -2093,9 +2109,8 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
         on_begin(me, level) {
-            // TODO if wire destruction is ever allowed, this will need to update somehow
-            me.is_wired = level.is_tile_wired(me, false);
-            me.is_active = ! me.is_wired;
+            level._set_tile_prop(me, 'wire_directions', 15);
+            level.recalculate_circuitry_next_wire_phase = true;
         },
         on_tic(me, level) {
             if (me.is_active)
@@ -2110,17 +2125,13 @@ const TILE_TYPES = {
                         level.transmute_tile(actor, 'explosion');
                     }
                 }
-                }
+            }
         },
         on_power(me, level) {
-            if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', true);
-            }
+            level._set_tile_prop(me, 'is_active', true);
         },
         on_depower(me, level) {
-            if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', false);
-            }
+            level._set_tile_prop(me, 'is_active', false);
         },
         visual_state(me) {
             return ! me || me.is_active ? 'active' : 'inactive';
@@ -2512,10 +2523,10 @@ const TILE_TYPES = {
             me.wire_directions = original.wire_directions;
         },
         on_starting_move(me, level) {
-            level.recalculate_circuitry();
+            level.recalculate_circuitry_next_wire_phase = true;
         },
         on_finishing_move(me, level) {
-            level.recalculate_circuitry();
+            level.recalculate_circuitry_next_wire_phase = true;
         },
     },
 

@@ -529,7 +529,7 @@ export class Level extends LevelInterface {
             this.connect_button(connectable);
         }
 
-        this.force_next_wire_phase = false;
+        this.recalculate_circuitry_next_wire_phase = false;
         this.undid_past_recalculate_circuitry = false;
         this.recalculate_circuitry(true);
 
@@ -756,7 +756,6 @@ export class Level extends LevelInterface {
                 }
             }
             
-            this.force_next_wire_phase = true;
             if (!undoing) {
                 this._push_pending_undo(() => this.undid_past_recalculate_circuitry = true);
             }
@@ -1969,6 +1968,14 @@ export class Level extends LevelInterface {
     }
 
     _do_wire_phase() {
+        let force_next_wire_phase = false;
+        if (this.recalculate_circuitry_next_wire_phase)
+        {
+            this.recalculate_circuitry();
+            this.recalculate_circuitry_next_wire_phase = false;
+            force_next_wire_phase = true;
+        }
+        
         if (this.circuits.length === 0)
             return;
 
@@ -2014,7 +2021,7 @@ export class Level extends LevelInterface {
                 this._set_tile_prop(tile, 'emitting_edges', emitting);
             }
         }
-        // Next, actors who are standing still, on floor, and holding a lightning bolt
+        // Next, actors who are standing still, on floor/electrified, and holding a lightning bolt
         let externally_powered_circuits = new Set;
         for (let actor of this.actors) {
             if (! actor.cell)
@@ -2022,7 +2029,7 @@ export class Level extends LevelInterface {
             let emitting = 0;
             if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
                 let wired_tile = actor.cell.get_wired_tile();
-                if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor')) {
+                if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor' || wired_tile.type.name === 'electrified_floor')) {
                     emitting = wired_tile.wire_directions;
                     for (let circuit of wired_tile.circuits) {
                         if (circuit) {
@@ -2037,13 +2044,8 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (! any_changed) {
-            if (this.force_next_wire_phase) {
-                this.force_next_wire_phase = false;
-            }
-            else {
-                return;
-            }
+        if (! any_changed && !force_next_wire_phase) {
+            return;
         }
 
         for (let tile of this.wired_outputs) {
@@ -2276,7 +2278,7 @@ export class Level extends LevelInterface {
         this.undo_buffer[this.undo_buffer_index] = null;
         
         if (this.undid_past_recalculate_circuitry) {
-            this.recalculate_circuitry(false, true);
+            this.recalculate_circuitry_next_wire_phase = true;
             this.undid_past_recalculate_circuitry = false;
         }
     }
@@ -2588,7 +2590,7 @@ export class Level extends LevelInterface {
             (new_type.is_power_source !== old_type.is_power_source) ||
             (new_type.wire_propagation_mode !== old_type.wire_propagation_mode))
             {
-                this.recalculate_circuitry();
+                this.recalculate_circuitry_next_wire_phase = true;
             }
         }
     }

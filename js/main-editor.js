@@ -2219,7 +2219,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     electrified_floor: {
         name: "Electrified floor",
-        desc: "Conducts power (like a blue teleporter). While powered, destroys anything not wearing lightning boots (except dirt blocks).",
+        desc: "Conducts power (like a 4-way wire). While powered, destroys anything not wearing lightning boots (except dirt blocks).",
     },
     hole: {
         name: "Hole",
