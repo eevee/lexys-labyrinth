@@ -2540,12 +2540,10 @@ export class Level extends LevelInterface {
             }
             
             //recalculate circuitry
-            //TODO: this does weird things with on/off switches, seemingly because of the 1 frame delay.
-            //anyway, we don't want to recalculate_circuitry just because the tile has wire directions now, unless they're different from what they used to be. but that seems unlikely unless on_begin added them...
-            //but we'd like transmuting into an on/off switch to work as expected, so I should look into it sometime
-            if (/*tile.wire_directions ||*/
-            (new_type.is_power_source && (new_type.is_power_source !== old_type.is_power_source)) ||
-            (new_type.wire_propagation_mode && (new_type.wire_propagation_mode !== old_type.wire_propagation_mode)))
+            if (
+            ((new_type.on_power !== undefined) !== (old_type.on_power !== undefined)) ||
+            (new_type.is_power_source !== old_type.is_power_source) ||
+            (new_type.wire_propagation_mode !== old_type.wire_propagation_mode))
             {
                 this.recalculate_circuitry();
             }
