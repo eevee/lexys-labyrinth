@@ -2154,6 +2154,33 @@ export class Level extends LevelInterface {
                 return;
         }
     }
+    
+    //same as above, but accepts multiple tiles
+    *iter_tiles_in_reading_order(start_cell, names, reverse = false) {
+        let i = this.coords_to_scalar(start_cell.x, start_cell.y);
+        let index = TILE_TYPES[names[0]].layer;
+        while (true) {
+            if (reverse) {
+                i -= 1;
+                if (i < 0) {
+                    i += this.size_x * this.size_y;
+                }
+            }
+            else {
+                i += 1;
+                i %= this.size_x * this.size_y;
+            }
+
+            let cell = this.linear_cells[i];
+            let tile = cell[index];
+            if (tile && names.indexOf(tile.type.name) >= 0) {
+                yield tile;
+            }
+
+            if (cell === start_cell)
+                return;
+        }
+    }
 
     // Iterates over the grid in a diamond pattern, spreading out from the given start cell (but not
     // including it).  Only used for connecting orange buttons.

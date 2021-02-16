@@ -829,6 +829,11 @@ const TILE_ENCODING = {
         name: 'dash_floor',
         is_extension: true,
     },
+    0xd9: {
+        name: 'teleport_blue_exit',
+        modifier: modifier_wire,
+        is_extension: true,
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,

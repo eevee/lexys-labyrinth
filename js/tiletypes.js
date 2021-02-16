@@ -1647,7 +1647,7 @@ const TILE_TYPES = {
                 // TODO cc2 has a bug where, once it wraps around to the bottom right, it seems to
                 // forget that it was ever looking for an unwired teleport and will just grab the
                 // first one it sees
-                for (let dest of level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true)) {
+                for (let dest of level.iter_tiles_in_reading_order(me.cell, ['teleport_blue', 'teleport_blue_exit'], true)) {
                     if (! dest.wire_directions) {
                         yield [dest, exit_direction];
                     }
@@ -1680,7 +1680,7 @@ const TILE_TYPES = {
                 walked_circuits.add(circuit);
 
                 for (let [tile, edges] of circuit.tiles.entries()) {
-                    if (tile.type === me.type) {
+                    if (tile.type === me.type || tile.type.name === 'teleport_blue_exit') {
                         candidate_teleporters.add(tile);
                     }
                     else if (tile.type.name === 'logic_gate' && ! circuit.inputs.get(tile)) {
@@ -1714,6 +1714,10 @@ const TILE_TYPES = {
                 yield [dest, exit_direction];
             }
         },
+    },
+    teleport_blue_exit: {
+        layer: LAYERS.terrain,
+        wire_propagation_mode: 'all',
     },
     teleport_red: {
         layer: LAYERS.terrain,

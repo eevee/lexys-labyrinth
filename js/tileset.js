@@ -1073,6 +1073,11 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     boulder: [8, 40],
     item_lock: [12, 43],
     dash_floor: [[0, 44], [1, 44], [2, 44], [3, 44], [4, 44], [5, 44], [6, 44], [7, 44]],
+    teleport_blue_exit: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: [11, 41],
+    },
 });
 
 export const TILESET_LAYOUTS = {

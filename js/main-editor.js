@@ -1072,7 +1072,7 @@ class WireOperation extends DrawOperation {
                 // TODO probably a better way to do this
                 if (! tile)
                     continue;
-                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block'].indexOf(tile.type.name) < 0)
+                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block', 'teleport_blue_exit'].indexOf(tile.type.name) < 0)
                     continue;
 
                 tile = {...tile};
@@ -1606,6 +1606,7 @@ const EDITOR_PALETTE = [{
         'fire_sticks',
         'turntable_cw',
         'turntable_ccw',
+        'teleport_blue_exit',
         'electrified_floor',
         'halo',
         'item_lock',
@@ -2197,7 +2198,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
         desc: "When activated, if there's an item on its tile, copies the item to the tile in front of it. Otherwise, copies the item AND terrain BEHIND it to the tile in front of it.",
     },
     global_cycler: {
-        name: "Global Cycler",
+        name: "Global cycler",
         desc: "When activated, every terrain/item/actor on the surrounding four tiles in the entire level becomes the terrain/item/actor one clockwise. Adjacent tiles with a 'no sign' on them are ignored. Two of the same tile in a row mean that tile will not be transformed and will stay as-is. Actors facing different directions will cause a relative direction change. Tiles next to Global Cyclers are not transformed.",
     },
     halo: {
@@ -2205,19 +2206,19 @@ const EDITOR_TILE_DESCRIPTIONS = {
         desc: "Protects the player from death once, destroying the would-be killer in the process.",
     },
     fire_sticks: {
-        name: "Dormant Lava",
+        name: "Dormant lava",
         desc: "Acts like dirt. However, fireballs will enter it and turn it into Fire in the process.",
     },
     turntable_cw: {
-        name: "Turntable (Clockwise)",
+        name: "Turntable (clockwise)",
         desc: "Rotates anything entering this tile clockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
     },
     turntable_ccw: {
-        name: "Turntable (Counterclockwise)",
+        name: "Turntable (counterclockwise)",
         desc: "Rotates anything entering this tile counterclockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
     },
     electrified_floor: {
-        name: "Electrified Floor",
+        name: "Electrified floor",
         desc: "Conducts power (like a blue teleporter). While powered, destroys anything not wearing lightning boots (except dirt blocks).",
     },
     hole: {
@@ -2225,11 +2226,11 @@ const EDITOR_TILE_DESCRIPTIONS = {
         desc: "A bottomless pit. Destroys everything (except ghosts).",
     },
     cracked_floor: {
-        name: "Cracked Floor",
+        name: "Cracked floor",
         desc: "Turns into a hole when something steps off of it (except ghosts).",
     },
     cracked_ice: {
-        name: "Cracked Ice",
+        name: "Cracked ice",
         desc: "Turns into water when something steps off of it (except ghosts).",
     },
     score_5x: {
@@ -2245,12 +2246,16 @@ const EDITOR_TILE_DESCRIPTIONS = {
         desc: "Similar to a dirt block, but rolls when pushed. Boulders transfer momentum to each other. Has ice block/frame block collision. Turns into gravel in water. Spreads slime.",
     },
     item_lock: {
-        name: "Item Lock",
+        name: "Item lock",
         desc: "When placed atop an item, you must have that item to enter the tile. When you do, pay the item and destroy the item lock. Also can be placed on top of a bonus, and you must pay that amount of bonus to enter.",
     },
     dash_floor: {
-        name: "Dash Floor",
+        name: "Dash floor",
         desc: "Anything walking on it moves at double speed. Stacks with speed shoes!",
+    },
+    teleport_blue_exit: {
+        name: "Blue teleporter exit",
+        desc: "A blue teleporter for all intents and purposes except it can only be exited, not entered.",
     },
 };
 
