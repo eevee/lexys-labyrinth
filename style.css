@@ -578,6 +578,7 @@ pre.stack-trace {
     grid:
         "header header"
         "links  links"
+        "disclaimer disclaimer"
         "stock  yours"
         / 3fr minmax(18em, 1fr)
     ;
@@ -686,38 +687,56 @@ pre.stack-trace {
 #splash > #splash-your-levels {
     grid-area: yours;
 }
+#splash > #splash-disclaimer {
+    grid-area: disclaimer;
+    font-size: 0.83em;
+    margin: 0;
+    text-align: center;
+    color: #c0c0c0;
+}
 
 @media (max-width: 800px) {
     #splash {
         /* Grid layout doesn't fit, just stack everything */
         display: flex;
         flex-direction: column;
+        gap: 0.5em;
         /* 10% padding is way way too much */
-        padding: 1em;
+        padding: 0.5em;
     }
     #splash::after {
         /* This needs different handling in a flex container */
         flex: 0 0 0.5em;
         height: auto;
     }
-    /* Shrink logo and title */
+    /* Shrink logo and title, and left-align both */
     #splash > header {
         grid-template-rows: auto auto;
+        grid-template-columns: min-content 1fr;
         column-gap: 0.5em;
+        margin: 0;
     }
     #splash > header img {
         width: 48px;
     }
     #splash > header h1 {
-        font-size: 2em;
+        font-size: 1.5em;
     }
     #splash > header p {
-        font-size: 1em;
+        font-size: 0.9em;
     }
     /* No need to boost the font size here */
     #splash > #splash-links {
         font-size: inherit;
         column-gap: 1em;
+    }
+    #splash > section {
+        padding: 0.5em;
+    }
+    /* This takes up an incredible amount of space on a phone; push it down, they have to scroll to
+     * see much of anything anyway.  TODO possibly revert if i can find a way to shorten wording */
+    #splash > #splash-disclaimer {
+        order: 99;
     }
 }
 
