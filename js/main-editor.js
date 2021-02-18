@@ -1603,7 +1603,6 @@ const EDITOR_PALETTE = [{
         'cracked_ice',
         'hole',
         'cracked_floor',
-        'fire_sticks',
         'turntable_cw',
         'turntable_ccw',
         'teleport_blue_exit',
