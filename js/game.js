@@ -2543,51 +2543,6 @@ export class Level extends LevelInterface {
             }
             this._do_extra_cooldown(tile);
         }
-        
-        //update static_on_tic_tiles
-        //TODO: if which on_tic happens first ever matters, this will introduce a time travel bug where the order is changed by changing tiles then undoing that. hmm
-        //ignore actors (because e.g. lit_dynamite gets called every tic because it's an actor)
-        if (!new_type.is_actor)
-        {
-            if (old_type.on_tic && !new_type.on_tic)
-            {
-                //search array and remove
-                for (let i = 0; i < this.static_on_tic_tiles.length; ++i)
-                {
-                    if (this.static_on_tic_tiles[i] == tile)
-                    {
-                        this.static_on_tic_tiles.splice(i, 1);
-                        break;
-                    }
-                }
-            }
-            else if (!old_type.on_tic && new_type.on_tic)
-            {
-                //add to end of array
-                this.static_on_tic_tiles.push(tile);
-            }
-            
-            //if we made a button, update accordingly
-            if (new_type.connects_to && (new_type.connects_to !== old_type.connects_to))
-            {
-                this.connect_button(tile);
-            }
-            
-            //ready the tile
-            if (new_type.on_begin)
-            {
-                new_type.on_begin(tile, this);
-            }
-            
-            //recalculate circuitry
-            if (
-            ((new_type.on_power !== undefined) !== (old_type.on_power !== undefined)) ||
-            (new_type.is_power_source !== old_type.is_power_source) ||
-            (new_type.wire_propagation_mode !== old_type.wire_propagation_mode))
-            {
-                this.recalculate_circuitry_next_wire_phase = true;
-            }
-        }
     }
 
     // Have an actor try to pick up a particular tile; it's prevented if there's a no sign, and the
