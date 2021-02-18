@@ -112,12 +112,6 @@ const OBITUARIES = {
         "you're feeling quite alarmed",
         //"
     ],
-    nonexistence: [
-        "I guess you don't exist",
-        "critical existence failure",
-        "no place to be",
-        "on a trip to nowhere",
-    ],
     electrocuted: [
         "a shocking revelation",
         "danger: high voltage",

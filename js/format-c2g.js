@@ -875,33 +875,9 @@ const TILE_ENCODING = {
         name: 'sand',
         is_extension: true,
     },
-    0xe8: {
-        name: 'terraformer_n',
-        is_extension: true,
-    },
-    0xe9: {
-        name: 'terraformer_e',
-        is_extension: true,
-    },
-    0xea: {
-        name: 'terraformer_s',
-        is_extension: true,
-    },
-    0xeb: {
-        name: 'terraformer_w',
-        is_extension: true,
-    },
-    0xec: {
-        name: 'global_cycler',
-        is_extension: true,
-    },
     0xed: {
         name: 'halo',
         has_next: true,
-        is_extension: true,
-    },
-    0xee: {
-        name: 'fire_sticks',
         is_extension: true,
     },
     0xef: {

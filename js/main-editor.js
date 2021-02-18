@@ -1613,8 +1613,6 @@ const EDITOR_PALETTE = [{
         'score_5x',
         'boulder',
         'logic_gate/diode',
-        'terraformer_n',
-        'global_cycler',
     ],
 }];
 
@@ -2193,21 +2191,9 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "Sand",
         desc: "Anything walking on it moves at half speed.  Stops all blocks.",
     },
-    terraformer_n: {
-        name: "Terraformer",
-        desc: "When activated, if there's an item on its tile, copies the item to the tile in front of it. Otherwise, copies the item AND terrain BEHIND it to the tile in front of it.",
-    },
-    global_cycler: {
-        name: "Global cycler",
-        desc: "When activated, every terrain/item/actor on the surrounding four tiles in the entire level becomes the terrain/item/actor one clockwise. Adjacent tiles with a 'no sign' on them are ignored. Two of the same tile in a row mean that tile will not be transformed and will stay as-is. Actors facing different directions will cause a relative direction change. Tiles next to Global Cyclers are not transformed.",
-    },
     halo: {
         name: "Halo",
         desc: "Protects the player from death once, destroying the would-be killer in the process.",
-    },
-    fire_sticks: {
-        name: "Dormant lava",
-        desc: "Acts like dirt. However, fireballs will enter it and turn it into Fire in the process.",
     },
     turntable_cw: {
         name: "Turntable (clockwise)",

@@ -1039,13 +1039,7 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     skeleton_key: [4, 40],
 
     sand: [10, 41],
-    terraformer_n: [0, 43],
-    terraformer_e: [1, 43],
-    terraformer_s: [2, 43],
-    terraformer_w: [3, 43],
-    global_cycler: [4, 43],
     halo: [5, 43],
-    fire_sticks: [6, 43],
     turntable_cw: {
         __special__: 'wires',
         base: [0, 2],
