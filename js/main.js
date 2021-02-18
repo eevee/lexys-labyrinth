@@ -1045,7 +1045,7 @@ class Player extends PrimaryView {
                 let header = mk('h3');
                 let dl = mk('dl');
                 let props = {};
-                for (let key of ['direction', 'movement_speed', 'movement_cooldown']) {
+                for (let key of ['direction', 'movement_speed', 'movement_cooldown', 'slide_mode']) {
                     let dd = mk('dd');
                     props[key] = dd;
                     dl.append(mk('dt', key), dd);
