@@ -834,6 +834,12 @@ const TILE_ENCODING = {
         modifier: modifier_wire,
         is_extension: true,
     },
+    0xda: {
+        name: 'glass_block',
+        has_next: true,
+        extra_args: [arg_direction],
+        is_extension: true,
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,

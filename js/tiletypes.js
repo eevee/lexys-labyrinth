@@ -763,6 +763,10 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'floor');
             }
+            else if (other.type.name === 'glass_block') {
+                level.transmute_tile(other, 'splash');
+                level.transmute_tile(me, 'floor');
+            }
             else if (other.type.name === 'ice_block') {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'ice');
@@ -1218,6 +1222,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             boulder: true,
+            glass_block: true,
         },
         on_clone(me, original) {
             me.arrows = new Set(original.arrows);
@@ -1277,26 +1282,55 @@ const TILE_TYPES = {
         can_reveal_walls: true,
         can_reverse_on_railroad: true,
         movement_speed: 4,
-        allows_push(me, direction) {
-            return me.arrows && me.arrows.has(direction);
+        try_pickup_item(me, level) {
+            if (me.encased_item === null) {
+                let item = me.cell.get_item();
+                if (item && !item.type.is_chip) {
+                    level.attempt_take(me, item);
+                    //then if we picked it up, encase it (so we have max one item at a time and so we can't 'use' the item)
+                    if (me.keyring !== undefined && me.keyring !== null && Object.keys(me.keyring).length > 0) {
+                        level._set_tile_prop(me, 'encased_item', Object.keys(me.keyring)[0]);
+                        level.take_all_keys_from_actor(me);
+                    }
+                    else if (me.toolbelt !== undefined && me.toolbelt !== null && me.toolbelt.length > 0)
+                    {
+                        level._set_tile_prop(me, 'encased_item', me.toolbelt[0]);
+                        level.take_all_tools_from_actor(me);
+                    }
+                }
+            }
+            /*if ((me.keyring === undefined || Object.keys(me.keyring).length == 0) && 
+            (me.toolbelt === undefined || me.toolbelt.length == 0)) {
+                let item = me.cell.get_item();
+                if (item) {
+                    level.attempt_take(me, item);
+                }
+            }*/
         },
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
-            boulder: true,
+        on_ready(me, level) {
+            level._set_tile_prop(me, 'encased_item', null);
+            this.try_pickup_item(me, level);
         },
         on_clone(me, original) {
-            me.arrows = new Set(original.arrows);
-        },
-        on_rotate(me, level, turn) {
-            // We rotate when turned on railroads
-            let new_arrows = new Set;
-            for (let arrow of me.arrows) {
-                new_arrows.add(DIRECTIONS[arrow][turn]);
+            me.encased_item = original.encased_item;
+            /*if (original.keyring !== undefined) {
+                me.keyring = {};
+                Object.assign(me.keyring, original.keyring);
             }
-            level._set_tile_prop(me, 'arrows', new_arrows);
+            if (original.toolbelt !== undefined) {
+                me.toolbelt = original.toolbelt.map((x) => x);
+            }*/
         },
+        on_finishing_move(me, level) {
+            this.try_pickup_item(me, level);
+        },
+        on_death(me, level) {
+            //needs to be called by transmute_tile to ttl and by lit_dynamite before remove_tile
+            if (me.encased_item !== null) {
+                level._place_dropped_item(me.encased_item, me.cell, me);
+                level._set_tile_prop(me, 'encased_item', null);
+            }
+        }
     },
     green_floor: {
         layer: LAYERS.terrain,
@@ -2318,6 +2352,7 @@ const TILE_TYPES = {
             frame_block: true,
             circuit_block: true,
             boulder: true,
+            glass_block: true,
         },
         movement_speed: 4,
         decide_movement(me, level) {
@@ -2470,6 +2505,7 @@ const TILE_TYPES = {
             frame_block: true,
             circuit_block: true,
             boulder: true,
+            glass_block: true,
         },
         on_ready(me, level) {
             me.current_emulatee = 0;
@@ -2653,6 +2689,9 @@ const TILE_TYPES = {
                         }
                         else {
                             // Everything else is destroyed
+                            if (tile.type.on_death) {
+                                tile.type.on_death(tile, level);
+                            }
                             level.remove_tile(tile);
                             removed_anything = true;
                         }
@@ -2835,6 +2874,7 @@ const TILE_TYPES = {
             frame_block: true,
             circuit_block: true,
             boulder: true,
+            glass_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -2858,6 +2898,7 @@ const TILE_TYPES = {
             frame_block: true,
             circuit_block: true,
             boulder: true,
+            glass_block: true,
         },
         infinite_items: {
             key_yellow: true,
@@ -2880,6 +2921,7 @@ const TILE_TYPES = {
             frame_block: true,
             circuit_block: true,
             boulder: true,
+            glass_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -2906,6 +2948,7 @@ const TILE_TYPES = {
             frame_block: true,
             circuit_block: true,
             boulder: true,
+            glass_block: true,
         },
         infinite_items: {
             key_yellow: true,

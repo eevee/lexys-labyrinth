@@ -1611,6 +1611,7 @@ const EDITOR_PALETTE = [{
         'item_lock',
         'score_5x',
         'boulder',
+        'glass_block',
         'logic_gate/diode',
     ],
 }];
@@ -2241,6 +2242,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
     teleport_blue_exit: {
         name: "Blue teleporter exit",
         desc: "A blue teleporter for all intents and purposes except it can only be exited, not entered.",
+    },
+    glass_block: {
+        name: "Glass block",
+        desc: "Similar to a dirt block, but stores the first item it moves over, dropping it when destroyed and cloning it in a cloning machine. Has ice block/frame block collision. Turns into floor in water. Doesn't have dirt block immunities.",
     },
 };
 

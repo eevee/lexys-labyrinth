@@ -2542,6 +2542,9 @@ export class Level extends LevelInterface {
                 this._set_tile_prop(tile, 'last_extra_cooldown_tic', null);
             }
             this._do_extra_cooldown(tile);
+            if (old_type.on_death) {
+                old_type.on_death(tile, this);
+            }
         }
     }
 

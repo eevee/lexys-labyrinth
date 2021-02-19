@@ -1080,6 +1080,10 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
         base: [0, 2],
         wired: [11, 41],
     },
+    glass_block: {
+        __special__: 'encased_item',
+        base: [14, 41],
+    }
 });
 
 export const TILESET_LAYOUTS = {
@@ -1591,6 +1595,16 @@ export class Tileset {
             this.draw_drawspec(drawspec.railroad_switch, name, tile, packet);
         }
     }
+    
+    _draw_encased_item(drawspec, name, tile, packet) {
+        //draw the encased item
+        if (tile !== null && tile.encased_item !== undefined && tile.encased_item !== null) {
+            this._draw_standard(this.layout[tile.encased_item], tile.encased_item, TILE_TYPES[tile.encased_item], packet);
+        }
+        //then draw the glass block
+        this._draw_standard(drawspec.base, name, tile, packet);
+    }
+    
 
     draw_drawspec(drawspec, name, tile, packet) {
         if (drawspec.__special__) {
@@ -1640,6 +1654,9 @@ export class Tileset {
             }
             else if (drawspec.__special__ === 'railroad') {
                 this._draw_railroad(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'encased_item') {
+                this._draw_encased_item(drawspec, name, tile, packet);
             }
             else {
                 console.error(`No such special ${drawspec.__special__} for ${name}`);
