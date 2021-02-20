@@ -1569,9 +1569,9 @@ export class Level extends LevelInterface {
         if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)) {
             speed /= terrain.type.speed_factor;
         }
-        //speed boots speed us up UNLESS we're on terrain that speeds us up AND it has a slide mode AND we're sliding (so e.g. we gain 2x on teleports, ice + ice skates, force floors + suction boots, sand and dash floors, but we don't gain 2x sliding on ice or force floors unless it's the turn we're leaving them)
+        //speed boots speed us up UNLESS we're entering a terrain with a speed factor and an unignored slide mode (so e.g. we gain 2x on teleports, ice + ice skates, force floors + suction boots, sand and dash floors, but we don't gain 2x sliding on ice or force floors unless it's the turn we're leaving them)
         if (actor.has_item('speed_boots')
-        && !(terrain.type.speed_factor && terrain.type.slide_mode && actor.slide_mode === terrain.type.slide_mode))
+        && !(terrain.type.speed_factor && terrain.type.slide_mode && !actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)))
         {
             speed /= 2;
         }
