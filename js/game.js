@@ -306,6 +306,10 @@ export class Cell extends Array {
             if (! tile.blocks(actor, direction, level))
                 continue;
 
+            if (tile.type.on_after_bumped) {
+                tile.type.on_after_bumped(tile, level, actor);
+            }
+
             if (push_mode === null)
                 return false;
 

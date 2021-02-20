@@ -1192,7 +1192,7 @@ const TILE_TYPES = {
             frame_block: true,
             boulder: true,
         },
-        on_bumped(me, level, other) {
+        on_after_bumped(me, level, other) {
             // Fireballs melt ice blocks on regular floor FIXME and water!
             // XXX what if i'm in motion?
             if (other.type.name === 'fireball') {
