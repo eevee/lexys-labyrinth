@@ -496,6 +496,7 @@ export const CC2_TILESET_LAYOUT = {
         burned: [1, 5],
         exploded: [1, 5],
         failed: [1, 5],
+        fell: [5, 39],
     },
     // Do a quick spin I guess??
     player1_exit: [[0, 22], [8, 22], [0, 23], [8, 23]],
@@ -546,6 +547,12 @@ export const CC2_TILESET_LAYOUT = {
                 east: [1, 25],
                 south: [2, 25],
                 west: [3, 25],
+            },
+            diode: {
+                north: [0, 41],
+                east: [1, 41],
+                south: [2, 41],
+                west: [3, 41],
             },
             and: {
                 north: [4, 25],
@@ -627,6 +634,7 @@ export const CC2_TILESET_LAYOUT = {
         burned: [1, 5],
         exploded: [1, 5],
         failed: [1, 5],
+        fell: [5, 39],
     },
     player2_exit: [[0, 27], [8, 27], [0, 28], [8, 28]],
     fire: [
@@ -1031,6 +1039,51 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
     skeleton_key: [4, 40],
 
     sand: [10, 41],
+    halo: [5, 43],
+    turntable_cw: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: [7, 43],
+            inactive: [9, 43],
+        }
+    },
+    turntable_ccw: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: [8, 43],
+            inactive: [10, 43],
+        }
+    },
+    electrified_floor: {
+        __special__: 'visual-state',
+        active: [[5, 41], [6, 41], [7, 41]],
+        inactive: [4, 41],
+    },
+    hole: {
+        __special__: 'visual-state',
+        north: [8, 41],
+        open: [9, 41],
+    },
+    cracked_floor: [11, 43],
+    cracked_ice: [7, 40],
+    score_5x: [10, 40],
+    spikes: [5, 40],
+    boulder: [8, 40],
+    item_lock: [12, 43],
+    dash_floor: [[0, 44], [1, 44], [2, 44], [3, 44], [4, 44], [5, 44], [6, 44], [7, 44]],
+    teleport_blue_exit: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: [11, 41],
+    },
+    glass_block: {
+        __special__: 'encased_item',
+        base: [14, 41],
+    }
 });
 
 export const TILESET_LAYOUTS = {
@@ -1473,7 +1526,7 @@ export class Tileset {
         if (tile && tile.cell) {
             // What goes on top varies a bit...
             let r = this.layout['#wire-width'] / 2;
-            if (tile.gate_type === 'not' || tile.gate_type === 'counter') {
+            if (tile.gate_type === 'not' || tile.gate_type === 'counter' || tile.gate_type === 'diode') {
                 this._draw_fourway_tile_power(tile, 0x0f, packet);
             }
             else {
@@ -1542,6 +1595,16 @@ export class Tileset {
             this.draw_drawspec(drawspec.railroad_switch, name, tile, packet);
         }
     }
+    
+    _draw_encased_item(drawspec, name, tile, packet) {
+        //draw the encased item
+        if (tile !== null && tile.encased_item !== undefined && tile.encased_item !== null) {
+            this._draw_standard(this.layout[tile.encased_item], tile.encased_item, TILE_TYPES[tile.encased_item], packet);
+        }
+        //then draw the glass block
+        this._draw_standard(drawspec.base, name, tile, packet);
+    }
+    
 
     draw_drawspec(drawspec, name, tile, packet) {
         if (drawspec.__special__) {
@@ -1591,6 +1654,9 @@ export class Tileset {
             }
             else if (drawspec.__special__ === 'railroad') {
                 this._draw_railroad(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'encased_item') {
+                this._draw_encased_item(drawspec, name, tile, packet);
             }
             else {
                 console.error(`No such special ${drawspec.__special__} for ${name}`);

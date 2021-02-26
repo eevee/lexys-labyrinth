@@ -530,8 +530,8 @@ const TILE_ENCODING = {
                 else {
                     tile.direction = DIRECTION_ORDER[modifier & 0x03];
                     let type = modifier >> 2;
-                    if (type < 6) {
-                        tile.gate_type = ['not', 'and', 'or', 'xor', 'latch-cw', 'nand'][type];
+                    if (type < 7) {
+                        tile.gate_type = ['not', 'and', 'or', 'xor', 'latch-cw', 'nand', 'diode'][type];
                     }
                     else if (type === 16) {
                         tile.gate_type = 'latch-ccw';
@@ -560,6 +560,9 @@ const TILE_ENCODING = {
                 }
                 else if (tile.gate_type === 'nand') {
                     return 20 + direction_offset;
+                }
+                else if (tile.gate_type === 'diode') {
+                    return 24 + direction_offset;
                 }
                 else if (tile.gate_type === 'counter') {
                     return 30 + tile.memory;
@@ -787,6 +790,56 @@ const TILE_ENCODING = {
     },
 
     // LL-specific tiles
+    0xd0: {
+        name: 'electrified_floor',
+        is_extension: true,
+    },
+    0xd1: {
+        name: 'hole',
+        is_extension: true,
+    },
+    0xd2: {
+        name: 'cracked_floor',
+        is_extension: true,
+    },
+    0xd3: {
+        name: 'cracked_ice',
+        is_extension: true,
+    },
+    0xd4: {
+        name: 'score_5x',
+        has_next: true,
+        is_extension: true,
+    },
+    0xd5: {
+        name: 'spikes',
+        is_extension: true,
+    },
+    0xd6: {
+        name: 'boulder',
+        has_next: true,
+        extra_args: [arg_direction],
+    },
+    0xd7: {
+        name: 'item_lock',
+        has_next: true,
+        is_extension: true,
+    },
+    0xd8: {
+        name: 'dash_floor',
+        is_extension: true,
+    },
+    0xd9: {
+        name: 'teleport_blue_exit',
+        modifier: modifier_wire,
+        is_extension: true,
+    },
+    0xda: {
+        name: 'glass_block',
+        has_next: true,
+        extra_args: [arg_direction],
+        is_extension: true,
+    },
     0xe0: {
         name: 'gift_bow',
         has_next: true,
@@ -797,6 +850,50 @@ const TILE_ENCODING = {
         has_next: true,
         modifier: modifier_wire,
         extra_args: [arg_direction],
+        is_extension: true,
+    },
+    0xe2: {
+        name: 'skeleton_key',
+        has_next: true,
+        is_extension: true,
+    },
+    0xe3: {
+        name: 'gate_red',
+        has_next: true,
+        is_extension: true,
+    },
+    0xe4: {
+        name: 'gate_blue',
+        has_next: true,
+        is_extension: true,
+    },
+    0xe5: {
+        name: 'gate_yellow',
+        has_next: true,
+        is_extension: true,
+    },
+    0xe6: {
+        name: 'gate_green',
+        has_next: true,
+        is_extension: true,
+    },
+    0xe7: {
+        name: 'sand',
+        is_extension: true,
+    },
+    0xed: {
+        name: 'halo',
+        has_next: true,
+        is_extension: true,
+    },
+    0xef: {
+        name: 'turntable_cw',
+        modifier: modifier_wire,
+        is_extension: true,
+    },
+    0xf0: {
+        name: 'turntable_ccw',
+        modifier: modifier_wire,
         is_extension: true,
     },
 };

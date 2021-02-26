@@ -15,11 +15,18 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
             let seen_edges = seen_cells.get(cell) ?? 0;
             if (seen_edges & edgeinfo.bit)
                 continue;
+                
+            let actor = cell.get_actor();
+            let wire_directions = terrain.wire_directions;
+            if ((actor?.wire_directions ?? null !== null) && (actor.movement_cooldown === 0 || level.compat.tiles_react_instantly))
+            {
+                wire_directions = actor.wire_directions;
+            }
 
             // The wire comes in from this edge towards the center; see how it connects within this
             // cell, then check for any neighbors
             let connections = edgeinfo.bit;
-            if (! is_first && ((terrain.wire_directions ?? 0) & edgeinfo.bit) === 0) {
+            if (! is_first && ((wire_directions ?? 0) & edgeinfo.bit) === 0) {
                 // There's not actually a wire here (but not if this is our starting cell, in which
                 // case we trust the caller)
                 if (on_dead_end) {
@@ -31,16 +38,16 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
                 // The wires in this tile never connect to each other
             }
             else if (terrain.type.wire_propagation_mode === 'cross' ||
-                (terrain.wire_directions === 0x0f && terrain.type.wire_propagation_mode !== 'all'))
+                (wire_directions === 0x0f && terrain.type.wire_propagation_mode !== 'all'))
             {
                 // This is a cross pattern, so only opposite edges connect
-                if (terrain.wire_directions & edgeinfo.opposite_bit) {
+                if (wire_directions & edgeinfo.opposite_bit) {
                     connections |= edgeinfo.opposite_bit;
                 }
             }
             else {
                 // Everything connects
-                connections |= terrain.wire_directions;
+                connections |= wire_directions;
             }
 
             seen_cells.set(cell, seen_edges | connections);

@@ -1072,7 +1072,7 @@ class WireOperation extends DrawOperation {
                 // TODO probably a better way to do this
                 if (! tile)
                     continue;
-                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block'].indexOf(tile.type.name) < 0)
+                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block', 'teleport_blue_exit', 'turntable_cw', 'turntable_ccw'].indexOf(tile.type.name) < 0)
                     continue;
 
                 tile = {...tile};
@@ -1598,6 +1598,21 @@ const EDITOR_PALETTE = [{
         'gate_yellow',
         'gate_green',
         'sand',
+        'dash_floor',
+        'spikes',
+        'cracked_ice',
+        'hole',
+        'cracked_floor',
+        'turntable_cw',
+        'turntable_ccw',
+        'teleport_blue_exit',
+        'electrified_floor',
+        'halo',
+        'item_lock',
+        'score_5x',
+        'boulder',
+        'glass_block',
+        'logic_gate/diode',
     ],
 }];
 
@@ -2094,6 +2109,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "NOT gate",
         desc: "Emits power only when not receiving power.",
     },
+    'logic_gate/diode': {
+        name: "Diode",
+        desc: "Emits power only when receiving power. (Effectively, this delays power by one frame.)",
+    },
     'logic_gate/and': {
         name: "AND gate",
         desc: "Emits power while both inputs are receiving power.",
@@ -2154,7 +2173,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     // Experimental
     circuit_block: {
         name: "Circuit block",
-        desc: "(Currently non-functional.)  May contain wires, which will connect to any adjacent wires and conduct power as normal.",
+        desc: "May contain wires, which will connect to any adjacent wires and conduct power as normal. When pushed into water, turns into floor with the same wires.",
     },
     gift_bow: {
         name: "Gift bow",
@@ -2171,7 +2190,63 @@ const EDITOR_TILE_DESCRIPTIONS = {
     sand: {
         name: "Sand",
         desc: "Anything walking on it moves at half speed.  Stops all blocks.",
-    }
+    },
+    halo: {
+        name: "Halo",
+        desc: "Protects the player from death once, destroying the would-be killer in the process.",
+    },
+    turntable_cw: {
+        name: "Turntable (clockwise)",
+        desc: "Rotates anything entering this tile clockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
+    },
+    turntable_ccw: {
+        name: "Turntable (counterclockwise)",
+        desc: "Rotates anything entering this tile counterclockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
+    },
+    electrified_floor: {
+        name: "Electrified floor",
+        desc: "Conducts power (like a 4-way wire). While powered, destroys anything not wearing lightning boots (except dirt blocks).",
+    },
+    hole: {
+        name: "Hole",
+        desc: "A bottomless pit. Destroys everything (except ghosts).",
+    },
+    cracked_floor: {
+        name: "Cracked floor",
+        desc: "Turns into a hole when something steps off of it (except ghosts).",
+    },
+    cracked_ice: {
+        name: "Cracked ice",
+        desc: "Turns into water when something steps off of it (except ghosts).",
+    },
+    score_5x: {
+        name: "×5 bonus",
+        desc: "Quintuples the player's current bonus points.  Can be collected by doppelgangers, rovers, and bowling balls, but will not grant bonus points.",
+    },
+    spikes: {
+        name: "Spikes",
+        desc: "Stops players (and doppelgangers) unless they have hiking boots. Everything else can pass.",
+    },
+    boulder: {
+        name: "Boulder",
+        desc: "Similar to a dirt block, but rolls when pushed. Boulders transfer momentum to each other. Has ice block/frame block collision. Turns into gravel in water. Spreads slime.",
+    },
+    item_lock: {
+        name: "Item lock",
+        desc: "When placed atop an item, you must have that item to enter the tile. When you do, pay the item and destroy the item lock. Also can be placed on top of a bonus, and you must pay that amount of bonus to enter.",
+    },
+    dash_floor: {
+        name: "Dash floor",
+        desc: "Anything walking on it moves at double speed. Stacks with speed shoes!",
+    },
+    teleport_blue_exit: {
+        name: "Blue teleporter exit",
+        desc: "A blue teleporter for all intents and purposes except it can only be exited, not entered.",
+    },
+    glass_block: {
+        name: "Glass block",
+        desc: "Similar to a dirt block, but stores the first item it moves over, dropping it when destroyed and cloning it in a cloning machine. Has ice block/frame block collision. Turns into floor in water. Doesn't have dirt block immunities.",
+    },
 };
 
 const SPECIAL_PALETTE_ENTRIES = {
@@ -2187,6 +2262,7 @@ const SPECIAL_PALETTE_ENTRIES = {
     'railroad/curve':       { name: 'railroad', tracks: 1 << 0, track_switch: null, entered_direction: 'north' },
     'railroad/switch':      { name: 'railroad', tracks: 0, track_switch: 0, entered_direction: 'north' },
     'logic_gate/not':       { name: 'logic_gate', direction: 'north', gate_type: 'not' },
+     'logic_gate/diode':       { name: 'logic_gate', direction: 'north', gate_type: 'diode' },
     'logic_gate/and':       { name: 'logic_gate', direction: 'north', gate_type: 'and' },
     'logic_gate/or':        { name: 'logic_gate', direction: 'north', gate_type: 'or' },
     'logic_gate/xor':       { name: 'logic_gate', direction: 'north', gate_type: 'xor' },
@@ -2418,6 +2494,8 @@ for (let cycle of [
     ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
     ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
     ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
+    ['terraformer_n', 'terraformer_e', 'terraformer_s', 'terraformer_w'],
+    ['turntable_cw', 'turntable_ccw'],
 ]) {
     for (let [i, name] of cycle.entries()) {
         let left = cycle[(i - 1 + cycle.length) % cycle.length];

@@ -109,6 +109,21 @@ export class Tile {
 
         return false;
     }
+    
+    slide_ignores(name) {
+        if (this.type.slide_ignores && this.type.slide_ignores.has(name))
+            return true;
+
+        if (this.toolbelt) {
+            for (let item of this.toolbelt) {
+                let item_type = TILE_TYPES[item];
+                if (item_type.item_slide_ignores && item_type.item_slide_ignores.has(name))
+                    return true;
+            }
+        }
+
+        return false;
+    }
 
     can_push(tile, direction) {
         // This tile already has a push queued, sorry
@@ -292,6 +307,10 @@ export class Cell extends Array {
 
             if (! tile.blocks(actor, direction, level))
                 continue;
+
+            if (tile.type.on_after_bumped) {
+                tile.type.on_after_bumped(tile, level, actor);
+            }
 
             if (push_mode === null)
                 return false;
@@ -525,66 +544,99 @@ export class Level extends LevelInterface {
         // Connect buttons and teleporters
         let num_cells = this.width * this.height;
         for (let connectable of connectables) {
-            let cell = connectable.cell;
-            let x = cell.x;
-            let y = cell.y;
-            // FIXME this is a single string for red/brown buttons (to match iter_tiles_in_RO) but a
-            // set for orange buttons (because flame jet states are separate tiles), which sucks ass
-            let goals = connectable.type.connects_to;
+            this.connect_button(connectable);
+        }
 
-            // Check for custom wiring, for MSCC .DAT levels
-            // TODO would be neat if this applied to orange buttons too
-            if (this.stored_level.has_custom_connections) {
-                let n = this.stored_level.coords_to_scalar(x, y);
-                let target_cell_n = null;
-                if (connectable.type.name === 'button_brown') {
-                    target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
+        this.recalculate_circuitry_next_wire_phase = false;
+        this.undid_past_recalculate_circuitry = false;
+        this.recalculate_circuitry(true);
+
+        // Finally, let all tiles do custom init behavior...  but backwards, to match actor order
+        for (let i = this.linear_cells.length - 1; i >= 0; i--) {
+            let cell = this.linear_cells[i];
+            for (let tile of cell) {
+                if (! tile)
+                    continue;
+                if (tile.type.on_ready) {
+                    tile.type.on_ready(tile, this);
                 }
-                else if (connectable.type.name === 'button_red') {
-                    target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
-                }
-                if (target_cell_n && target_cell_n < this.width * this.height) {
-                    let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
-                    for (let tile of this.cell(tx, ty)) {
-                        if (tile && goals === tile.type.name) {
-                            connectable.connection = tile;
-                            break;
-                        }
-                    }
-                }
-                continue;
             }
+        }
+        // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
+        this.pending_undo = this.create_undo_entry();
+    }
+    
+    connect_button(connectable) {
+        let cell = connectable.cell;
+        let x = cell.x;
+        let y = cell.y;
+        // FIXME this is a single string for red/brown buttons (to match iter_tiles_in_RO) but a
+        // set for orange buttons (because flame jet states are separate tiles), which sucks ass
+        let goals = connectable.type.connects_to;
 
-            // Orange buttons do a really weird diamond search
-            if (connectable.type.connect_order === 'diamond') {
-                for (let cell of this.iter_cells_in_diamond(connectable.cell)) {
-                    let target = null;
-                    for (let tile of cell) {
-                        if (tile && goals.has(tile.type.name)) {
-                            target = tile;
-                            break;
-                        }
-                    }
-                    if (target !== null) {
-                        connectable.connection = target;
+        // Check for custom wiring, for MSCC .DAT levels
+        // TODO would be neat if this applied to orange buttons too
+        if (this.stored_level.has_custom_connections) {
+            let n = this.stored_level.coords_to_scalar(x, y);
+            let target_cell_n = null;
+            if (connectable.type.name === 'button_brown') {
+                target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
+            }
+            else if (connectable.type.name === 'button_red') {
+                target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
+            }
+            if (target_cell_n && target_cell_n < this.width * this.height) {
+                let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
+                for (let tile of this.cell(tx, ty)) {
+                    if (tile && goals === tile.type.name) {
+                        connectable.connection = tile;
                         break;
                     }
                 }
-                continue;
             }
-
-            // Otherwise, look in reading order
-            for (let tile of this.iter_tiles_in_reading_order(cell, goals)) {
-                // TODO ideally this should be a weak connection somehow, since dynamite can destroy
-                // empty cloners and probably traps too
-                connectable.connection = tile;
-                // Just grab the first
-                break;
-            }
+            return;
         }
 
+        // Orange buttons do a really weird diamond search
+        if (connectable.type.connect_order === 'diamond') {
+            for (let cell of this.iter_cells_in_diamond(connectable.cell)) {
+                let target = null;
+                for (let tile of cell) {
+                    if (tile && goals.has(tile.type.name)) {
+                        target = tile;
+                        break;
+                    }
+                }
+                if (target !== null) {
+                    connectable.connection = target;
+                    break;
+                }
+            }
+            return;
+        }
+
+        // Otherwise, look in reading order
+        for (let tile of this.iter_tiles_in_reading_order(cell, goals)) {
+            // TODO ideally this should be a weak connection somehow, since dynamite can destroy
+            // empty cloners and probably traps too
+            connectable.connection = tile;
+            // Just grab the first
+            break;
+        }
+    }
+    
+    recalculate_circuitry(first_time = false, undoing = false) {
         // Build circuits out of connected wires
         // TODO document this idea
+        
+        if (!first_time) {
+            for (let circuit of this.circuits) {
+                for (let tile of circuit.tiles) {
+                    tile[0].circuits = [null, null, null, null];
+                }
+            }
+        }
+        
         this.circuits = [];
         this.power_sources = [];
         let wired_outputs = new Set;
@@ -594,6 +646,7 @@ export class Level extends LevelInterface {
         };
         for (let cell of this.linear_cells) {
             // We're interested in static circuitry, which means terrain
+            // OR circuit blocks on top
             let terrain = cell.get_terrain();
             if (! terrain)  // ?!
                 continue;
@@ -602,7 +655,13 @@ export class Level extends LevelInterface {
                 this.power_sources.push(terrain);
             }
 
+            let actor = cell.get_actor();
             let wire_directions = terrain.wire_directions;
+            if ((actor?.wire_directions ?? null !== null) && (actor.movement_cooldown === 0 || this.compat.tiles_react_instantly))
+            {
+                wire_directions = actor.wire_directions;
+            }
+            
             if (! wire_directions && ! terrain.wire_tunnel_directions) {
                 // No wires, not interesting...  unless it's a logic gate, which defines its own
                 // wires!  We only care about outgoing ones here, on the off chance that they point
@@ -635,7 +694,7 @@ export class Level extends LevelInterface {
                     continue;
 
                 let circuit = {
-                    is_powered: false,
+                    is_powered: first_time ? false : null,
                     tiles: new Map,
                     inputs: new Map,
                 };
@@ -700,20 +759,25 @@ export class Level extends LevelInterface {
         }
         this.wired_outputs = Array.from(wired_outputs);
         this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
-
-        // Finally, let all tiles do custom init behavior...  but backwards, to match actor order
-        for (let i = this.linear_cells.length - 1; i >= 0; i--) {
-            let cell = this.linear_cells[i];
-            for (let tile of cell) {
-                if (! tile)
-                    continue;
-                if (tile.type.on_ready) {
-                    tile.type.on_ready(tile, this);
+        
+        if (!first_time) {
+            //update wireables
+             for (var i = 0; i < this.width; ++i)
+            {
+                for (var j = 0; j < this.height; ++j)
+                {
+                    let terrain = this.cell(i, j).get_terrain();
+                    if (terrain.is_wired !== undefined)
+                    {
+                        terrain.type.on_begin(terrain, this);
+                    }
                 }
             }
+            
+            if (!undoing) {
+                this._push_pending_undo(() => this.undid_past_recalculate_circuitry = true);
+            }
         }
-        // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
-        this.pending_undo = this.create_undo_entry();
     }
 
     can_accept_input() {
@@ -1521,11 +1585,14 @@ export class Level extends LevelInterface {
         // FIXME this feels clunky
         let goal_cell = this.get_neighboring_cell(actor.cell, direction);
         let terrain = goal_cell.get_terrain();
-        if (actor.has_item('speed_boots')) {
-            speed /= 2;
-        }
-        else if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name)) {
+        if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)) {
             speed /= terrain.type.speed_factor;
+        }
+        //speed boots speed us up UNLESS we're entering a terrain with a speed factor and an unignored slide mode (so e.g. we gain 2x on teleports, ice + ice skates, force floors + suction boots, sand and dash floors, but we don't gain 2x sliding on ice or force floors unless it's the turn we're leaving them)
+        if (actor.has_item('speed_boots')
+        && !(terrain.type.speed_factor && terrain.type.slide_mode && !actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)))
+        {
+            speed /= 2;
         }
 
         let orig_cell = actor.cell;
@@ -1577,11 +1644,15 @@ export class Level extends LevelInterface {
     move_to(actor, goal_cell, speed) {
         if (actor.cell === goal_cell)
             return;
+        
+        if (actor.type.on_starting_move) {
+            actor.type.on_starting_move(actor, this);
+        }
 
         let original_cell = actor.cell;
         // Physically remove the actor first, so that it won't get in the way of e.g. a splash
         // spawned from stepping off of a lilypad
-        this.remove_tile(actor);
+        this.remove_tile(actor, true);
 
         // Announce we're leaving, for the handful of tiles that care about it
         for (let tile of original_cell) {
@@ -1609,21 +1680,23 @@ export class Level extends LevelInterface {
                 continue;
             if (actor.ignores(tile.type.name))
                 continue;
+            if (actor.slide_ignores(tile.type.name))
+                continue;
 
             // Possibly kill a player
             if (actor.has_item('helmet') || tile.has_item('helmet')) {
                 // Helmet disables this, do nothing
             }
             else if (actor.type.is_real_player && tile.type.is_monster) {
-                this.fail(tile.type.name, actor);
+                this.fail(tile.type.name, tile, actor);
             }
             else if (actor.type.is_monster && tile.type.is_real_player) {
-                this.fail(actor.type.name, tile);
+                this.fail(actor.type.name, actor, tile);
             }
             else if (actor.type.is_block && tile.type.is_real_player && ! actor.is_pulled) {
                 // Note that blocks squish players if they move for ANY reason, even if pushed by
                 // another player!  The only exception is being pulled
-                this.fail('squished', tile);
+                this.fail('squished', actor, tile);
             }
 
             if (tile.type.on_approach) {
@@ -1656,7 +1729,7 @@ export class Level extends LevelInterface {
             this.player.movement_cooldown === this.player.movement_speed &&
             ! actor.has_item('helmet') && ! this.player.has_item('helmet'))
         {
-            this.fail(actor.type.name);
+            this.fail(actor.type.name, actor, this.player);
         }
 
         if (this.compat.tiles_react_instantly) {
@@ -1666,6 +1739,10 @@ export class Level extends LevelInterface {
 
     // Step on every tile in a cell we just arrived in
     step_on_cell(actor, cell) {
+        if (actor.type.on_finishing_move) {
+            actor.type.on_finishing_move(actor, this);
+        }
+        
         // Step on topmost things first -- notably, it's safe to step on water with flippers on top
         // TODO is there a custom order here similar to collision checking?
         for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
@@ -1812,7 +1889,7 @@ export class Level extends LevelInterface {
         }
 
         // Now physically move the actor, but their movement waits until next decision phase
-        this.remove_tile(actor);
+        this.remove_tile(actor, true);
         this.add_tile(actor, dest.cell);
     }
 
@@ -1911,6 +1988,14 @@ export class Level extends LevelInterface {
     }
 
     _do_wire_phase() {
+        let force_next_wire_phase = false;
+        if (this.recalculate_circuitry_next_wire_phase)
+        {
+            this.recalculate_circuitry();
+            this.recalculate_circuitry_next_wire_phase = false;
+            force_next_wire_phase = true;
+        }
+        
         if (this.circuits.length === 0)
             return;
 
@@ -1956,7 +2041,7 @@ export class Level extends LevelInterface {
                 this._set_tile_prop(tile, 'emitting_edges', emitting);
             }
         }
-        // Next, actors who are standing still, on floor, and holding a lightning bolt
+        // Next, actors who are standing still, on floor/electrified, and holding a lightning bolt
         let externally_powered_circuits = new Set;
         for (let actor of this.actors) {
             if (! actor.cell)
@@ -1964,7 +2049,7 @@ export class Level extends LevelInterface {
             let emitting = 0;
             if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
                 let wired_tile = actor.cell.get_wired_tile();
-                if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor')) {
+                if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor' || wired_tile.type.name === 'electrified_floor')) {
                     emitting = wired_tile.wire_directions;
                     for (let circuit of wired_tile.circuits) {
                         if (circuit) {
@@ -1979,8 +2064,9 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (! any_changed)
+        if (! any_changed && !force_next_wire_phase) {
             return;
+        }
 
         for (let tile of this.wired_outputs) {
             // This is only used within this function, no need to undo
@@ -2090,6 +2176,33 @@ export class Level extends LevelInterface {
                 return;
         }
     }
+    
+    //same as above, but accepts multiple tiles
+    *iter_tiles_in_reading_order_multiple(start_cell, names, reverse = false) {
+        let i = this.coords_to_scalar(start_cell.x, start_cell.y);
+        let index = TILE_TYPES[names[0]].layer;
+        while (true) {
+            if (reverse) {
+                i -= 1;
+                if (i < 0) {
+                    i += this.size_x * this.size_y;
+                }
+            }
+            else {
+                i += 1;
+                i %= this.size_x * this.size_y;
+            }
+
+            let cell = this.linear_cells[i];
+            let tile = cell[index];
+            if (tile && names.indexOf(tile.type.name) >= 0) {
+                yield tile;
+            }
+
+            if (cell === start_cell)
+                return;
+        }
+    }
 
     // Iterates over the grid in a diamond pattern, spreading out from the given start cell (but not
     // including it).  Only used for connecting orange buttons.
@@ -2183,6 +2296,11 @@ export class Level extends LevelInterface {
         }
         this._undo_entry(this.undo_buffer[this.undo_buffer_index]);
         this.undo_buffer[this.undo_buffer_index] = null;
+        
+        if (this.undid_past_recalculate_circuitry) {
+            this.recalculate_circuitry_next_wire_phase = true;
+            this.undid_past_recalculate_circuitry = false;
+        }
     }
 
     // Reverse a single undo entry
@@ -2280,7 +2398,7 @@ export class Level extends LevelInterface {
         }
     }
 
-    fail(reason, player = null) {
+    fail(reason, killer = null, player = null) {
         if (this.state !== 'playing')
             return;
 
@@ -2294,14 +2412,34 @@ export class Level extends LevelInterface {
         if (player === null) {
             player = this.player;
         }
+        
+        if (player != null && this.take_tool_from_actor(player, 'halo')) {
+            this.sfx.play_once('revive');
+            if (reason === 'time')
+            {
+                this.pause_timer();
+            }
+            else if (killer !== null)
+            {
+                if (killer.type.is_actor || killer.type.is_item)
+                {
+                    this.remove_tile(killer);
+                }
+                else //presumably terrain
+                {
+                    this.transmute_tile(killer, 'floor');
+                }
+            }
+            return;
+        }
 
         this._push_pending_undo(() => {
             this.fail_reason = null;
-            player.fail_reason = null;
+            if (player != null) { player.fail_reason = null; }
         });
         this.state = 'failure';
         this.fail_reason = reason;
-        player.fail_reason = reason;
+        if (player != null) { player.fail_reason = reason; }
     }
 
     win() {
@@ -2424,6 +2562,9 @@ export class Level extends LevelInterface {
                 this._set_tile_prop(tile, 'last_extra_cooldown_tic', null);
             }
             this._do_extra_cooldown(tile);
+            if (old_type.on_death) {
+                old_type.on_death(tile, this);
+            }
         }
     }
 
@@ -2537,9 +2678,9 @@ export class Level extends LevelInterface {
         return true;
     }
 
-    take_key_from_actor(actor, name) {
+    take_key_from_actor(actor, name, ignore_infinity = false) {
         if (actor.keyring && (actor.keyring[name] ?? 0) > 0) {
-            if (actor.type.infinite_items && actor.type.infinite_items[name]) {
+            if (!ignore_infinity && actor.type.infinite_items && actor.type.infinite_items[name]) {
                 // Some items can't be taken away normally, by which I mean, green or yellow keys
                 return true;
             }

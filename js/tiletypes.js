@@ -18,7 +18,7 @@ function on_begin_force_floor(me, level) {
 
     me.type.on_arrive(me, level, actor);
     if (me.type.slide_mode) {
-        actor.slide_mode = me.type.slide_mode;
+        level._set_tile_prop(actor, 'slide_mode', me.type.slide_mode);
     }
 
     // Item bestowal
@@ -36,7 +36,7 @@ function on_begin_force_floor(me, level) {
     if (level.attempt_take(actor, item) && actor.ignores(me.type.name)) {
         // If they just picked up suction boots, they're no longer sliding
         // TODO this feels hacky, shouldn't the slide mode be erased some other way?
-        actor.slide_mode = null;
+        level._set_tile_prop(actor, 'slide_mode', null);
     }
 }
 
@@ -87,6 +87,30 @@ function _define_gate(key) {
     };
 }
 
+function update_wireable(me, level) {
+    if (me.is_wired === undefined) {
+        //start of the level/first time, then
+        me.is_wired = level.is_tile_wired(me, false);
+        me.is_active = !me.is_wired;
+    }
+    else {
+        let new_is_wired = level.is_tile_wired(me, false);
+        if (new_is_wired && !me.is_wired)
+        {
+            //connected
+            level._set_tile_prop(me, 'is_wired', true);
+            //TODO: it'll always get on_power called later if it's wired to something already given power, right?
+            level._set_tile_prop(me, 'is_active', false);
+        }
+        else if (!new_is_wired && me.is_wired)
+        {
+            //disconnected
+            level._set_tile_prop(me, 'is_wired', false);
+            level._set_tile_prop(me, 'is_active', true);
+        }
+    }
+}
+
 function player_visual_state(me) {
     if (! me) {
         return 'normal';
@@ -105,6 +129,12 @@ function player_visual_state(me) {
     }
     else if (me.fail_reason === 'slimed') {
         return 'slimed';
+    }
+    else if (me.fail_reason === 'electrocuted') {
+        return 'burned'; //same gfx for now
+    }
+    else if (me.fail_reason === 'fell') {
+        return 'fell';
     }
     else if (me.fail_reason) {
         return 'failed';
@@ -190,7 +220,7 @@ const TILE_TYPES = {
     floor: {
         layer: LAYERS.terrain,
         on_approach(me, level, other) {
-            if (other.type.name === 'blob') {
+            if (other.type.name === 'blob' || other.type.name === 'boulder') {
                 // Blobs spread slime onto floor
                 if (other.previous_cell && other.previous_cell.has('slime')) {
                     level.transmute_tile(me, 'slime');
@@ -618,6 +648,72 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         speed_factor: 0.5,
     },
+    dash_floor: {
+        layer: LAYERS.terrain,
+        speed_factor: 2,
+    },
+    spikes: {
+        layer: LAYERS.terrain,
+        blocks(me, level, other) {
+            return !(!other.type.is_player || other.has_item('hiking_boots'));
+        },
+    },
+    turntable_cw: {
+        layer: LAYERS.terrain,
+        wire_propagation_mode: 'all',
+        on_begin(me, level) {
+            update_wireable(me, level);
+        },
+        on_arrive(me, level, other) {
+            if (! me.is_active)
+                return;
+            other.direction = DIRECTIONS[other.direction].right;
+            if (other.type.on_rotate) {
+                other.type.on_rotate(other, level, 'right');
+            }
+        },
+        on_power(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
+        },
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
+        visual_state(me) {
+            return ! me || me.is_active ? 'active' : 'inactive';
+        },
+    },
+    turntable_ccw: {
+        layer: LAYERS.terrain,
+        wire_propagation_mode: 'all',
+        on_begin(me, level) {
+            update_wireable(me, level);
+        },
+        on_arrive(me, level, other) {
+            if (! me.is_active)
+                return;
+            other.direction = DIRECTIONS[other.direction].left;
+            if (other.type.on_rotate) {
+                other.type.on_rotate(other, level, 'left');
+            }
+        },
+        on_power(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
+        },
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
+        visual_state(me) {
+            return ! me || me.is_active ? 'active' : 'inactive';
+        },
+    },
 
     // Hazards
     fire: {
@@ -639,7 +735,7 @@ const TILE_TYPES = {
                 level.sfx.play_once('splash', me.cell);
             }
             else if (other.type.is_real_player) {
-                level.fail('burned', other);
+                level.fail('burned', me, other);
             }
             else {
                 level.transmute_tile(other, 'explosion');
@@ -665,12 +761,26 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'floor');
             }
+            else if (other.type.name === 'glass_block') {
+                level.transmute_tile(other, 'splash');
+                level.transmute_tile(me, 'floor');
+            }
             else if (other.type.name === 'ice_block') {
                 level.transmute_tile(other, 'splash');
                 level.transmute_tile(me, 'ice');
             }
+            else if (other.type.name === 'boulder') {
+                level.transmute_tile(other, 'splash');
+                level.transmute_tile(me, 'gravel');
+            }
+            else if (other.type.name === 'circuit_block') {
+                level.transmute_tile(me, 'floor');
+                level._set_tile_prop(me, 'wire_directions', other.wire_directions);
+                level.transmute_tile(other, 'splash');
+                level.recalculate_circuitry_next_wire_phase = true;
+            }
             else if (other.type.is_real_player) {
-                level.fail('drowned', other);
+                level.fail('drowned', me, other);
             }
             else {
                 level.transmute_tile(other, 'splash');
@@ -680,6 +790,16 @@ const TILE_TYPES = {
     turtle: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.ghost | COLLISION.fireball,
+        on_depart(me, level, other) {
+            level.transmute_tile(me, 'water');
+            level.spawn_animation(me.cell, 'splash');
+            level.sfx.play_once('splash', me.cell);
+        },
+    },
+    cracked_ice: {
+        layer: LAYERS.terrain,
+        slide_mode: 'ice',
+        speed_factor: 2,
         on_depart(me, level, other) {
             level.transmute_tile(me, 'water');
             level.spawn_animation(me.cell, 'splash');
@@ -850,7 +970,7 @@ const TILE_TYPES = {
     slime: {
         layer: LAYERS.terrain,
         on_arrive(me, level, other) {
-            if (other.type.name === 'ghost' || other.type.name === 'blob') {
+            if (other.type.name === 'ghost' || other.type.name === 'blob' || other.type.name === 'boulder') {
                 // No effect
                 return;
             }
@@ -860,7 +980,7 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'floor');
             }
             else if (other.type.is_real_player) {
-                level.fail('slimed', other);
+                level.fail('slimed', me, other);
             }
             else {
                 level.transmute_tile(other, 'splash_slime');
@@ -884,11 +1004,50 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.remove_tile(me);
             if (other.type.is_real_player) {
-                level.fail('exploded', other);
+                level.fail('exploded', me, other);
             }
             else {
                 level.sfx.play_once('bomb', me.cell);
                 level.transmute_tile(other, 'explosion');
+            }
+        },
+    },
+    hole: {
+        layer: LAYERS.terrain,
+        on_begin(me, level) {
+            var one_north = level.cell(me.cell.x, me.cell.y - 1);
+            if (one_north === null || one_north.get_terrain().type.name != 'hole') {
+                level._set_tile_prop(me, 'visual_state', 'north');
+            }
+            else {
+                level._set_tile_prop(me, 'visual_state', 'open');
+            }
+        },
+        on_arrive(me, level, other) {
+            if (other.type.is_real_player) {
+                level.fail('fell', me, other);
+            }
+            else {
+                level.transmute_tile(other, 'puff');
+            }
+        },
+        visual_state(me) {
+            return (me && me.visual_state) ?? 'open';
+        },
+    },
+    cracked_floor: {
+        layer: LAYERS.terrain,
+        on_depart(me, level, other) {
+            level.spawn_animation(me.cell, 'puff');
+            level.transmute_tile(me, 'hole');
+            if (other === level.player) {
+                level.sfx.play_once('popwall', me.cell);
+            }
+            //update hole visual state
+            me.type.on_begin(me, level);
+            var one_south = level.cell(me.cell.x, me.cell.y + 1);
+            if (one_south !== null && one_south.get_terrain().type.name == 'hole') {
+                me.type.on_begin(one_south.get_terrain(), level);
             }
         },
     },
@@ -951,6 +1110,60 @@ const TILE_TYPES = {
         layer: LAYERS.item_mod,
         item_modifier: 'pickup',
     },
+    item_lock: {
+        layer: LAYERS.item_mod,
+        item_modifier: 'ignore',
+        blocks(me, level, other) {
+            let item = me.cell.get_item();
+            if (item === null) {
+                return false;
+            }
+            if (item.type.name == 'score_10') {
+                return !(other.type.is_real_player && level.bonus_points >= 10);
+            }
+            else if (item.type.name == 'score_100') {
+                return !(other.type.is_real_player && level.bonus_points >= 100);
+            }
+            else if (item.type.name == 'score_1000') {
+                return !(other.type.is_real_player && level.bonus_points >= 1000);
+            }
+            else if (item.type.name == 'score_2x') {
+                return !(other.type.is_real_player && level.bonus_points >= 1);
+            }
+            else if (item.type.name == 'score_5x') {
+                return !(other.type.is_real_player && level.bonus_points >= 1);
+            }
+            return !other.has_item(item.type.name);
+        },
+        on_arrive(me, level, other) {
+            let item = me.cell.get_item();
+            if (item === null) {
+                return;
+            }
+            if (item.type.name == 'score_10') {
+                level.adjust_bonus(-10);
+            }
+            else if (item.type.name == 'score_100') {
+                level.adjust_bonus(-100);
+            }
+            else if (item.type.name == 'score_1000') {
+                level.adjust_bonus(-1000);
+            }
+            else if (item.type.name == 'score_2x') {
+                level.adjust_bonus(0, 1/2);
+            }
+            else if (item.type.name == 'score_5x') {
+                level.adjust_bonus(0, 1/5);
+            }
+            else {
+                level.take_key_from_actor(other, item.type.name, true) || level.take_tool_from_actor(other, item.type.name);
+            }
+            level.sfx.play_once('door', me.cell);
+            level.spawn_animation(me.cell, 'puff');
+            level.remove_tile(me);
+            level.remove_tile(item);
+        },
+    },
 
     // Mechanisms
     dirt_block: {
@@ -959,7 +1172,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all,
         is_actor: true,
         is_block: true,
-        ignores: new Set(['fire', 'flame_jet_on']),
+        ignores: new Set(['fire', 'flame_jet_on', 'electrified_floor']),
         can_reverse_on_railroad: true,
         movement_speed: 4,
     },
@@ -975,8 +1188,9 @@ const TILE_TYPES = {
         pushes: {
             ice_block: true,
             frame_block: true,
+            boulder: true,
         },
-        on_bumped(me, level, other) {
+        on_after_bumped(me, level, other) {
             // Fireballs melt ice blocks on regular floor FIXME and water!
             // XXX what if i'm in motion?
             if (other.type.name === 'fireball') {
@@ -1005,6 +1219,8 @@ const TILE_TYPES = {
             dirt_block: true,
             ice_block: true,
             frame_block: true,
+            boulder: true,
+            glass_block: true,
         },
         on_clone(me, original) {
             me.arrows = new Set(original.arrows);
@@ -1018,6 +1234,43 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'arrows', new_arrows);
         },
     },
+    boulder: {
+        layer: LAYERS.actor,
+        collision_mask: COLLISION.block_cc2,
+        blocks_collision: COLLISION.all,
+        is_actor: true,
+        is_block: true,
+        can_reveal_walls: true,
+        pushes: {
+            ice_block: true,
+            frame_block: true,
+            //boulders don't push each other; instead on_bumped will chain through them
+        },
+        ignores: new Set(['fire', 'flame_jet_on', 'electrified_floor']),
+        can_reverse_on_railroad: true,
+        movement_speed: 4,
+        decide_movement(me, level) {
+            if (me.rolling) {
+                level._set_tile_prop(me, 'rolling', false);
+                return [me.direction, null];
+            }
+            else {
+                return null;
+            }
+        },
+        on_bumped(me, level, other) {
+            if (other.type.name === 'boulder') {
+                level._set_tile_prop(me, 'rolling', true);
+                level._set_tile_prop(me, 'direction', other.direction);
+                level._set_tile_prop(other, 'rolling', false);
+            }
+        },
+        on_starting_move(me, level) {
+            if (!me.rolling) {
+                level._set_tile_prop(me, 'rolling', true);
+            }
+        },
+    },
     glass_block: {
         layer: LAYERS.actor,
         collision_mask: COLLISION.block_cc2,
@@ -1027,25 +1280,55 @@ const TILE_TYPES = {
         can_reveal_walls: true,
         can_reverse_on_railroad: true,
         movement_speed: 4,
-        allows_push(me, direction) {
-            return me.arrows && me.arrows.has(direction);
+        try_pickup_item(me, level) {
+            if (me.encased_item === null) {
+                let item = me.cell.get_item();
+                if (item && !item.type.is_chip) {
+                    level.attempt_take(me, item);
+                    //then if we picked it up, encase it (so we have max one item at a time and so we can't 'use' the item)
+                    if (me.keyring !== undefined && me.keyring !== null && Object.keys(me.keyring).length > 0) {
+                        level._set_tile_prop(me, 'encased_item', Object.keys(me.keyring)[0]);
+                        level.take_all_keys_from_actor(me);
+                    }
+                    else if (me.toolbelt !== undefined && me.toolbelt !== null && me.toolbelt.length > 0)
+                    {
+                        level._set_tile_prop(me, 'encased_item', me.toolbelt[0]);
+                        level.take_all_tools_from_actor(me);
+                    }
+                }
+            }
+            /*if ((me.keyring === undefined || Object.keys(me.keyring).length == 0) && 
+            (me.toolbelt === undefined || me.toolbelt.length == 0)) {
+                let item = me.cell.get_item();
+                if (item) {
+                    level.attempt_take(me, item);
+                }
+            }*/
         },
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
+        on_ready(me, level) {
+            level._set_tile_prop(me, 'encased_item', null);
+            this.try_pickup_item(me, level);
         },
         on_clone(me, original) {
-            me.arrows = new Set(original.arrows);
-        },
-        on_rotate(me, level, turn) {
-            // We rotate when turned on railroads
-            let new_arrows = new Set;
-            for (let arrow of me.arrows) {
-                new_arrows.add(DIRECTIONS[arrow][turn]);
+            me.encased_item = original.encased_item;
+            /*if (original.keyring !== undefined) {
+                me.keyring = {};
+                Object.assign(me.keyring, original.keyring);
             }
-            level._set_tile_prop(me, 'arrows', new_arrows);
+            if (original.toolbelt !== undefined) {
+                me.toolbelt = original.toolbelt.map((x) => x);
+            }*/
         },
+        on_finishing_move(me, level) {
+            this.try_pickup_item(me, level);
+        },
+        on_death(me, level) {
+            //needs to be called by transmute_tile to ttl and by lit_dynamite before remove_tile
+            if (me.encased_item !== null) {
+                level._place_dropped_item(me.encased_item, me.cell, me);
+                level._set_tile_prop(me, 'encased_item', null);
+            }
+        }
     },
     green_floor: {
         layer: LAYERS.terrain,
@@ -1085,7 +1368,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             level.remove_tile(me);
             if (other.type.is_real_player) {
-                level.fail('exploded', other);
+                level.fail('exploded', me, other);
             }
             else {
                 level.sfx.play_once('bomb', me.cell);
@@ -1174,13 +1457,18 @@ const TILE_TYPES = {
     },
     trap: {
         layer: LAYERS.terrain,
+        on_begin(me, level) {
+            if (me.presses === undefined) {
+                level._set_tile_prop(me, 'presses', 0);
+            }
+        },
         add_press_ready(me, level, other) {
             // Same as below, but without ejection
-            me.presses = (me.presses ?? 0) + 1;
+            level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
         },
         // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
         add_press(me, level, is_wire = false) {
-            level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
+            level._set_tile_prop(me, 'presses', me.presses + 1);
             // TODO weird cc2 case that may or may not be a bug: actors aren't ejected if the trap
             // opened because of wiring
             if (me.presses === 1 && ! is_wire) {
@@ -1194,7 +1482,7 @@ const TILE_TYPES = {
             }
         },
         remove_press(me, level) {
-            level._set_tile_prop(me, 'presses', me.presses - 1);
+            level._set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
             if (me._initially_open) {
                 level._set_tile_prop(me, '_initially_open', false);
             }
@@ -1248,9 +1536,7 @@ const TILE_TYPES = {
         },
         _blob_mogrifications: ['glider', 'paramecium', 'fireball', 'bug', 'walker', 'ball', 'teeth', 'tank_blue', 'teeth_timid'],
         on_begin(me, level) {
-            // TODO if wire destruction is ever allowed, this will need to update somehow
-            me.is_wired = level.is_tile_wired(me, false);
-            me.is_active = ! me.is_wired;
+            update_wireable(me, level);
         },
         on_arrive(me, level, other) {
             // Note: Transmogrifiers technically contain wires the way teleports do, and CC2 uses
@@ -1300,7 +1586,7 @@ const TILE_TYPES = {
                 // TODO cc2 has a bug where, once it wraps around to the bottom right, it seems to
                 // forget that it was ever looking for an unwired teleport and will just grab the
                 // first one it sees
-                for (let dest of level.iter_tiles_in_reading_order(me.cell, 'teleport_blue', true)) {
+                for (let dest of level.iter_tiles_in_reading_order_multiple(me.cell, ['teleport_blue', 'teleport_blue_exit'], true)) {
                     if (! dest.wire_directions) {
                         yield [dest, exit_direction];
                     }
@@ -1333,7 +1619,7 @@ const TILE_TYPES = {
                 walked_circuits.add(circuit);
 
                 for (let [tile, edges] of circuit.tiles.entries()) {
-                    if (tile.type === me.type) {
+                    if (tile.type === me.type || tile.type.name === 'teleport_blue_exit') {
                         candidate_teleporters.add(tile);
                     }
                     else if (tile.type.name === 'logic_gate' && ! circuit.inputs.get(tile)) {
@@ -1368,18 +1654,20 @@ const TILE_TYPES = {
             }
         },
     },
+    teleport_blue_exit: {
+        layer: LAYERS.terrain,
+        wire_propagation_mode: 'all',
+    },
     teleport_red: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
         wire_propagation_mode: 'none',
         teleport_allow_override: true,
         on_begin(me, level) {
-            // TODO if wire destruction is ever allowed, this will need to update somehow
             // FIXME must be connected to something that can convey current: a wire, a switch, a
             // blue teleporter, etc; NOT nothing, a wall, a transmogrifier, a force floor, etc.
             // this is also how blue teleporters, transmogrifiers, and railroads work!
-            me.is_wired = level.is_tile_wired(me);
-            me.is_active = ! me.is_wired;
+            update_wireable(me, level);
         },
         *teleport_dest_order(me, level, other) {
             // Wired red teleporters can be turned off, which disconnects them from every other red
@@ -1500,7 +1788,7 @@ const TILE_TYPES = {
                 // TODO would be neat if this understood "ignores anything with fire immunity" but that
                 // might be a bit too high-level for this game
                 if (actor.type.is_real_player) {
-                    level.fail('burned', actor);
+                    level.fail('burned', me, actor);
                 }
                 else {
                     level.sfx.play_once('bomb', me.cell);
@@ -1509,6 +1797,39 @@ const TILE_TYPES = {
             }
         },
     },
+    electrified_floor: {
+        layer: LAYERS.terrain,
+        wire_propagation_mode: 'all',
+        on_begin(me, level) {
+            level._set_tile_prop(me, 'wire_directions', 15);
+            level.recalculate_circuitry_next_wire_phase = true;
+        },
+        on_tic(me, level) {
+            if (me.is_active)
+            {
+                let actor = me.cell.get_actor();
+                if (actor && actor.movement_cooldown <= 0 && ! actor.ignores(me.type.name)) {
+                    if (actor.type.is_real_player) {
+                        level.fail('electrocuted', me, actor);
+                    }
+                    else {
+                        level.sfx.play_once('bomb', me.cell);
+                        level.transmute_tile(actor, 'explosion');
+                    }
+                }
+            }
+        },
+        on_power(me, level) {
+            level._set_tile_prop(me, 'is_active', true);
+        },
+        on_depower(me, level) {
+            level._set_tile_prop(me, 'is_active', false);
+        },
+        visual_state(me) {
+            return ! me || me.is_active ? 'active' : 'inactive';
+        },
+    },
+    
     // Buttons
     button_blue: {
         layer: LAYERS.terrain,
@@ -1727,6 +2048,7 @@ const TILE_TYPES = {
         // gate_type: not, and, or, xor, nand, latch-cw, latch-ccw, counter, bogus
         _gate_types: {
             not: ['out0', null, 'in0', null],
+            diode: ['out0', null, 'in0', null],
             and: ['out0', 'in0', null, 'in1'],
             or: ['out0', 'in0', null, 'in1'],
             xor: ['out0', 'in0', null, 'in1'],
@@ -1780,6 +2102,9 @@ const TILE_TYPES = {
 
             if (me.gate_type === 'not') {
                 output0 = ! input0;
+            }
+            else if (me.gate_type === 'diode') {
+                output0 = input0;
             }
             else if (me.gate_type === 'and') {
                 output0 = input0 && input1;
@@ -1886,6 +2211,15 @@ const TILE_TYPES = {
         is_block: true,
         can_reverse_on_railroad: true,
         movement_speed: 4,
+        on_clone(me, original) {
+            me.wire_directions = original.wire_directions;
+        },
+        on_starting_move(me, level) {
+            level.recalculate_circuitry_next_wire_phase = true;
+        },
+        on_finishing_move(me, level) {
+            level.recalculate_circuitry_next_wire_phase = true;
+        },
     },
 
     // Time alteration
@@ -2015,6 +2349,8 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
+            glass_block: true,
         },
         movement_speed: 4,
         decide_movement(me, level) {
@@ -2120,10 +2456,11 @@ const TILE_TYPES = {
         ignores: new Set([
             'bomb', 'green_bomb',
             'water',
-            'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se',
+            'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice',
             'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
             // Ghosts don't activate swivels or popwalls
             'popwall', 'swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw',
+            'hole', 'cracked_floor',
         ]),
         movement_speed: 4,
         // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
@@ -2165,6 +2502,8 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
+            glass_block: true,
         },
         on_ready(me, level) {
             me.current_emulatee = 0;
@@ -2240,7 +2579,8 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', ]),
+        item_slide_ignores: new Set(['cracked_ice']),
     },
     suction_boots: {
         layer: LAYERS.item,
@@ -2343,10 +2683,13 @@ const TILE_TYPES = {
                         else if (tile.type.is_real_player) {
                             // TODO it would be nice if i didn't have to special-case this every
                             // time
-                            level.fail(me.type.name, tile);
+                            level.fail(me.type.name, me, tile);
                         }
                         else {
                             // Everything else is destroyed
+                            if (tile.type.on_death) {
+                                tile.type.on_death(tile, level);
+                            }
                             level.remove_tile(tile);
                             removed_anything = true;
                         }
@@ -2420,7 +2763,7 @@ const TILE_TYPES = {
             if (me.cell.has('cloner'))
                 return;
             if (other.type.is_real_player) {
-                level.fail(me.type.name, other);
+                level.fail(me.type.name, me, other);
             }
             else {
                 level.transmute_tile(other, 'explosion');
@@ -2432,7 +2775,7 @@ const TILE_TYPES = {
             // Blow up anything we run into
             if (obstacle && obstacle.type.is_actor) {
                 if (obstacle.type.is_real_player) {
-                    level.fail(me.type.name, obstacle);
+                    level.fail(me.type.name, me, obstacle);
                 }
                 else {
                     level.transmute_tile(obstacle, 'explosion');
@@ -2479,6 +2822,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_ignores: new Set(['electrified_floor']),
     },
     speed_boots: {
         layer: LAYERS.item,
@@ -2504,6 +2848,12 @@ const TILE_TYPES = {
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
     },
+    halo: {
+        layer: LAYERS.item,
+        is_item: true,
+        is_tool: true,
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+    },
 
     // Progression
     player: {
@@ -2521,6 +2871,8 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
+            glass_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -2537,12 +2889,14 @@ const TILE_TYPES = {
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']),
         pushes: {
             dirt_block: true,
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
+            glass_block: true,
         },
         infinite_items: {
             key_yellow: true,
@@ -2564,6 +2918,8 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
+            glass_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -2583,12 +2939,14 @@ const TILE_TYPES = {
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']),
         pushes: {
             dirt_block: true,
             ice_block: true,
             frame_block: true,
             circuit_block: true,
+            boulder: true,
+            glass_block: true,
         },
         infinite_items: {
             key_yellow: true,
@@ -2667,6 +3025,19 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.adjust_bonus(0, 2);
+                level.sfx.play_once('get-bonus2', me.cell);
+            }
+            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
+                level.remove_tile(me);
+            }
+        },
+    },
+    score_5x: {
+        layer: LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        on_arrive(me, level, other) {
+            if (other.type.is_real_player) {
+                level.adjust_bonus(0, 5);
                 level.sfx.play_once('get-bonus2', me.cell);
             }
             if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
