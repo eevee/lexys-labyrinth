@@ -1306,14 +1306,16 @@ dl.score-chart .-star {
     font-size: calc(var(--tile-height) * var(--scale) / 3);
     display: flex;
     align-items: center;
+    gap: 0.5em;
 }
 .chips h3,
 .time h3,
 .bonus h3 {
-    flex: 1;
+    flex: 0;
+    order: 2;
     font-size: 1.5em;
     line-height: 1;
-    color: hsl(225, 20%, 90%);
+    color: hsl(225, 20%, 80%);
 }
 .chips output,
 .time output,
@@ -1424,10 +1426,10 @@ dl.score-chart .-star {
         /* Rearrange the grid to be vertical */
         grid:
             "level      level"
-            "chips      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "time       inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "bonus      inventory" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            / 1fr min-content
+            "inventory  chips" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            "inventory  time" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            "inventory  bonus" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
+            / min-content 1fr
         ;
     }
     #player .inventory {

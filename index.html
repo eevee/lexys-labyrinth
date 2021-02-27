@@ -142,16 +142,16 @@
         <div id="player-main">
             <div id="player-controls">
                 <button class="control-pause" type="button" title="pause">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></svg>
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></path></svg>
                     <span class="keyhint"><kbd>p</kbd></span></button>
                 <button class="control-restart" type="button" title="restart">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></svg>
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></path></svg>
                     </button>
                 <button class="control-undo" type="button" title="undo">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></svg>
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></path></svg>
                     </button>
                 <button class="control-rewind" type="button" title="rewind">
-                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></svg>
+                    <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></path></svg>
                     <span class="keyhint"><kbd>z</kbd></span></button>
                 <div class="radio-faux-button-set">
                     <label><input class="control-turn-based" type="checkbox"> <span>Turn <br>based <br>mode</span></label>
@@ -180,15 +180,35 @@
                     <div class="player-hint"></div>
                 </div>
                 <div class="chips">
-                    <h3>Hearts</h3>
+                    <h3>
+                        <svg class="svg-icon" viewBox="0 0 16 16" title="Hearts">
+                            <path d="M4,2 C 2,2 1,4 1,6 C 1,8 2,10 4,12 C 6,14 8,15 8,15 C 8,15 10,14 12,12 C 14,10 15,8 15,6 C 15,4 14,2 12,2 C 10,2 8,5 8,5 C 8,5 6,2 4,2 z M12,4 C 12,5 13,6 14,6 C 13,6 12,7 12,8 C 12,7 11,6 10,6 C 11,6 12,5 12,4 z"></path>
+                        </svg>
+                    </h3>
                     <output></output>
                 </div>
                 <div class="time">
-                    <h3>Time</h3>
+                    <h3>
+                        <svg class="svg-icon" viewBox="0 0 16 16" title="Time">
+                            <path d="M 7,3 A -6,6 0 0 1 13,9 -6,6 0 0 1 7,15 -6,6 0 0 1 1,9 -6,6 0 0 1 7,3 Z M 7,4 A -5,5 0 0 0 2,9 -5,5 0 0 0 7,14 -5,5 0 0 0 12,9 -5,5 0 0 0 7,4 Z"></path>
+                            <!-- cap -->
+                            <path d="M 15,4 12,1 c -1,0 -1,0 -1,1 l 1,1 -2,2 1,1 2,-2 1,1 c 1,0 1,0 1,-1 z"></path>
+                            <!-- arrow -->
+                            <path d="M 8,9 10,6 7,8 Z"></path>
+                            <!-- center -->
+                            <circle cx="7" cy="9" r="1"></circle>
+                        </svg>
+                    </h3>
                     <output></output>
                 </div>
                 <div class="bonus">
-                    <h3>Bonus</h3>
+                    <h3>
+                        <svg class="svg-icon" viewBox="0 0 16 16" title="Bonus">
+                            <circle cx="8" cy="8" r="4"></circle>
+                            <path d="m9,7 2,-6 c 2,0 1,1 2,2 1,1 2,0 2,2 z"></path>
+                            <path d="M7,9 5,15 C 3,15 4,14 3,13 2,12 1,13 1,11 z"></path>
+                        </svg>
+                    </h3>
                     <output></output>
                 </div>
                 <div class="inventory"></div>
