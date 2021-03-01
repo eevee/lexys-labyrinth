@@ -95,6 +95,7 @@ export const COLLISION = {
     rover:              0x1000,
     ghost:              0x8000,
     // For a tile's COLLISION, use one of these bit combinations
+    monster_general:    0x6f00,  // everything but ghost and rover
     monster_solid:      0x7f00,  // everything but ghost
     monster_any:        0xff00,  // everything including ghost
 

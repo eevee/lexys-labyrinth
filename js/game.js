@@ -1,5 +1,5 @@
 import * as algorithms from './algorithms.js';
-import { DIRECTIONS, DIRECTION_ORDER, LAYERS, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
+import { DIRECTIONS, DIRECTION_ORDER, LAYERS, INPUT_BITS, PICKUP_PRIORITIES, TICS_PER_SECOND } from './defs.js';
 import { LevelInterface } from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 
@@ -16,7 +16,9 @@ export class Tile {
             this.movement_cooldown = 0;
         }
 
-        if (type.has_inventory) {
+        // Pre-seed actors who are expected to have inventories, with one
+        // TODO do i need this at all?
+        if (type.item_pickup_priority <= PICKUP_PRIORITIES.normal) {
             this.keyring = {};
             this.toolbelt = [];
         }
