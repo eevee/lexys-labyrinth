@@ -1453,7 +1453,7 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (actor.decision === null) {
+        if (actor.decision === null && ! forced_only) {
             actor.last_blocked_direction = null;
         }
 
