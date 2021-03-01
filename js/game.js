@@ -116,6 +116,8 @@ export class Tile {
 
         if (this.toolbelt) {
             for (let item of this.toolbelt) {
+                if (! item)
+                    continue;
                 let item_type = TILE_TYPES[item];
                 if (item_type.item_slide_ignores && item_type.item_slide_ignores.has(name))
                     return true;
