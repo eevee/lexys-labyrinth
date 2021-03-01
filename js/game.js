@@ -355,17 +355,31 @@ export class Cell extends Array {
                         if (actor === level.player) {
                             level._set_tile_prop(actor, 'is_pushing', true);
                         }
+                        // We can't directly push a sliding block, even one on a force floor that's
+                        // stuck on a wall.  Instead, it becomes a pending move for the block, which
+                        // will use this as a decision next time it's allowed to move
+                        // FIXME this is clumsy and creates behavior dependent on actor order.  my
+                        // original implementation only did this if the push /failed/; is that worth
+                        // a compat option?  also, how does any of this work under lynx rules?
+                        if (tile.slide_mode === 'force' ||
+                            (tile.slide_mode !== null && tile.movement_cooldown > 0))
+                        {
+                            level._set_tile_prop(tile, 'pending_push', direction);
+                            // FIXME if the block has already made a decision then this is necessary
+                            // to override it.  but i don't like it; (a) it might cause blocks to
+                            // get stuck against walls on force floors, because the code to fix that
+                            // is at decision time; (b) it's done for pulling too and just feels
+                            // hacky?
+                            tile.decision = direction;
+                            return false;
+                        }
+
                         if (level.attempt_out_of_turn_step(tile, direction)) {
                             if (actor === level.player) {
                                 level.sfx.play_once('push');
                             }
                         }
                         else {
-                            // If the push failed and the obstacle is in the middle of a slide,
-                            // remember this as the next move it'll make.
-                            if (tile.slide_mode !== null && tile.movement_cooldown > 0) {
-                                level._set_tile_prop(tile, 'pending_push', direction);
-                            }
                             return false;
                         }
                     }
@@ -1108,7 +1122,7 @@ export class Level extends LevelInterface {
         let success = this.attempt_step(actor, direction);
 
         // CC2 handles bonking for all kinds of sliding here -- bonking on ice causes an immediate
-        // turnaround, and bonking on an RFF rolls a new direction and tries again
+        // turnaround, and bonking on a force floor tries again (including rolling a new RFF)
         // TODO this assumes the slide comes from the terrain, which is always the case atm
         if (! success) {
             let terrain = actor.cell.get_terrain();
@@ -1120,18 +1134,23 @@ export class Level extends LevelInterface {
                 (terrain.type.slide_mode === 'ice' && (
                     ! actor.ignores(terrain.type.name) || actor.type.name === 'ghost')) ||
                 // But they only bonk on a force floor if it affects them
-                (terrain.type.name === 'force_floor_all' &&
+                (terrain.type.slide_mode === 'force' &&
                     actor.slide_mode && ! actor.ignores(terrain.type.name))))
             {
-                // Turn the actor around (so ice corners bonk correctly), pretend they stepped on
-                // the tile again (so RFFs roll again), and try moving again
-                this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
+                // Turn the actor around so ice corners bonk correctly
+                if (terrain.type.slide_mode === 'ice') {
+                    this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
+                }
+                // Pretend they stepped on the tile again
                 // Note that ghosts bonk even on ice corners, which they can otherwise pass through,
                 // argh!
                 if (terrain.type.on_arrive && actor.type.name !== 'ghost') {
                     terrain.type.on_arrive(terrain, this, actor);
                 }
-                success = this.attempt_step(actor, actor.direction);
+                // If we got a new direction, try moving again
+                if (direction !== actor.direction) {
+                    success = this.attempt_step(actor, actor.direction);
+                }
             }
             else if (actor.slide_mode === 'teleport') {
                 // Failed teleport slides only last for a single attempt.  (Successful teleports
@@ -1420,11 +1439,10 @@ export class Level extends LevelInterface {
                 }
             }
 
-            // If we're overriding a force floor but the direction we're moving in is blocked, the
-            // force floor takes priority (and we've already bumped the wall(s))
+            // If we're overriding a force floor but the direction we're moving in is blocked, this
+            // counts as a forced move
             if (actor.slide_mode === 'force' && ! open) {
                 this._set_tile_prop(actor, 'last_move_was_force', true);
-                actor.decision = actor.direction;
             }
             else {
                 // Otherwise this is 100% a conscious move so we lose our override power next tic
@@ -1451,8 +1469,10 @@ export class Level extends LevelInterface {
 
         if (actor.pending_push) {
             // Blocks that were pushed while sliding will move in the push direction as soon as
-            // they stop sliding, regardless of what they landed on.  Also used for hooking.
-            // This isn't cleared until the block makes another move; see _do_actor_movement.
+            // they can make a decision, even if they're still sliding or are off-tic.  Also used
+            // for hooking.  (Note that if the block is on a force floor and is blocked in the push
+            // direction, under CC2 rules it'll then try the force floor; see attempt_step.)
+            // This isn't cleared until the block actually attempts a move; see _do_actor_movement.
             actor.decision = actor.pending_push;
             return;
         }
