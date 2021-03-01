@@ -2979,9 +2979,8 @@ const COMPAT_FLAGS = [{
     // TODO maybe steam as well?
     rulesets: new Set(['steam-strict']),
 }, {
-    key: 'blue_keys_not_edible',
-    label: "Monsters do not eat blue keys",
-    // TODO wonder if this should also remove the special behavior of red keys
+    key: 'monsters_ignore_keys',
+    label: "Monsters ignore keys",
     rulesets: new Set(['ms']),
 }, {
     // XXX this is goofy

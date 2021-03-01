@@ -103,3 +103,13 @@ export const COLLISION = {
     all_but_real_player:    0xffff & ~0x0003,
     all:                    0xffff,
 };
+
+// Item pickup priority, which both actors and items have.  An actor will pick up an item if the
+// item's priority is greater than or equal to the actor's.
+export const PICKUP_PRIORITIES = {
+    never: 4,   // cc2 blocks, never pick anything up
+    always: 3,  // all actors; blue keys, yellow teleporters (everything picks up except cc2 blocks)
+    normal: 2,  // actors with inventories; most items
+    player: 1,  // players and doppelgangers; red keys (ignored by everything else)
+    real_player: 0,
+};

@@ -67,6 +67,9 @@ export class Tile {
                 return false;
         }
 
+        if (level.compat.monsters_ignore_keys && this.type.is_key)
+            return false;
+
         if (this.type.blocks_collision & other.type.collision_mask)
             return true;
 
@@ -1776,23 +1779,32 @@ export class Level extends LevelInterface {
             if (actor.ignores(tile.type.name))
                 continue;
 
-            if (tile.type.is_item &&
-                // FIXME implement item priority i'm begging you
-                ((actor.type.has_inventory && ! (tile.type.name === 'key_red' && ! actor.type.is_player)) ||
-                    (cell.get_item_mod() && cell.get_item_mod().type.item_modifier === 'pickup')) &&
-                this.attempt_take(actor, tile))
-            {
-                if (tile.type.is_key) {
-                    this.sfx.play_once('get-key', cell);
-                }
-                else {
-                    this.sfx.play_once('get-tool', cell);
-                }
-            }
-            else if (tile.type.teleport_dest_order) {
-                // This is used by an extra pass just after our caller, so it doesn't need to undo
+            if (tile.type.teleport_dest_order) {
+                // This is used by an extra pass just after our caller, so it doesn't need to undo.
+                // It DOES need to happen before items, though, or yellow teleporters never work!
                 actor.just_stepped_on_teleporter = tile;
             }
+            else if (tile.type.item_priority !== undefined) {
+                // Possibly try to pick items up
+                // TODO maybe this should be a method
+                let mod = cell.get_item_mod();
+                let try_pickup = (
+                    tile.type.item_priority >= actor.type.item_pickup_priority ||
+                    (mod && mod.type.item_modifier === 'pickup'));
+                if (this.compat.monsters_ignore_keys && tile.type.is_key && actor.type.is_monster) {
+                    try_pickup = false;
+                }
+                if (try_pickup && this.attempt_take(actor, tile)) {
+                    if (tile.type.is_key) {
+                        this.sfx.play_once('get-key', cell);
+                    }
+                    else if (tile.type.is_item) {
+                        this.sfx.play_once('get-tool', cell);
+                    }
+                    continue;
+                }
+            }
+
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
             }
@@ -1890,7 +1902,8 @@ export class Level extends LevelInterface {
         }
 
         if (! success) {
-            if (actor.type.has_inventory && teleporter.type.name === 'teleport_yellow' &&
+            if (teleporter.type.item_priority !== undefined &&
+                teleporter.type.item_priority >= actor.type.item_pickup_priority &&
                 this.allow_taking_yellow_teleporters)
             {
                 // Super duper special yellow teleporter behavior: you pick it the fuck up
@@ -2598,6 +2611,17 @@ export class Level extends LevelInterface {
         let mod = cell.get_item_mod();
         if (mod && mod.type.item_modifier === 'ignore')
             return false;
+
+        // Some faux items have custom pickup behavior, e.g. chips and bonuses
+        if (tile.type.on_pickup) {
+            if (tile.type.on_pickup(tile, this, actor)) {
+                this.remove_tile(tile);
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
 
         // Handling a full inventory is a teeny bit complicated.  We want the following:
         // - At no point are two items in the same cell

@@ -1,6 +1,8 @@
-import { COLLISION, DIRECTIONS, DIRECTION_ORDER, LAYERS, TICS_PER_SECOND } from './defs.js';
+import { COLLISION, DIRECTIONS, DIRECTION_ORDER, LAYERS, TICS_PER_SECOND, PICKUP_PRIORITIES } from './defs.js';
 import { random_choice } from './util.js';
 
+// TODO factor out some repeated stuff: common monster bits, common item bits, repeated collision
+// masks
 function activate_me(me, level) {
     me.type.activate(me, level);
 }
@@ -31,9 +33,11 @@ function on_begin_force_floor(me, level) {
     let item = me.cell.get_item();
     if (! item)
         return;
-    if (item.type.name === 'key_red')
+    if (item.type.item_priority < actor.type.item_pickup_priority)
         return;
-    if (level.attempt_take(actor, item) && actor.ignores(me.type.name)) {
+    if (! level.attempt_take(actor, item))
+        return;
+    if (actor.ignores(me.type.name)) {
         // If they just picked up suction boots, they're no longer sliding
         // TODO this feels hacky, shouldn't the slide mode be erased some other way?
         level._set_tile_prop(actor, 'slide_mode', null);
@@ -1097,6 +1101,7 @@ const TILE_TYPES = {
             }
         },
     },
+    // Item modifiers
     no_sign: {
         layer: LAYERS.item_mod,
         item_modifier: 'ignore',
@@ -1170,6 +1175,7 @@ const TILE_TYPES = {
         layer: LAYERS.actor,
         collision_mask: COLLISION.block_cc1,
         blocks_collision: COLLISION.all,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         is_actor: true,
         is_block: true,
         ignores: new Set(['fire', 'flame_jet_on', 'electrified_floor']),
@@ -1180,6 +1186,7 @@ const TILE_TYPES = {
         layer: LAYERS.actor,
         collision_mask: COLLISION.block_cc2,
         blocks_collision: COLLISION.all,
+        item_pickup_priority: PICKUP_PRIORITIES.never,
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
@@ -1207,6 +1214,7 @@ const TILE_TYPES = {
         layer: LAYERS.actor,
         collision_mask: COLLISION.block_cc2,
         blocks_collision: COLLISION.all,
+        item_pickup_priority: PICKUP_PRIORITIES.never,
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
@@ -1238,6 +1246,8 @@ const TILE_TYPES = {
         layer: LAYERS.actor,
         collision_mask: COLLISION.block_cc2,
         blocks_collision: COLLISION.all,
+        // XXX?
+        item_pickup_priority: PICKUP_PRIORITIES.never,
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
@@ -1275,6 +1285,7 @@ const TILE_TYPES = {
         layer: LAYERS.actor,
         collision_mask: COLLISION.block_cc2,
         blocks_collision: COLLISION.all,
+        item_pickup_priority: PICKUP_PRIORITIES.never,
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
@@ -1354,11 +1365,10 @@ const TILE_TYPES = {
         is_chip: true,
         is_required_chip: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        on_arrive(me, level, other) {
-            if (other.type.is_real_player) {
-                level.collect_chip();
-                level.remove_tile(me);
-            }
+        item_priority: PICKUP_PRIORITIES.real_player,
+        on_pickup(me, level, other) {
+            level.collect_chip();
+            return true;
         },
         // Not affected by gray buttons
     },
@@ -1402,6 +1412,9 @@ const TILE_TYPES = {
             me.type.on_gray_button(me, level);
         },
     },
+
+    // ------------------------------------------------------------------------------------------------
+    // Floor mechanisms
     cloner: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
@@ -1740,6 +1753,7 @@ const TILE_TYPES = {
     },
     teleport_yellow: {
         layer: LAYERS.terrain,
+        item_priority: PICKUP_PRIORITIES.always,
         slide_mode: 'teleport',
         teleport_allow_override: true,
         *teleport_dest_order(me, level, other) {
@@ -1829,7 +1843,8 @@ const TILE_TYPES = {
             return ! me || me.is_active ? 'active' : 'inactive';
         },
     },
-    
+
+    // ------------------------------------------------------------------------------------------------
     // Buttons
     button_blue: {
         layer: LAYERS.terrain,
@@ -2226,33 +2241,32 @@ const TILE_TYPES = {
     stopwatch_bonus: {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_arrive(me, level, other) {
-            if (other.type.is_real_player) {
-                level.remove_tile(me);
-                level.adjust_timer(+10);
-            }
+        item_priority: PICKUP_PRIORITIES.real_player,
+        on_pickup(me, level, other) {
+            level.adjust_timer(+10);
+            return true;
         },
     },
     stopwatch_penalty: {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_arrive(me, level, other) {
-            if (other.type.is_real_player) {
-                level.remove_tile(me);
-                level.adjust_timer(-10);
-            }
+        item_priority: PICKUP_PRIORITIES.real_player,
+        on_pickup(me, level, other) {
+            level.adjust_timer(-10);
+            return true;
         },
     },
     stopwatch_toggle: {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_arrive(me, level, other) {
-            if (other.type.is_real_player) {
-                level.pause_timer();
-            }
+        item_priority: PICKUP_PRIORITIES.player,
+        on_pickup(me, level, other) {
+            level.pause_timer();
+            return false;
         },
     },
 
+    // ------------------------------------------------------------------------------------------------
     // Critters
     bug: {
         layer: LAYERS.actor,
@@ -2260,6 +2274,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.bug,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         decide_movement(me, level) {
             // always try turning as left as possible, and fall back to less-left turns
@@ -2273,6 +2288,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         decide_movement(me, level) {
             // always try turning as right as possible, and fall back to less-right turns
@@ -2286,6 +2302,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         decide_movement(me, level) {
             // preserve current direction; if that doesn't work, bounce back the way we came
@@ -2299,6 +2316,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         decide_movement(me, level) {
             // preserve current direction; if that doesn't work, pick a random direction, even the
@@ -2322,6 +2340,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         decide_movement(me, level) {
             // always keep moving forward, but reverse if the flag is set
@@ -2344,6 +2363,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         pushes: {
             dirt_block: true,
             ice_block: true,
@@ -2371,6 +2391,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 8,
         decide_movement(me, level) {
             // move completely at random
@@ -2384,6 +2405,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         movement_parity: 2,
         decide_movement(me, level) {
@@ -2403,6 +2425,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         movement_parity: 2,
         decide_movement(me, level) {
@@ -2422,6 +2445,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.fireball,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         ignores: new Set(['fire', 'flame_jet_on']),
         decide_movement(me, level) {
@@ -2437,6 +2461,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         ignores: new Set(['water', 'turtle']),  // doesn't cause turtles to disappear
         decide_movement(me, level) {
@@ -2452,6 +2477,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.ghost,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.normal,
         has_inventory: true,
         ignores: new Set([
             'bomb', 'green_bomb',
@@ -2481,18 +2507,19 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.monster_generic,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         movement_parity: 4,
         decide_movement: pursue_player,
     },
     rover: {
-        // TODO pushes blocks apparently??
         layer: LAYERS.actor,
         is_actor: true,
         is_monster: true,
         has_inventory: true,
         collision_mask: COLLISION.rover,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.normal,
         can_reveal_walls: true,
         movement_speed: 8,
         movement_parity: 2,
@@ -2536,28 +2563,18 @@ const TILE_TYPES = {
 
     // Keys, whose behavior varies
     key_red: {
-        // TODO Red key can ONLY be picked up by players (and doppelgangers), no other actor that
-        // has an inventory
+        // Red key is only picked up by players and doppelgangers
         layer: LAYERS.item,
+        item_priority: PICKUP_PRIORITIES.player,
         is_item: true,
         is_key: true,
     },
     key_blue: {
-        // Blue key is picked up by dirt blocks and all monsters, including those that don't have an
-        // inventory normally
+        // Blue key is picked up by all actors except CC2 blocks
         layer: LAYERS.item,
+        item_priority: PICKUP_PRIORITIES.always,
         is_item: true,
         is_key: true,
-        on_arrive(me, level, other) {
-            // Call it...  everything except ice and directional blocks?  These rules are weird.
-            // Note that the game itself normally handles picking items up, so we only get here for
-            // actors who aren't supposed to have an inventory
-            // TODO make this a...  flag?  i don't know?
-            // TODO major difference from lynx...
-            if (other.type.name !== 'ice_block' && other.type.name !== 'frame_block' && ! level.compat.blue_keys_not_edible) {
-                level.attempt_take(other, me);
-            }
-        },
     },
     key_yellow: {
         layer: LAYERS.item,
@@ -2565,12 +2582,14 @@ const TILE_TYPES = {
         is_key: true,
         // FIXME ok this is ghastly
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     key_green: {
         layer: LAYERS.item,
         is_item: true,
         is_key: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     // Boots
     // TODO note: ms allows blocks to pass over tools
@@ -2579,6 +2598,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
         item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', ]),
         item_slide_ignores: new Set(['cracked_ice']),
     },
@@ -2587,6 +2607,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
         item_ignores: new Set([
             'force_floor_n',
             'force_floor_s',
@@ -2600,6 +2621,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
         // Note that these do NOT ignore fire because of the ghost interaction
         // XXX starting to wonder if this is even useful really
         item_ignores: new Set(['flame_jet_on']),
@@ -2609,6 +2631,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
         item_ignores: new Set(['water']),
     },
     hiking_boots: {
@@ -2616,6 +2639,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
         item_ignores: new Set(['sand']),
         // FIXME uhh these "ignore" that dirt and gravel block us, but they don't ignore the on_arrive, so, uhhhh
     },
@@ -2625,6 +2649,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
         on_depart(me, level, other) {
             if (other.type.is_real_player && ! me.cell.get_item_mod()) {
                 level._set_tile_prop(me, 'timer', 85);  // FIXME??  wiki just says about 4.3 seconds what
@@ -2641,6 +2666,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.dropped_item,
         blocks_collision: COLLISION.all_but_real_player,
+        // FIXME item_pickup_priority?
         // FIXME inherits a copy of player's inventory!
         // FIXME holds down buttons, so needs an on_arrive
         // FIXME speaking of buttons, destroyed actors should on_depart (behind compat flag)
@@ -2740,6 +2766,7 @@ const TILE_TYPES = {
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
         on_drop(level) {
             return 'rolling_ball';
         },
@@ -2751,6 +2778,7 @@ const TILE_TYPES = {
         has_inventory: true,
         can_reveal_walls: true,
         collision_mask: COLLISION.dropped_item,
+        item_pickup_priority: PICKUP_PRIORITIES.normal,
         // FIXME do i start moving immediately when dropped, or next turn?
         movement_speed: 4,
         decide_movement(me, level) {
@@ -2792,30 +2820,32 @@ const TILE_TYPES = {
         },
     },
     xray_eye: {
-        // TODO not implemented
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     helmet: {
-        // TODO not implemented
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     railroad_sign: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     foil: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     lightning_bolt: {
         layer: LAYERS.item,
@@ -2823,36 +2853,42 @@ const TILE_TYPES = {
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
         item_ignores: new Set(['electrified_floor']),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     speed_boots: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     bribe: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     hook: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     skeleton_key: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
     halo: {
         layer: LAYERS.item,
         is_item: true,
         is_tool: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
     },
 
     // Progression
@@ -2863,6 +2899,7 @@ const TILE_TYPES = {
         is_real_player: true,
         collision_mask: COLLISION.real_player1,
         blocks_collision: COLLISION.real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.real_player,
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -2886,6 +2923,7 @@ const TILE_TYPES = {
         is_real_player: true,
         collision_mask: COLLISION.real_player2,
         blocks_collision: COLLISION.real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.real_player,
         has_inventory: true,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -2910,6 +2948,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.doppel1,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.player,
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
@@ -2936,6 +2975,7 @@ const TILE_TYPES = {
         is_monster: true,
         collision_mask: COLLISION.doppel2,
         blocks_collision: COLLISION.all_but_real_player,
+        item_pickup_priority: PICKUP_PRIORITIES.player,
         has_inventory: true,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
@@ -2961,88 +3001,92 @@ const TILE_TYPES = {
         is_chip: true,
         is_required_chip: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        on_arrive(me, level, other) {
-            if (other.type.is_real_player) {
-                level.collect_chip();
-                level.remove_tile(me);
-            }
+        item_priority: PICKUP_PRIORITIES.real_player,
+        on_pickup(me, level, other) {
+            level.collect_chip();
+            return true;
         },
     },
     chip_extra: {
         layer: LAYERS.item,
         is_chip: true,
         blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
-        on_arrive(me, level, other) {
-            if (other.type.is_real_player) {
-                level.collect_chip();
-                level.remove_tile(me);
-            }
+        item_priority: PICKUP_PRIORITIES.real_player,
+        on_pickup(me, level, other) {
+            level.collect_chip();
+            return true;
         },
     },
+    // Score bonuses; they're picked up as normal EXCEPT by ghosts, but only a real player can
+    // actually add to the player's bonus
     score_10: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_arrive(me, level, other) {
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
+        on_pickup(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             if (other.type.is_real_player) {
                 level.adjust_bonus(10);
                 level.sfx.play_once('get-bonus', me.cell);
             }
-            // TODO turn this into a flag on those types??  idk
-            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
-                level.remove_tile(me);
-            }
+            return true;
         },
     },
     score_100: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_arrive(me, level, other) {
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
+        on_pickup(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             if (other.type.is_real_player) {
                 level.adjust_bonus(100);
                 level.sfx.play_once('get-bonus', me.cell);
             }
-            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
-                level.remove_tile(me);
-            }
+            return true;
         },
     },
     score_1000: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_arrive(me, level, other) {
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
+        on_pickup(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             if (other.type.is_real_player) {
                 level.adjust_bonus(1000);
                 level.sfx.play_once('get-bonus', me.cell);
             }
-            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
-                level.remove_tile(me);
-            }
+            return true;
         },
     },
     score_2x: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_arrive(me, level, other) {
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
+        on_pickup(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             if (other.type.is_real_player) {
                 level.adjust_bonus(0, 2);
                 level.sfx.play_once('get-bonus2', me.cell);
             }
-            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
-                level.remove_tile(me);
-            }
+            return true;
         },
     },
     score_5x: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
-        on_arrive(me, level, other) {
+        blocks_collision: COLLISION.block_cc1 | (COLLISION.monster_solid & ~COLLISION.rover),
+        item_priority: PICKUP_PRIORITIES.normal,
+        on_pickup(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
             if (other.type.is_real_player) {
                 level.adjust_bonus(0, 5);
                 level.sfx.play_once('get-bonus2', me.cell);
             }
-            if (other.type.is_player || other.type.name === 'rover' || other.type.name === 'bowling_ball') {
-                level.remove_tile(me);
-            }
+            return true;
         },
     },
 
@@ -3197,8 +3241,17 @@ for (let [name, type] of Object.entries(TILE_TYPES)) {
         console.error(`Tile type ${name} has a bad layer`);
     }
 
-    if (type.is_actor && type.collision_mask === undefined) {
-        console.error(`Tile type ${name} is an actor but has no collision mask`);
+    if (type.is_actor) {
+        if (type.collision_mask === undefined)
+            console.error(`Tile type ${name} is an actor but has no collision mask`);
+
+        if (type.item_pickup_priority === undefined)
+            console.error(`Tile type ${name} is an actor but has no item pickup priority`);
+    }
+
+    if (type.is_item) {
+        if (type.item_priority === undefined)
+            console.error(`Tile type ${name} is an item but has no item priority`);
     }
 }
 
