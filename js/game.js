@@ -1071,12 +1071,6 @@ export class Level extends LevelInterface {
                 }
             }
 
-            if (! forced_only && actor.type.on_tic) {
-                actor.type.on_tic(actor, this);
-                if (! actor.cell)
-                    continue;
-            }
-
             if (actor === this.player) {
                 this.make_player_decision(actor, this.p1_input, forced_only);
             }

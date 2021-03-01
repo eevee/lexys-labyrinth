@@ -2222,6 +2222,7 @@ const TILE_TYPES = {
         layer: LAYERS.actor,
         collision_mask: COLLISION.block_cc2,
         blocks_collision: COLLISION.all,
+        item_pickup_priority: PICKUP_PRIORITIES.never,
         is_actor: true,
         is_block: true,
         can_reverse_on_railroad: true,
@@ -2657,6 +2658,23 @@ const TILE_TYPES = {
                 // Actors are expected to have this, so populate it
                 level._set_tile_prop(me, 'movement_cooldown', 0);
                 level.add_actor(me);
+                // Dynamite inherits a copy of the player's inventory, which largely doesn't matter
+                // except for suction boots, helmet, or lightning bolt; keys can't matter because
+                // dynamite is blocked by doors
+                if (other.toolbelt) {
+                    level._set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
+                }
+                // Dynamite that lands on a force floor is moved by it, and dynamite that lands on a
+                // button holds it down
+                // TODO is there anything this should NOT activate?
+                let terrain = me.cell.get_terrain();
+                if (terrain && terrain.type.on_arrive && ! me.ignores(terrain.type.name)) {
+                    terrain.type.on_arrive(terrain, level, me);
+                }
+                // FIXME Ugh should this just be step_on or what?  but it doesn't slide on ice
+                if (terrain && terrain.type.slide_mode === 'force') {
+                    level.make_slide(me, terrain.type.slide_mode);
+                }
             }
         },
     },
@@ -2664,23 +2682,15 @@ const TILE_TYPES = {
         layer: LAYERS.actor,
         is_actor: true,
         is_monster: true,
-        collision_mask: COLLISION.dropped_item,
+        collision_mask: COLLISION.block_cc1,
         blocks_collision: COLLISION.all_but_real_player,
-        // FIXME item_pickup_priority?
-        // FIXME inherits a copy of player's inventory!
-        // FIXME holds down buttons, so needs an on_arrive
-        // FIXME speaking of buttons, destroyed actors should on_depart (behind compat flag)
-        // FIXME wait couldn't this just be a decide_movement?
-        on_tic(me, level) {
-            // FIXME When Chip or Melinda leaves a tile with a time bomb and no no sign on it, the
-            // time bomb will count down for about 4.3 seconds before exploding; it does not matter
-            // whether the player dropped the item (e.g. if the player teleported)????
-            if (me.slide_mode || me.movement_cooldown)
-                return;
-
+        item_pickup_priority: PICKUP_PRIORITIES.always,
+        movement_speed: 4,
+        // FIXME especially for buttons, destroyed actors should on_depart (behind compat flag)
+        decide_movement(me, level) {
             level._set_tile_prop(me, 'timer', me.timer - 1);
             if (me.timer > 0)
-                return;
+                return null;
 
             // Kaboom!  Blow up a 5x5 square
             level.sfx.play_once('bomb', me.cell);
@@ -2742,7 +2752,8 @@ const TILE_TYPES = {
                     else if (terrain) {
                         // Anything other than these babies gets blown up and turned into floor
                         if (!(
-                            terrain.type.name === 'steel' || terrain.type.name === 'socket' || terrain.type.name === 'logic_gate' || terrain.type.name === 'floor'))
+                            terrain.type.name === 'steel' || terrain.type.name === 'socket' ||
+                            terrain.type.name === 'logic_gate' || terrain.type.name === 'floor'))
                         {
                             level.transmute_tile(terrain, 'floor');
                             removed_anything = true;
@@ -2755,6 +2766,8 @@ const TILE_TYPES = {
                     }
                 }
             }
+
+            return null;
         },
         visual_state(me) {
             // 0 1 2 3 4
@@ -2777,7 +2790,7 @@ const TILE_TYPES = {
         is_monster: true,
         has_inventory: true,
         can_reveal_walls: true,
-        collision_mask: COLLISION.dropped_item,
+        collision_mask: COLLISION.bowling_ball,
         item_pickup_priority: PICKUP_PRIORITIES.normal,
         // FIXME do i start moving immediately when dropped, or next turn?
         movement_speed: 4,
@@ -3245,7 +3258,7 @@ for (let [name, type] of Object.entries(TILE_TYPES)) {
         if (type.collision_mask === undefined)
             console.error(`Tile type ${name} is an actor but has no collision mask`);
 
-        if (type.item_pickup_priority === undefined)
+        if (type.ttl === undefined && type.item_pickup_priority === undefined)
             console.error(`Tile type ${name} is an actor but has no item pickup priority`);
     }
 
