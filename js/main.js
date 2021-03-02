@@ -2944,73 +2944,102 @@ const COMPAT_RULESETS = [
     ['ms', "Microsoft"],
     ['custom', "Custom"],
 ];
-const COMPAT_FLAGS = [{
+// FIXME some of the names of the flags themselves kinda suck
+const COMPAT_FLAGS = [
+// Level loading
+{
     key: 'no_auto_convert_ccl_popwalls',
-    label: "Don't fix populated recessed walls in CC1 levels",
+    label: "Recessed walls under actors in CCL levels are left alone",
     rulesets: new Set(['steam-strict', 'lynx', 'ms']),
 }, {
     key: 'no_auto_convert_ccl_blue_walls',
-    label: "Don't fix populated blue walls in CC1 levels",
+    label: "Blue walls under blocks in CCL levels are left alone",
     rulesets: new Set(['steam-strict', 'lynx']),
+},
+
+// Core
+{
+    key: 'use_lynx_loop',
+    label: "Game uses the Lynx-style update loop",
+    rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
 }, {
+    key: 'emulate_60fps',
+    label: "Game runs at 60 FPS",
+    rulesets: new Set(['steam', 'steam-strict']),
+},
+
+// Tiles
+{
+    // XXX this is goofy
+    key: 'tiles_react_instantly',
+    label: "Tiles react when approached",
+    rulesets: new Set(['ms']),
+}, {
+    key: 'rff_actually_random',
+    label: "Random force floors are actually random",
+    rulesets: new Set(['ms']),
+},
+
+// Items
+{
     key: 'no_immediate_detonate_bombs',
-    label: "Don't immediately detonate populated mines",
+    label: "Mines under non-player actors don't explode at level start",
     rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'detonate_bombs_under_players',
-    label: "Detonate mines populated by players",
+    label: "Mines under players explode at level start",
     rulesets: new Set(['steam', 'steam-strict']),
 }, {
-    key: 'tanks_teeth_push_ice_blocks',
-    label: "Blue tanks and teeth can push ice blocks",
+    key: 'monsters_ignore_keys',
+    label: "Monsters completely ignore keys",
     rulesets: new Set(['ms']),
-}, {
-    key: 'sliding_tanks_ignore_button',
-    label: "Blue tanks ignore blue buttons while sliding",
-    // TODO ms?
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'cloner_tanks_react_button',
-    label: "Blue tanks on cloners respond to blue buttons",
-    rulesets: new Set(['steam-strict']),
+},
+
+// Blocks
+{
+    key: 'no_early_push',
+    label: "Player pushes blocks at move time",
+    rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'use_legacy_hooking',
-    label: "Player pulls blocks at decision time",
-    // TODO maybe steam as well?
-    rulesets: new Set(['steam-strict']),
+    label: "Pulling blocks with the hook happens at decision time",
+    rulesets: new Set(['steam', 'steam-strict']),
 }, {
-    key: 'monsters_ignore_keys',
-    label: "Monsters ignore keys",
-    rulesets: new Set(['ms']),
-}, {
-    // XXX this is goofy
-    key: 'tiles_react_instantly',
-    label: "Tiles react instantly",
+    // FIXME this is kind of annoying, there are some collision rules too
+    key: 'tanks_teeth_push_ice_blocks',
+    label: "Ice blocks emulate pgchip rules",
     rulesets: new Set(['ms']),
 }, {
     key: 'emulate_spring_mining',
-    label: "Emulate spring mining",
+    label: "Spring mining is possible",
+    rulesets: new Set(['steam-strict']),
+/* XXX not implemented
+}, {
+    key: 'emulate_flicking',
+    label: "Flicking is possible",
+    rulesets: new Set(['ms']),
+*/
+},
+
+// Monsters
+{
+    // TODO? in lynx they ignore the button while in motion too
+    // TODO what about in a trap, in every game??
+    // TODO what does ms do when a tank is on ice or a ff?  wiki's description is wacky
+    // TODO yellow tanks seem to have memory too??
+    key: 'tanks_always_obey_button',
+    label: "Blue tanks always obey blue buttons",
     rulesets: new Set(['steam-strict']),
 }, {
-    // XXX not implemented
-    /*
-    key: 'emulate_flicking',
-    label: "Emulate flicking",
+    key: 'rff_blocks_monsters',
+    label: "Random force floors block monsters",
     rulesets: new Set(['ms']),
 }, {
-    */
-    key: 'use_lynx_loop',
-    label: "Use Lynx-style update loop",
-    rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
-}, {
-    key: 'no_early_push',
-    label: "Player doesn't push at decision time",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'emulate_60fps',
-    label: "Run at 60 FPS",
-    rulesets: new Set(['steam', 'steam-strict']),
-}];
+    key: 'fire_allows_monsters',
+    label: "Fire doesn't block monsters",
+    rulesets: new Set(['ms']),
+},
+];
 class CompatOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);

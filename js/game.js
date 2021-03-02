@@ -1461,13 +1461,6 @@ export class Level extends LevelInterface {
     }
 
     make_actor_decision(actor, forced_only = false) {
-        // Compat flag for blue tanks
-        if (this.compat.sliding_tanks_ignore_button &&
-            actor.slide_mode && actor.pending_reverse)
-        {
-            this._set_tile_prop(actor, 'pending_reverse', false);
-        }
-
         if (actor.pending_push) {
             // Blocks that were pushed while sliding will move in the push direction as soon as
             // they can make a decision, even if they're still sliding or are off-tic.  Also used
@@ -2501,6 +2494,10 @@ export class Level extends LevelInterface {
     // Get the next direction a random force floor will use.  They share global
     // state and cycle clockwise.
     get_force_floor_direction() {
+        if (this.compat.rff_actually_random) {
+            return DIRECTION_ORDER[this.prng() % 4];
+        }
+
         let d = this.force_floor_direction;
         this.force_floor_direction = DIRECTIONS[d].right;
         return d;

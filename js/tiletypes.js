@@ -372,6 +372,7 @@ const TILE_TYPES = {
             {
                 // Blocks can be pushed off of blue walls in TW Lynx, which only works due to a tiny
                 // quirk of the engine that I don't want to replicate, so replace them with popwalls
+                // TODO this also works with invis walls apparently.  maybe only for blocks?
                 me.type = TILE_TYPES['popwall'];
             }
         },
@@ -741,7 +742,15 @@ const TILE_TYPES = {
     // Hazards
     fire: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.monster_solid & ~COLLISION.fireball,
+        // Fire blocks most monsters, except in MS where they walk right in and get roasted
+        blocks(me, level, other) {
+            if (other.type.collision_mask & (COLLISION.fireball | COLLISION.ghost))
+                return false;
+            if (other.type.collision_mask & COLLISION.monster_any) {
+                return ! level.compat.fire_allows_monsters;
+            }
+            return false;
+        },
         on_arrive(me, level, other) {
             if (other.type.name === 'ghost') {
                 // Ghosts with fire boots erase fire, otherwise are unaffected
@@ -986,6 +995,10 @@ const TILE_TYPES = {
         speed_factor: 2,
         on_begin: on_begin_force_floor,
         // TODO ms: this is random, and an acting wall to monsters (!)
+        blocks(me, level, other) {
+            return (level.compat.rff_blocks_monsters &&
+                (other.type.collision_mask & COLLISION.monster_general));
+        },
         on_arrive(me, level, other) {
             level.set_actor_direction(other, level.get_force_floor_direction());
         },
@@ -1871,11 +1884,16 @@ const TILE_TYPES = {
             // Flip direction of all blue tanks
             for (let actor of level.actors) {
                 // TODO generify somehow??
-                if (actor.type.name === 'tank_blue') {
-                    if (level.compat.cloner_tanks_react_button || ! actor.cell.has('cloner')) {
-                        level._set_tile_prop(actor, 'pending_reverse', ! actor.pending_reverse);
-                    }
+                if (actor.type.name !== 'tank_blue')
+                    continue;
+
+                if (! level.compat.tanks_always_obey_button &&
+                    (actor.slide_mode || actor.cell.has('cloner')))
+                {
+                    continue;
                 }
+
+                level._set_tile_prop(actor, 'pending_reverse', ! actor.pending_reverse);
             }
         },
         on_arrive(me, level, other) {
