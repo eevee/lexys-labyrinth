@@ -2053,9 +2053,16 @@ const TILE_TYPES = {
         is_power_source: true,
         wire_propagation_mode: 'cross',
         get_emitting_edges(me, level) {
+            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
             // We emit current as long as there's NOT an actor fully on us
             let actor = me.cell.get_actor();
-            if (actor && actor.movement_cooldown === 0) {
+            let held = (actor && actor.movement_cooldown === 0);
+            if (me.is_first_frame) {
+                held = ! held;
+                level._set_tile_prop(me, 'is_first_frame', false);
+            }
+
+            if (held) {
                 return 0;
             }
             else {
@@ -2063,9 +2070,11 @@ const TILE_TYPES = {
             }
         },
         on_arrive(me, level, other) {
+            level._set_tile_prop(me, 'is_first_frame', true);
             level.sfx.play_once('button-press', me.cell);
         },
         on_depart(me, level, other) {
+            level._set_tile_prop(me, 'is_first_frame', true);
             level.sfx.play_once('button-release', me.cell);
         },
         visual_state: button_visual_state,
@@ -2221,8 +2230,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         is_power_source: true,
         get_emitting_edges(me, level) {
-            // TODO this is inconsistent with the pink/black buttons, but cc2 has a single-frame
-            // delay here!
+            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
             if (me.is_first_frame) {
                 level._set_tile_prop(me, 'is_first_frame', false);
                 return me.wire_directions;
@@ -2240,8 +2248,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         is_power_source: true,
         get_emitting_edges(me, level) {
-            // TODO this is inconsistent with the pink/black buttons, but cc2 has a single-frame
-            // delay here!
+            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
             if (me.is_first_frame) {
                 level._set_tile_prop(me, 'is_first_frame', false);
                 return 0;
