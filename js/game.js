@@ -507,10 +507,6 @@ export class Level extends LevelInterface {
         // If there's exactly one yellow teleporter when the level loads, it cannot be picked up
         let yellow_teleporter_count = 0;
         this.allow_taking_yellow_teleporters = false;
-        // Speedup for flame jets, which aren't actors but do a thing every tic
-        // TODO this won't notice if a new tile with an on_tic is created, but that's impossible
-        // atm...  or, at least, it's hacked to still work with flame_jet_off
-        this.static_on_tic_tiles = [];
         for (let y = 0; y < this.height; y++) {
             let row = [];
             for (let x = 0; x < this.width; x++) {
@@ -538,9 +534,6 @@ export class Level extends LevelInterface {
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);
-                    }
-                    else if (tile.type.on_tic) {
-                        this.static_on_tic_tiles.push(tile);
                     }
                     cell._add(tile);
 
@@ -957,11 +950,20 @@ export class Level extends LevelInterface {
         // the way of the teleporter but finished moving away during the above loop; this is
         // particularly bad when it happens with a block you're pushing.  (CC2 doesn't need to do
         // this because blocks you're pushing are always a frame ahead of you anyway.)
+        // This is also where we handle tiles with persistent standing behavior.
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
             if (! actor.cell)
                 continue;
+            if (actor.type.ttl)
+                continue;
 
+            if (actor.movement_cooldown <= 0) {
+                let terrain = actor.cell.get_terrain();
+                if (terrain.type.on_stand && ! actor.ignores(terrain.type.name)) {
+                    terrain.type.on_stand(terrain, this, actor);
+                }
+            }
             if (actor.just_stepped_on_teleporter) {
                 this.attempt_teleport(actor);
             }
@@ -972,8 +974,6 @@ export class Level extends LevelInterface {
         this._do_wire_phase();
         this._do_wire_phase();
         this._do_wire_phase();
-        // TODO should this also happen three times?
-        this._do_static_phase();
 
         this._do_cleanup_phase();
     }
@@ -997,7 +997,6 @@ export class Level extends LevelInterface {
         this._do_decision_phase();
         this._do_combined_action_phase(3);
         this._do_wire_phase();
-        this._do_static_phase();
 
         this._do_cleanup_phase();
     }
@@ -1008,12 +1007,10 @@ export class Level extends LevelInterface {
         this._do_decision_phase(true);
         this._do_combined_action_phase(1, true);
         this._do_wire_phase();
-        this._do_static_phase();
 
         this._do_decision_phase(true);
         this._do_combined_action_phase(1, true);
         this._do_wire_phase();
-        this._do_static_phase();
     }
     // This is in the "finish" part to preserve the property turn-based mode expects, where "finish"
     // picks up right when the player could provide input
@@ -1021,7 +1018,6 @@ export class Level extends LevelInterface {
         this._do_decision_phase();
         this._do_combined_action_phase(1);
         this._do_wire_phase();
-        this._do_static_phase();
 
         this._do_cleanup_phase();
     }
@@ -1094,6 +1090,12 @@ export class Level extends LevelInterface {
                 continue;
 
             this._do_actor_cooldown(actor, cooldown);
+            if (actor.movement_cooldown <= 0) {
+                let terrain = actor.cell.get_terrain();
+                if (terrain.type.on_stand && ! actor.ignores(terrain.type.name)) {
+                    terrain.type.on_stand(terrain, this, actor);
+                }
+            }
             if (actor.just_stepped_on_teleporter) {
                 this.attempt_teleport(actor);
             }
@@ -2152,15 +2154,6 @@ export class Level extends LevelInterface {
                 circuit.is_powered = is_powered;
             }
         });
-    }
-
-    // Some non-actor tiles still want to act every tic.  Note that this should happen AFTER wiring.
-    _do_static_phase() {
-        for (let tile of this.static_on_tic_tiles) {
-            if (tile.type.on_tic) {
-                tile.type.on_tic(tile, this);
-            }
-        }
     }
 
     // -------------------------------------------------------------------------

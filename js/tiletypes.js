@@ -1812,9 +1812,6 @@ const TILE_TYPES = {
         on_power(me, level) {
             me.type.activate(me, level);
         },
-        // This is a silly hack to get us flagged as a static tile, so when we're turned on, that
-        // tile's on_tic will still run
-        on_tic() {},
     },
     flame_jet_on: {
         layer: LAYERS.terrain,
@@ -1827,19 +1824,16 @@ const TILE_TYPES = {
         on_power(me, level) {
             me.type.activate(me, level);
         },
-        on_tic(me, level) {
-            let actor = me.cell.get_actor();
-            if (actor && actor.movement_cooldown <= 0 && ! actor.ignores(me.type.name)) {
-                // Note that (dirt?) blocks, fireballs, and anything with fire boots are immune
-                // TODO would be neat if this understood "ignores anything with fire immunity" but that
-                // might be a bit too high-level for this game
-                if (actor.type.is_real_player) {
-                    level.fail('burned', me, actor);
-                }
-                else {
-                    level.sfx.play_once('bomb', me.cell);
-                    level.transmute_tile(actor, 'explosion');
-                }
+        on_stand(me, level, other) {
+            // Note that (dirt?) blocks, fireballs, and anything with fire boots are immune
+            // TODO would be neat if this understood "ignores anything with fire immunity" but that
+            // might be a bit too high-level for this game
+            if (other.type.is_real_player) {
+                level.fail('burned', me, other);
+            }
+            else {
+                level.sfx.play_once('bomb', me.cell);
+                level.transmute_tile(other, 'explosion');
             }
         },
     },
@@ -1850,19 +1844,16 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'wire_directions', 15);
             level.recalculate_circuitry_next_wire_phase = true;
         },
-        on_tic(me, level) {
-            if (me.is_active)
-            {
-                let actor = me.cell.get_actor();
-                if (actor && actor.movement_cooldown <= 0 && ! actor.ignores(me.type.name)) {
-                    if (actor.type.is_real_player) {
-                        level.fail('electrocuted', me, actor);
-                    }
-                    else {
-                        level.sfx.play_once('bomb', me.cell);
-                        level.transmute_tile(actor, 'explosion');
-                    }
-                }
+        on_stand(me, level, other) {
+            if (! me.is_active)
+                return;
+
+            if (other.type.is_real_player) {
+                level.fail('electrocuted', me, other);
+            }
+            else {
+                level.sfx.play_once('bomb', me.cell);
+                level.transmute_tile(other, 'explosion');
             }
         },
         on_power(me, level) {
