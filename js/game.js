@@ -807,11 +807,12 @@ export class Level extends LevelInterface {
     // Lynx PRNG, used unchanged in CC2
     prng() {
         let n = (this._rng1 >> 2) - this._rng1;
-        if (!(this._rng1 & 0x02)) --n;
-        this._rng1 = (this._rng1 >> 1) | (this._rng2 & 0x80);
-        this._rng2 = (this._rng2 << 1) | (n & 0x01);
-        let ret = (this._rng1 ^ this._rng2) & 0xff;
-        return ret;
+        if (!(this._rng1 & 0x02)) {
+            n -= 1;
+        }
+        this._rng1 = ((this._rng1 >> 1) | (this._rng2 & 0x80)) & 0xff;
+        this._rng2 = ((this._rng2 << 1) | (n & 0x01)) & 0xff;
+        return this._rng1 ^ this._rng2;
     }
 
     // Weird thing done by CC2 to make blobs...  more...  random

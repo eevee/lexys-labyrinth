@@ -1759,28 +1759,43 @@ const TILE_TYPES = {
     teleport_green: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
-        teleport_dest_order(me, level, other) {
+        *teleport_dest_order(me, level, other) {
             let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
             if (all.length <= 1) {
                 // If this is the only teleporter, just walk out the other side — and, crucially, do
                 // NOT advance the PRNG
-                return [[me, other.direction]];
+                yield [me, other.direction];
+                return;
             }
-            // Note the iterator starts on the /next/ teleporter, so there's an implicit +1 here.
-            // The -1 is to avoid spitting us back out of the same teleporter, which will be last in
-            // the list
-            let target = all[level.prng() % (all.length - 1)];
-            // Also pick the actor's exit direction
+            // The green teleporter scheme is:
+            // 1. Use the PRNG to pick another green teleporter
+            // 2. Use the PRNG to pick an exit direction
+            // 3. Search the selected exit teleporter for a viable exit direction
+            // 4. If that doesn't work, continue searching green teleporters in reading order
+            // 5. When we reach the entry teleporter, stop and give up
+            // This means that completely blocked green teleporters are skipped, BUT if the only
+            // available teleporters are between the entry and chosen exit, they'll never be tried.
+            // TODO that sucks actually; compat option?
+
+            // The iterator starts on the /next/ teleporter, so there's an implicit +1 here.  The -1
+            // avoids spitting us back out of the same teleporter, which will be last in the list
+            let start_index = level.prng() % (all.length - 1);
+            // Also pick the initial exit direction
             let exit_direction = DIRECTION_ORDER[level.prng() % 4];
-            return [
-                // Green teleporters allow exiting in any direction, similar to red, but only on the
-                // one they found; if that fails, you walk straight across the one you entered
-                [target, exit_direction],
-                [target, DIRECTIONS[exit_direction].right],
-                [target, DIRECTIONS[exit_direction].opposite],
-                [target, DIRECTIONS[exit_direction].left],
-                [me, other.direction],
-            ];
+
+            for (let index = start_index; index < all.length - 1; index++) {
+                let target = all[index];
+
+                // Green teleporters allow exiting in any direction, similar to red
+                yield [target, exit_direction];
+                yield [target, DIRECTIONS[exit_direction].right];
+                yield [target, DIRECTIONS[exit_direction].opposite];
+                yield [target, DIRECTIONS[exit_direction].left];
+            }
+
+            // We've circled back around to our entry teleporter; give up
+            yield [me, other.direction];
+            return;
         },
     },
     teleport_yellow: {
