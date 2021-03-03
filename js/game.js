@@ -92,8 +92,11 @@ export class Tile {
             other.type.name !== 'ghost')
             return true;
 
-        if (this.type.blocks)
-            return this.type.blocks(this, level, other, direction);
+        if (this.type.blocks && this.type.blocks(this, level, other, direction))
+            return true;
+        
+        if (other.type.blocked_by && other.type.blocked_by(other, level, this))
+            return true;
 
         return false;
     }
@@ -2441,6 +2444,9 @@ export class Level extends LevelInterface {
             {
                 if (killer.type.is_actor || killer.type.is_item)
                 {
+                    if (killer.type.on_death) {
+                        killer.type.on_death(killer, this);
+                    }
                     this.remove_tile(killer);
                 }
                 else //presumably terrain
@@ -2584,9 +2590,10 @@ export class Level extends LevelInterface {
                 this._set_tile_prop(tile, 'last_extra_cooldown_tic', null);
             }
             this._do_extra_cooldown(tile);
-            if (old_type.on_death) {
-                old_type.on_death(tile, this);
-            }
+        }
+        
+        if (old_type.on_death) {
+            old_type.on_death(tile, this);
         }
     }
 

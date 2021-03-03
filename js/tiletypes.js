@@ -1079,12 +1079,14 @@ const TILE_TYPES = {
             if (other === level.player) {
                 level.sfx.play_once('popwall', me.cell);
             }
-            //update hole visual state
-            me.type.on_begin(me, level);
-            var one_south = level.cell(me.cell.x, me.cell.y + 1);
-            if (one_south !== null && one_south.get_terrain().type.name == 'hole') {
-                me.type.on_begin(one_south.get_terrain(), level);
-            }
+        },
+        on_death(me, level) {
+          //update hole visual state
+          me.type.on_begin(me, level);
+          var one_south = level.cell(me.cell.x, me.cell.y + 1);
+          if (one_south !== null && one_south.get_terrain().type.name == 'hole') {
+              me.type.on_begin(one_south.get_terrain(), level);
+          }
         },
     },
     thief_tools: {
@@ -1324,29 +1326,19 @@ const TILE_TYPES = {
         can_reverse_on_railroad: true,
         movement_speed: 4,
         try_pickup_item(me, level) {
+            //suck up any item that ever CAN be picked up off of the floor and put it in our encased_item slot (not an inventory since e.g. a glass block with red key can't unlock red doors)
             if (me.encased_item === null) {
                 let item = me.cell.get_item();
-                if (item && !item.type.is_chip) {
-                    level.attempt_take(me, item);
-                    //then if we picked it up, encase it (so we have max one item at a time and so we can't 'use' the item)
-                    if (me.keyring !== undefined && me.keyring !== null && Object.keys(me.keyring).length > 0) {
-                        level._set_tile_prop(me, 'encased_item', Object.keys(me.keyring)[0]);
-                        level.take_all_keys_from_actor(me);
-                    }
-                    else if (me.toolbelt !== undefined && me.toolbelt !== null && me.toolbelt.length > 0)
-                    {
-                        level._set_tile_prop(me, 'encased_item', me.toolbelt[0]);
-                        level.take_all_tools_from_actor(me);
-                    }
+                let mod = me.cell.get_item_mod();
+                if (mod && mod.type.item_modifier === 'ignore') {
+                  return;
+                }
+                //hmm, actually chips seem to work OK. Alright, why not then?
+                if (item /*&& !item.type.is_chip*/ && item.type.item_priority !== undefined) {
+                  level._set_tile_prop(me, 'encased_item', item.type.name);
+                  level.remove_tile(item);
                 }
             }
-            /*if ((me.keyring === undefined || Object.keys(me.keyring).length == 0) && 
-            (me.toolbelt === undefined || me.toolbelt.length == 0)) {
-                let item = me.cell.get_item();
-                if (item) {
-                    level.attempt_take(me, item);
-                }
-            }*/
         },
         on_ready(me, level) {
             level._set_tile_prop(me, 'encased_item', null);
@@ -1354,21 +1346,17 @@ const TILE_TYPES = {
         },
         on_clone(me, original) {
             me.encased_item = original.encased_item;
-            /*if (original.keyring !== undefined) {
-                me.keyring = {};
-                Object.assign(me.keyring, original.keyring);
-            }
-            if (original.toolbelt !== undefined) {
-                me.toolbelt = original.toolbelt.map((x) => x);
-            }*/
         },
         on_finishing_move(me, level) {
             this.try_pickup_item(me, level);
         },
+        blocked_by(me, level, other) {
+            return other.cell.get_item() !== null && me.encased_item !== null;
+        },
         on_death(me, level) {
             //needs to be called by transmute_tile to ttl and by lit_dynamite before remove_tile
             if (me.encased_item !== null) {
-                level._place_dropped_item(me.encased_item, me.cell, me);
+                level._place_dropped_item(me.encased_item, me.cell ?? me.previous_cell, me);
                 level._set_tile_prop(me, 'encased_item', null);
             }
         }
@@ -1876,6 +1864,11 @@ const TILE_TYPES = {
         },
         on_depower(me, level) {
             level._set_tile_prop(me, 'is_active', false);
+        },
+        on_death(me, level) {
+            //need to remove our wires since they're an implementation detail
+            level._set_tile_prop(me, 'wire_directions', 0);
+            level.recalculate_circuitry_next_wire_phase = true;
         },
         visual_state(me) {
             return ! me || me.is_active ? 'active' : 'inactive';
@@ -2655,6 +2648,7 @@ const TILE_TYPES = {
 
                     let actor = cell.get_actor();
                     let terrain = cell.get_terrain();
+                    let item = cell.get_item();
                     let removed_anything;
                     for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
                         let tile = cell[layer];
@@ -2670,6 +2664,10 @@ const TILE_TYPES = {
                             level.fail(me.type.name, me, tile);
                         }
                         else {
+                            //newly appearing items (e.g. dropped by a glass block) are safe
+                            if (tile.type.layer === LAYERS.item && tile !== item) {
+                              continue;
+                            }
                             // Everything else is destroyed
                             if (tile.type.on_death) {
                                 tile.type.on_death(tile, level);
@@ -2699,7 +2697,14 @@ const TILE_TYPES = {
                     }
                     else if (terrain) {
                         // Anything other than these babies gets blown up and turned into floor
-                        if (!(
+                        if (terrain.type.name === 'hole') {
+                            //do nothing
+                        }
+                        else if (terrain.type.name === 'cracked_floor') {
+                            level.transmute_tile(terrain, 'hole');
+                            removed_anything = true;
+                        }
+                        else if (!(
                             terrain.type.name === 'steel' || terrain.type.name === 'socket' ||
                             terrain.type.name === 'logic_gate' || terrain.type.name === 'floor'))
                         {
