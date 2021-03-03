@@ -1079,12 +1079,14 @@ const TILE_TYPES = {
             if (other === level.player) {
                 level.sfx.play_once('popwall', me.cell);
             }
-            //update hole visual state
-            me.type.on_begin(me, level);
-            var one_south = level.cell(me.cell.x, me.cell.y + 1);
-            if (one_south !== null && one_south.get_terrain().type.name == 'hole') {
-                me.type.on_begin(one_south.get_terrain(), level);
-            }
+        },
+        on_death(me, level) {
+          //update hole visual state
+          me.type.on_begin(me, level);
+          var one_south = level.cell(me.cell.x, me.cell.y + 1);
+          if (one_south !== null && one_south.get_terrain().type.name == 'hole') {
+              me.type.on_begin(one_south.get_terrain(), level);
+          }
         },
     },
     thief_tools: {
@@ -1859,6 +1861,11 @@ const TILE_TYPES = {
         },
         on_depower(me, level) {
             level._set_tile_prop(me, 'is_active', false);
+        },
+        on_death(me, level) {
+            //need to remove our wires since they're an implementation detail
+            level._set_tile_prop(me, 'wire_directions', 0);
+            level.recalculate_circuitry_next_wire_phase = true;
         },
         visual_state(me) {
             return ! me || me.is_active ? 'active' : 'inactive';
@@ -2687,7 +2694,14 @@ const TILE_TYPES = {
                     }
                     else if (terrain) {
                         // Anything other than these babies gets blown up and turned into floor
-                        if (!(
+                        if (terrain.type.name === 'hole') {
+                            //do nothing
+                        }
+                        else if (terrain.type.name === 'cracked_floor') {
+                            level.transmute_tile(terrain, 'hole');
+                            removed_anything = true;
+                        }
+                        else if (!(
                             terrain.type.name === 'steel' || terrain.type.name === 'socket' ||
                             terrain.type.name === 'logic_gate' || terrain.type.name === 'floor'))
                         {
