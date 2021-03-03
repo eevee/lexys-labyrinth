@@ -548,12 +548,6 @@ export const CC2_TILESET_LAYOUT = {
                 south: [2, 25],
                 west: [3, 25],
             },
-            diode: {
-                north: [0, 41],
-                east: [1, 41],
-                south: [2, 41],
-                west: [3, 41],
-            },
             and: {
                 north: [4, 25],
                 east: [5, 25],
@@ -862,135 +856,378 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     ..._omit_custom_lexy_vfx,
 };
 
-export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
+export const LL_TILESET_LAYOUT = {
     '#ident': 'lexy',
     '#name': "Lexy's Labyrinth",
-    // TODO dimensions, when this is stable??  might one day rearrange, leave some extra space
+    '#dimensions': [32, 32],
     '#supported-versions': new Set(['cc1', 'cc2', 'll']),
+    '#wire-width': 1/16,
 
-    // Completed teeth sprites
-    teeth: Object.assign({}, CC2_TILESET_LAYOUT.teeth, {
-        north: [[1, 32], [0, 32], [1, 32], [2, 32]],
-    }),
-    teeth_timid: {
-        north: [[7, 32], [6, 32], [7, 32], [8, 32]],
-        east:  [[4, 32], [2, 17], [4, 32], [3, 17]],
-        south: [[3, 32], [0, 17], [3, 32], [1, 17]],
-        west:  [[5, 32], [4, 17], [5, 32], [5, 17]],
-    },
+    // ------------------------------------------------------------------------------------------------
+    // Left side: tiles
 
-    // Extra player sprites
-    player: Object.assign({}, CC2_TILESET_LAYOUT.player, {
-        __special__: 'visual-state',
-        pushing: {
-            north: [[8, 24], [0, 34], [8, 24], [1, 34]],
-            east: [[9, 24], [2, 34], [9, 24], [3, 34]],
-            south: [[10, 24], [4, 34], [10, 24], [5, 34]],
-            west: [[11, 24], [6, 34], [11, 24], [7, 34]],
-        },
-        skating: {
-            north: [0, 33],
-            east: [1, 33],
-            south: [2, 33],
-            west: [3, 33],
-        },
-        forced: 'skating',
-        exited: [14, 32],
-        burned: {
-            north: [4, 33],
-            east: [5, 33],
-            south: [6, 33],
-            west: [7, 33],
-        },
-        slimed: [1, 38],
-    }),
-    player2: Object.assign({}, CC2_TILESET_LAYOUT.player2, {
-        __special__: 'visual-state',
-        pushing: {
-            north: [[8, 29], [8, 34], [8, 29], [9, 34]],
-            east: [[9, 29], [10, 34], [9, 29], [11, 34]],
-            south: [[10, 29], [12, 34], [10, 29], [13, 34]],
-            west: [[11, 29], [14, 34], [11, 29], [15, 34]],
-        },
-        skating: {
-            north: [8, 33],
-            east: [9, 33],
-            south: [10, 33],
-            west: [11, 33],
-        },
-        forced: 'skating',
-        exited: [15, 32],
-        burned: {
-            north: [12, 33],
-            east: [13, 33],
-            south: [14, 33],
-            west: [15, 33],
-        },
-        slimed: [1, 38],
-    }),
-    bogus_player_burned_fire: {
-        __special__: 'overlay',
-        overlay: [6, 33],
-        base: 'fire',
-    },
-    bogus_player_burned: {
-        __special__: 'overlay',
-        overlay: [6, 33],
-        base: 'floor',
-    },
-
-    // Custom tiles
-    popwall2: [9, 32],
-    gift_bow: [10, 32],
-    circuit_block: {
+    // Terrain
+    floor: {
+        // Wiring!
         __special__: 'wires',
-        base: [13, 32],
-        wired: [11, 32],
-        wired_cross: [12, 32],
+        base: [0, 2],
+        wired: [0, 28],
+        wired_cross: [1, 28],
+        is_wired_optional: true,
+    },
+    wall: [0, 3],
+    floor_letter: {
+        __special__: 'letter',
+        base: [1, 2],
+        letter_glyphs: {
+            // Arrows
+            "⬆": [6, 1],
+            "➡": [6.5, 1],
+            "⬇": [6, 1.5],
+            "⬅": [6.5, 1.5],
+        },
+        letter_ranges: [{
+            // ASCII text (only up through uppercase)
+            range: [32, 96],
+            x0: 0,
+            y0: 0,
+            w: 0.5,
+            h: 0.5,
+            columns: 32,
+        }],
+    },
+    steel: {
+        // Wiring!
+        __special__: 'wires',
+        base: [1, 3],
+        wired: [0, 29],
+        wired_cross: [1, 29],
+        is_wired_optional: true,
+    },
+    hint: [2, 2],
+    wall_invisible: {
+        __special__: 'perception',
+        modes: new Set(['palette', 'editor', 'xray']),
+        hidden: [0, 2],
+        revealed: [3, 2],
+    },
+    // FIXME this shouldn't be visible with seeing eye (or should it not spawn at all?)
+    wall_invisible_revealed: [0, 3],
+    wall_appearing: {
+        __special__: 'perception',
+        modes: new Set(['palette', 'editor', 'xray']),
+        hidden: [0, 2],
+        revealed: [3, 3],
+    },
+    popwall: [4, 2],
+    popwall2: [4, 3],
+    fake_floor: {
+        __special__: 'perception',
+        modes: new Set(['palette', 'editor', 'xray']),
+        hidden: [5, 2],
+        revealed: [5, 3],
+    },
+    fake_wall: [5, 2],
+    popdown_floor: {
+        __special__: 'perception',
+        modes: new Set(['palette', 'editor', 'xray']),
+        hidden: {
+            __special__: 'visual-state',
+            depressed: [6, 2],
+            normal: [6, 3],
+        },
+        revealed: [6, 2],
+    },
+    popdown_wall: [6, 3],
+    thief_tools: [8, 2],
+    thief_keys: [8, 3],
+    canopy: {
+        __special__: 'perception',
+        modes: new Set(['editor', 'xray']),
+        hidden: [9, 2],
+        revealed: [9, 3],
+    },
+    no_player1_sign: [10, 2],
+    no_player2_sign: [10, 3],
+    '#active-player-background': [11, 2],
+    // TODO dopps can push but i don't think they have any other visuals
+    doppelganger1: {
+        __special__: 'overlay',
+        base: [11, 3],
+        overlay: 'player',
+    },
+    doppelganger2: {
+        __special__: 'overlay',
+        base: [11, 3],
+        overlay: 'player2',
+    },
+    exit: [
+        [12, 2],
+        [13, 2],
+        [14, 2],
+        [15, 2],
+    ],
+    socket: [12, 3],
+
+    floor_custom_green: [0, 4],
+    floor_custom_pink: [1, 4],
+    floor_custom_yellow: [2, 4],
+    floor_custom_blue: [3, 4],
+    wall_custom_green: [0, 5],
+    wall_custom_pink: [1, 5],
+    wall_custom_yellow: [2, 5],
+    wall_custom_blue: [3, 5],
+    sand: [0, 6],
+    spikes: [0, 7],
+    hole: {
+        __special__: 'visual-state',
+        north: [1, 6],
+        open: [1, 7],
+    },
+    cracked_floor: [2, 6],
+    
+    thin_walls: {
+        __special__: 'thin_walls',
+        thin_walls_ns: [8, 4],
+        thin_walls_ew: [8, 5],
     },
 
-    // Blob and walker in all four directions
-    blob: {
-        north: [[0, 35], [1, 35], [2, 35], [3, 35], [4, 35], [5, 35], [6, 35], [7, 35]],
-        east: [[8, 35], [9, 35], [10, 35], [11, 35], [12, 35], [13, 35], [14, 35], [15, 35]],
-        south: [[0, 36], [1, 36], [2, 36], [3, 36], [4, 36], [5, 36], [6, 36], [7, 36]],
-        west: [[8, 36], [9, 36], [10, 36], [11, 36], [12, 36], [13, 36], [14, 36], [15, 36]],
+    force_floor_n: {
+        __special__: 'scroll',
+        base: [0, 8],
+        scroll_region: [0, 1],
     },
-    walker: {
-        north: [[0, 37], [1, 37], [2, 37], [3, 37]],
-        east: [[4, 37], [5, 37], [6, 37], [7, 37]],
-        // Same animations but played backwards
-        south: [[2, 37], [1, 37], [0, 37], [3, 37]],
-        west: [[6, 37], [5, 37], [4, 37], [7, 37]],
+    force_floor_e: {
+        __special__: 'scroll',
+        base: [3, 8],
+        scroll_region: [-1, 0],
     },
-    // Pressed buttons
+    force_floor_s: {
+        __special__: 'scroll',
+        base: [1, 9],
+        scroll_region: [0, -1],
+    },
+    force_floor_w: {
+        __special__: 'scroll',
+        base: [2, 9],
+        scroll_region: [1, 0],
+    },
+    water: [[4, 8], [5, 8], [6, 8], [7, 8]],
+    fire: [[4, 9], [5, 9], [6, 9], [7, 9]],
+    force_floor_all: [[0, 10], [1, 10], [2, 10], [3, 10], [4, 10], [5, 10], [6, 10], [7, 10]],
+    slime: [[0, 11], [1, 11], [2, 11], [3, 11], [4, 11], [5, 11], [6, 11], [7, 11]],
+
+    turtle: {
+        // Turtles draw atop fake water, but don't act like water otherwise
+        __special__: 'overlay',
+        overlay: [[8, 8], [9, 8], [10, 8], [9, 8]],  // TODO also 14 + 15, bobbing pseudorandomly
+        base: 'water',
+    },
+    ice: [12, 8],
+    cracked_ice: [12, 9],
+    ice_se: [13, 8],
+    ice_sw: [14, 8],
+    ice_ne: [13, 9],
+    ice_nw: [14, 9],
+    dirt: [15, 8],
+    gravel: [15, 9],
+    green_floor: [[8, 10], [9, 10], [10, 10], [11, 10]],
+    green_wall: [[8, 11], [9, 11], [10, 11], [11, 11]],
+    purple_floor: [[12, 10], [13, 10], [14, 10], [15, 10]],
+    purple_wall: [[12, 11], [13, 11], [14, 11], [15, 11]],
+
+    // Cool movement tiles
+    railroad: {
+        __special__: 'railroad',
+        base: [15, 9],
+        railroad_ties: {
+            ne: [0, 12],
+            se: [1, 12],
+            sw: [2, 12],
+            nw: [3, 12],
+            ew: [4, 12],
+            ns: [5, 12],
+        },
+        railroad_active: {
+            ne: [0, 13],
+            se: [1, 13],
+            sw: [2, 13],
+            nw: [3, 13],
+            ew: [4, 13],
+            ns: [5, 13],
+        },
+        railroad_inactive: {
+            ne: [0, 14],
+            se: [1, 14],
+            sw: [2, 14],
+            nw: [3, 14],
+            ew: [4, 14],
+            ns: [5, 14],
+        },
+        railroad_switch: [6, 12],
+    },
+    swivel_floor: [7, 12],
+    swivel_se: [6, 13],
+    swivel_sw: [7, 13],
+    swivel_ne: [6, 14],
+    swivel_nw: [7, 14],
+    dash_floor: [[0, 15], [1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15]],
+
+    // Items
+    flippers: [0, 16],
+    fire_boots: [1, 16],
+    cleats: [2, 16],
+    suction_boots: [3, 16],
+    hiking_boots: [4, 16],
+    lightning_bolt: [5, 16],
+    speed_boots: [6, 16],
+    bribe: [7, 16],
+    railroad_sign: [0, 17],
+    hook: [1, 17],
+    foil: [2, 17],
+    xray_eye: [3, 17],
+    helmet: [4, 17],
+    skeleton_key: [0, 18],
+    halo: [1, 18],
+    no_sign: [6, 18],
+    gift_bow: [7, 18],
+    score_10: [0, 19],
+    score_100: [1, 19],
+    score_1000: [2, 19],
+    score_2x: [3, 19],
+    score_5x: [4, 19],
+    stopwatch_bonus: [5, 19],
+    stopwatch_penalty: [6, 19],
+    stopwatch_toggle: [7, 19],
+
+    chip: [[8, 16], [9, 16], [10, 16], [9, 16]],
+    chip_extra: {
+        __special__: 'perception',
+        modes: new Set(['palette', 'editor']),
+        hidden: [[8, 16], [9, 16], [10, 16], [9, 16]],
+        revealed: [8, 19],
+    },
+    green_chip: [[8, 17], [9, 17], [10, 17], [9, 17]],
+    bowling_ball: [11, 16],
+    rolling_ball: {
+        north: [[12, 16], [13, 16], [11, 17], [11, 17], [11, 17], [14, 16], [15, 16], [11, 16]],
+        east: [[12, 17], [13, 17], [11, 17], [11, 17], [11, 17], [14, 17], [15, 17], [11, 16]],
+        south: [[15, 16], [14, 16], [11, 17], [11, 17], [11, 17], [13, 16], [12, 16], [11, 16]],
+        west: [[15, 17], [14, 17], [11, 17], [11, 17], [11, 17], [13, 17], [12, 17], [11, 16]],
+    },
+    bomb: {
+        __special__: 'bomb-fuse',
+        bomb: [11, 18],
+        fuse: [13, 18],
+    },
+    green_bomb: {
+        __special__: 'bomb-fuse',
+        bomb: [12, 18],
+        fuse: [13, 18],
+    },
+    dynamite: [10, 19],
+    dynamite_lit: {
+        __special__: 'visual-state',
+        0: [11, 19],
+        1: [12, 19],
+        2: [13, 19],
+        3: [14, 19],
+        4: [15, 19],
+    },
+
+    // Doors and mechanisms
+    key_red: [0, 20],
+    key_blue: [0, 21],
+    key_yellow: [0, 22],
+    key_green: [0, 23],
+    door_red: [1, 20],
+    door_blue: [1, 21],
+    door_yellow: [1, 22],
+    door_green: [1, 23],
+    gate_red: [2, 20],
+    gate_blue: [2, 21],
+    gate_yellow: [2, 22],
+    gate_green: [2, 23],
+    teleport_red: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: [[4, 20], [5, 20], [6, 20], [7, 20]],
+            inactive: [9, 23],
+        },
+    },
+    teleport_blue: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: [[4, 21], [5, 21], [6, 21], [7, 21]],
+    },
+    teleport_yellow: [[4, 22], [5, 22], [6, 22], [7, 22]],
+    teleport_green: [[4, 23], [5, 23], [6, 23], [7, 23]],
+    teleport_blue_exit: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: [8, 23],
+    },
+    transmogrifier: {
+        __special__: 'visual-state',
+        active: [[8, 20], [9, 20], [10, 20], [11, 20]],
+        inactive: [10, 23],
+    },
+    turntable_cw: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: [[8, 21], [9, 21], [10, 21], [11, 21]],
+            inactive: [8, 21],
+        }
+    },
+    turntable_ccw: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: [[8, 22], [9, 22], [10, 22], [11, 22]],
+            inactive: [8, 22],
+        }
+    },
+    flame_jet_off: [12, 21],
+    flame_jet_on: [[13, 21], [14, 21], [15, 21]],
+    electrified_floor: {
+        __special__: 'visual-state',
+        active: [[13, 22], [14, 22], [15, 22]],
+        inactive: [12, 22],
+    },
+
+    // Buttons
     button_blue: {
         __special__: 'visual-state',
-        released: [8, 6],
-        pressed: [8, 37],
+        released: [0, 24],
+        pressed: [0, 25],
     },
     button_green: {
         __special__: 'visual-state',
-        released: [9, 6],
-        pressed: [9, 37],
+        released: [1, 24],
+        pressed: [1, 25],
     },
     button_red: {
         __special__: 'visual-state',
-        released: [10, 6],
-        pressed: [10, 37],
+        released: [2, 24],
+        pressed: [2, 25],
     },
     button_brown: {
         __special__: 'visual-state',
-        released: [11, 6],
-        pressed: [11, 37],
+        released: [3, 24],
+        pressed: [3, 25],
     },
     button_pink: {
         __special__: 'wires',
         base: [0, 2],
         wired: {
             __special__: 'visual-state',
-            released: [12, 6],
-            pressed: [12, 37],
+            released: [4, 24],
+            pressed: [4, 25],
         },
     },
     button_black: {
@@ -999,92 +1236,381 @@ export const LL_TILESET_LAYOUT = Object.assign({}, CC2_TILESET_LAYOUT, {
         base: [0, 2],
         wired: {
             __special__: 'visual-state',
-            released: [13, 6],
-            pressed: [13, 37],
+            released: [5, 24],
+            pressed: [5, 25],
         },
     },
     button_orange: {
         __special__: 'visual-state',
-        released: [14, 6],
-        pressed: [14, 37],
+        released: [6, 24],
+        pressed: [6, 25],
     },
     button_gray: {
         __special__: 'visual-state',
-        released: [11, 9],
-        pressed: [15, 37],
+        released: [7, 24],
+        pressed: [7, 25],
+    },
+    light_switch_off: {
+        __special__: 'wires',
+        base: [15, 25],
+        wired: [14, 24],
+    },
+    light_switch_on: {
+        __special__: 'wires',
+        base: [15, 25],
+        wired: [14, 25],
+    },
+    button_yellow: [15, 24],
+
+    cloner: [0, 26],  // FIXME arrows at [0, 27]
+    trap: {
+        __special__: 'visual-state',
+        open: [1, 26],
+        closed: [1, 27],
     },
 
-    // Custom VFX
-    splash_slime: [[0, 38], [1, 38], [2, 38], [3, 38]],
-    teleport_flash: [[4, 38], [5, 38], [6, 38], [7, 38]],
-    chip_extra: {
+    // Wire and logic
+    '#unpowered': [2, 28],
+    '#powered': [2, 29],
+    '#wire-tunnel': [2, 30],
+    logic_gate: {
+        __special__: 'logic-gate',
+        logic_gate_tiles: {
+            counter: [2, 31],
+            not: {
+                north: [3, 28],
+                east: [3, 29],
+                south: [3, 30],
+                west: [3, 31],
+            },
+            and: {
+                north: [4, 28],
+                east: [4, 29],
+                south: [4, 30],
+                west: [4, 31],
+            },
+            or: {
+                north: [5, 28],
+                east: [5, 29],
+                south: [5, 30],
+                west: [5, 31],
+            },
+            xor: {
+                north: [6, 28],
+                east: [6, 29],
+                south: [6, 30],
+                west: [6, 31],
+            },
+            nand: {
+                north: [7, 28],
+                east: [7, 29],
+                south: [7, 30],
+                west: [7, 31],
+            },
+            'latch-cw': {
+                north: [8, 28],
+                east: [8, 29],
+                south: [8, 30],
+                west: [8, 31],
+            },
+            'latch-ccw': {
+                north: [9, 28],
+                east: [9, 29],
+                south: [9, 30],
+                west: [9, 31],
+            },
+            diode: {
+                north: [10, 28],
+                east: [10, 29],
+                south: [10, 30],
+                west: [10, 31],
+            },
+        },
+    },
+
+    // ------------------------------------------------------------------------------------------------
+    // Right side: actors
+
+    player: {
+        __special__: 'visual-state',
+        normal: {
+            north: [16, 0],
+            east: [16, 1],
+            south: [16, 2],
+            west: [16, 3],
+        },
+        moving: {
+            north: [[16, 0], [17, 0], [18, 0], [19, 0], [20, 0], [21, 0], [22, 0], [23, 0]],
+            east: [[16, 1], [17, 1], [18, 1], [19, 1], [20, 1], [21, 1], [22, 1], [23, 1]],
+            south: [[16, 2], [17, 2], [18, 2], [19, 2], [20, 2], [21, 2], [22, 2], [23, 2]],
+            west: [[16, 3], [17, 3], [18, 3], [19, 3], [20, 3], [21, 3], [22, 3], [23, 3]],
+        },
+        swimming: {
+            north: [[24, 0], [25, 0]],
+            east: [[24, 1], [25, 1]],
+            south: [[24, 2], [25, 2]],
+            west: [[24, 3], [25, 3]],
+        },
+        pushing: {
+            north: [[26, 0], [27, 0], [28, 0], [27, 0]],
+            east: [[26, 1], [27, 1], [28, 1], [27, 1]],
+            south: [[26, 2], [27, 2], [28, 2], [27, 2]],
+            west: [[26, 3], [27, 3], [28, 3], [27, 3]],
+        },
+        blocked: {
+            north: [28, 0],
+            east: [28, 1],
+            south: [28, 2],
+            west: [28, 3],
+        },
+        skating: {
+            north: [29, 0],
+            east: [29, 1],
+            south: [29, 2],
+            west: [29, 3],
+        },
+        forced: 'skating',
+        burned: {
+            north: [30, 0],
+            east: [30, 1],
+            south: [30, 2],
+            west: [30, 3],
+        },
+        // These are frames from the splash/explosion animations
+        exploded: [17, 26],
+        failed: [17, 26],
+        drowned: [17, 27],
+        slimed: [17, 28],
+        fell: [17, 29],
+        exited: [31, 0],
+    },
+    bogus_player_win: {
+        __special__: 'overlay',
+        overlay: [16, 2],
+        base: 'exit',
+    },
+    bogus_player_swimming: {
+        north: [[24, 0], [25, 0]],
+        east: [[24, 1], [25, 1]],
+        south: [[24, 2], [25, 2]],
+        west: [[24, 3], [25, 3]],
+    },
+    bogus_player_drowned: {
+        __special__: 'overlay',
+        overlay: [17, 27],  // splash
+        base: 'water',
+    },
+    bogus_player_burned_fire: {
+        __special__: 'overlay',
+        overlay: [17, 26],  // explosion
+        base: 'fire',
+    },
+    bogus_player_burned: {
+        __special__: 'overlay',
+        overlay: [17, 26],  // explosion
+        base: 'floor',
+    },
+
+    player2: {
+        __special__: 'visual-state',
+        normal: {
+            north: [16, 4],
+            east: [16, 5],
+            south: [16, 6],
+            west: [16, 7],
+        },
+        moving: {
+            north: [[16, 4], [17, 4], [18, 4], [19, 4], [20, 4], [21, 4], [22, 4], [23, 4]],
+            east: [[16, 5], [17, 5], [18, 5], [19, 5], [20, 5], [21, 5], [22, 5], [23, 5]],
+            south: [[16, 6], [17, 6], [18, 6], [19, 6], [20, 6], [21, 6], [22, 6], [23, 6]],
+            west: [[16, 7], [17, 7], [18, 7], [19, 7], [20, 7], [21, 7], [22, 7], [23, 7]],
+        },
+        swimming: {
+            north: [[24, 4], [25, 4]],
+            east: [[24, 5], [25, 5]],
+            south: [[24, 6], [25, 6]],
+            west: [[24, 7], [25, 7]],
+        },
+        pushing: {
+            north: [[26, 4], [27, 4], [28, 4], [27, 4]],
+            east: [[26, 5], [27, 5], [28, 5], [27, 5]],
+            south: [[26, 6], [27, 6], [28, 6], [27, 6]],
+            west: [[26, 7], [27, 7], [28, 7], [27, 7]],
+        },
+        blocked: {
+            north: [28, 4],
+            east: [28, 5],
+            south: [28, 6],
+            west: [28, 7],
+        },
+        skating: {
+            north: [29, 4],
+            east: [29, 5],
+            south: [29, 6],
+            west: [29, 7],
+        },
+        forced: 'skating',
+        burned: {
+            north: [30, 4],
+            east: [30, 5],
+            south: [30, 6],
+            west: [30, 7],
+        },
+        // These are frames from the splash/explosion animations
+        exploded: [17, 26],
+        failed: [17, 26],
+        drowned: [17, 27],
+        slimed: [17, 28],
+        fell: [17, 29],
+        exited: [31, 4],
+    },
+
+    tank_blue: {
+        north: [[16, 8], [17, 8]],
+        east: [[16, 9], [17, 9]],
+        south: [[16, 10], [17, 10]],
+        west: [[16, 11], [17, 11]],
+    },
+    tank_yellow: {
+        north: [[18, 8], [19, 8]],
+        east: [[18, 9], [19, 9]],
+        south: [[18, 10], [19, 10]],
+        west: [[18, 11], [19, 11]],
+    },
+    bug: {
+        north: [[20, 8], [21, 8], [22, 8], [23, 8]],
+        east: [[20, 9], [21, 9], [22, 9], [23, 9]],
+        south: [[20, 10], [21, 10], [22, 10], [23, 10]],
+        west: [[20, 11], [21, 11], [22, 11], [23, 11]],
+    },
+    paramecium: {
+        north: [[24, 8], [25, 8], [26, 8], [25, 8]],
+        east: [[24, 9], [25, 9], [26, 9], [25, 9]],
+        south: [[24, 10], [25, 10], [26, 10], [25, 10]],
+        west: [[24, 11], [25, 11], [26, 11], [25, 11]],
+    },
+    glider: {
+        north: [[27, 8], [28, 8]],
+        east: [[27, 9], [28, 9]],
+        south: [[27, 10], [28, 10]],
+        west: [[27, 11], [28, 11]],
+    },
+    ghost: {
+        north: [29, 8],
+        east: [29, 9],
+        south: [29, 10],
+        west: [29, 11],
+    },
+
+    blob: {
+        north: [[16, 12], [17, 12], [18, 12], [19, 12], [20, 12], [21, 12], [22, 12], [23, 12]],
+        east: [[16, 13], [17, 13], [18, 13], [19, 13], [20, 13], [21, 13], [22, 13], [23, 13]],
+        south: [[16, 14], [17, 14], [18, 14], [19, 14], [20, 14], [21, 14], [22, 14], [23, 14]],
+        west: [[16, 15], [17, 15], [18, 15], [19, 15], [20, 15], [21, 15], [22, 15], [23, 15]],
+    },
+    walker: {
+        north: [[24, 12], [25, 12], [26, 12], [27, 12]],
+        east: [[24, 13], [25, 13], [26, 13], [27, 13]],
+        // Same animations but played backwards
+        south: [[26, 12], [25, 12], [24, 12], [27, 12]],
+        west: [[26, 13], [25, 13], [24, 13], [27, 13]],
+    },
+
+    // TODO should explicitly set the non-moving tile, so we can have the walk tile start with
+    // immediate movement?
+    // TODO this shouldn't run at half speed, it's already designed to be one step, and when teeth
+    // move at half speed it looks clumsy
+    teeth: {
+        north: [[16, 16], [17, 16], [18, 16], [17, 16]],
+        east: [[16, 17], [17, 17], [18, 17], [17, 17]],
+        south: [[16, 18], [17, 18], [18, 18], [17, 18]],
+        west: [[16, 19], [17, 19], [18, 19], [17, 19]],
+    },
+    teeth_timid: {
+        north: [[19, 16], [20, 16], [21, 16], [20, 16]],
+        east: [[19, 17], [20, 17], [21, 17], [20, 17]],
+        south: [[19, 18], [20, 18], [21, 18], [20, 18]],
+        west: [[19, 19], [20, 19], [21, 19], [20, 19]],
+    },
+
+    // Blocks
+    dirt_block: {
         __special__: 'perception',
-        modes: new Set(['palette', 'editor']),
-        hidden: [[11, 3], [0, 39], [1, 39], [0, 39]],
-        revealed: [10, 3],
+        modes: new Set(['editor', 'xray']),
+        hidden: [16, 20],
+        revealed: [16, 21],
     },
-    chip: [[11, 3], [0, 39], [1, 39], [0, 39]],
-    green_chip: [[9, 3], [2, 39], [3, 39], [2, 39]],
-    player1_exit: [[8, 38], [9, 38], [10, 38], [11, 38]],
-    player2_exit: [[12, 38], [13, 38], [14, 38], [15, 38]],
-    puff: [[4, 39], [5, 39], [6, 39], [7, 39]],
-    transmogrify_flash: [[8, 39], [9, 39], [10, 39], [11, 39], [12, 39], [13, 39], [14, 39], [15, 39]],
-
-    // More custom tiles
-    gate_red: [0, 40],
-    gate_blue: [1, 40],
-    gate_yellow: [2, 40],
-    gate_green: [3, 40],
-
-    skeleton_key: [4, 40],
-
-    sand: [10, 41],
-    halo: [5, 43],
-    turntable_cw: {
-        __special__: 'wires',
-        base: [0, 2],
-        wired: {
-            __special__: 'visual-state',
-            active: [7, 43],
-            inactive: [9, 43],
-        }
+    ice_block: {
+        __special__: 'perception',
+        modes: new Set(['editor', 'xray']),
+        hidden: [17, 20],
+        revealed: [17, 21],
     },
-    turntable_ccw: {
-        __special__: 'wires',
-        base: [0, 2],
-        wired: {
-            __special__: 'visual-state',
-            active: [8, 43],
-            inactive: [10, 43],
-        }
-    },
-    electrified_floor: {
-        __special__: 'visual-state',
-        active: [[5, 41], [6, 41], [7, 41]],
-        inactive: [4, 41],
-    },
-    hole: {
-        __special__: 'visual-state',
-        north: [8, 41],
-        open: [9, 41],
-    },
-    cracked_floor: [11, 43],
-    cracked_ice: [7, 40],
-    score_5x: [10, 40],
-    spikes: [5, 40],
-    boulder: [8, 40],
-    item_lock: [12, 43],
-    dash_floor: [[0, 44], [1, 44], [2, 44], [3, 44], [4, 44], [5, 44], [6, 44], [7, 44]],
-    teleport_blue_exit: {
-        __special__: 'wires',
-        base: [0, 2],
-        wired: [11, 41],
+    frame_block: {
+        __special__: 'arrows',
+        base: [18, 20],
+        arrows: [18, 21],
     },
     glass_block: {
         __special__: 'encased_item',
-        base: [14, 41],
-    }
-});
+        base: [19, 21],
+    },
+    boulder: [20, 20],
+    circuit_block: {
+        __special__: 'wires',
+        base: [16, 22],
+        wired: [17, 22],
+        wired_cross: [18, 22],
+    },
+
+    rover: {
+        __special__: 'rover',
+        direction: [26, 24],
+        inert: [16, 24],
+        teeth: [[16, 24], [24, 24]],
+        // cw, slow
+        glider: [[16, 24], [17, 24], [18, 24], [19, 24], [20, 24], [21, 24], [22, 24], [23, 24]],
+        // ccw, fast
+        bug: [
+            [23, 24], [22, 24], [21, 24], [20, 24], [19, 24], [18, 24], [17, 24], [16, 24],
+            [23, 24], [22, 24], [21, 24], [20, 24], [19, 24], [18, 24], [17, 24], [16, 24],
+        ],
+        ball: [[16, 24], [20, 24]],
+        teeth_timid: [[16, 24], [25, 24]],
+        // ccw, slow
+        fireball: [[23, 24], [22, 24], [21, 24], [20, 24], [19, 24], [18, 24], [17, 24], [16, 24]],
+        // cw, fast
+        paramecium: [
+            [16, 24], [17, 24], [18, 24], [19, 24], [20, 24], [21, 24], [22, 24], [23, 24],
+            [16, 24], [17, 24], [18, 24], [19, 24], [20, 24], [21, 24], [22, 24], [23, 24],
+        ],
+        walker: [[24, 24], [25, 24]],
+    },
+    ball: [
+        // appropriately, this animation ping-pongs
+        [27, 24], [28, 24], [29, 24], [30, 24],
+        [31, 24], [30, 24], [29, 24], [28, 24],
+    ],
+    fireball: [[16, 25], [17, 25], [18, 25], [19, 25]],
+    floor_mimic: {
+        __special__: 'perception',
+        modes: new Set(['palette', 'editor', 'xray']),
+        hidden: [0, 2],
+        revealed: [31, 25],
+    },
+
+    // VFX
+    explosion: [[16, 26], [17, 26], [18, 26], [19, 26]],
+    splash: [[16, 27], [17, 27], [18, 27], [19, 27]],
+    splash_slime: [[16, 28], [17, 28], [18, 28], [19, 28]],
+    player1_exit: [[10, 28], [11, 28], [12, 28], [13, 28]],
+    player2_exit: [[10, 29], [11, 29], [12, 29], [13, 29]],
+    transmogrify_flash: [[24, 26], [25, 26], [26, 26], [27, 26], [28, 26], [29, 26], [30, 26], [31, 26]],
+    teleport_flash: [[24, 27], [25, 27], [26, 27], [27, 27]],
+    puff: [[24, 28], [25, 28], [26, 28], [27, 28]],
+
+    item_lock: [26, 31],  // XXX delete this
+};
 
 export const TILESET_LAYOUTS = {
     'tw-static': TILE_WORLD_TILESET_LAYOUT,
