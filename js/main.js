@@ -2814,7 +2814,7 @@ class OptionsOverlay extends DialogOverlay {
         let layout;
         // Note: Animated Tile World has a 1px gap between rows to indicate where animations
         // start and also a single extra 1px column on the left, which I super don't support :(
-        for (let try_layout of [CC2_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT]) {
+        for (let try_layout of Object.values(TILESET_LAYOUTS)) {
             let [w, h] = try_layout['#dimensions'];
             // XXX this assumes square tiles, but i have written mountains of code that doesn't!
             if (img.naturalWidth * h === img.naturalHeight * w) {
