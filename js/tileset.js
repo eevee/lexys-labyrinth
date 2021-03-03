@@ -535,6 +535,12 @@ export const CC2_TILESET_LAYOUT = {
 
     logic_gate: {
         __special__: 'logic-gate',
+        counter_numbers: {
+            x: 0,
+            y: 3,
+            width: 0.75,
+            height: 1,
+        },
         logic_gate_tiles: {
             'latch-ccw': {
                 north: [8, 21],
@@ -1275,6 +1281,12 @@ export const LL_TILESET_LAYOUT = {
     '#wire-tunnel': [2, 30],
     logic_gate: {
         __special__: 'logic-gate',
+        counter_numbers: {
+            x: 7,
+            y: 1,
+            width: 0.75,
+            height: 1,
+        },
         logic_gate_tiles: {
             counter: [2, 31],
             not: {
@@ -2081,7 +2093,10 @@ export class Tileset {
 
         // Layer 3: counter number
         if (tile.gate_type === 'counter') {
-            packet.blit(0, 3, tile.memory * 0.75, 0, 0.75, 1, 0.125, 0);
+            let nums = drawspec.counter_numbers;
+            packet.blit(
+                nums.x, nums.y, tile.memory * nums.width, 0,
+                nums.width, nums.height, (1 - nums.width) / 2, (1 - nums.height) / 2);
         }
     }
 
