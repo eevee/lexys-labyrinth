@@ -1711,10 +1711,6 @@ export class Tileset {
                 // Lexy runs cooldown from S to 1; CC2 from S-1 to 0.  0 is bad, because p becomes 1
                 // and will overflow the cel lookup
                 // FIXME handle this better!  it happens even to lexy
-                // this new one happened because of turntable attempt_step, not sure why yet
-                if (p < 0) {
-                    p = 0;
-                }
                 if (p >= 1) {
                     p = 0.999;
                 }
