@@ -674,7 +674,7 @@ export class Level extends LevelInterface {
 
             let actor = cell.get_actor();
             let wire_directions = terrain.wire_directions;
-            if ((actor?.wire_directions ?? null !== null) && (actor.movement_cooldown === 0 || this.compat.tiles_react_instantly))
+            if (actor && actor.wire_directions !== null && (actor.movement_cooldown === 0 || this.compat.tiles_react_instantly))
             {
                 wire_directions = actor.wire_directions;
             }
