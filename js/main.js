@@ -2828,24 +2828,11 @@ class OptionsOverlay extends DialogOverlay {
             return;
         }
 
-        // Load into a canvas and erase the transparent color
+        // Load into a canvas and erase the background, if any
         let canvas = mk('canvas', {width: img.naturalWidth, height: img.naturalHeight});
         let ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0);
-        let trans = layout['#transparent-color'];
-        let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let px = image_data.data;
-        for (let i = 0; i < canvas.width * canvas.height * 4; i += 4) {
-            if (px[i] === trans[0] && px[i + 1] === trans[1] &&
-                px[i + 2] === trans[2] && px[i + 3] === trans[3])
-            {
-                px[i] = 0;
-                px[i + 1] = 0;
-                px[i + 2] = 0;
-                px[i + 3] = 0;
-            }
-        }
-        ctx.putImageData(image_data, 0, 0);
+        this._erase_background(canvas, ctx, layout);
 
         let [w, h] = layout['#dimensions'];
         let tw = Math.floor(img.naturalWidth / w);
@@ -2889,6 +2876,36 @@ class OptionsOverlay extends DialogOverlay {
             tile_width: tw,
             tile_height: th,
         };
+    }
+
+    _erase_background(canvas, ctx, layout) {
+        let trans = layout['#transparent-color'];
+        if (! trans)
+            return;
+
+        let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let px = image_data.data;
+        if (trans.length === 2) {
+            // Read the background color from a pixel
+            let i = trans[0] + trans[1] * canvas.width;
+            if (px[i + 3] === 0) {
+                // Background is already transparent!
+                return;
+            }
+            trans = [px[i], px[i + 1], px[i + 2], px[i + 3]];
+        }
+
+        for (let i = 0; i < canvas.width * canvas.height * 4; i += 4) {
+            if (px[i] === trans[0] && px[i + 1] === trans[1] &&
+                px[i + 2] === trans[2] && px[i + 3] === trans[3])
+            {
+                px[i] = 0;
+                px[i + 1] = 0;
+                px[i + 2] = 0;
+                px[i + 3] = 0;
+            }
+        }
+        ctx.putImageData(image_data, 0, 0);
     }
 
     update_selected_tileset(slot_ident) {

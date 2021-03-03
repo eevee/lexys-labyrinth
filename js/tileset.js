@@ -19,7 +19,7 @@ export const CC2_TILESET_LAYOUT = {
     '#ident': 'cc2',
     '#name': "Chip's Challenge 2",
     '#dimensions': [16, 32],
-    '#transparent-color': [0x52, 0xce, 0x6b, 0xff],
+    '#transparent-color': [0, 0],
     '#supported-versions': new Set(['cc1', 'cc2']),
     '#wire-width': 1/16,
 
