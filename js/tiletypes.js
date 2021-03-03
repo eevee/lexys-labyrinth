@@ -1350,6 +1350,9 @@ const TILE_TYPES = {
         on_finishing_move(me, level) {
             this.try_pickup_item(me, level);
         },
+        blocked_by(me, level, other) {
+            return other.cell.get_item() !== null && me.encased_item !== null;
+        },
         on_death(me, level) {
             //needs to be called by transmute_tile to ttl and by lit_dynamite before remove_tile
             if (me.encased_item !== null) {
