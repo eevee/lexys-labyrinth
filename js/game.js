@@ -2441,6 +2441,9 @@ export class Level extends LevelInterface {
             {
                 if (killer.type.is_actor || killer.type.is_item)
                 {
+                    if (killer.type.on_death) {
+                        killer.type.on_death(killer, this);
+                    }
                     this.remove_tile(killer);
                 }
                 else //presumably terrain

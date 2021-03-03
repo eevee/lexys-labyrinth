@@ -1351,7 +1351,7 @@ const TILE_TYPES = {
         on_death(me, level) {
             //needs to be called by transmute_tile to ttl and by lit_dynamite before remove_tile
             if (me.encased_item !== null) {
-                level._place_dropped_item(me.encased_item, me.cell, me);
+                level._place_dropped_item(me.encased_item, me.cell ?? me.previous_cell, me);
                 level._set_tile_prop(me, 'encased_item', null);
             }
         }
@@ -2638,6 +2638,7 @@ const TILE_TYPES = {
 
                     let actor = cell.get_actor();
                     let terrain = cell.get_terrain();
+                    let item = cell.get_item();
                     let removed_anything;
                     for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
                         let tile = cell[layer];
@@ -2653,6 +2654,10 @@ const TILE_TYPES = {
                             level.fail(me.type.name, me, tile);
                         }
                         else {
+                            //newly appearing items (e.g. dropped by a glass block) are safe
+                            if (tile.type.layer === LAYERS.item && tile !== item) {
+                              continue;
+                            }
                             // Everything else is destroyed
                             if (tile.type.on_death) {
                                 tile.type.on_death(tile, level);
