@@ -1324,14 +1324,15 @@ const TILE_TYPES = {
         can_reverse_on_railroad: true,
         movement_speed: 4,
         try_pickup_item(me, level) {
-            //suck up any item that ever CAN be picked up off of the floor (except hearts!) and put it in our encased_item slot (not an inventory since e.g. a glass block with red key can't unlock red doors)
+            //suck up any item that ever CAN be picked up off of the floor and put it in our encased_item slot (not an inventory since e.g. a glass block with red key can't unlock red doors)
             if (me.encased_item === null) {
                 let item = me.cell.get_item();
                 let mod = me.cell.get_item_mod();
                 if (mod && mod.type.item_modifier === 'ignore') {
                   return;
                 }
-                if (item && !item.type.is_chip && item.type.item_priority !== undefined) {
+                //hmm, actually chips seem to work OK. Alright, why not then?
+                if (item /*&& !item.type.is_chip*/ && item.type.item_priority !== undefined) {
                   level._set_tile_prop(me, 'encased_item', item.type.name);
                   level.remove_tile(item);
                 }
