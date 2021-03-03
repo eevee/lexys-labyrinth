@@ -1324,29 +1324,18 @@ const TILE_TYPES = {
         can_reverse_on_railroad: true,
         movement_speed: 4,
         try_pickup_item(me, level) {
+            //suck up any item that ever CAN be picked up off of the floor (except hearts!) and put it in our encased_item slot (not an inventory since e.g. a glass block with red key can't unlock red doors)
             if (me.encased_item === null) {
                 let item = me.cell.get_item();
-                if (item && !item.type.is_chip) {
-                    level.attempt_take(me, item);
-                    //then if we picked it up, encase it (so we have max one item at a time and so we can't 'use' the item)
-                    if (me.keyring !== undefined && me.keyring !== null && Object.keys(me.keyring).length > 0) {
-                        level._set_tile_prop(me, 'encased_item', Object.keys(me.keyring)[0]);
-                        level.take_all_keys_from_actor(me);
-                    }
-                    else if (me.toolbelt !== undefined && me.toolbelt !== null && me.toolbelt.length > 0)
-                    {
-                        level._set_tile_prop(me, 'encased_item', me.toolbelt[0]);
-                        level.take_all_tools_from_actor(me);
-                    }
+                let mod = me.cell.get_item_mod();
+                if (mod && mod.type.item_modifier === 'ignore') {
+                  return;
+                }
+                if (item && !item.type.is_chip && item.type.item_priority !== undefined) {
+                  level._set_tile_prop(me, 'encased_item', item.type.name);
+                  level.remove_tile(item);
                 }
             }
-            /*if ((me.keyring === undefined || Object.keys(me.keyring).length == 0) && 
-            (me.toolbelt === undefined || me.toolbelt.length == 0)) {
-                let item = me.cell.get_item();
-                if (item) {
-                    level.attempt_take(me, item);
-                }
-            }*/
         },
         on_ready(me, level) {
             level._set_tile_prop(me, 'encased_item', null);
@@ -1354,13 +1343,6 @@ const TILE_TYPES = {
         },
         on_clone(me, original) {
             me.encased_item = original.encased_item;
-            /*if (original.keyring !== undefined) {
-                me.keyring = {};
-                Object.assign(me.keyring, original.keyring);
-            }
-            if (original.toolbelt !== undefined) {
-                me.toolbelt = original.toolbelt.map((x) => x);
-            }*/
         },
         on_finishing_move(me, level) {
             this.try_pickup_item(me, level);

@@ -1603,7 +1603,7 @@ export class Tileset {
     _draw_encased_item(drawspec, name, tile, packet) {
         //draw the encased item
         if (tile !== null && tile.encased_item !== undefined && tile.encased_item !== null) {
-            this._draw_standard(this.layout[tile.encased_item], tile.encased_item, TILE_TYPES[tile.encased_item], packet);
+            this._draw_standard(this.layout[tile.encased_item], tile.encased_item, null, packet);
         }
         //then draw the glass block
         this._draw_standard(drawspec.base, name, tile, packet);
