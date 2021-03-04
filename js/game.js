@@ -59,7 +59,7 @@ export class Tile {
         // Extremely awkward special case: items don't block monsters if the cell also contains an
         // item modifier (i.e. "no" sign) or a real player
         // TODO would love to get this outta here
-        if (this.type.is_item) {
+        if (this.type.is_item || this.type.is_chip) {
             let item_mod = this.cell.get_item_mod();
             if (item_mod && item_mod.type.item_modifier)
                 return false;
