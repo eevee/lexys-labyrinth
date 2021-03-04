@@ -674,7 +674,11 @@ export class Level extends LevelInterface {
 
             let actor = cell.get_actor();
             let wire_directions = terrain.wire_directions;
-            if (actor && actor.wire_directions !== null && (actor.movement_cooldown === 0 || this.compat.tiles_react_instantly))
+            // FIXME this doesn't allow a blank circuit block to erase wires,
+            // but it can't anyway because Tile.wire_directions = 0; need some
+            // other way to identify a tile as wired, or at least an actor
+            if (actor && actor.wire_directions &&
+                (actor.movement_cooldown === 0 || this.compat.tiles_react_instantly))
             {
                 wire_directions = actor.wire_directions;
             }
