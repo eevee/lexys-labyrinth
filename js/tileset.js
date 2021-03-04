@@ -1271,8 +1271,8 @@ export const LL_TILESET_LAYOUT = {
     cloner: [0, 26],  // FIXME arrows at [0, 27]
     trap: {
         __special__: 'visual-state',
-        open: [1, 26],
-        closed: [1, 27],
+        open: [1, 27],
+        closed: [1, 26],
     },
 
     // Wire and logic
