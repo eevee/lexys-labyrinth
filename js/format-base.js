@@ -8,12 +8,23 @@ export class StoredCell extends Array {
 }
 
 export class Replay {
-    constructor(initial_force_floor_direction, blob_seed, inputs = null) {
+    constructor(initial_force_floor_direction, blob_seed, inputs = null, step_parity = null, tw_seed = 0) {
         this.initial_force_floor_direction = initial_force_floor_direction;
         this.blob_seed = blob_seed;
+        this.step_parity = step_parity;
+        this.tw_seed = tw_seed;
         this.inputs = inputs ?? new Uint8Array;
         this.duration = this.inputs.length;
         this.cursor = 0;
+    }
+
+    configure_level(level) {
+        level.force_floor_direction = this.initial_force_floor_direction;
+        level._blob_modifier = this.blob_seed;
+        level._tw_rng = this.tw_seed;
+        if (this.step_parity !== null) {
+            level.step_parity = this.step_parity;
+        }
     }
 
     get(t) {

@@ -6,6 +6,7 @@ import { DIRECTIONS, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
+import * as format_tws from './format-tws.js';
 import { Level } from './game.js';
 import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import { Editor } from './main-editor.js';
@@ -1122,7 +1123,7 @@ class Player extends PrimaryView {
                 return;
 
             let [x, y] = this.renderer.cell_coords_from_event(ev);
-            this.level.move_to(this.level.player, this.level.cell(x, y), 1);
+            this.level.move_to(this.level.player, this.level.cell(x, y));
             // TODO this behaves a bit weirdly when paused (doesn't redraw even with a force), i
             // think because we're still claiming a speed of 1 so time has to pass before the move
             // actually "happens"
@@ -1341,8 +1342,7 @@ class Player extends PrimaryView {
         this.debug.replay_duration_el.textContent = format_replay_duration(t);
 
         if (! record) {
-            this.level.force_floor_direction = replay.initial_force_floor_direction;
-            this.level._blob_modifier = replay.blob_seed;
+            replay.configure_level(this.level);
             // FIXME should probably start playback on first real input
             this.set_state('playing');
         }
@@ -2980,9 +2980,21 @@ const COMPAT_FLAGS = [
     label: "Game uses the Lynx-style update loop",
     rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
 }, {
+    key: 'player_moves_last',
+    label: "Player always moves last",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
     key: 'emulate_60fps',
     label: "Game runs at 60 FPS",
     rulesets: new Set(['steam', 'steam-strict']),
+}, {
+    key: 'reuse_actor_slots',
+    label: "Game reuses slots in the actor list",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'force_lynx_animation_lengths',
+    label: "Animations use Lynx duration",
+    rulesets: new Set(['lynx']),
 },
 
 // Tiles
@@ -2995,6 +3007,14 @@ const COMPAT_FLAGS = [
     key: 'rff_actually_random',
     label: "Random force floors are actually random",
     rulesets: new Set(['ms']),
+}, {
+    key: 'no_backwards_override',
+    label: "Player can't override backwards on a force floor",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'traps_like_lynx',
+    label: "Traps eject faster, and even when already open",
+    rulesets: new Set(['lynx']),
 },
 
 // Items
@@ -3010,6 +3030,10 @@ const COMPAT_FLAGS = [
     key: 'monsters_ignore_keys',
     label: "Monsters completely ignore keys",
     rulesets: new Set(['ms']),
+}, {
+    key: 'monsters_blocked_by_items',
+    label: "Monsters can't step on items to get the player",
+    rulesets: new Set(['lynx']),
 },
 
 // Blocks
@@ -3048,9 +3072,25 @@ const COMPAT_FLAGS = [
     label: "Blue tanks always obey blue buttons",
     rulesets: new Set(['steam-strict']),
 }, {
+    key: 'tanks_ignore_button_while_moving',
+    label: "Blue tanks ignore blue buttons while moving",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'blobs_use_tw_prng',
+    label: "Blobs use the Tile World RNG",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'teeth_target_internal_position',
+    label: "Teeth target the player's internal position",
+    rulesets: new Set(['lynx']),
+}, {
     key: 'rff_blocks_monsters',
     label: "Random force floors block monsters",
     rulesets: new Set(['ms']),
+}, {
+    key: 'bonking_isnt_instant',
+    label: "Bonking while sliding doesn't apply instantly",
+    rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'fire_allows_monsters',
     label: "Fire doesn't block monsters",
@@ -3355,9 +3395,8 @@ class PackTestDialog extends DialogOverlay {
                 let replay = stored_level.replay;
                 level = new Level(stored_level, compat);
                 level.sfx = dummy_sfx;
-                level.force_floor_direction = replay.initial_force_floor_direction;
-                level._blob_modifier = replay.blob_seed;
                 level.undo_enabled = false; // slight performance boost
+                replay.configure_level(level);
 
                 while (true) {
                     let input = replay.get(level.tic_counter);

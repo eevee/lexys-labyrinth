@@ -191,7 +191,14 @@ function pursue_player(me, level) {
     let player = level.player;
     // CC2 behavior (not Lynx (TODO compat?)): pursue the player's apparent position, not just the
     // cell they're in
-    let [px, py] = player.visual_position();
+    let px, py;
+    if (level.compat.teeth_target_internal_position) {
+        px = player.cell.x;
+        py = player.cell.y;
+    }
+    else {
+        [px, py] = player.visual_position();
+    }
 
     let dx = me.cell.x - px;
     let dy = me.cell.y - py;
@@ -1495,11 +1502,17 @@ const TILE_TYPES = {
                 level._set_tile_prop(me, 'presses', 0);
             }
         },
+        on_arrive(me, level, other) {
+            // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible,
+            // and also do it slightly faster
+            if (level.compat.traps_like_lynx) {
+                level.attempt_out_of_turn_step(other, other.direction, 3);
+            }
+        },
         add_press_ready(me, level, other) {
             // Same as below, but without ejection
             level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
         },
-        // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
         add_press(me, level, is_wire = false) {
             level._set_tile_prop(me, 'presses', me.presses + 1);
             // TODO weird cc2 case that may or may not be a bug: actors aren't ejected if the trap
@@ -1510,7 +1523,9 @@ const TILE_TYPES = {
                 if (actor) {
                     // Forcibly move anything released from a trap, which keeps it in sync with
                     // whatever pushed the button
-                    level.attempt_out_of_turn_step(actor, actor.direction);
+                    level.attempt_out_of_turn_step(
+                        actor, actor.direction,
+                        level.compat.traps_like_lynx ? 3 : 0);
                 }
             }
         },
@@ -2399,8 +2414,15 @@ const TILE_TYPES = {
         movement_speed: 8,
         decide_movement(me, level) {
             // move completely at random
-            let modifier = level.get_blob_modifier();
-            return [DIRECTION_ORDER[(level.prng() + modifier) % 4]];
+            let d;
+            if (level.compat.blobs_use_tw_prng) {
+                d = level.tw_prng_random4();
+            }
+            else {
+                let modifier = level.get_blob_modifier();
+                d = (level.prng() + modifier) % 4;
+            }
+            return [DIRECTION_ORDER[d]];
         },
     },
     teeth: {
