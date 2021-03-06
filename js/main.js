@@ -397,11 +397,10 @@ class SFXPlayer {
             let dy = cell.y - this.player_y;
             let dist = Math.sqrt(dx*dx + dy*dy);
             // x/(x + a) is a common and delightful way to get an easy asymptote and output between
-            // 0 and 1.  Here, the result is above 2/3 for almost everything on screen; drops down
-            // to 1/3 for things 20 tiles away (which is, roughly, the periphery when standing in
-            // the center of a CC1 map), and bottoms out at 1/15 for standing in one corner of a
-            // CC2 map of max size and hearing something on the far opposite corner.
-            volume *= 1 - dist / (dist + 10);
+            // 0 and 1.  This arbitrary factor of 2 seems to work nicely in practice, falling off
+            // quickly so you don't get drowned in button spam, but still leaving buttons audible
+            // even at the far reaches of a 100×100 level.  (Maybe because gain is exponential?)
+            volume *= 1 - dist / (dist + 2);
         }
         let gain = this.ctx.createGain();
         gain.gain.value = volume;
