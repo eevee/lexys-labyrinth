@@ -3592,7 +3592,7 @@ class Conductor {
         document.querySelector('#main-compat').addEventListener('click', ev => {
             new CompatOverlay(this).open();
         });
-        document.querySelector('#main-compat output').textContent = this._compat_ruleset ?? 'Custom';
+        document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[this._compat_ruleset ?? 'custom'];
 
         // Bind to the navigation headers, which list the current level pack
         // and level
