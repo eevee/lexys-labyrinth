@@ -1,4 +1,4 @@
-import * as fflate from 'https://cdn.skypack.dev/fflate?min';
+import * as fflate from './vendor/fflate.mjs';
 
 import { DIRECTIONS, LAYERS, TICS_PER_SECOND } from './defs.js';
 import { TILES_WITH_PROPS } from './editor-tile-overlays.js';

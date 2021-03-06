@@ -36,9 +36,17 @@ Give it a try, I guess!  [https://c.eev.ee/lexys-labyrinth/](https://c.eev.ee/le
 - Load levels directly from the BBC set list
 - Mouse support
 
-### Noble aspirations
+## For developers
 
-- New exclusive puzzle elements??  Embrace extend extinguish baby
+It's all static JS; there's no build system.  If you want to run it locally, just throw your favorite HTTP server at a checkout and open a browser.  (Browsers won't allow XHR from `file:///` URLs, alas.  If you don't have a favorite HTTP server, try `python -m http.server`.)
+
+If you have Node installed, you can test the solutions included with the bundled level packs without needing a web browser:
+
+```
+node js/headless/bulktest.mjs
+```
+
+Note that solution playback is still not perfect, so don't be alarmed if you don't get 100% — only if you make a change and something regresses.
 
 ## Special thanks
 

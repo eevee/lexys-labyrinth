@@ -71,7 +71,6 @@ export function parse_solutions(bytes) {
             let step_parity = initial_state >> 3;
             let initial_rff = ['north', 'west', 'south', 'east'][initial_state & 0x7];
             let initial_rng = view.getUint32(p + 8, true);  // FIXME how is this four bytes??  lynx rng doesn't even have four bytes of STATE
-            console.log(number, initial_state.toString(16), initial_rng.toString(16));
             let total_duration = view.getUint32(p + 12, true);
 
             // TODO split this off though

@@ -1445,6 +1445,12 @@ const TILE_TYPES = {
     cloner: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
+        populate_defaults(me) {
+            me.arrows = 0;  // bitmask of glowing arrows (visual, no gameplay impact)
+        },
+        on_ready(me, level) {
+            me.arrows ??= 0;
+        },
         traps(me, actor) {
             return ! actor._clone_release;
         },

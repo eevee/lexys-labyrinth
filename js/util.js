@@ -1,4 +1,4 @@
-import * as fflate from 'https://cdn.skypack.dev/fflate?min';
+import * as fflate from './vendor/fflate.mjs';
 
 // Base class for custom errors
 export class LLError extends Error {}
@@ -320,8 +320,6 @@ export function* walk_grid(x0, y0, x1, y1, min_a, min_b, max_a, max_b) {
         }
     }
 }
-window.walk_grid = walk_grid;
-// console.table(Array.from(walk_grid(13, 27.133854389190674, 12.90625, 27.227604389190674)))
 
 // Root class to indirect over where we might get files from
 // - a pool of uploaded in-memory files
@@ -330,7 +328,7 @@ window.walk_grid = walk_grid;
 // - HTTP (but only for files we choose ourselves, not arbitrary ones, due to CORS)
 // Note that where possible, these classes lowercase all filenames, in keeping with C2G's implicit
 // requirement that filenames are case-insensitive  :/
-class FileSource {
+export class FileSource {
     constructor() {}
 
     // Get a file's contents as an ArrayBuffer

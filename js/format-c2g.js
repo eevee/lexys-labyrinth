@@ -409,8 +409,14 @@ const TILE_ENCODING = {
     },
     0x44: {
         name: 'cloner',
-        // TODO visual directions bitmask, no gameplay impact, possible editor impact
-        modifier: null,
+        modifier: {
+            decode(tile, mod) {
+                tile.arrows = mod;
+            },
+            encode(tile) {
+                return tile.arrows;
+            },
+        },
     },
     0x45: {
         name: 'hint',

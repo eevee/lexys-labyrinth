@@ -163,6 +163,10 @@ export class StoredPack {
         // error: any error received while loading the level
         // bytes: Uint8Array of the encoded level data
         this.level_metadata = [];
+
+        // Sparse/optional array of Replays, generally from an ancillary file like a TWS
+        // TODO unclear if this is a good API for this
+        this.level_replays = [];
     }
 
     // TODO this may or may not work sensibly when correctly following a c2g
@@ -177,10 +181,13 @@ export class StoredPack {
             // The editor stores inflated levels at times, so respect that
             return meta.stored_level;
         }
-        else {
-            // Otherwise, attempt to load the level
-            return this._level_loader(meta);
+
+        // Otherwise, attempt to load the level
+        let stored_level = this._level_loader(meta);
+        if (! stored_level.has_replay && this.level_replays[index]) {
+            stored_level._replay = this.level_replays[index];
         }
+        return stored_level;
     }
 }
 

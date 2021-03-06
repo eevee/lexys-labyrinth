@@ -1,8 +1,8 @@
 // TODO bugs and quirks i'm aware of:
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
-import * as fflate from 'https://cdn.skypack.dev/fflate?min';
+import * as fflate from './vendor/fflate.mjs';
 
-import { DIRECTIONS, INPUT_BITS, TICS_PER_SECOND } from './defs.js';
+import { COMPAT_FLAGS, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, DIRECTIONS, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
@@ -2953,150 +2953,6 @@ class OptionsOverlay extends DialogOverlay {
         super.close();
     }
 }
-const COMPAT_RULESETS = [
-    ['lexy', "Lexy"],
-    ['steam', "Steam/CC2"],
-    ['steam-strict', "Steam/CC2 (strict)"],
-    ['lynx', "Lynx"],
-    ['ms', "Microsoft"],
-    ['custom', "Custom"],
-];
-// FIXME some of the names of the flags themselves kinda suck
-const COMPAT_FLAGS = [
-// Level loading
-{
-    key: 'no_auto_convert_ccl_popwalls',
-    label: "Recessed walls under actors in CCL levels are left alone",
-    rulesets: new Set(['steam-strict', 'lynx', 'ms']),
-}, {
-    key: 'no_auto_convert_ccl_blue_walls',
-    label: "Blue walls under blocks in CCL levels are left alone",
-    rulesets: new Set(['steam-strict', 'lynx']),
-},
-
-// Core
-{
-    key: 'use_lynx_loop',
-    label: "Game uses the Lynx-style update loop",
-    rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
-}, {
-    key: 'player_moves_last',
-    label: "Player always moves last",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'emulate_60fps',
-    label: "Game runs at 60 FPS",
-    rulesets: new Set(['steam', 'steam-strict']),
-}, {
-    key: 'reuse_actor_slots',
-    label: "Game reuses slots in the actor list",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'force_lynx_animation_lengths',
-    label: "Animations use Lynx duration",
-    rulesets: new Set(['lynx']),
-},
-
-// Tiles
-{
-    // XXX this is goofy
-    key: 'tiles_react_instantly',
-    label: "Tiles react when approached",
-    rulesets: new Set(['ms']),
-}, {
-    key: 'rff_actually_random',
-    label: "Random force floors are actually random",
-    rulesets: new Set(['ms']),
-}, {
-    key: 'no_backwards_override',
-    label: "Player can't override backwards on a force floor",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'traps_like_lynx',
-    label: "Traps eject faster, and even when already open",
-    rulesets: new Set(['lynx']),
-},
-
-// Items
-{
-    key: 'no_immediate_detonate_bombs',
-    label: "Mines under non-player actors don't explode at level start",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'detonate_bombs_under_players',
-    label: "Mines under players explode at level start",
-    rulesets: new Set(['steam', 'steam-strict']),
-}, {
-    key: 'monsters_ignore_keys',
-    label: "Monsters completely ignore keys",
-    rulesets: new Set(['ms']),
-}, {
-    key: 'monsters_blocked_by_items',
-    label: "Monsters can't step on items to get the player",
-    rulesets: new Set(['lynx']),
-},
-
-// Blocks
-{
-    key: 'no_early_push',
-    label: "Player pushes blocks at move time",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'use_legacy_hooking',
-    label: "Pulling blocks with the hook happens at decision time",
-    rulesets: new Set(['steam', 'steam-strict']),
-}, {
-    // FIXME this is kind of annoying, there are some collision rules too
-    key: 'tanks_teeth_push_ice_blocks',
-    label: "Ice blocks emulate pgchip rules",
-    rulesets: new Set(['ms']),
-}, {
-    key: 'emulate_spring_mining',
-    label: "Spring mining is possible",
-    rulesets: new Set(['steam-strict']),
-/* XXX not implemented
-}, {
-    key: 'emulate_flicking',
-    label: "Flicking is possible",
-    rulesets: new Set(['ms']),
-*/
-},
-
-// Monsters
-{
-    // TODO? in lynx they ignore the button while in motion too
-    // TODO what about in a trap, in every game??
-    // TODO what does ms do when a tank is on ice or a ff?  wiki's description is wacky
-    // TODO yellow tanks seem to have memory too??
-    key: 'tanks_always_obey_button',
-    label: "Blue tanks always obey blue buttons",
-    rulesets: new Set(['steam-strict']),
-}, {
-    key: 'tanks_ignore_button_while_moving',
-    label: "Blue tanks ignore blue buttons while moving",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'blobs_use_tw_prng',
-    label: "Blobs use the Tile World RNG",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'teeth_target_internal_position',
-    label: "Teeth target the player's internal position",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'rff_blocks_monsters',
-    label: "Random force floors block monsters",
-    rulesets: new Set(['ms']),
-}, {
-    key: 'bonking_isnt_instant',
-    label: "Bonking while sliding doesn't apply instantly",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'fire_allows_monsters',
-    label: "Fire doesn't block monsters",
-    rulesets: new Set(['ms']),
-},
-];
 class CompatOverlay extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
@@ -3113,13 +2969,13 @@ class CompatOverlay extends DialogOverlay {
         );
 
         let button_set = mk('div.radio-faux-button-set');
-        for (let [ruleset, label] of COMPAT_RULESETS) {
+        for (let ruleset of COMPAT_RULESET_ORDER) {
             button_set.append(mk('label',
                 mk('input', {type: 'radio', name: '__ruleset__', value: ruleset}),
                 mk('span.-button',
                     mk('img.compat-icon', {src: `icons/compat-${ruleset}.png`}),
                     mk('br'),
-                    label,
+                    COMPAT_RULESET_LABELS[ruleset],
                 ),
             ));
         }
@@ -3140,7 +2996,7 @@ class CompatOverlay extends DialogOverlay {
                 mk('input', {type: 'checkbox', name: compat.key}),
                 mk('span.-desc', compat.label),
             );
-            for (let [ruleset, _] of COMPAT_RULESETS) {
+            for (let ruleset of COMPAT_RULESET_ORDER) {
                 if (ruleset === 'lexy' || ruleset === 'custom')
                     continue;
 
@@ -3263,12 +3119,12 @@ class PackTestDialog extends DialogOverlay {
         });
 
         let ruleset_dropdown = mk('select', {name: 'ruleset'});
-        for (let [ruleset, label] of COMPAT_RULESETS) {
+        for (let ruleset of COMPAT_RULESET_ORDER) {
             if (ruleset === 'custom') {
                 ruleset_dropdown.append(mk('option', {value: ruleset, selected: 'selected'}, "Current ruleset"));
             }
             else {
-                ruleset_dropdown.append(mk('option', {value: ruleset}, label));
+                ruleset_dropdown.append(mk('option', {value: ruleset}, COMPAT_RULESET_LABELS[ruleset]));
             }
         }
         this.main.append(
@@ -3302,12 +3158,7 @@ class PackTestDialog extends DialogOverlay {
             compat = this.conductor.compat;
         }
         else {
-            compat = {};
-            for (let compatdef of COMPAT_FLAGS) {
-                if (compatdef.rulesets.has(ruleset)) {
-                    compat[compatdef.key] = true;
-                }
-            }
+            compat = compat_flags_for_ruleset(ruleset);
         }
 
         for (let tbody of this.results.querySelectorAll('tbody')) {
@@ -3690,11 +3541,7 @@ class Conductor {
         this._compat_ruleset = 'custom';  // Only used by the compat dialog
         if (typeof this.stash.compat === 'string') {
             this._compat_ruleset = this.stash.compat;
-            for (let compat of COMPAT_FLAGS) {
-                if (compat.rulesets.has(this.stash.compat)) {
-                    this.compat[compat.key] = true;
-                }
-            }
+            this.compat = compat_flags_for_ruleset(this.stash.compat);
         }
         else {
             Object.extend(this.compat, this.stash.compat);
@@ -4000,8 +3847,7 @@ class Conductor {
             this._compat_ruleset = ruleset;
         }
 
-        let label = COMPAT_RULESETS.filter(item => item[0] === ruleset)[0][1];
-        document.querySelector('#main-compat output').textContent = label;
+        document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[ruleset];
 
         this.compat = flags;
     }

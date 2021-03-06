@@ -114,3 +114,159 @@ export const PICKUP_PRIORITIES = {
     player: 1,  // players and doppelgangers; red keys (ignored by everything else)
     real_player: 0,
 };
+
+export const COMPAT_RULESET_LABELS = {
+    lexy: "Lexy",
+    steam: "Steam/CC2",
+    'steam-strict': "Steam/CC2 (strict)",
+    lynx: "Lynx",
+    ms: "Microsoft",
+    custom: "Custom",
+};
+export const COMPAT_RULESET_ORDER = ['lexy', 'steam', 'steam-strict', 'lynx', 'ms', 'custom'];
+// FIXME some of the names of the flags themselves kinda suck
+export const COMPAT_FLAGS = [
+// Level loading
+{
+    key: 'no_auto_convert_ccl_popwalls',
+    label: "Recessed walls under actors in CCL levels are left alone",
+    rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+}, {
+    key: 'no_auto_convert_ccl_blue_walls',
+    label: "Blue walls under blocks in CCL levels are left alone",
+    rulesets: new Set(['steam-strict', 'lynx']),
+},
+
+// Core
+{
+    key: 'use_lynx_loop',
+    label: "Game uses the Lynx-style update loop",
+    rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
+}, {
+    key: 'player_moves_last',
+    label: "Player always moves last",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
+    key: 'emulate_60fps',
+    label: "Game runs at 60 FPS",
+    rulesets: new Set(['steam', 'steam-strict']),
+}, {
+    key: 'reuse_actor_slots',
+    label: "Game reuses slots in the actor list",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'force_lynx_animation_lengths',
+    label: "Animations use Lynx duration",
+    rulesets: new Set(['lynx']),
+},
+
+// Tiles
+{
+    // XXX this is goofy
+    key: 'tiles_react_instantly',
+    label: "Tiles react when approached",
+    rulesets: new Set(['ms']),
+}, {
+    key: 'rff_actually_random',
+    label: "Random force floors are actually random",
+    rulesets: new Set(['ms']),
+}, {
+    key: 'no_backwards_override',
+    label: "Player can't override backwards on a force floor",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'traps_like_lynx',
+    label: "Traps eject faster, and even when already open",
+    rulesets: new Set(['lynx']),
+},
+
+// Items
+{
+    key: 'no_immediate_detonate_bombs',
+    label: "Mines under non-player actors don't explode at level start",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
+    key: 'detonate_bombs_under_players',
+    label: "Mines under players explode at level start",
+    rulesets: new Set(['steam', 'steam-strict']),
+}, {
+    key: 'monsters_ignore_keys',
+    label: "Monsters completely ignore keys",
+    rulesets: new Set(['ms']),
+}, {
+    key: 'monsters_blocked_by_items',
+    label: "Monsters can't step on items to get the player",
+    rulesets: new Set(['lynx']),
+},
+
+// Blocks
+{
+    key: 'no_early_push',
+    label: "Player pushes blocks at move time",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
+    key: 'use_legacy_hooking',
+    label: "Pulling blocks with the hook happens at decision time",
+    rulesets: new Set(['steam', 'steam-strict']),
+}, {
+    // FIXME this is kind of annoying, there are some collision rules too
+    key: 'tanks_teeth_push_ice_blocks',
+    label: "Ice blocks emulate pgchip rules",
+    rulesets: new Set(['ms']),
+}, {
+    key: 'emulate_spring_mining',
+    label: "Spring mining is possible",
+    rulesets: new Set(['steam-strict']),
+/* XXX not implemented
+}, {
+    key: 'emulate_flicking',
+    label: "Flicking is possible",
+    rulesets: new Set(['ms']),
+*/
+},
+
+// Monsters
+{
+    // TODO? in lynx they ignore the button while in motion too
+    // TODO what about in a trap, in every game??
+    // TODO what does ms do when a tank is on ice or a ff?  wiki's description is wacky
+    // TODO yellow tanks seem to have memory too??
+    key: 'tanks_always_obey_button',
+    label: "Blue tanks always obey blue buttons",
+    rulesets: new Set(['steam-strict']),
+}, {
+    key: 'tanks_ignore_button_while_moving',
+    label: "Blue tanks ignore blue buttons while moving",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'blobs_use_tw_prng',
+    label: "Blobs use the Tile World RNG",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'teeth_target_internal_position',
+    label: "Teeth target the player's internal position",
+    rulesets: new Set(['lynx']),
+}, {
+    key: 'rff_blocks_monsters',
+    label: "Random force floors block monsters",
+    rulesets: new Set(['ms']),
+}, {
+    key: 'bonking_isnt_instant',
+    label: "Bonking while sliding doesn't apply instantly",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
+    key: 'fire_allows_monsters',
+    label: "Fire doesn't block monsters",
+    rulesets: new Set(['ms']),
+},
+];
+
+export function compat_flags_for_ruleset(ruleset) {
+    let compat = {};
+    for (let compatdef of COMPAT_FLAGS) {
+        if (compatdef.rulesets.has(ruleset)) {
+            compat[compatdef.key] = true;
+        }
+    }
+    return compat;
+}
