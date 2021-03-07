@@ -5,6 +5,7 @@ const _omit_custom_lexy_vfx = {
     teleport_flash: null,
     transmogrify_flash: null,
     puff: null,
+    fall: null,
 };
 
 export const CC2_TILESET_LAYOUT = {
@@ -1977,6 +1978,7 @@ export const LL_TILESET_LAYOUT = {
     explosion: [[16, 26], [17, 26], [18, 26], [19, 26]],
     splash: [[16, 27], [17, 27], [18, 27], [19, 27]],
     splash_slime: [[16, 28], [17, 28], [18, 28], [19, 28]],
+    fall: [[16, 29], [17, 29], [18, 29], [19, 29]],
     player1_exit: [[20, 28], [21, 28], [22, 28], [23, 28]],
     player2_exit: [[20, 29], [21, 29], [22, 29], [23, 29]],
     transmogrify_flash: [[24, 26], [25, 26], [26, 26], [27, 26], [28, 26], [29, 26], [30, 26], [31, 26]],

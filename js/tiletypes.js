@@ -1110,7 +1110,7 @@ const TILE_TYPES = {
                 level.fail('fell', me, other);
             }
             else {
-                level.transmute_tile(other, 'puff');
+                level.transmute_tile(other, 'fall');
             }
         },
         visual_state(me) {
@@ -3265,6 +3265,12 @@ const TILE_TYPES = {
         ttl: 4 * 3 + 1,
     },
     puff: {
+        layer: LAYERS.vfx,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 4 * 3 + 1,
+    },
+    fall: {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,
