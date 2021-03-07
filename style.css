@@ -514,12 +514,9 @@ body[data-mode=player] #editor-play {
     margin: auto;
     background: url(icons/tool-bg-selected.png) repeat;
     animation: scrolling-sidewalk linear 0.4s infinite;
-    /*
-    box-shadow:
-        inset 5vw 0 5vw -5vw black,
-        inset -5vw 0 5vw -5vw black;
-    */
-    mask: linear-gradient(to right, transparent 0, #ffffff40 10%, white 20%, white 80%, #ffffff40 90%, transparent 100%);
+    --mask: linear-gradient(to right, transparent 0, #ffffff40 10%, white 20%, white 80%, #ffffff40 90%, transparent 100%);
+    -webkit-mask-image: var(--mask);
+    mask-image: var(--mask);
 }
 .scrolling-sidewalk > img {
     display: block;
