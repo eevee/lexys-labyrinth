@@ -1982,8 +1982,6 @@ export const LL_TILESET_LAYOUT = {
     transmogrify_flash: [[24, 26], [25, 26], [26, 26], [27, 26], [28, 26], [29, 26], [30, 26], [31, 26]],
     teleport_flash: [[24, 27], [25, 27], [26, 27], [27, 27]],
     puff: [[24, 28], [25, 28], [26, 28], [27, 28]],
-
-    item_lock: [26, 31],  // XXX delete this
 };
 
 export const TILESET_LAYOUTS = {
