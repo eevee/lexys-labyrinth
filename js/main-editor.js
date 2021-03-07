@@ -2518,6 +2518,21 @@ const SPECIAL_PALETTE_BEHAVIOR = {
             return 'circuit_block/xxx';
         },
     },
+    sokoban_block: {
+        pick_palette_entry(tile) {
+            return 'sokoban_block/' + (tile.color ?? 'red');
+        },
+    },
+    sokoban_button: {
+        pick_palette_entry(tile) {
+            return 'sokoban_button/' + (tile.color ?? 'red');
+        },
+    },
+    sokoban_wall: {
+        pick_palette_entry(tile) {
+            return 'sokoban_wall/' + (tile.color ?? 'red');
+        },
+    },
 };
 // Fill in some special behavior that boils down to rotating tiles which happen to be encoded as
 // different tile types
