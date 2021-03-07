@@ -2030,6 +2030,11 @@ export class Tileset {
         if (coords[0] instanceof Array) {
             if (tile && tile.movement_speed) {
                 let p = tile.movement_progress(packet.tic % 1, packet.update_rate);
+                // FIXME still get p > 1 in steam-strict
+                if (p >= 1) {
+                    //console.warn(name, "p =", p, "tic =", packet.tic, "duration =", duration);
+                    p = 0.999;
+                }
                 coords = coords[Math.floor(p * coords.length)];
             }
             else  {
@@ -2101,7 +2106,7 @@ export class Tileset {
                 p = p * duration % 1;
             }
             if (p >= 1) {
-                console.warn(name, "p =", p, "tic =", packet.tic, "duration =", duration);
+                //console.warn(name, "p =", p, "tic =", packet.tic, "duration =", duration);
                 p = 0.999;
             }
             n = Math.floor(p * frames.length);
