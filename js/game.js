@@ -2495,6 +2495,16 @@ export class Level extends LevelInterface {
         }
     }
 
+    kill_actor(actor, animation_name = null) {
+        // FIXME use this everywhere, fail when it's a player, move on_death here
+        if (animation_name) {
+            this.transmute_tile(actor, animation_name);
+        }
+        else {
+            this.remove_tile(actor);
+        }
+    }
+
     fail(reason, killer = null, player = null) {
         if (this.state !== 'playing')
             return;

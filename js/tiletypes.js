@@ -703,6 +703,12 @@ const TILE_TYPES = {
         blocks(me, level, other) {
             return !(!other.type.is_player || other.has_item('hiking_boots'));
         },
+        on_arrive(me, level, other) {
+            if (other.type.name === 'glass_block') {
+                // FIXME need a glass shatter vfx
+                level.kill_actor(other, 'explosion');
+            }
+        },
     },
     turntable_cw: {
         layer: LAYERS.terrain,
@@ -1701,6 +1707,31 @@ const TILE_TYPES = {
 
             teeth: 'teeth_timid',
             teeth_timid: 'teeth',
+
+            // Items are only mogrified when inside a glass block
+            key_red: 'key_blue',
+            key_blue: 'key_red',
+            key_yellow: 'key_green',
+            key_green: 'key_yellow',
+
+            flippers: 'fire_boots',
+            fire_boots: 'flippers',
+            cleats: 'suction_boots',
+            suction_boots: 'cleats',
+            hiking_boots: 'speed_boots',
+            speed_boots: 'hiking_boots',
+            lightning_bolt: 'railroad_sign',
+            railroad_sign: 'lightning_bolt',
+            helmet: 'xray_eye',
+            xray_eye: 'helmet',
+            hook: 'foil',
+            foil: 'hook',
+            bowling_ball: 'dynamite',
+            dynamite: 'bowling_ball',
+            bribe: 'skeleton_key',
+            skeleton_key: 'bribe',
+            stopwatch_bonus: 'stopwatch_penalty',
+            stopwatch_penalty: 'stopwatch_bonus',
         },
         _blob_mogrifications: ['glider', 'paramecium', 'fireball', 'bug', 'walker', 'ball', 'teeth', 'tank_blue', 'teeth_timid'],
         on_begin(me, level) {
@@ -1720,6 +1751,15 @@ const TILE_TYPES = {
             else if (name === 'blob') {
                 let options = me.type._blob_mogrifications;
                 level.transmute_tile(other, options[level.prng() % options.length]);
+            }
+            else if (name === 'glass_block' && other.encased_item) {
+                let new_item = me.type._mogrifications[other.encased_item];
+                if (new_item) {
+                    level._set_tile_prop(other, 'encased_item', new_item);
+                }
+                else {
+                    return;
+                }
             }
             else if (name === 'sokoban_block') {
                 level._set_tile_prop(other, 'color', ({
