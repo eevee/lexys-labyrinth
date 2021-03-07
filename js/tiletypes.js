@@ -713,16 +713,19 @@ const TILE_TYPES = {
     turntable_cw: {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
+        // Not actually a teleporter, but we use the same slide type
+        teleport_allow_override: true,
         on_begin(me, level) {
             update_wireable(me, level);
         },
         on_arrive(me, level, other) {
             if (! me.is_active)
                 return;
-            other.direction = DIRECTIONS[other.direction].right;
+            level.set_actor_direction(other, DIRECTIONS[other.direction].right);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'right');
             }
+            level.make_slide(other, 'teleport-forever');
         },
         on_power(me, level) {
             if (me.is_wired) {
@@ -741,16 +744,19 @@ const TILE_TYPES = {
     turntable_ccw: {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
+        // Not actually a teleporter, but we use the same slide type
+        teleport_allow_override: true,
         on_begin(me, level) {
             update_wireable(me, level);
         },
         on_arrive(me, level, other) {
             if (! me.is_active)
                 return;
-            other.direction = DIRECTIONS[other.direction].left;
+            level.set_actor_direction(other, DIRECTIONS[other.direction].left);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'left');
             }
+            level.make_slide(other, 'teleport-forever');
         },
         on_power(me, level) {
             if (me.is_wired) {
@@ -1569,7 +1575,7 @@ const TILE_TYPES = {
             me.arrows = 0;  // bitmask of glowing arrows (visual, no gameplay impact)
         },
         on_ready(me, level) {
-            me.arrows ??= 0;
+            me.arrows = me.arrows ?? 0;
         },
         traps(me, actor) {
             return ! actor._clone_release;

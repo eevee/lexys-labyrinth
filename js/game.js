@@ -1930,6 +1930,8 @@ export class Level extends LevelInterface {
             // Curious special-case red teleporter behavior: if you pass through a wired but
             // inactive one, you keep sliding indefinitely.  Players can override out of it, but
             // other actors cannot.  (Normally, a teleport slide ends after one decision phase.)
+            // XXX this is useful when the exit is briefly blocked, but it can also get monsters
+            // stuck forever  :(
             this.make_slide(actor, 'teleport-forever');
             // Also, there's no sound and whatnot, so everything else is skipped outright.
             return;
