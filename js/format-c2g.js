@@ -111,6 +111,16 @@ let modifier_wire = {
     },
 };
 
+let modifier_color = {
+    _order: ['red', 'blue', 'yellow', 'green'],
+    decode(tile, modifier) {
+        tile.color = this._order[modifier % 4];
+    },
+    encode(tile) {
+        return this._order.indexOf(tile.color);
+    },
+};
+
 let arg_direction = {
     size: 1,
     decode(tile, dirbyte) {
@@ -795,6 +805,7 @@ const TILE_ENCODING = {
         has_next: true,
     },
 
+    // ------------------------------------------------------------------------------------------------
     // LL-specific tiles
     0xd0: {
         name: 'electrified_floor',
@@ -826,11 +837,7 @@ const TILE_ENCODING = {
         has_next: true,
         extra_args: [arg_direction],
     },
-    0xd7: {
-        name: 'item_lock',
-        has_next: true,
-        is_extension: true,
-    },
+    // 0xd7
     0xd8: {
         name: 'dash_floor',
         is_extension: true,
@@ -900,6 +907,23 @@ const TILE_ENCODING = {
     0xf0: {
         name: 'turntable_ccw',
         modifier: modifier_wire,
+        is_extension: true,
+    },
+    0xf1: {
+        name: 'sokoban_block',
+        has_next: true,
+        modifier: modifier_color,
+        extra_args: [arg_direction],
+        is_extension: true,
+    },
+    0xf2: {
+        name: 'sokoban_button',
+        modifier: modifier_color,
+        is_extension: true,
+    },
+    0xf3: {
+        name: 'sokoban_wall',
+        modifier: modifier_color,
         is_extension: true,
     },
 };

@@ -521,6 +521,8 @@ export class Level extends LevelInterface {
         // If there's exactly one yellow teleporter when the level loads, it cannot be picked up
         let yellow_teleporter_count = 0;
         this.allow_taking_yellow_teleporters = false;
+        // Sokoban buttons function as a group
+        this.sokoban_buttons_unpressed = {};
         for (let y = 0; y < this.height; y++) {
             let row = [];
             for (let x = 0; x < this.width; x++) {
@@ -560,6 +562,10 @@ export class Level extends LevelInterface {
                         if (yellow_teleporter_count > 1) {
                             this.allow_taking_yellow_teleporters = true;
                         }
+                    }
+                    else if (tile.type.name === 'sokoban_button') {
+                        this.sokoban_buttons_unpressed[tile.color] =
+                            (this.sokoban_buttons_unpressed[tile.color] ?? 0) + 1;
                     }
                 }
             }

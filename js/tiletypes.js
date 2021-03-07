@@ -272,18 +272,30 @@ const TILE_TYPES = {
     floor_custom_green: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.ghost,
+        blocks(me, level, other) {
+            return (other.type.name === 'sokoban_block' && other.color !== 'green');
+        },
     },
     floor_custom_pink: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.ghost,
+        blocks(me, level, other) {
+            return (other.type.name === 'sokoban_block' && other.color !== 'red');
+        },
     },
     floor_custom_yellow: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.ghost,
+        blocks(me, level, other) {
+            return (other.type.name === 'sokoban_block' && other.color !== 'yellow');
+        },
     },
     floor_custom_blue: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.ghost,
+        blocks(me, level, other) {
+            return (other.type.name === 'sokoban_block' && other.color !== 'blue');
+        },
     },
     wall: {
         layer: LAYERS.terrain,
@@ -821,6 +833,15 @@ const TILE_TYPES = {
                 level.transmute_tile(other, 'splash');
                 level.recalculate_circuitry_next_wire_phase = true;
             }
+            else if (other.type.name === 'sokoban_block') {
+                level.transmute_tile(me, ({
+                    red: 'floor_custom_pink',
+                    blue: 'floor_custom_blue',
+                    yellow: 'floor_custom_yellow',
+                    green: 'floor_custom_green',
+                })[other.color]);
+                level.transmute_tile(other, 'splash');
+            }
             else if (other.type.is_real_player) {
                 level.fail('drowned', me, other);
             }
@@ -1243,6 +1264,8 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
             boulder: true,
+            glass_block: true,
+            sokoban_block: true,
         },
         on_after_bumped(me, level, other) {
             // Fireballs melt ice blocks on regular floor FIXME and water!
@@ -1276,6 +1299,7 @@ const TILE_TYPES = {
             frame_block: true,
             boulder: true,
             glass_block: true,
+            sokoban_block: true,
         },
         on_clone(me, original) {
             me.arrows = new Set(original.arrows);
@@ -1446,6 +1470,90 @@ const TILE_TYPES = {
         },
     },
 
+    // Sokoban blocks, buttons, and walls -- they each come in four colors, the buttons can be
+    // pressed by anything EXCEPT a sokoban block of the WRONG color, and the walls become floors
+    // only when ALL the buttons of the corresponding color are pressed
+    sokoban_block: {
+        layer: LAYERS.actor,
+        collision_mask: COLLISION.block_cc1,
+        blocks_collision: COLLISION.all,
+        item_pickup_priority: PICKUP_PRIORITIES.always,
+        is_actor: true,
+        is_block: true,
+        can_reverse_on_railroad: true,
+        movement_speed: 4,
+        populate_defaults(me) {
+            me.color = 'red';
+        },
+        visual_state(me) {
+            return me.color ?? 'red';
+        },
+    },
+    sokoban_button: {
+        layer: LAYERS.terrain,
+        populate_defaults(me) {
+            me.color = 'red';
+        },
+        on_arrive(me, level, other) {
+            if (other.type.name === 'sokoban_block' && me.color !== other.color)
+                return;
+            level.sfx.play_once('button-press', me.cell);
+
+            level.sokoban_buttons_unpressed[me.color] -= 1;
+            level._push_pending_undo(() => {
+                level.sokoban_buttons_unpressed[me.color] += 1;
+            });
+            if (level.sokoban_buttons_unpressed[me.color] === 0) {
+                for (let cell of level.linear_cells) {
+                    let terrain = cell.get_terrain();
+                    if (terrain.type.name === 'sokoban_wall' && terrain.color === me.color) {
+                        level.transmute_tile(terrain, 'sokoban_floor');
+                    }
+                }
+            }
+        },
+        on_depart(me, level, other) {
+            if (other.type.name === 'sokoban_block' && me.color !== other.color)
+                return;
+            level.sfx.play_once('button-release', me.cell);
+
+            level.sokoban_buttons_unpressed[me.color] += 1;
+            level._push_pending_undo(() => {
+                level.sokoban_buttons_unpressed[me.color] -= 1;
+            });
+            if (level.sokoban_buttons_unpressed[me.color] === 1) {
+                for (let cell of level.linear_cells) {
+                    let terrain = cell.get_terrain();
+                    if (terrain.type.name === 'sokoban_floor' && terrain.color === me.color) {
+                        level.transmute_tile(terrain, 'sokoban_wall');
+                    }
+                }
+            }
+        },
+        visual_state(me) {
+            return (me.color ?? 'red') + '_' + button_visual_state(me);
+        },
+    },
+    sokoban_wall: {
+        layer: LAYERS.terrain,
+        blocks_collision: COLLISION.all_but_ghost,
+        populate_defaults(me) {
+            me.color = 'red';
+        },
+        visual_state(me) {
+            return me.color ?? 'red';
+        },
+    },
+    sokoban_floor: {
+        layer: LAYERS.terrain,
+        populate_defaults(me) {
+            me.color = 'red';
+        },
+        visual_state(me) {
+            return me.color ?? 'red';
+        },
+    },
+
     // ------------------------------------------------------------------------------------------------
     // Floor mechanisms
     cloner: {
@@ -1612,6 +1720,14 @@ const TILE_TYPES = {
             else if (name === 'blob') {
                 let options = me.type._blob_mogrifications;
                 level.transmute_tile(other, options[level.prng() % options.length]);
+            }
+            else if (name === 'sokoban_block') {
+                level._set_tile_prop(other, 'color', ({
+                    red: 'blue',
+                    blue: 'red',
+                    yellow: 'green',
+                    green: 'yellow',
+                })[other.color]);
             }
             else {
                 return;
@@ -2408,6 +2524,7 @@ const TILE_TYPES = {
             circuit_block: true,
             boulder: true,
             glass_block: true,
+            sokoban_block: true,
         },
         decide_movement(me, level) {
             if (me.pending_decision) {
@@ -2531,6 +2648,7 @@ const TILE_TYPES = {
             circuit_block: true,
             boulder: true,
             glass_block: true,
+            sokoban_block: true,
         },
         on_ready(me, level) {
             me.current_emulatee = 0;
@@ -2864,6 +2982,7 @@ const TILE_TYPES = {
             circuit_block: true,
             boulder: true,
             glass_block: true,
+            sokoban_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -2888,6 +3007,7 @@ const TILE_TYPES = {
             circuit_block: true,
             boulder: true,
             glass_block: true,
+            sokoban_block: true,
         },
         infinite_items: {
             key_yellow: true,
@@ -2911,6 +3031,7 @@ const TILE_TYPES = {
             circuit_block: true,
             boulder: true,
             glass_block: true,
+            sokoban_block: true,
         },
         infinite_items: {
             key_green: true,
@@ -2938,6 +3059,7 @@ const TILE_TYPES = {
             circuit_block: true,
             boulder: true,
             glass_block: true,
+            sokoban_block: true,
         },
         infinite_items: {
             key_yellow: true,
