@@ -481,6 +481,8 @@ export class Level extends LevelInterface {
         // Note that this clock counts *up*, even on untimed levels, and is unaffected by CC2's
         // clock alteration shenanigans
         this.tic_counter = 0;
+        // 0 to 2, counting which frame within a tic we're on in CC2
+        this.frame_offset = 0;
         // 0 to 7, indicating the first tic that teeth can move on.
         // 0 is equivalent to even step; 4 is equivalent to odd step.
         // 5 is the default in CC2.  Lynx can use any of the 8.  MSCC uses
@@ -818,12 +820,10 @@ export class Level extends LevelInterface {
 
     can_accept_input() {
         // We can accept input anytime the player can move, i.e. when they're not already moving and
-        // not in an un-overrideable slide.
-        // Note that this only makes sense in the middle of a tic; at the beginning of one, the
-        // player's movement cooldown may very well be 1, but it'll be decremented before they
-        // attempt to move
-        return this.player.movement_cooldown === 0 && (this.player.slide_mode === null || (
-            this.player.slide_mode === 'force' && this.player.last_move_was_force));
+        // not in an un-overrideable slide
+        return this.player.movement_cooldown === 0 &&
+            (this.player.slide_mode === null || (
+                this.player.slide_mode === 'force' && this.player.last_move_was_force));
     }
 
     // Lynx PRNG, used unchanged in CC2
@@ -874,81 +874,33 @@ export class Level extends LevelInterface {
     // Input is a bit mask of INPUT_BITS.
     advance_tic(p1_input) {
         if (this.state !== 'playing') {
-            console.warn(`Level.advance_tic() called when state is ${this.state}`);
+            console.warn(`Attempting to advance game when state is ${this.state}`);
             return;
         }
 
-        this.begin_tic(p1_input);
-        this.finish_tic(p1_input);
-    }
-
-    // FIXME a whole bunch of these comments are gonna be wrong or confusing now
-    begin_tic(p1_input) {
-        // At the beginning of the very first tic, some tiles want to do initialization that's not
-        // appropriate to do before the game begins.  (For example, bombs blow up anything that
-        // starts on them in CC2, but we don't want to do that before the game has run at all.  We
-        // DEFINITELY don't want to blow the PLAYER up before the game starts!)
-        if (! this.done_on_begin) {
-            // Run backwards, to match actor order
-            for (let i = this.linear_cells.length - 1; i >= 0; i--) {
-                let cell = this.linear_cells[i];
-                for (let tile of cell) {
-                    if (tile && tile.type.on_begin) {
-                        tile.type.on_begin(tile, this);
-                    }
-                }
-            }
-            // It's not possible to rewind to before this happened, so clear undo and permanently
-            // set a flag
-            this.pending_undo = this.create_undo_entry();
-            this.done_on_begin = true;
-        }
-
-        if (this.undo_enabled) {
-            // Store some current level state in the undo entry.  (These will often not be modified, but
-            // they only take a few bytes each so that's fine.)
-            for (let key of [
-                    '_rng1', '_rng2', '_blob_modifier', '_tw_rng', 'force_floor_direction',
-                    'tic_counter', 'time_remaining', 'timer_paused',
-                    'chips_remaining', 'bonus_points', 'state',
-                    'player1_move', 'player2_move', 'remaining_players', 'player',
-            ]) {
-                this.pending_undo.level_props[key] = this[key];
-            }
-        }
-        this.p1_input = p1_input;
-        this.p1_released |= ~p1_input;  // Action keys released since we last checked them
-        this.swap_player1 = false;
-
-        this.sfx.set_player_position(this.player.cell);
+        this._do_init_phase();
+        this._set_p1_input(p1_input);
 
         if (this.compat.use_lynx_loop) {
             if (this.compat.emulate_60fps) {
-                this._begin_tic_lynx60();
+                this._advance_tic_lynx60();
             }
             else {
-                this._begin_tic_lynx();
+                this._advance_tic_lynx();
             }
         }
         else {
-            this._begin_tic_lexy();
+            this._advance_tic_lexy();
         }
     }
 
-    // FIXME merge this a bit more with the lynx loop, which should be more in finish_tic anyway
-    // FIXME fix turn-based mode
-    // FIXME you are now not synched with something coming out of a trap or cloner, but i don't know
-    // how to fix that with this loop
-    // Finish a tic, i.e., apply input just before the player can make a decision and then do it
-    finish_tic(p1_input) {
-        this.p1_input = p1_input;
-        this.p1_released |= ~p1_input;  // Action keys released since we last checked them
-        
-        if (this.compat.use_lynx_loop) {
-            if (this.compat.emulate_60fps) {
-                this._finish_tic_lynx60();
-            }
-            return;
+    // Default loop: run at 20 tics per second, split things into some more loops
+    _advance_tic_lexy() {
+        // Under CC2 rules, there are two wire updates at the very beginning of the game before the
+        // player can actually move.  That means the first tic has five wire phases total.
+        if (this.tic_counter === 0) {
+            this._do_wire_phase();
+            this._do_wire_phase();
         }
 
         this._do_decision_phase();
@@ -996,6 +948,7 @@ export class Level extends LevelInterface {
 
         this._swap_players();
 
+        // Wire updates every frame, which means thrice per tic
         this._do_wire_phase();
         this._do_wire_phase();
         this._do_wire_phase();
@@ -1003,48 +956,108 @@ export class Level extends LevelInterface {
         this._do_cleanup_phase();
     }
 
-    // Lexy-style loop, similar to Lynx but with some things split out into separate phases
-    _begin_tic_lexy() {
-        // CC2 wiring runs every frame, not every tic, so we need to do it three times, but dealing
-        // with it is delicate.  Ideally the player would see the current state of the game when
-        // they move, so all the wire updates should be at the end, BUT under CC2 rules, there are
-        // two wire updates at the start of the game before any movement can actually happen.
-        // Do those here, then otherwise do three wire phases when finishing.
-        if (this.tic_counter === 0) {
-            this._do_wire_phase();
-            this._do_wire_phase();
-        }
-    }
-
-    // Lynx-style loop: everyone decides, then everyone moves/cools.
-    _begin_tic_lynx() {
-        // FIXME this should have three wire passes too, chief
+    // Lynx loop: everyone decides, then everyone moves/cools in a single pass
+    _advance_tic_lynx() {
         this._do_decision_phase();
         this._do_combined_action_phase(3);
         this._do_wire_phase();
+        this._do_wire_phase();
+        this._do_wire_phase();
 
         this._do_cleanup_phase();
     }
 
-    // Same as above, but split up to run at 60fps, where only every third frame allows for
-    // decisions.  This is how CC2 works.
-    _begin_tic_lynx60() {
+    // CC2 loop: similar to the Lynx loop, but run three times per tic, and non-forced decisions can
+    // only be made every third frame
+    _advance_tic_lynx60() {
         this._do_decision_phase(true);
         this._do_combined_action_phase(1, true);
         this._do_wire_phase();
 
+        this.frame_offset = 1;
         this._do_decision_phase(true);
         this._do_combined_action_phase(1, true);
         this._do_wire_phase();
-    }
-    // This is in the "finish" part to preserve the property turn-based mode expects, where "finish"
-    // picks up right when the player could provide input
-    _finish_tic_lynx60() {
+
+        this.frame_offset = 2;
         this._do_decision_phase();
         this._do_combined_action_phase(1);
         this._do_wire_phase();
 
+        this.frame_offset = 0;
         this._do_cleanup_phase();
+    }
+
+    // Attempt to advance by one FRAME at a time.  Primarily useful for running 60 FPS mode at,
+    // well, 60 FPS.
+    advance_frame(p1_input) {
+        if (this.compat.use_lynx_loop && this.compat.emulate_60fps) {
+            // Lynx 60, i.e. CC2
+            if (this.frame_offset === 0) {
+                this._do_init_phase(p1_input);
+            }
+            this._set_p1_input(p1_input);
+            let is_decision_frame = this.frame_offset === 2;
+
+            this._do_decision_phase(! is_decision_frame);
+            this._do_combined_action_phase(1, ! is_decision_frame);
+            this._do_wire_phase();
+
+            if (this.frame_offset === 2) {
+                this._do_cleanup_phase();
+            }
+        }
+        else {
+            // This is either Lexy mode or Lynx mode, and either way we run at 20 tps
+            if (this.frame_offset === 0) {
+                this.advance_tic(p1_input);
+            }
+        }
+
+        this.frame_offset = (this.frame_offset + 1) % 3;
+    }
+
+    _set_p1_input(p1_input) {
+        this.p1_input = p1_input;
+        this.p1_released |= ~p1_input;  // Action keys released since we last checked them
+    }
+
+    _do_init_phase() {
+        // At the beginning of the very first tic, some tiles want to do initialization that's not
+        // appropriate to do before the game begins.  (For example, bombs blow up anything that
+        // starts on them in CC2, but we don't want to do that before the game has run at all.  We
+        // DEFINITELY don't want to blow the PLAYER up before the game starts!)
+        if (! this.done_on_begin) {
+            // Run backwards, to match actor order
+            for (let i = this.linear_cells.length - 1; i >= 0; i--) {
+                let cell = this.linear_cells[i];
+                for (let tile of cell) {
+                    if (tile && tile.type.on_begin) {
+                        tile.type.on_begin(tile, this);
+                    }
+                }
+            }
+            // It's not possible to rewind to before this happened, so clear undo and permanently
+            // set a flag
+            this.pending_undo = this.create_undo_entry();
+            this.done_on_begin = true;
+        }
+
+        if (this.undo_enabled) {
+            // Store some current level state in the undo entry.  (These will often not be modified, but
+            // they only take a few bytes each so that's fine.)
+            for (let key of [
+                    '_rng1', '_rng2', '_blob_modifier', '_tw_rng', 'force_floor_direction',
+                    'tic_counter', 'frame_offset', 'time_remaining', 'timer_paused',
+                    'chips_remaining', 'bonus_points', 'state',
+                    'player1_move', 'player2_move', 'remaining_players', 'player',
+            ]) {
+                this.pending_undo.level_props[key] = this[key];
+            }
+        }
+        this.swap_player1 = false;
+
+        this.sfx.set_player_position(this.player.cell);
     }
 
     // Decision phase: all actors decide on their movement "simultaneously"

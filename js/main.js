@@ -444,25 +444,12 @@ class Player extends PrimaryView {
         this.music_audio_el = this.music_el.querySelector('audio');
         this.music_index = null;
 
-        // 0: normal realtime mode
-        // 1: turn-based mode, at the start of a tic
-        // 2: turn-based mode, in mid-tic, with the game frozen waiting for input
-        this.turn_mode = 0;
+        this.turn_based_mode = false;
+        this.turn_based_mode_waiting = false;
         this.turn_based_checkbox = this.root.querySelector('.control-turn-based');
         this.turn_based_checkbox.checked = false;
         this.turn_based_checkbox.addEventListener('change', ev => {
-            if (this.turn_based_checkbox.checked) {
-                // If we're leaving real-time mode then we're between tics
-                this.turn_mode = 1;
-            }
-            else {
-                if (this.turn_mode === 2) {
-                    // Finish up the tic with dummy input
-                    this.level.finish_tic(0);
-                    this.advance_by(1);
-                }
-                this.turn_mode = 0;
-            }
+            this.turn_based_mode = this.turn_based_checkbox.checked;
         });
 
         // Bind buttons
@@ -592,7 +579,7 @@ class Player extends PrimaryView {
 
             // Per-tic navigation; only useful if the game isn't running
             if (ev.key === ',') {
-                if (this.state === 'stopped' || this.state === 'paused' || this.turn_mode > 0) {
+                if (this.state === 'stopped' || this.state === 'paused' || this.turn_based_mode) {
                     this.set_state('paused');
                     this.undo();
                     this.update_ui();
@@ -601,11 +588,16 @@ class Player extends PrimaryView {
                 return;
             }
             if (ev.key === '.') {
-                if (this.state === 'waiting' || this.state === 'paused' || this.turn_mode > 0) {
-                    if (this.state === 'waiting' || this.turn_mode === 1) {
-                        this.set_state('paused');
+                if (this.state === 'waiting' || this.state === 'paused' || this.turn_based_mode) {
+                    if (this.state === 'waiting') {
+                        if (this.turn_based_mode) {
+                            this.set_state('playing');
+                        }
+                        else {
+                            this.set_state('paused');
+                        }
                     }
-                    this.advance_by(1, true);
+                    this.advance_by(1, true, ev.altKey && this.level.compat.emulate_60fps);
                     this._redraw();
                 }
                 return;
@@ -1301,7 +1293,7 @@ class Player extends PrimaryView {
     _clear_state() {
         this.set_state('waiting');
 
-        this.turn_mode = this.turn_based_checkbox.checked ? 1 : 0;
+        this.turn_based_mode_waiting = false;
         this.last_advance = 0;
         this.current_keyring = {};
         this.current_toolbelt = [];
@@ -1382,7 +1374,8 @@ class Player extends PrimaryView {
         return input;
     }
 
-    advance_by(tics, force = false) {
+    advance_by(tics, force = false, use_frames = false) {
+        let crossed_tic_boundary = false;
         for (let i = 0; i < tics; i++) {
             // FIXME turn-based mode should be disabled during a replay
             let input = this.get_input();
@@ -1394,38 +1387,32 @@ class Player extends PrimaryView {
                 this.debug.replay.set(this.level.tic_counter, input);
             }
 
-            // Turn-based mode is considered assistance, but only if the game actually attempts to
-            // progress while it's enabled
-            if (this.turn_mode > 0) {
+            if (this.turn_based_mode) {
+                // Turn-based mode is considered assistance, but only if the game actually attempts
+                // to progress while it's enabled
                 this.level.aid = Math.max(1, this.level.aid);
-            }
 
-            let has_input = wait || input;
-            // Turn-based mode complicates this slightly; it aligns us to the middle of a tic
-            if (this.turn_mode === 2) {
-                if (has_input || force) {
-                    // Finish the current tic, then continue as usual.  This means the end of the
-                    // tic doesn't count against the number of tics to advance -- because it already
-                    // did, the first time we tried it
-                    this.level.finish_tic(input);
-                    this.turn_mode = 1;
-                }
-                else {
+                // If we're in turn-based mode and could provide input here, but don't have any,
+                // then wait until we do
+                if (this.level.can_accept_input() && ! input && ! wait && ! force) {
+                    this.turn_based_mode_waiting = true;
                     continue;
                 }
             }
 
-            // We should now be at the start of a tic
-            this.level.begin_tic(input);
-            if (this.turn_mode > 0 && this.level.can_accept_input() && ! has_input) {
-                // If we're in turn-based mode and could provide input here, but don't have any,
-                // then wait until we do
-                this.turn_mode = 2;
+            this.turn_based_mode_waiting = false;
+            if (use_frames) {
+                this.level.advance_frame(input);
+                if (this.level.frame_offset === 0) {
+                    crossed_tic_boundary = true;
+                }
             }
             else {
-                this.level.finish_tic(input);
+                this.level.advance_tic(input);
+                crossed_tic_boundary = true;
             }
 
+            // FIXME don't do this til we would next advance?  or some other way let it play out
             if (this.level.state !== 'playing') {
                 // We either won or lost!
                 this.set_state('stopped');
@@ -1455,6 +1442,10 @@ class Player extends PrimaryView {
         // tracking fractional updates, but asking to run at 10× and only getting 2× would suck)
         let num_advances = 1;
         let dt = 1000 / (TICS_PER_SECOND * this.play_speed);
+        let use_frames = this.level.compat.emulate_60fps && this.state === 'playing';
+        if (use_frames) {
+            dt /= 3;
+        }
         if (dt < 10) {
             num_advances = Math.ceil(10 / dt);
             dt = 10;
@@ -1469,7 +1460,7 @@ class Player extends PrimaryView {
         this._advance_handle = window.setTimeout(this._advance_bound, dt);
 
         if (this.state === 'playing') {
-            this.advance_by(num_advances);
+            this.advance_by(num_advances, false, use_frames);
         }
         else if (this.state === 'rewinding') {
             if (this.level.has_undo()) {
@@ -1488,10 +1479,6 @@ class Player extends PrimaryView {
 
     undo() {
         this.level.undo();
-        // Undo always returns to the start of a tic
-        if (this.turn_mode === 2) {
-            this.turn_mode = 1;
-        }
     }
 
     // Redraws every frame, unless the game isn't running
@@ -1500,28 +1487,24 @@ class Player extends PrimaryView {
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
         let tic_offset;
-        if (this.turn_mode === 2) {
+        if (this.turn_based_mode_waiting || this.state === 'stopped' || ! this.use_interpolation) {
             // We're dawdling between tics, so nothing is actually animating, but the clock hasn't
             // advanced yet; pretend whatever's currently animating has finished
             // FIXME this creates bizarre side effects like actors making a huge first step when
             // stepping forwards one tic at a time, but without it you get force floors animating
             // and then abruptly reversing in turn-based mode (maybe we should just not interpolate
             // at all in that case??)
-            tic_offset = 0.999;
-        }
-        else if (this.state === 'stopped') {
             // Once the game is over, interpolating backwards makes less sense
             // FIXME this /appears/ to skip a whole tic of movement though.  hm.
-            tic_offset = 0.999;
+            tic_offset = this.level.compat.emulate_60fps ? 0.333 : 0.999;
         }
-        else if (this.use_interpolation) {
+        else {
+            // Note that, conveniently, when running at 60 FPS this ranges from 0 to 1/3, so nothing
+            // actually needs to change
             tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
             if (this.state === 'rewinding') {
                 tic_offset = 1 - tic_offset;
             }
-        }
-        else {
-            tic_offset = 0.999;
         }
 
         this._redraw(tic_offset);
@@ -1661,12 +1644,14 @@ class Player extends PrimaryView {
 
         if (this.debug.enabled) {
             let t = this.level.tic_counter;
-            if (this.turn_mode === 2) {
-                this.debug.time_tics_el.textContent = `${t}½`;
+            let current_tic = String(t);
+            if (this.level.frame_offset === 1) {
+                current_tic += "⅓";
             }
-            else {
-                this.debug.time_tics_el.textContent = `${t}`;
+            else if (this.level.frame_offset === 2) {
+                current_tic += "⅔";
             }
+            this.debug.time_tics_el.textContent = current_tic;
             this.debug.time_moves_el.textContent = `${Math.floor(t/4)}`;
             this.debug.time_secs_el.textContent = (t / 20).toFixed(2);
 
@@ -1687,10 +1672,9 @@ class Player extends PrimaryView {
     }
 
     autopause() {
-        if (this.turn_mode > 0) {
-            // Turn-based mode doesn't need this
+        // Turn-based mode doesn't need this
+        if (this.turn_based_mode)
             return;
-        }
 
         this.set_state('paused');
     }
