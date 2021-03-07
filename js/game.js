@@ -1020,6 +1020,7 @@ export class Level extends LevelInterface {
     _set_p1_input(p1_input) {
         this.p1_input = p1_input;
         this.p1_released |= ~p1_input;  // Action keys released since we last checked them
+        this.swap_player1 = false;
     }
 
     _do_init_phase() {
@@ -1055,7 +1056,6 @@ export class Level extends LevelInterface {
                 this.pending_undo.level_props[key] = this[key];
             }
         }
-        this.swap_player1 = false;
 
         this.sfx.set_player_position(this.player.cell);
     }
