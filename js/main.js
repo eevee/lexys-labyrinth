@@ -1115,11 +1115,14 @@ class Player extends PrimaryView {
             if (ev.button !== 1)
                 return;
 
+            if (this.state === 'stopped')
+                return;
             let [x, y] = this.renderer.cell_coords_from_event(ev);
             this.level.move_to(this.level.player, this.level.cell(x, y));
-            // TODO this behaves a bit weirdly when paused (doesn't redraw even with a force), i
-            // think because we're still claiming a speed of 1 so time has to pass before the move
-            // actually "happens"
+            if (this.state === 'waiting') {
+                this.set_state('paused');
+            }
+            this._redraw();
         });
         this.renderer.canvas.addEventListener('mousemove', ev => {
             let tooltip = this.debug.actor_tooltip;
@@ -1481,39 +1484,43 @@ class Player extends PrimaryView {
         this.level.undo();
     }
 
+    _max_tic_offset() {
+        return this.level.compat.emulate_60fps ? 0.333 : 0.999;
+    }
+
     // Redraws every frame, unless the game isn't running
     redraw() {
         // TODO this is not gonna be right while pausing lol
         // TODO i'm not sure it'll be right when rewinding either
         // TODO or if the game's speed changes.  wow!
         let tic_offset;
-        if (this.turn_based_mode_waiting || this.state === 'stopped' || ! this.use_interpolation) {
+        let max = this._max_tic_offset();
+        if (this.turn_based_mode_waiting || ! this.use_interpolation) {
             // We're dawdling between tics, so nothing is actually animating, but the clock hasn't
             // advanced yet; pretend whatever's currently animating has finished
             // FIXME this creates bizarre side effects like actors making a huge first step when
             // stepping forwards one tic at a time, but without it you get force floors animating
             // and then abruptly reversing in turn-based mode (maybe we should just not interpolate
             // at all in that case??)
-            // Once the game is over, interpolating backwards makes less sense
-            // FIXME this /appears/ to skip a whole tic of movement though.  hm.
-            tic_offset = this.level.compat.emulate_60fps ? 0.333 : 0.999;
+            tic_offset = max;
         }
         else {
             // Note that, conveniently, when running at 60 FPS this ranges from 0 to 1/3, so nothing
             // actually needs to change
-            tic_offset = Math.min(0.9999, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
+            tic_offset = Math.min(max, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
             if (this.state === 'rewinding') {
-                tic_offset = 1 - tic_offset;
+                tic_offset = max - tic_offset;
             }
         }
 
         this._redraw(tic_offset);
 
-        // Check for a stopped game *after* drawing, so that if the game ends, we still draw its
-        // final result before stopping the draw loop
-        // TODO for bonus points, also finish the player animation (but don't advance the game any further)
-        // TODO stop redrawing when in turn-based mode 2?
-        if (this.state === 'playing' || this.state === 'rewinding') {
+        // Check for a stopped game *after* drawing, so that when the game ends, we still animate
+        // its final tic before stopping the draw loop
+        // TODO stop redrawing when waiting on turn-based mode?  but then, when is it restarted
+        if (this.state === 'playing' || this.state === 'rewinding' ||
+            (this.state === 'stopped' && tic_offset < 0.99))
+        {
             this._redraw_handle = requestAnimationFrame(this._redraw_bound);
         }
         else {
@@ -1528,7 +1535,7 @@ class Player extends PrimaryView {
             // Default to drawing the "end" state of the tic when we're paused; the renderer
             // interpolates backwards, so this will show the actual state of the game
             if (this.state === 'paused') {
-                tic_offset = 0.999;
+                tic_offset = this._max_tic_offset();
             }
             else {
                 tic_offset = 0;
