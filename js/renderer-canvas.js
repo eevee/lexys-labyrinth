@@ -14,6 +14,8 @@ class CanvasRendererDrawPacket extends DrawPacket {
         // Offset within the cell, for actors in motion
         this.offsetx = 0;
         this.offsety = 0;
+        // Compatibility settings
+        this.use_cc2_anim_speed = renderer.use_cc2_anim_speed;
     }
 
     blit(tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) {
@@ -60,6 +62,7 @@ export class CanvasRenderer {
         this.show_actor_order = false;
         this.use_rewind_effect = false;
         this.perception = 'normal';  // normal, xray, editor, palette
+        this.use_cc2_anim_speed = false;
         this.active_player = null;
     }
 

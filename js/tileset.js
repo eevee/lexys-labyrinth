@@ -7,14 +7,6 @@ const _omit_custom_lexy_vfx = {
     puff: null,
 };
 
-// TODO move the remaining stuff (arrows, overlay i think, probably force floor thing) into specials
-// TODO more explicitly define animations, give them a speed!  maybe fold directions into it
-// TODO relatedly, the push animations are sometimes glitchy depending on when you start?
-// TODO animate swimming player always
-// TODO life might be easier if i used the lynx-style loop with cooldown at the end
-// TODO define a draw state object to pass into here; need it for making turtles work right, fixing
-// blur with cc2 blobs/walkers, also makes a lot of signatures cleaner (make sure not slower)
-// TODO monsters should only animate while moving?  (not actually how cc2 works...)
 export const CC2_TILESET_LAYOUT = {
     '#ident': 'cc2',
     '#name': "Chip's Challenge 2",
@@ -58,8 +50,13 @@ export const CC2_TILESET_LAYOUT = {
         hidden: [0, 2],
         revealed: [9, 31],
     },
-    // FIXME this shouldn't be visible with seeing eye (or should it not spawn at all?)
-    wall_invisible_revealed: [1, 2],
+    wall_invisible_revealed: {
+        // This is specifically /invisible/ when you have the xray glasses
+        __special__: 'perception',
+        modes: new Set(['xray']),
+        hidden: [1, 2],
+        revealed: null,
+    },
     wall_appearing: {
         __special__: 'perception',
         modes: new Set(['palette', 'editor', 'xray']),
@@ -90,12 +87,11 @@ export const CC2_TILESET_LAYOUT = {
     thief_tools: [3, 2],
     socket: [4, 2],
     hint: [5, 2],
-    exit: [
-        [6, 2],
-        [7, 2],
-        [8, 2],
-        [9, 2],
-    ],
+    exit: {
+        __special__: 'animated',
+        duration: 16,
+        all: [[6, 2], [7, 2], [8, 2], [9, 2]],
+    },
     ice_block: {
         __special__: 'perception',
         modes: new Set(['editor', 'xray']),
@@ -157,7 +153,11 @@ export const CC2_TILESET_LAYOUT = {
     splash_slime: [[0, 5], [1, 5], [2, 5], [3, 5]],
     splash: [[4, 5], [5, 5], [6, 5], [7, 5]],
     flame_jet_off: [8, 5],
-    flame_jet_on: [[9, 5], [10, 5], [11, 5]],
+    flame_jet_on: {
+        __special__: 'animated',
+        duration: 12,
+        all: [[9, 5], [10, 5], [11, 5]],
+    },
     popdown_wall: [12, 5],
     popdown_floor: {
         __special__: 'perception',
@@ -213,6 +213,9 @@ export const CC2_TILESET_LAYOUT = {
 
     // TODO moving
     bug: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
         north: [[0, 7], [1, 7], [2, 7], [3, 7]],
         east: [[4, 7], [5, 7], [6, 7], [7, 7]],
         south: [[8, 7], [9, 7], [10, 7], [11, 7]],
@@ -220,20 +223,36 @@ export const CC2_TILESET_LAYOUT = {
     },
 
     tank_blue: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 32,
         north: [[0, 8], [1, 8]],
         east: [[2, 8], [3, 8]],
         south: [[4, 8], [5, 8]],
         west: [[6, 8], [7, 8]],
     },
     glider: {
+        __special__: 'animated',
+        duration: 10,
+        cc2_duration: 8,
         north: [[8, 8], [9, 8]],
         east: [[10, 8], [11, 8]],
         south: [[12, 8], [13, 8]],
         west: [[14, 8], [15, 8]],
     },
 
-    green_floor: [[0, 9], [1, 9], [2, 9], [3, 9]],
-    purple_floor: [[4, 9], [5, 9], [6, 9], [7, 9]],
+    green_floor: {
+        __special__: 'animated',
+        duration: 24,
+        cc2_duration: 16,
+        all: [[0, 9], [1, 9], [2, 9], [3, 9]],
+    },
+    purple_floor: {
+        __special__: 'animated',
+        duration: 24,
+        cc2_duration: 16,
+        all: [[4, 9], [5, 9], [6, 9], [7, 9]],
+    },
     green_wall: {
         __special__: 'overlay',
         base: 'green_floor',
@@ -250,11 +269,12 @@ export const CC2_TILESET_LAYOUT = {
         open: [10, 9],
     },
     button_gray: [11, 9],
-    // Fireball animation is REALLY FAST, runs roughly twice per move
-    fireball: [
-        [12, 9], [13, 9], [14, 9], [15, 9],
-        [12, 9], [13, 9], [14, 9], [15, 9],
-    ],
+    fireball: {
+        __special__: 'animated',
+        duration: 12,
+        cc2_duration: 4,
+        all: [[12, 9], [13, 9], [14, 9], [15, 9]],
+    },
 
     fake_wall: [0, 10],
     fake_floor: {
@@ -272,20 +292,25 @@ export const CC2_TILESET_LAYOUT = {
     teleport_blue: {
         __special__: 'wires',
         base: [0, 2],
-        wired: [[4, 10], [5, 10], [6, 10], [7, 10]],
+        wired: {
+            __special__: 'animated',
+            duration: 20,
+            cc2_duration: 16,
+            all: [[4, 10], [5, 10], [6, 10], [7, 10]],
+        },
     },
     popwall: [8, 10],
     popwall2: [8, 10],
     gravel: [9, 10],
-    ball: [
+    ball: {
+        __special__: 'animated',
+        global: false,
+        duration: 0.5,
+        cc2_duration: 1,
+        idle_frame_index: 2,
         // appropriately, this animation ping-pongs
-        [10, 10], [11, 10], [12, 10], [13, 10],
-        [14, 10], [13, 10], [12, 10], [11, 10],
-        // FIXME the ball bounces so it specifically needs to play its animation every move; this
-        // defeats the ½x slowdown.  it's dumb and means this anim as written doesn't match cc2
-        [10, 10], [11, 10], [12, 10], [13, 10],
-        [14, 10], [13, 10], [12, 10], [11, 10],
-    ],
+        all: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10], [13, 10], [12, 10], [11, 10]],
+    },
     steel: {
         // Wiring!
         __special__: 'wires',
@@ -295,16 +320,16 @@ export const CC2_TILESET_LAYOUT = {
         is_wired_optional: true,
     },
 
-    // TODO should explicitly set the non-moving tile, so we can have the walk tile start with
-    // immediate movement?
-    // TODO this shouldn't run at half speed, it's already designed to be one step, and when teeth
-    // move at half speed it looks clumsy
     teeth: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
+        idle_frame_index: 1,
         // NOTE: CC2 inexplicably dropped north teeth and just uses the south sprites instead
-        north: [[1, 11], [0, 11], [1, 11], [2, 11]],
-        east: [[4, 11], [3, 11], [4, 11], [5, 11]],
-        south: [[1, 11], [0, 11], [1, 11], [2, 11]],
-        west: [[7, 11], [6, 11], [7, 11], [8, 11]],
+        north: [[0, 11], [1, 11], [2, 11], [1, 11]],
+        east: [[3, 11], [4, 11], [5, 11], [4, 11]],
+        south: [[0, 11], [1, 11], [2, 11], [1, 11]],
+        west: [[6, 11], [7, 11], [8, 11], [7, 11]],
     },
     swivel_sw: [9, 11],
     swivel_nw: [10, 11],
@@ -314,6 +339,9 @@ export const CC2_TILESET_LAYOUT = {
     '#wire-tunnel': [14, 11],
     stopwatch_penalty: [15, 11],
     paramecium: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
         north: [[0, 12], [1, 12], [2, 12]],
         east: [[3, 12], [4, 12], [5, 12]],
         south: [[6, 12], [7, 12], [8, 12]],
@@ -323,7 +351,12 @@ export const CC2_TILESET_LAYOUT = {
     turtle: {
         // Turtles draw atop fake water, but don't act like water otherwise
         __special__: 'overlay',
-        overlay: [13, 12],  // TODO also 14 + 15, bobbing pseudorandomly
+        overlay: {
+            __special__: 'animated',
+            duration: 256,
+            positionally_hashed: true,
+            all: [[13, 12], [14, 12], [15, 12], [14, 12]],
+        },
         base: 'water',
     },
 
@@ -354,6 +387,10 @@ export const CC2_TILESET_LAYOUT = {
 
     // timid teeth
     teeth_timid: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
+        idle_frame_index: 1,
         // NOTE: CC2 inexplicably dropped north teeth and just uses the south sprites instead
         // NOTE: it also skimped on timid teeth frames
         north: [[1, 17], [0, 17]],
@@ -362,8 +399,16 @@ export const CC2_TILESET_LAYOUT = {
         west: [[5, 17], [4, 17]],
     },
     bowling_ball: [6, 17],
-    rolling_ball: [[6, 17], [7, 17]],
+    rolling_ball: {
+        __special__: 'animated',
+        global: false,
+        duration: 2,
+        all: [[6, 17], [7, 17]],
+    },
     tank_yellow: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 32,
         north: [[8, 17], [9, 17]],
         east: [[10, 17], [11, 17]],
         south: [[12, 17], [13, 17]],
@@ -374,24 +419,50 @@ export const CC2_TILESET_LAYOUT = {
         __special__: 'rover',
         direction: [10, 18],
         inert: [0, 18],
-        teeth: [[0, 18], [8, 18]],
+        teeth: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[0, 18], [8, 18]],
+        },
         // cw, slow
-        glider: [[0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18]],
+        glider: {
+            __special__: 'animated',
+            duration: 32,
+            all: [[0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18]],
+        },
         // ccw, fast
-        bug: [
-            [7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18],
-            [7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18],
-        ],
-        ball: [[0, 18], [4, 18]],
-        teeth_timid: [[0, 18], [9, 18]],
+        bug: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18]],
+        },
+        ball: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[0, 18], [4, 18]],
+        },
+        teeth_timid: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[0, 18], [9, 18]],
+        },
         // ccw, slow
-        fireball: [[7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18]],
+        fireball: {
+            __special__: 'animated',
+            duration: 32,
+            all: [[7, 18], [6, 18], [5, 18], [4, 18], [3, 18], [2, 18], [1, 18], [0, 18]],
+        },
         // cw, fast
-        paramecium: [
-            [0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18],
-            [0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18],
-        ],
-        walker: [[8, 18], [9, 18]],
+        paramecium: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[0, 18], [1, 18], [2, 18], [3, 18], [4, 18], [5, 18], [6, 18], [7, 18]],
+        },
+        walker: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[8, 18], [9, 18]],
+        },
     },
     xray_eye: [11, 18],
     ghost: {
@@ -403,29 +474,51 @@ export const CC2_TILESET_LAYOUT = {
 
     force_floor_n: {
         __special__: 'scroll',
+        duration: 20,
+        cc2_duration: 8,
         base: [0, 19],
         scroll_region: [0, 1],
     },
     force_floor_e: {
         __special__: 'scroll',
+        duration: 20,
+        cc2_duration: 8,
         base: [3, 19],
         scroll_region: [-1, 0],
     },
     force_floor_s: {
         __special__: 'scroll',
+        duration: 20,
+        cc2_duration: 8,
         base: [1, 20],
         scroll_region: [0, -1],
     },
     force_floor_w: {
         __special__: 'scroll',
+        duration: 20,
+        cc2_duration: 8,
         base: [2, 20],
         scroll_region: [1, 0],
     },
-    teleport_green: [[4, 19], [5, 19], [6, 19], [7, 19]],
-    teleport_yellow: [[8, 19], [9, 19], [10, 19], [11, 19]],
+    teleport_green: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 16,
+        all: [[4, 19], [5, 19], [6, 19], [7, 19]],
+    },
+    teleport_yellow: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 16,
+        all: [[8, 19], [9, 19], [10, 19], [11, 19]],
+    },
     transmogrifier: {
         __special__: 'visual-state',
-        active: [[12, 19], [13, 19], [14, 19], [15, 19]],
+        active: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[12, 19], [13, 19], [14, 19], [15, 19]],
+        },
         inactive: [12, 19],
     },
     teleport_red: {
@@ -433,13 +526,27 @@ export const CC2_TILESET_LAYOUT = {
         base: [0, 2],
         wired: {
             __special__: 'visual-state',
-            active: [[4, 20], [5, 20], [6, 20], [7, 20]],
+            active: {
+                __special__: 'animated',
+                duration: 20,
+                cc2_duration: 16,
+                all: [[4, 20], [5, 20], [6, 20], [7, 20]],
+            },
             inactive: [4, 20],
         },
     },
-    slime: [[8, 20], [9, 20], [10, 20], [11, 20], [12, 20], [13, 20], [14, 20], [15, 20]],
+    slime: {
+        __special__: 'animated',
+        duration: 60,
+        all: [[8, 20], [9, 20], [10, 20], [11, 20], [12, 20], [13, 20], [14, 20], [15, 20]],
+    },
 
-    force_floor_all: [[0, 21], [1, 21], [2, 21], [3, 21], [4, 21], [5, 21], [6, 21], [7, 21]],
+    force_floor_all: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 8,
+        all: [[0, 21], [1, 21], [2, 21], [3, 21], [4, 21], [5, 21], [6, 21], [7, 21]],
+    },
     // latches
     light_switch_off: {
         __special__: 'wires',
@@ -468,6 +575,10 @@ export const CC2_TILESET_LAYOUT = {
             west: [11, 24],
         },
         moving: {
+            __special__: 'animated',
+            global: false,
+            duration: 0.5,
+            cc2_duration: 1,
             north: [[0, 22], [1, 22], [2, 22], [3, 22], [4, 22], [5, 22], [6, 22], [7, 22]],
             east: [[8, 22], [9, 22], [10, 22], [11, 22], [12, 22], [13, 22], [14, 22], [15, 22]],
             south: [[0, 23], [1, 23], [2, 23], [3, 23], [4, 23], [5, 23], [6, 23], [7, 23]],
@@ -475,13 +586,24 @@ export const CC2_TILESET_LAYOUT = {
         },
         pushing: 'blocked',
         swimming: {
+            __special__: 'animated',
+            global: false,
+            duration: 1,
             north: [[0, 24], [1, 24]],
             east: [[2, 24], [3, 24]],
             south: [[4, 24], [5, 24]],
             west: [[6, 24], [7, 24]],
         },
-        // The classic CC2 behavior, spinning on ice
-        skating: [[0, 22], [8, 22], [0, 23], [8, 23]],
+        // The classic CC2 behavior, spinning/slipping on ice
+        skating: {
+            __special__: 'animated',
+            global: false,
+            duration: 0.5,
+            all: [
+                [0, 22], [1, 22], [2, 22], [8, 22], [9, 22], [10, 22],
+                [0, 23], [1, 23], [2, 23], [8, 23], [9, 23], [10, 23],
+            ],
+        },
         // TODO i don't know what CC2 does
         forced: {
             north: [2, 22],
@@ -506,10 +628,10 @@ export const CC2_TILESET_LAYOUT = {
         base: 'exit',
     },
     bogus_player_swimming: {
-        north: [[0, 24], [1, 24]],
-        east: [[2, 24], [3, 24]],
-        south: [[4, 24], [5, 24]],
-        west: [[6, 24], [7, 24]],
+        north: [0, 24],
+        east: [2, 24],
+        south: [4, 24],
+        west: [6, 24],
     },
     bogus_player_drowned: {
         __special__: 'overlay',
@@ -526,12 +648,12 @@ export const CC2_TILESET_LAYOUT = {
         overlay: [2, 5],  // explosion frame 3
         base: 'floor',
     },
-    water: [
-        [12, 24],
-        [13, 24],
-        [14, 24],
-        [15, 24],
-    ],
+    water: {
+        __special__: 'animated',
+        duration: 36,
+        cc2_duration: 20,
+        all: [[12, 24], [13, 24], [14, 24], [15, 24]],
+    },
 
     logic_gate: {
         __special__: 'logic-gate',
@@ -599,27 +721,42 @@ export const CC2_TILESET_LAYOUT = {
             west: [8, 28],
             east: [8, 27],
         },
-        blocked: 'pushing',
-        moving: {
-            north: [[0, 27], [1, 27], [2, 27], [3, 27], [4, 27], [5, 27], [6, 27], [7, 27]],
-            south: [[0, 28], [1, 28], [2, 28], [3, 28], [4, 28], [5, 28], [6, 28], [7, 28]],
-            west: [[8, 28], [9, 28], [10, 28], [11, 28], [12, 28], [13, 28], [14, 28], [15, 28]],
-            east: [[8, 27], [9, 27], [10, 27], [11, 27], [12, 27], [13, 27], [14, 27], [15, 27]],
-        },
-        pushing: {
+        blocked: {
             north: [8, 29],
             east: [9, 29],
             south: [10, 29],
             west: [11, 29],
         },
+        moving: {
+            __special__: 'animated',
+            global: false,
+            duration: 0.5,
+            cc2_duration: 1,
+            north: [[0, 27], [1, 27], [2, 27], [3, 27], [4, 27], [5, 27], [6, 27], [7, 27]],
+            south: [[0, 28], [1, 28], [2, 28], [3, 28], [4, 28], [5, 28], [6, 28], [7, 28]],
+            west: [[8, 28], [9, 28], [10, 28], [11, 28], [12, 28], [13, 28], [14, 28], [15, 28]],
+            east: [[8, 27], [9, 27], [10, 27], [11, 27], [12, 27], [13, 27], [14, 27], [15, 27]],
+        },
+        pushing: 'blocked',
         swimming: {
+            __special__: 'animated',
+            global: false,
+            duration: 1,
             north: [[0, 29], [1, 29]],
             east: [[2, 29], [3, 29]],
             south: [[4, 29], [5, 29]],
             west: [[6, 29], [7, 29]],
         },
-        // The classic CC2 behavior, spinning on ice
-        skating: [[0, 27], [8, 27], [0, 28], [8, 28]],
+        // The classic CC2 behavior, spinning on ice (which can never happen but)
+        skating: {
+            __special__: 'animated',
+            global: false,
+            duration: 0.5,
+            all: [
+                [0, 27], [1, 27], [2, 27], [8, 27], [9, 27], [10, 27],
+                [0, 28], [1, 28], [2, 28], [8, 28], [9, 28], [10, 28],
+            ],
+        },
         // TODO i don't know what CC2 does
         forced: {
             north: [2, 27],
@@ -637,12 +774,12 @@ export const CC2_TILESET_LAYOUT = {
         fell: [5, 39],
     },
     player2_exit: [[0, 27], [8, 27], [0, 28], [8, 28]],
-    fire: [
-        [12, 29],
-        [13, 29],
-        [14, 29],
-        [15, 29],
-    ],
+    fire: {
+        __special__: 'animated',
+        duration: 36,
+        cc2_duration: 20,
+        all: [[12, 29], [13, 29], [14, 29], [15, 29]],
+    },
 
     railroad: {
         __special__: 'railroad',
@@ -729,6 +866,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     ice_ne: [1, 11],
     ice_se: [1, 12],
     ice_sw: [1, 13],
+    // FIXME this stuff needs like reveal and whatnot
     fake_wall: [1, 14],
     fake_floor: [1, 15],
 
@@ -917,8 +1055,13 @@ export const LL_TILESET_LAYOUT = {
         hidden: [0, 2],
         revealed: [3, 2],
     },
-    // FIXME this shouldn't be visible with seeing eye (or should it not spawn at all?)
-    wall_invisible_revealed: [0, 3],
+    wall_invisible_revealed: {
+        // This is specifically /invisible/ when you have the xray glasses
+        __special__: 'perception',
+        modes: new Set(['xray']),
+        hidden: [0, 3],
+        revealed: null,
+    },
     wall_appearing: {
         __special__: 'perception',
         modes: new Set(['palette', 'editor', 'xray']),
@@ -967,12 +1110,11 @@ export const LL_TILESET_LAYOUT = {
         base: [11, 3],
         overlay: 'player2',
     },
-    exit: [
-        [12, 2],
-        [13, 2],
-        [14, 2],
-        [15, 2],
-    ],
+    exit: {
+        __special__: 'animated',
+        duration: 16,
+        all: [[12, 2], [13, 2], [14, 2], [15, 2]],
+    },
     socket: [12, 3],
 
     floor_custom_green: [0, 4],
@@ -1000,33 +1142,65 @@ export const LL_TILESET_LAYOUT = {
 
     force_floor_n: {
         __special__: 'scroll',
+        duration: 20,
+        cc2_duration: 8,
         base: [0, 8],
         scroll_region: [0, 1],
     },
     force_floor_e: {
         __special__: 'scroll',
+        duration: 20,
+        cc2_duration: 8,
         base: [3, 8],
         scroll_region: [-1, 0],
     },
     force_floor_s: {
         __special__: 'scroll',
+        duration: 20,
+        cc2_duration: 8,
         base: [1, 9],
         scroll_region: [0, -1],
     },
     force_floor_w: {
         __special__: 'scroll',
+        duration: 20,
+        cc2_duration: 8,
         base: [2, 9],
         scroll_region: [1, 0],
     },
-    water: [[4, 8], [5, 8], [6, 8], [7, 8]],
-    fire: [[4, 9], [5, 9], [6, 9], [7, 9]],
-    force_floor_all: [[0, 10], [1, 10], [2, 10], [3, 10], [4, 10], [5, 10], [6, 10], [7, 10]],
-    slime: [[0, 11], [1, 11], [2, 11], [3, 11], [4, 11], [5, 11], [6, 11], [7, 11]],
+    water: {
+        __special__: 'animated',
+        duration: 36,
+        cc2_duration: 20,
+        all: [[4, 8], [5, 8], [6, 8], [7, 8]],
+    },
+    fire: {
+        __special__: 'animated',
+        duration: 36,
+        cc2_duration: 20,
+        all: [[4, 9], [5, 9], [6, 9], [7, 9]],
+    },
+    force_floor_all: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 8,
+        all: [[0, 10], [1, 10], [2, 10], [3, 10], [4, 10], [5, 10], [6, 10], [7, 10]],
+    },
+    slime: {
+        __special__: 'animated',
+        duration: 60,
+        all: [[0, 11], [1, 11], [2, 11], [3, 11], [4, 11], [5, 11], [6, 11], [7, 11]],
+    },
 
     turtle: {
         // Turtles draw atop fake water, but don't act like water otherwise
         __special__: 'overlay',
-        overlay: [[8, 8], [9, 8], [10, 8], [9, 8]],  // TODO also 14 + 15, bobbing pseudorandomly
+        overlay: {
+            __special__: 'animated',
+            duration: 180,
+            positionally_hashed: true,
+            all: [[8, 8], [9, 8], [10, 8], [9, 8]],
+        },
         base: 'water',
     },
     ice: [12, 8],
@@ -1037,10 +1211,30 @@ export const LL_TILESET_LAYOUT = {
     ice_nw: [14, 9],
     dirt: [15, 8],
     gravel: [15, 9],
-    green_floor: [[8, 10], [9, 10], [10, 10], [11, 10]],
-    green_wall: [[8, 11], [9, 11], [10, 11], [11, 11]],
-    purple_floor: [[12, 10], [13, 10], [14, 10], [15, 10]],
-    purple_wall: [[12, 11], [13, 11], [14, 11], [15, 11]],
+    green_floor: {
+        __special__: 'animated',
+        duration: 24,
+        cc2_duration: 16,
+        all: [[8, 10], [9, 10], [10, 10], [11, 10]],
+    },
+    green_wall: {
+        __special__: 'animated',
+        duration: 24,
+        cc2_duration: 16,
+        all: [[8, 11], [9, 11], [10, 11], [11, 11]],
+    },
+    purple_floor: {
+        __special__: 'animated',
+        duration: 24,
+        cc2_duration: 16,
+        all: [[12, 10], [13, 10], [14, 10], [15, 10]],
+    },
+    purple_wall: {
+        __special__: 'animated',
+        duration: 24,
+        cc2_duration: 16,
+        all: [[12, 11], [13, 11], [14, 11], [15, 11]],
+    },
 
     // Cool movement tiles
     railroad: {
@@ -1077,7 +1271,11 @@ export const LL_TILESET_LAYOUT = {
     swivel_sw: [7, 13],
     swivel_ne: [6, 14],
     swivel_nw: [7, 14],
-    dash_floor: [[0, 15], [1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15]],
+    dash_floor: {
+        __special__: 'animated',
+        duration: 16,
+        all: [[0, 15], [1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15]],
+    },
 
     // Items
     flippers: [0, 16],
@@ -1106,31 +1304,39 @@ export const LL_TILESET_LAYOUT = {
     stopwatch_penalty: [6, 19],
     stopwatch_toggle: [7, 19],
 
-    chip: [[8, 16], [9, 16], [10, 16], [9, 16]],
+    chip: {
+        __special__: 'animated',
+        duration: 20,
+        all: [[8, 16], [9, 16], [10, 16], [9, 16]],
+    },
     chip_extra: {
         __special__: 'perception',
         modes: new Set(['palette', 'editor']),
-        hidden: [[8, 16], [9, 16], [10, 16], [9, 16]],
+        hidden: {
+            __special__: 'animated',
+            duration: 20,
+            all: [[8, 16], [9, 16], [10, 16], [9, 16]],
+        },
         revealed: [8, 19],
     },
-    green_chip: [[8, 17], [9, 17], [10, 17], [9, 17]],
+    green_chip: {
+        __special__: 'animated',
+        duration: 20,
+        all: [[8, 17], [9, 17], [10, 17], [9, 17]],
+    },
     bowling_ball: [11, 16],
     rolling_ball: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
         north: [[12, 16], [13, 16], [11, 17], [11, 17], [11, 17], [14, 16], [15, 16], [11, 16]],
         east: [[12, 17], [13, 17], [11, 17], [11, 17], [11, 17], [14, 17], [15, 17], [11, 16]],
         south: [[15, 16], [14, 16], [11, 17], [11, 17], [11, 17], [13, 16], [12, 16], [11, 16]],
         west: [[15, 17], [14, 17], [11, 17], [11, 17], [11, 17], [13, 17], [12, 17], [11, 16]],
     },
-    bomb: {
-        __special__: 'bomb-fuse',
-        bomb: [11, 18],
-        fuse: [13, 18],
-    },
-    green_bomb: {
-        __special__: 'bomb-fuse',
-        bomb: [12, 18],
-        fuse: [13, 18],
-    },
+    // LL bombs aren't animated
+    bomb: [11, 18],
+    green_bomb: [12, 18],
     dynamite: [10, 19],
     dynamite_lit: {
         __special__: 'visual-state',
@@ -1159,17 +1365,37 @@ export const LL_TILESET_LAYOUT = {
         base: [0, 2],
         wired: {
             __special__: 'visual-state',
-            active: [[4, 20], [5, 20], [6, 20], [7, 20]],
+            active: {
+                __special__: 'animated',
+                duration: 20,
+                cc2_duration: 16,
+                all: [[4, 20], [5, 20], [6, 20], [7, 20]],
+            },
             inactive: [9, 23],
         },
     },
     teleport_blue: {
         __special__: 'wires',
         base: [0, 2],
-        wired: [[4, 21], [5, 21], [6, 21], [7, 21]],
+        wired: {
+            __special__: 'animated',
+            duration: 20,
+            cc2_duration: 16,
+            all: [[4, 21], [5, 21], [6, 21], [7, 21]],
+        },
     },
-    teleport_yellow: [[4, 22], [5, 22], [6, 22], [7, 22]],
-    teleport_green: [[4, 23], [5, 23], [6, 23], [7, 23]],
+    teleport_yellow: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 16,
+        all: [[4, 22], [5, 22], [6, 22], [7, 22]],
+    },
+    teleport_green: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 16,
+        all: [[4, 23], [5, 23], [6, 23], [7, 23]],
+    },
     teleport_blue_exit: {
         __special__: 'wires',
         base: [0, 2],
@@ -1177,7 +1403,11 @@ export const LL_TILESET_LAYOUT = {
     },
     transmogrifier: {
         __special__: 'visual-state',
-        active: [[8, 20], [9, 20], [10, 20], [11, 20]],
+        active: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[8, 20], [9, 20], [10, 20], [11, 20]],
+        },
         inactive: [10, 23],
     },
     turntable_cw: {
@@ -1185,7 +1415,11 @@ export const LL_TILESET_LAYOUT = {
         base: [0, 2],
         wired: {
             __special__: 'visual-state',
-            active: [[8, 21], [9, 21], [10, 21], [11, 21]],
+            active: {
+                __special__: 'animated',
+                duration: 16,
+                all: [[8, 21], [9, 21], [10, 21], [11, 21]],
+            },
             inactive: [8, 21],
         }
     },
@@ -1194,15 +1428,29 @@ export const LL_TILESET_LAYOUT = {
         base: [0, 2],
         wired: {
             __special__: 'visual-state',
-            active: [[8, 22], [9, 22], [10, 22], [11, 22]],
+            active: {
+                __special__: 'animated',
+                duration: 16,
+                all: [[8, 22], [9, 22], [10, 22], [11, 22]],
+            },
             inactive: [8, 22],
         }
     },
     flame_jet_off: [12, 21],
-    flame_jet_on: [[13, 21], [14, 21], [15, 21]],
+    flame_jet_on: {
+        __special__: 'animated',
+        duration: 18,
+        cc2_duration: 12,
+        all: [[13, 21], [14, 21], [15, 21]],
+    },
     electrified_floor: {
         __special__: 'visual-state',
-        active: [[13, 22], [14, 22], [15, 22]],
+        active: {
+            __special__: 'animated',
+            duration: 18,
+            cc2_duration: 12,
+            all: [[13, 22], [14, 22], [15, 22]],
+        },
         inactive: [12, 22],
     },
 
@@ -1352,28 +1600,39 @@ export const LL_TILESET_LAYOUT = {
             west: [16, 3],
         },
         moving: {
+            __special__: 'animated',
+            global: false,
+            duration: 0.5,
+            cc2_duration: 1,
             north: [[16, 0], [17, 0], [18, 0], [19, 0], [20, 0], [21, 0], [22, 0], [23, 0]],
             east: [[16, 1], [17, 1], [18, 1], [19, 1], [20, 1], [21, 1], [22, 1], [23, 1]],
             south: [[16, 2], [17, 2], [18, 2], [19, 2], [20, 2], [21, 2], [22, 2], [23, 2]],
             west: [[16, 3], [17, 3], [18, 3], [19, 3], [20, 3], [21, 3], [22, 3], [23, 3]],
         },
         swimming: {
+            __special__: 'animated',
+            global: false,
+            duration: 1,
             north: [[24, 0], [25, 0]],
             east: [[24, 1], [25, 1]],
             south: [[24, 2], [25, 2]],
             west: [[24, 3], [25, 3]],
         },
         pushing: {
+            __special__: 'animated',
+            global: false,
+            duration: 0.5,
+            cc2_duration: 1,
             north: [[26, 0], [27, 0], [28, 0], [27, 0]],
             east: [[26, 1], [27, 1], [28, 1], [27, 1]],
             south: [[26, 2], [27, 2], [28, 2], [27, 2]],
             west: [[26, 3], [27, 3], [28, 3], [27, 3]],
         },
         blocked: {
-            north: [28, 0],
-            east: [28, 1],
-            south: [28, 2],
-            west: [28, 3],
+            north: [27, 0],
+            east: [27, 1],
+            south: [27, 2],
+            west: [27, 3],
         },
         skating: {
             north: [29, 0],
@@ -1402,10 +1661,10 @@ export const LL_TILESET_LAYOUT = {
         base: 'exit',
     },
     bogus_player_swimming: {
-        north: [[24, 0], [25, 0]],
-        east: [[24, 1], [25, 1]],
-        south: [[24, 2], [25, 2]],
-        west: [[24, 3], [25, 3]],
+        north: [24, 0],
+        east: [24, 1],
+        south: [24, 2],
+        west: [24, 3],
     },
     bogus_player_drowned: {
         __special__: 'overlay',
@@ -1432,28 +1691,39 @@ export const LL_TILESET_LAYOUT = {
             west: [16, 7],
         },
         moving: {
+            __special__: 'animated',
+            global: false,
+            duration: 0.5,
+            cc2_duration: 1,
             north: [[16, 4], [17, 4], [18, 4], [19, 4], [20, 4], [21, 4], [22, 4], [23, 4]],
             east: [[16, 5], [17, 5], [18, 5], [19, 5], [20, 5], [21, 5], [22, 5], [23, 5]],
             south: [[16, 6], [17, 6], [18, 6], [19, 6], [20, 6], [21, 6], [22, 6], [23, 6]],
             west: [[16, 7], [17, 7], [18, 7], [19, 7], [20, 7], [21, 7], [22, 7], [23, 7]],
         },
         swimming: {
+            __special__: 'animated',
+            global: false,
+            duration: 1,
             north: [[24, 4], [25, 4]],
             east: [[24, 5], [25, 5]],
             south: [[24, 6], [25, 6]],
             west: [[24, 7], [25, 7]],
         },
         pushing: {
+            __special__: 'animated',
+            global: false,
+            duration: 0.5,
+            cc2_duration: 1,
             north: [[26, 4], [27, 4], [28, 4], [27, 4]],
             east: [[26, 5], [27, 5], [28, 5], [27, 5]],
             south: [[26, 6], [27, 6], [28, 6], [27, 6]],
             west: [[26, 7], [27, 7], [28, 7], [27, 7]],
         },
         blocked: {
-            north: [28, 4],
-            east: [28, 5],
-            south: [28, 6],
-            west: [28, 7],
+            north: [27, 4],
+            east: [27, 5],
+            south: [27, 6],
+            west: [27, 7],
         },
         skating: {
             north: [29, 4],
@@ -1478,30 +1748,45 @@ export const LL_TILESET_LAYOUT = {
     },
 
     tank_blue: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 32,
         north: [[16, 8], [17, 8]],
         east: [[16, 9], [17, 9]],
         south: [[16, 10], [17, 10]],
         west: [[16, 11], [17, 11]],
     },
     tank_yellow: {
+        __special__: 'animated',
+        duration: 20,
+        cc2_duration: 32,
         north: [[18, 8], [19, 8]],
         east: [[18, 9], [19, 9]],
         south: [[18, 10], [19, 10]],
         west: [[18, 11], [19, 11]],
     },
     bug: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
         north: [[20, 8], [21, 8], [22, 8], [23, 8]],
         east: [[20, 9], [21, 9], [22, 9], [23, 9]],
         south: [[20, 10], [21, 10], [22, 10], [23, 10]],
         west: [[20, 11], [21, 11], [22, 11], [23, 11]],
     },
     paramecium: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
         north: [[24, 8], [25, 8], [26, 8], [25, 8]],
         east: [[24, 9], [25, 9], [26, 9], [25, 9]],
         south: [[24, 10], [25, 10], [26, 10], [25, 10]],
         west: [[24, 11], [25, 11], [26, 11], [25, 11]],
     },
     glider: {
+        __special__: 'animated',
+        duration: 10,
+        cc2_duration: 8,
         north: [[27, 8], [28, 8]],
         east: [[27, 9], [28, 9]],
         south: [[27, 10], [28, 10]],
@@ -1515,12 +1800,18 @@ export const LL_TILESET_LAYOUT = {
     },
 
     blob: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
         north: [[16, 12], [17, 12], [18, 12], [19, 12], [20, 12], [21, 12], [22, 12], [23, 12]],
         east: [[16, 13], [17, 13], [18, 13], [19, 13], [20, 13], [21, 13], [22, 13], [23, 13]],
         south: [[16, 14], [17, 14], [18, 14], [19, 14], [20, 14], [21, 14], [22, 14], [23, 14]],
         west: [[16, 15], [17, 15], [18, 15], [19, 15], [20, 15], [21, 15], [22, 15], [23, 15]],
     },
     walker: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
         north: [[24, 12], [25, 12], [26, 12], [27, 12]],
         east: [[24, 13], [25, 13], [26, 13], [27, 13]],
         // Same animations but played backwards
@@ -1528,17 +1819,21 @@ export const LL_TILESET_LAYOUT = {
         west: [[26, 13], [25, 13], [24, 13], [27, 13]],
     },
 
-    // TODO should explicitly set the non-moving tile, so we can have the walk tile start with
-    // immediate movement?
-    // TODO this shouldn't run at half speed, it's already designed to be one step, and when teeth
-    // move at half speed it looks clumsy
     teeth: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
+        idle_frame_index: 1,
         north: [[16, 16], [17, 16], [18, 16], [17, 16]],
         east: [[16, 17], [17, 17], [18, 17], [17, 17]],
         south: [[16, 18], [17, 18], [18, 18], [17, 18]],
         west: [[16, 19], [17, 19], [18, 19], [17, 19]],
     },
     teeth_timid: {
+        __special__: 'animated',
+        global: false,
+        duration: 1,
+        idle_frame_index: 1,
         north: [[19, 16], [20, 16], [21, 16], [20, 16]],
         east: [[19, 17], [20, 17], [21, 17], [20, 17]],
         south: [[19, 18], [20, 18], [21, 18], [20, 18]],
@@ -1579,31 +1874,66 @@ export const LL_TILESET_LAYOUT = {
         __special__: 'rover',
         direction: [26, 24],
         inert: [16, 24],
-        teeth: [[16, 24], [24, 24]],
+        teeth: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[16, 24], [24, 24]],
+        },
         // cw, slow
-        glider: [[16, 24], [17, 24], [18, 24], [19, 24], [20, 24], [21, 24], [22, 24], [23, 24]],
+        glider: {
+            __special__: 'animated',
+            duration: 32,
+            all: [[16, 24], [17, 24], [18, 24], [19, 24], [20, 24], [21, 24], [22, 24], [23, 24]],
+        },
         // ccw, fast
-        bug: [
-            [23, 24], [22, 24], [21, 24], [20, 24], [19, 24], [18, 24], [17, 24], [16, 24],
-            [23, 24], [22, 24], [21, 24], [20, 24], [19, 24], [18, 24], [17, 24], [16, 24],
-        ],
-        ball: [[16, 24], [20, 24]],
-        teeth_timid: [[16, 24], [25, 24]],
+        bug: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[23, 24], [22, 24], [21, 24], [20, 24], [19, 24], [18, 24], [17, 24], [16, 24]],
+        },
+        ball: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[16, 24], [20, 24]],
+        },
+        teeth_timid: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[16, 24], [25, 24]],
+        },
         // ccw, slow
-        fireball: [[23, 24], [22, 24], [21, 24], [20, 24], [19, 24], [18, 24], [17, 24], [16, 24]],
+        fireball: {
+            __special__: 'animated',
+            duration: 32,
+            all: [[23, 24], [22, 24], [21, 24], [20, 24], [19, 24], [18, 24], [17, 24], [16, 24]],
+        },
         // cw, fast
-        paramecium: [
-            [16, 24], [17, 24], [18, 24], [19, 24], [20, 24], [21, 24], [22, 24], [23, 24],
-            [16, 24], [17, 24], [18, 24], [19, 24], [20, 24], [21, 24], [22, 24], [23, 24],
-        ],
-        walker: [[24, 24], [25, 24]],
+        paramecium: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[16, 24], [17, 24], [18, 24], [19, 24], [20, 24], [21, 24], [22, 24], [23, 24]],
+        },
+        walker: {
+            __special__: 'animated',
+            duration: 16,
+            all: [[24, 24], [25, 24]],
+        },
     },
-    ball: [
+    ball: {
+        __special__: 'animated',
+        global: false,
+        duration: 0.5,
+        cc2_duration: 1,
+        idle_frame_index: 2,
         // appropriately, this animation ping-pongs
-        [27, 24], [28, 24], [29, 24], [30, 24],
-        [31, 24], [30, 24], [29, 24], [28, 24],
-    ],
-    fireball: [[16, 25], [17, 25], [18, 25], [19, 25]],
+        all: [[27, 24], [28, 24], [29, 24], [30, 24], [31, 24], [30, 24], [29, 24], [28, 24]],
+    },
+    fireball: {
+        __special__: 'animated',
+        duration: 12,
+        cc2_duration: 4,
+        all: [[16, 25], [17, 25], [18, 25], [19, 25]],
+    },
     floor_mimic: {
         __special__: 'perception',
         modes: new Set(['palette', 'editor', 'xray']),
@@ -1636,6 +1966,9 @@ export class DrawPacket {
     constructor(tic = 0, perception = 'normal') {
         this.tic = tic;
         this.perception = perception;
+        this.use_cc2_anim_speed = false;
+        // this.x
+        // this.y
 
         // Distinguishes between interpolation of 20tps and 60fps; 3 means 20tps, 1 means 60fps
         // XXX this isn't actually about update /rate/; it's about how many "frames" of cooldown
@@ -1662,7 +1995,6 @@ export class Tileset {
         this.layout = layout;
         this.size_x = size_x;
         this.size_y = size_y;
-        this.animation_slowdown = 2;
     }
 
     draw(tile, packet) {
@@ -1673,12 +2005,7 @@ export class Tileset {
     // without it you'll get defaults.
     draw_type(name, tile, packet) {
         let drawspec = this.layout[name];
-        if (drawspec === null) {
-            // This is explicitly never drawn (used for extra visual-only frills that don't exist in
-            // some tilesets)
-            return;
-        }
-        if (! drawspec) {
+        if (drawspec === undefined) {
             // This is just missing
             console.error(`Don't know how to draw tile type ${name}!`);
             return;
@@ -1698,47 +2025,93 @@ export class Tileset {
             coords = coords[(tile && tile.direction) ?? 'south'];
         }
 
-        // Deal with animation
+        // Any animation not using the 'animated' special is a dedicated animation tile (like an
+        // explosion or splash) and just plays over the course of its lifetime
         if (coords[0] instanceof Array) {
             if (tile && tile.movement_speed) {
-                // This tile reports its own animation timing (in frames), so trust that, and use
-                // the current tic's fraction.  If we're between tics, interpolate.
-                // FIXME if the game ever runs every frame we will have to adjust the interpolation
                 let p = tile.movement_progress(packet.tic % 1, packet.update_rate);
-                if (this.animation_slowdown > 1 && ! tile.type.ttl) {
-                    // The players have full walk animations, but they look very silly when squeezed
-                    // into the span of a single step, so instead we only play half at a time.  The
-                    // halves alternate, so the player still sees the whole animation when walking
-                    // continuously.  To make this work, consider: p, the current progress through
-                    // the animation, is in [0, 1).  To play the first half, we want [0, 0.5); to
-                    // play the second half, we want [0.5, 1).  Thus we add an integer in [0, 2) to
-                    // offset us into which half to play, then divide by 2 to renormalize.
-                    // Which half to use is determined by when the animation /started/, as measured
-                    // in animation lengths.
-                    let start_time = (packet.tic * 3 / tile.movement_speed) - p;
-                    // Rounding smooths out float error (assuming the framerate never exceeds 1000)
-                    let segment = Math.floor(Math.round(start_time * 1000) / 1000 % this.animation_slowdown);
-                    p = (p + segment) / this.animation_slowdown;
-                }
-                // Lexy runs cooldown from S to 1; CC2 from S-1 to 0.  0 is bad, because p becomes 1
-                // and will overflow the cel lookup
-                // FIXME handle this better!  it happens even to lexy
-                if (p >= 1) {
-                    p = 0.999;
-                }
                 coords = coords[Math.floor(p * coords.length)];
             }
-            else if (tile && tile.type.movement_speed) {
-                // This is an actor that's not moving, so use the first frame
+            else  {
                 coords = coords[0];
-            }
-            else {
-                // This tile animates on a global timer, one cycle every quarter of a second
-                coords = coords[Math.floor(packet.tic / this.animation_slowdown % 5 / 5 * coords.length)];
             }
         }
 
         packet.blit(coords[0], coords[1]);
+    }
+
+    _draw_animated(drawspec, name, tile, packet) {
+        let frames;
+        if (drawspec.all) {
+            frames = drawspec.all;
+        }
+        else if (tile && tile.direction) {
+            frames = drawspec[tile.direction];
+        }
+        else {
+            frames = drawspec.south;
+        }
+        // Shortcut: when drawing statically, skip all of this
+        if (! tile || packet.tic === 0) {
+            packet.blit(...frames[drawspec.idle_frame_index ?? 0]);
+            return;
+        }
+
+        let is_global = drawspec.global ?? true;
+        let duration = drawspec.duration;
+        if (packet.use_cc2_anim_speed && drawspec.cc2_duration) {
+            duration = drawspec.cc2_duration;
+        }
+
+        let n;
+        if (is_global) {
+            // This tile animates on a global timer, looping every 'duration' frames
+            let p = packet.tic * 3 / duration;
+            // Lilypads bob at pseudo-random.  CC2 has a much simpler approach to this, but it looks
+            // kind of bad with big patches of lilypads.  It's 202x so let's use that CPU baby
+            if (drawspec.positionally_hashed) {
+                // This is the 32-bit FNV-1a hash algorithm, if you're curious
+                let h = 0x811c9dc5;
+                h = Math.imul(h ^ packet.x, 0x01000193);
+                h = Math.imul(h ^ packet.y, 0x01000193);
+                p += (h & 63) / 64;
+            }
+            n = Math.floor(p % 1 * frames.length);
+        }
+        else if (tile && tile.movement_speed) {
+            // This tile is in motion and its animation runs 'duration' times each move.
+            let p = tile.movement_progress(packet.tic % 1, packet.update_rate);
+            duration = duration ?? 1;
+            if (duration < 1) {
+                // The 'duration' may be fractional; for example, the player's walk cycle is two
+                // steps, so its duration is 0.5 and each move plays half of the full animation.
+                // Consider: p, the current progress through the animation, is in [0, 1).  To play
+                // the first half, we want [0, 0.5); to play the second half, we want [0.5, 1).
+                // Thus we add an integer in [0, 2) to offset us into which half to play, then
+                // divide by 2 to renormalize.  Which half to use is determined by when the
+                // animation /started/, as measured in animation lengths.
+                let start_time = (packet.tic * 3 / tile.movement_speed) - p;
+                // Rounding smooths out float error (assuming the framerate never exceeds 1000)
+                let segment = Math.floor(Math.round(start_time * 1000) / 1000 % (1 / duration));
+                p = (p + segment) * duration;
+            }
+            else if (duration > 1) {
+                // Larger durations are much easier; just multiply and mod.
+                // (Note that large fractional durations like 2.5 will not work.)
+                p = p * duration % 1;
+            }
+            if (p >= 1) {
+                console.warn(name, "p =", p, "tic =", packet.tic, "duration =", duration);
+                p = 0.999;
+            }
+            n = Math.floor(p * frames.length);
+        }
+        else {
+            // This is an actor that's not moving, so use the idle frame
+            n = drawspec.idle_frame_index ?? 0;
+        }
+
+        packet.blit(...frames[n]);
     }
 
     // Simple overlaying used for green/purple toggle tiles and doppelgangers.  Draw the base (a
@@ -1762,9 +2135,12 @@ export class Tileset {
     // Scrolling region, used for force floors
     _draw_scroll(drawspec, name, tile, packet) {
         let [x, y] = drawspec.base;
-        let duration = 3 * this.animation_slowdown;
-        x += drawspec.scroll_region[0] * (packet.tic % duration / duration);
-        y += drawspec.scroll_region[1] * (packet.tic % duration / duration);
+        let duration = drawspec.duration;
+        if (packet.use_cc2_anim_speed && drawspec.cc2_duration) {
+            duration = drawspec.cc2_duration;
+        }
+        x += drawspec.scroll_region[0] * (packet.tic * 3 / duration % 1);
+        y += drawspec.scroll_region[1] * (packet.tic * 3 / duration % 1);
         // Round to pixels
         x = Math.floor(x * this.size_x + 0.5) / this.size_x;
         y = Math.floor(y * this.size_y + 0.5) / this.size_y;
@@ -1989,6 +2365,7 @@ export class Tileset {
     }
 
     _draw_double_size_monster(drawspec, name, tile, packet) {
+        // FIXME at 60fps, the first step draws slightly offset, looks funky
         // CC2's tileset has double-size art for blobs and walkers that spans the tile they're
         // moving from AND the tile they're moving into.
         // First, of course, this only happens if they're moving at all.
@@ -2148,8 +2525,15 @@ export class Tileset {
     
 
     draw_drawspec(drawspec, name, tile, packet) {
+        if (drawspec === null)
+            // This is explicitly never drawn (used for extra visual-only frills that don't exist in
+            // some tilesets)
+            return;
         if (drawspec.__special__) {
-            if (drawspec.__special__ === 'overlay') {
+            if (drawspec.__special__ === 'animated') {
+                this._draw_animated(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'overlay') {
                 this._draw_overlay(drawspec, name, tile, packet);
             }
             else if (drawspec.__special__ === 'scroll') {

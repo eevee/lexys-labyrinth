@@ -533,6 +533,8 @@ class Player extends PrimaryView {
 
         this.use_interpolation = true;
         // Default to the LL tileset for safety, but change when we load a level
+        // (Note also that this must be created in the constructor so the CC2 timing option can be
+        // applied to it)
         this.renderer = new CanvasRenderer(this.conductor.tilesets['ll']);
         this._loaded_tileset = false;
         this.level_el.append(this.renderer.canvas);
@@ -1212,6 +1214,7 @@ class Player extends PrimaryView {
         this.music_enabled = options.music_enabled ?? true;
         this.sfx_player.volume = options.sound_volume ?? 1.0;
         this.sfx_player.enabled = options.sound_enabled ?? true;
+        this.renderer.use_cc2_anim_speed = options.use_cc2_anim_speed ?? false;
 
         if (this.level) {
             this.update_tileset();
@@ -2584,6 +2587,8 @@ class OptionsOverlay extends DialogOverlay {
                 mk('label', mk('input', {name: 'sound-enabled', type: 'checkbox'}), " Enabled"),
                 mk('input', {name: 'sound-volume', type: 'range', min: 0, max: 1, step: 0.05}),
             ),
+            mk('dt'),
+            mk('dd', mk('label', mk('input', {name: 'use-cc2-anim-speed', type: 'checkbox'}), " Use CC2 animation speed")),
         );
         // Update volume live, if the player is active and was playing when this dialog was opened
         // (note that it won't auto-pause until open())
@@ -2692,6 +2697,7 @@ class OptionsOverlay extends DialogOverlay {
         this.root.elements['music-enabled'].checked = this.conductor.options.music_enabled ?? true;
         this.root.elements['sound-volume'].value = this.conductor.options.sound_volume ?? 1.0;
         this.root.elements['sound-enabled'].checked = this.conductor.options.sound_enabled ?? true;
+        this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
 
         this.root.elements['custom-tileset'].addEventListener('change', ev => {
             this._load_custom_tileset(ev.target.files[0]);
@@ -2703,6 +2709,7 @@ class OptionsOverlay extends DialogOverlay {
             options.music_enabled = this.root.elements['music-enabled'].checked;
             options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
             options.sound_enabled = this.root.elements['sound-enabled'].checked;
+            options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
 
             // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data
             // URIs, and /delete/ any custom ones we're not using any more, both of which require

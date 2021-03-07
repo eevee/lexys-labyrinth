@@ -146,9 +146,12 @@ function player_visual_state(me) {
     else if (me.exited) {
         return 'exited';
     }
-    else if (me.cell && (me.previous_cell || me.cell).has('water')) {
-        // CC2 shows a swimming pose while still in water, or moving away from water
-        // FIXME this also shows in some cases when we don't have flippers, e.g. when starting in water
+    // This is slightly complicated.  We should show a swimming pose while still in water, or moving
+    // away from water (as CC2 does), but NOT when stepping off a lilypad (which will already have
+    // been turned into water), and NOT without flippers (which can happen if we start on water)
+    else if (me.cell && (me.previous_cell || me.cell).has('water') &&
+        ! me.not_swimming && me.has_item('flippers'))
+    {
         return 'swimming';
     }
     else if (me.slide_mode === 'ice') {
@@ -833,6 +836,9 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'water');
             level.spawn_animation(me.cell, 'splash');
             level.sfx.play_once('splash', me.cell);
+            // Visual property, so the actor knows it's stepping off a lilypad, not swimming out of
+            // the water we just turned into
+            level._set_tile_prop(other, 'not_swimming', true);
         },
     },
     cracked_ice: {

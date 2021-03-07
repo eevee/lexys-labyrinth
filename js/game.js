@@ -1092,6 +1092,9 @@ export class Level extends LevelInterface {
                 if (actor.is_pulled) {
                     this._set_tile_prop(actor, 'is_pulled', false);
                 }
+                if (actor.not_swimming) {
+                    this._set_tile_prop(actor, 'not_swimming', false);
+                }
             }
 
             if (actor === this.player) {
