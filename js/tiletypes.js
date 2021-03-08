@@ -713,64 +713,34 @@ const TILE_TYPES = {
     turntable_cw: {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
-        // Not actually a teleporter, but we use the same slide type
-        teleport_allow_override: true,
-        on_begin(me, level) {
-            update_wireable(me, level);
-        },
         on_arrive(me, level, other) {
-            if (! me.is_active)
-                return;
             level.set_actor_direction(other, DIRECTIONS[other.direction].right);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'right');
             }
-            level.make_slide(other, 'teleport-forever');
+            level.make_slide(other, 'turntable');
         },
-        on_power(me, level) {
-            if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', true);
-            }
+        activate(me, level) {
+            level.transmute_tile(me, 'turntable_ccw');
         },
-        on_depower(me, level) {
-            if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', false);
-            }
-        },
-        visual_state(me) {
-            return ! me || me.is_active ? 'active' : 'inactive';
-        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     turntable_ccw: {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
-        // Not actually a teleporter, but we use the same slide type
-        teleport_allow_override: true,
-        on_begin(me, level) {
-            update_wireable(me, level);
-        },
         on_arrive(me, level, other) {
-            if (! me.is_active)
-                return;
             level.set_actor_direction(other, DIRECTIONS[other.direction].left);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'left');
             }
-            level.make_slide(other, 'teleport-forever');
+            level.make_slide(other, 'turntable');
         },
-        on_power(me, level) {
-            if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', true);
-            }
+        activate(me, level) {
+            level.transmute_tile(me, 'turntable_cw');
         },
-        on_depower(me, level) {
-            if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', false);
-            }
-        },
-        visual_state(me) {
-            return ! me || me.is_active ? 'active' : 'inactive';
-        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
 
     // Hazards
@@ -1738,7 +1708,7 @@ const TILE_TYPES = {
             }
         },
         visual_state(me) {
-            return ! me || me.is_active ? 'active' : 'inactive';
+            return me && me.is_active === false ? 'inactive' : 'active';
         },
     },
     teleport_blue: {
@@ -1876,7 +1846,7 @@ const TILE_TYPES = {
             }
         },
         visual_state(me) {
-            return ! me || me.is_active ? 'active' : 'inactive';
+            return me && me.is_active === false ? 'inactive' : 'active';
         },
     },
     teleport_green: {
@@ -2006,7 +1976,7 @@ const TILE_TYPES = {
             level.recalculate_circuitry_next_wire_phase = true;
         },
         visual_state(me) {
-            return ! me || me.is_active ? 'active' : 'inactive';
+            return me && me.is_active === false ? 'inactive' : 'active';
         },
     },
 

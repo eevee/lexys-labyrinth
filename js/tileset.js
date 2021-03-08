@@ -1274,7 +1274,7 @@ export const LL_TILESET_LAYOUT = {
     swivel_nw: [7, 14],
     dash_floor: {
         __special__: 'animated',
-        duration: 16,
+        duration: 24,
         all: [[0, 15], [1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15]],
     },
 
@@ -1415,26 +1415,20 @@ export const LL_TILESET_LAYOUT = {
         __special__: 'wires',
         base: [0, 2],
         wired: {
-            __special__: 'visual-state',
-            active: {
-                __special__: 'animated',
-                duration: 16,
-                all: [[8, 21], [9, 21], [10, 21], [11, 21]],
-            },
-            inactive: [8, 21],
+            __special__: 'animated',
+            duration: 12,
+            cc2_duration: 16,
+            all: [[8, 21], [9, 21], [10, 21], [11, 21]],
         }
     },
     turntable_ccw: {
         __special__: 'wires',
         base: [0, 2],
         wired: {
-            __special__: 'visual-state',
-            active: {
-                __special__: 'animated',
-                duration: 16,
-                all: [[8, 22], [9, 22], [10, 22], [11, 22]],
-            },
-            inactive: [8, 22],
+            __special__: 'animated',
+            duration: 12,
+            cc2_duration: 16,
+            all: [[8, 22], [9, 22], [10, 22], [11, 22]],
         }
     },
     flame_jet_off: [12, 21],

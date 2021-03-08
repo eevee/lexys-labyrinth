@@ -1159,6 +1159,10 @@ export class Level extends LevelInterface {
         if (actor.pending_push) {
             this._set_tile_prop(actor, 'pending_push', null);
         }
+        // Turntable slide wears off after a single /attempted/ move
+        if (actor.slide_mode === 'turntable') {
+            this.make_slide(actor, null);
+        }
 
         // Actor is allowed to move, so do so
         let success = this.attempt_step(actor, direction);
@@ -1719,6 +1723,12 @@ export class Level extends LevelInterface {
     }
 
     attempt_out_of_turn_step(actor, direction, frameskip = 0) {
+        if (actor.slide_mode === 'turntable') {
+            // Something is (e.g.) pushing a block that just landed on a turntable and is waiting to
+            // slide out of it.  Ignore the push direction and move in its current direction;
+            // otherwise a player will push a block straight through, then turn, which sucks
+            direction = actor.direction;
+        }
         let success = this.attempt_step(actor, direction, frameskip);
         if (success) {
             this._do_extra_cooldown(actor);
