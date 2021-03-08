@@ -1,4 +1,4 @@
-import * as fflate from './vendor/fflate.mjs';
+import * as fflate from './vendor/fflate.js';
 
 // Base class for custom errors
 export class LLError extends Error {}
