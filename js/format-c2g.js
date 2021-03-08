@@ -895,7 +895,7 @@ const TILE_ENCODING = {
         is_extension: true,
     },
     0xed: {
-        name: 'halo',
+        name: 'ankh',
         has_next: true,
         is_extension: true,
     },

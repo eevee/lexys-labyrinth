@@ -706,7 +706,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.name === 'glass_block') {
                 // FIXME need a glass shatter vfx
-                level.kill_actor(other, 'explosion');
+                level.kill_actor(other, me, 'explosion');
             }
         },
     },
@@ -770,12 +770,8 @@ const TILE_TYPES = {
                 level.transmute_tile(me, 'water');
                 level.sfx.play_once('splash', me.cell);
             }
-            else if (other.type.is_real_player) {
-                level.fail('burned', me, other);
-            }
             else {
-                level.transmute_tile(other, 'explosion');
-                level.sfx.play_once('bomb', me.cell);
+                level.kill_actor(other, me, 'explosion', 'bomb', 'burned');
             }
         },
     },
@@ -2922,8 +2918,31 @@ const TILE_TYPES = {
     skeleton_key: {
         ...COMMON_TOOL,
     },
-    halo: {
+    ankh: {
         ...COMMON_TOOL,
+        on_depart(me, level, other) {
+            let terrain = me.cell.get_terrain();
+            if (other.type.is_real_player && terrain && terrain.type.name === 'floor' &&
+                terrain.wire_directions === 0 && terrain.wire_tunnel_directions === 0)
+            {
+                if (level.ankh_tile) {
+                    level.transmute_tile(level.ankh_tile, 'floor');
+                    level.spawn_animation(level.ankh_tile, 'puff');
+                }
+                let old_tile = level.ankh_tile;
+                level.ankh_tile = terrain;
+                level._push_pending_undo(() => {
+                    level.ankh_tile = old_tile;
+                });
+                level.transmute_tile(terrain, 'floor_ankh');
+                // TODO some kinda vfx + sfx
+                level.remove_tile(me);
+            }
+        },
+    },
+    floor_ankh: {
+        layer: LAYERS.terrain,
+        blocks_collision: COLLISION.all_but_real_player,
     },
 
     // Progression
@@ -3241,6 +3260,12 @@ const TILE_TYPES = {
         ttl: 4 * 3 + 1,
     },
     fall: {
+        layer: LAYERS.vfx,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 4 * 3 + 1,
+    },
+    resurrection: {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,

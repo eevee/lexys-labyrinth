@@ -518,6 +518,7 @@ export class Level extends LevelInterface {
         let n = 0;
         let connectables = [];
         this.remaining_players = 0;
+        this.ankh_tile = null;
         // If there's exactly one yellow teleporter when the level loads, it cannot be picked up
         let yellow_teleporter_count = 0;
         this.allow_taking_yellow_teleporters = false;
@@ -2507,8 +2508,17 @@ export class Level extends LevelInterface {
         }
     }
 
-    kill_actor(actor, animation_name = null) {
+    kill_actor(actor, killer, animation_name = null, sfx = null, fail_reason = null) {
         // FIXME use this everywhere, fail when it's a player, move on_death here
+        if (actor.type.is_real_player) {
+            // FIXME move death here
+            this.fail(fail_reason, null, actor);
+            return;
+        }
+
+        if (sfx) {
+            this.sfx.play_once(sfx, actor.cell);
+        }
         if (animation_name) {
             this.transmute_tile(actor, animation_name);
         }
@@ -2521,38 +2531,39 @@ export class Level extends LevelInterface {
         if (this.state !== 'playing')
             return;
 
+        if (player === null) {
+            player = this.player;
+        }
+        
+        // FIXME move to kill_actor
+        if (player != null && this.ankh_tile && reason !== 'time') {
+            let cell = this.ankh_tile.cell;
+            let actor = cell.get_actor();
+            if (! actor) {
+                // FIXME water should still splash, etc
+                this.sfx.play_once('revive');
+
+                this._set_tile_prop(player, 'movement_cooldown', null);
+                this._set_tile_prop(player, 'movement_speed', null);
+                this.make_slide(player, null);
+                this.move_to(player, cell);
+
+                this.transmute_tile(this.ankh_tile, 'floor');
+                this.spawn_animation(cell, 'resurrection');
+                let old_tile = this.ankh_tile;
+                this.ankh_tile = null;
+                this._push_pending_undo(() => {
+                    this.ankh_tile = old_tile;
+                });
+                return;
+            }
+        }
+
         if (reason === 'time') {
             this.sfx.play_once('timeup');
         }
         else {
             this.sfx.play_once('lose');
-        }
-
-        if (player === null) {
-            player = this.player;
-        }
-        
-        if (player != null && this.take_tool_from_actor(player, 'halo')) {
-            this.sfx.play_once('revive');
-            if (reason === 'time')
-            {
-                this.pause_timer();
-            }
-            else if (killer !== null)
-            {
-                if (killer.type.is_actor || killer.type.is_item)
-                {
-                    if (killer.type.on_death) {
-                        killer.type.on_death(killer, this);
-                    }
-                    this.remove_tile(killer);
-                }
-                else //presumably terrain
-                {
-                    this.transmute_tile(killer, 'floor');
-                }
-            }
-            return;
         }
 
         this._push_pending_undo(() => {

@@ -1293,7 +1293,8 @@ export const LL_TILESET_LAYOUT = {
     xray_eye: [3, 17],
     helmet: [4, 17],
     skeleton_key: [0, 18],
-    halo: [1, 18],
+    ankh: [1, 18],
+    floor_ankh: [2, 18],
     no_sign: [6, 18],
     gift_bow: [7, 18],
     score_10: [0, 19],
@@ -1418,7 +1419,7 @@ export const LL_TILESET_LAYOUT = {
             __special__: 'animated',
             duration: 12,
             cc2_duration: 16,
-            all: [[8, 21], [9, 21], [10, 21], [11, 21]],
+            all: [[8, 22], [9, 22], [10, 22], [11, 22]],
         }
     },
     turntable_ccw: {
@@ -1428,7 +1429,7 @@ export const LL_TILESET_LAYOUT = {
             __special__: 'animated',
             duration: 12,
             cc2_duration: 16,
-            all: [[8, 22], [9, 22], [10, 22], [11, 22]],
+            all: [[8, 21], [9, 21], [10, 21], [11, 21]],
         }
     },
     flame_jet_off: [12, 21],
@@ -1978,6 +1979,7 @@ export const LL_TILESET_LAYOUT = {
     transmogrify_flash: [[24, 26], [25, 26], [26, 26], [27, 26], [28, 26], [29, 26], [30, 26], [31, 26]],
     teleport_flash: [[24, 27], [25, 27], [26, 27], [27, 27]],
     puff: [[24, 28], [25, 28], [26, 28], [27, 28]],
+    resurrection: [[23, 28], [22, 28], [21, 28], [20, 28]],
 };
 
 export const TILESET_LAYOUTS = {

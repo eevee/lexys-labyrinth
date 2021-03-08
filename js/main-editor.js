@@ -1607,7 +1607,7 @@ const EDITOR_PALETTE = [{
         'turntable_ccw',
         'teleport_blue_exit',
         'electrified_floor',
-        'halo',
+        'ankh',
         'score_5x',
         'boulder',
         'glass_block',
