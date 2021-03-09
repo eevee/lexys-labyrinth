@@ -5,7 +5,7 @@ import TILE_TYPES from './tiletypes.js';
 
 class CanvasRendererDrawPacket extends DrawPacket {
     constructor(renderer, ctx, perception, clock, update_progress, update_rate) {
-        super(perception, clock, update_progress, update_rate);
+        super(perception, renderer.hide_logic, clock, update_progress, update_rate);
         this.renderer = renderer;
         this.ctx = ctx;
         // Canvas position of the cell being drawn
@@ -62,6 +62,7 @@ export class CanvasRenderer {
         this.show_actor_order = false;
         this.use_rewind_effect = false;
         this.perception = 'normal';  // normal, xray, editor, palette
+        this.hide_logic = false;
         this.update_rate = 3;
         this.use_cc2_anim_speed = false;
         this.active_player = null;

@@ -1130,11 +1130,11 @@ export function parse_level(buf, number = 1) {
 
             if (view.byteLength <= 22)
                 continue;
-            //options.hide_logic = view.getUint8(22, true);
+            level.hide_logic = !! view.getUint8(22, true);
 
             if (view.byteLength <= 23)
                 continue;
-            level.use_cc1_boots = view.getUint8(23, true);
+            level.use_cc1_boots = !! view.getUint8(23, true);
 
             if (view.byteLength <= 24)
                 continue;
@@ -1482,17 +1482,32 @@ export function synthesize_level(stored_level) {
     }
 
     // Options block
-    let options = new Uint8Array(3);
+    let options = new Uint8Array(25);  // max possible size
+    let options_length = 0;
     new DataView(options.buffer).setUint16(0, stored_level.time_limit, true);
     if (stored_level.viewport_size === 10) {
         options[2] = 0;
     }
     else if (stored_level.viewport_size === 9) {
         options[2] = 1;
+        options_length = 3;
+    }
+    if (stored_level.hide_logic) {
+        options[22] = 1;
+        options_length = 23;
+    }
+    if (stored_level.use_cc1_boots) {
+        options[23] = 1;
+        options_length = 24;
+    }
+    if (stored_level.blob_behavior !== 0) {
+        options[24] = stored_level.blob_behavior;
+        options_length = 25;
     }
     // TODO split
-    // TODO for size purposes, omit the block entirely if all options are defaults?
-    c2m.add_section('OPTN', options);
+    if (options_length > 0) {
+        c2m.add_section('OPTN', options.slice(0, options_length));
+    }
 
     // Store camera regions
     // TODO LL feature, should be distinguished somehow

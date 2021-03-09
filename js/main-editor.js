@@ -141,17 +141,24 @@ class EditorLevelMetaOverlay extends DialogOverlay {
                 mk('br'),
                 mk('label',
                     mk('input', {name: 'blob_behavior', type: 'radio', value: '1'}),
-                    " 4 patterns (default; PRNG + rotating offset)"),
+                    " 4 patterns (CC2 default; PRNG + rotating offset)"),
                 mk('br'),
                 mk('label',
                     mk('input', {name: 'blob_behavior', type: 'radio', value: '2'}),
-                    " Extra random (initial seed is truly random)"),
+                    " Extra random (LL default; initial seed is truly random)"),
             ),
+            mk('dt', "Options"),
+            mk('dd', mk('label',
+                mk('input', {name: 'hide_logic', type: 'checkbox'}),
+                " Hide wires and logic gates (warning: CC2 also hides pink/black buttons!)")),
+            mk('dd', mk('label',
+                mk('input', {name: 'use_cc1_boots', type: 'checkbox'}),
+                " Use CC1-style inventory (can only pick up the four classic boots; can't drop or cycle)")),
         );
         this.root.elements['viewport'].value = stored_level.viewport_size;
-        // FIXME this isn't actually saved lol but also it's 24 bytes into the damn options.  also
-        // it should default to 2, the good one
         this.root.elements['blob_behavior'].value = stored_level.blob_behavior;
+        this.root.elements['hide_logic'].checked = stored_level.hide_logic;
+        this.root.elements['use_cc1_boots'].checked = stored_level.use_cc1_boots;
         // TODO:
         // - chips?
         // - password???
@@ -183,6 +190,8 @@ class EditorLevelMetaOverlay extends DialogOverlay {
             }
 
             stored_level.blob_behavior = parseInt(els.blob_behavior.value, 10);
+            stored_level.hide_logic = els.hide_logic.checked;
+            stored_level.use_cc1_boots = els.use_cc1_boots.checked;
             stored_level.viewport_size = parseInt(els.viewport.value, 10);
             this.conductor.player.update_viewport_size();
 
@@ -3212,6 +3221,7 @@ export class Editor extends PrimaryView {
         stored_level.size_x = size_x;
         stored_level.size_y = size_y;
         stored_level.viewport_size = 10;
+        stored_level.blob_behavior = 2;  // extra random
         for (let i = 0; i < size_x * size_y; i++) {
             stored_level.linear_cells.push(this.make_blank_cell(...stored_level.scalar_to_coords(i)));
         }

@@ -1994,8 +1994,9 @@ export const TILESET_LAYOUTS = {
 
 // Bundle of arguments for drawing a tile, containing some standard state about the game
 export class DrawPacket {
-    constructor(perception = 'normal', clock = 0, update_progress = 0, update_rate = 3) {
+    constructor(perception = 'normal', hide_logic = false, clock = 0, update_progress = 0, update_rate = 3) {
         this.perception = perception;
+        this.hide_logic = hide_logic && perception === 'normal';
         this.use_cc2_anim_speed = false;
         this.clock = clock;
         this.update_progress = update_progress;
@@ -2177,7 +2178,7 @@ export class Tileset {
         let wire_radius = this.layout['#wire-width'] / 2;
         // TODO circuit block with a lightning bolt is always powered
         // TODO circuit block in motion doesn't inherit cell's power
-        if (tile && tile.wire_directions) {
+        if (tile && tile.wire_directions && ! packet.hide_logic) {
             // Draw the base tile
             packet.blit(drawspec.base[0], drawspec.base[1]);
 
@@ -2210,9 +2211,8 @@ export class Tileset {
             }
         }
 
-
         // Wired tiles may also have tunnels, drawn on top of everything else
-        if (tile && tile.wire_tunnel_directions) {
+        if (tile && tile.wire_tunnel_directions && ! packet.hide_logic) {
             let tunnel_coords = this.layout['#wire-tunnel'];
             let tunnel_width = 6/32;
             let tunnel_length = 12/32;
@@ -2602,7 +2602,12 @@ export class Tileset {
                 }
             }
             else if (drawspec.__special__ === 'logic-gate') {
-                this._draw_logic_gate(drawspec, name, tile, packet);
+                if (packet.hide_logic) {
+                    this.draw_type('floor', tile, packet);
+                }
+                else {
+                    this._draw_logic_gate(drawspec, name, tile, packet);
+                }
             }
             else if (drawspec.__special__ === 'railroad') {
                 this._draw_railroad(drawspec, name, tile, packet);

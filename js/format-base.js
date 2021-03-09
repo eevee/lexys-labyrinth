@@ -113,6 +113,7 @@ export class StoredLevel extends LevelInterface {
         // 1 - 4 patterns (default; PRNG + rotating through 0-3)
         // 2 - extra random (like deterministic, but initial seed is "actually" random)
         this.blob_behavior = 1;
+        this.hide_logic = false;
 
         // Lazy-loading that allows for checking existence (see methods below)
         // TODO this needs a better interface, these get accessed too much atm

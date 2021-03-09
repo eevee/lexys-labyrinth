@@ -1334,6 +1334,8 @@ class Player extends PrimaryView {
         // (This happens here because we could technically still do 20tps if we wanted, and the
         // renderer doesn't actually have any way to know that)
         this.renderer.update_rate = this.level.update_rate;
+        // Likewise, we don't want this automatically read from the level, but we do respect it here
+        this.renderer.hide_logic = this.level.stored_level.hide_logic;
 
         this.update_ui();
         // Force a redraw, which won't happen on its own since the game isn't running
