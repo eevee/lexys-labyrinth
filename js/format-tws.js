@@ -1,4 +1,4 @@
-import { INPUT_BITS } from './defs.js';
+import { DIRECTIONS, INPUT_BITS } from './defs.js';
 import * as format_base from './format-base.js';
 
 
@@ -65,12 +65,16 @@ export function parse_solutions(bytes) {
         else {
             // Long record
             let number = view.getUint16(p, true);
-            // Password is 2–5 but we don't care
-            let flags = bytes[p + 6];
+            // 2-5: password, don't care
+            // 6: flags, always zero
             let initial_state = bytes[p + 7];
             let step_parity = initial_state >> 3;
             let initial_rff = ['north', 'west', 'south', 'east'][initial_state & 0x7];
-            let initial_rng = view.getUint32(p + 8, true);  // FIXME how is this four bytes??  lynx rng doesn't even have four bytes of STATE
+            // In CC2 replays, the initial RFF direction is the one you'll actually start with;
+            // however, in Lynx, the direction is rotated BEFORE it takes effect, so to compensate
+            // we have to rotate this once ahead of time
+            initial_rff = DIRECTIONS[initial_rff].right;
+            let initial_rng = view.getUint32(p + 8, true);
             let total_duration = view.getUint32(p + 12, true);
 
             // TODO split this off though
