@@ -2738,13 +2738,6 @@ const TILE_TYPES = {
                         if (! tile)
                             continue;
 
-                        // Canopy protects everything else
-                        if (tile.type.name === 'canopy') {
-                            actor = null;
-                            terrain = null;
-                            break;
-                        }
-
                         // Terrain is transmuted afterwards; VFX are left alone; actors are killed
                         // after the loop (which also allows the glass block to safely drop an item)
                         if (tile.type.layer === LAYERS.terrain ||
@@ -2757,6 +2750,13 @@ const TILE_TYPES = {
                         // Anything else is destroyed
                         level.remove_tile(tile);
                         removed_anything = true;
+
+                        // Canopy protects everything else
+                        if (tile.type.name === 'canopy') {
+                            actor = null;
+                            terrain = null;
+                            break;
+                        }
                     }
 
                     if (actor) {
