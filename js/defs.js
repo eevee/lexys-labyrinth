@@ -190,6 +190,10 @@ export const COMPAT_FLAGS = [
     label: "Mines under players explode at level start",
     rulesets: new Set(['steam', 'steam-strict']),
 }, {
+    key: 'cloned_bowling_balls_can_be_lost',
+    label: "Bowling balls on cloners are destroyed when fired at point blank",
+    rulesets: new Set(['steam-strict']),
+}, {
     key: 'monsters_ignore_keys',
     label: "Monsters completely ignore keys",
     rulesets: new Set(['ms']),
