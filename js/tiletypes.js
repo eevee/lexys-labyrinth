@@ -407,13 +407,22 @@ const TILE_TYPES = {
     fake_floor: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        reveal(me, level, other) {
+            level.spawn_animation(me.cell, 'puff');
+            level.transmute_tile(me, 'floor');
+            if (other === level.player) {
+                level.sfx.play_once('fake-floor', me.cell);
+            }
+        },
         on_bumped(me, level, other) {
-            if (other.type.can_reveal_walls) {
-                level.spawn_animation(me.cell, 'puff');
-                level.transmute_tile(me, 'floor');
-                if (other === level.player) {
-                    level.sfx.play_once('fake-floor', me.cell);
-                }
+            if (other.type.can_reveal_walls && ! level.compat.blue_floors_vanish_on_arrive) {
+                this.reveal(me, level, other);
+            }
+        },
+        on_arrive(me, level, other) {
+            // In Lynx, these disappear only when you step on them
+            if (level.compat.blue_floors_vanish_on_arrive) {
+                this.reveal(me, level, other);
             }
         },
     },
@@ -1465,8 +1474,8 @@ const TILE_TYPES = {
         on_ready(me, level) {
             me.arrows = me.arrows ?? 0;
         },
-        traps(me, actor) {
-            return ! actor._clone_release;
+        traps(me, level, other) {
+            return ! other._clone_release;
         },
         activate(me, level, aggressive = false) {
             let actor = me.cell.get_actor();
@@ -1532,10 +1541,9 @@ const TILE_TYPES = {
             }
         },
         on_arrive(me, level, other) {
-            // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible,
-            // and also do it slightly faster
+            // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
             if (level.compat.traps_like_lynx) {
-                level.attempt_out_of_turn_step(other, other.direction, 3);
+                level.attempt_out_of_turn_step(other, other.direction);
             }
         },
         add_press_ready(me, level, other) {
@@ -1544,17 +1552,13 @@ const TILE_TYPES = {
         },
         add_press(me, level, is_wire = false) {
             level._set_tile_prop(me, 'presses', me.presses + 1);
-            // TODO weird cc2 case that may or may not be a bug: actors aren't ejected if the trap
-            // opened because of wiring
             if (me.presses === 1 && ! is_wire) {
                 // Free any actor on us, if we went from 0 to 1 presses (i.e. closed to open)
                 let actor = me.cell.get_actor();
                 if (actor) {
                     // Forcibly move anything released from a trap, which keeps it in sync with
                     // whatever pushed the button
-                    level.attempt_out_of_turn_step(
-                        actor, actor.direction,
-                        level.compat.traps_like_lynx ? 3 : 0);
+                    level.attempt_out_of_turn_step(actor, actor.direction);
                 }
             }
         },
@@ -1565,8 +1569,19 @@ const TILE_TYPES = {
             }
         },
         // FIXME also doesn't trap ghosts, is that a special case???
-        traps(me, actor) {
-            return ! me.presses && ! me._initially_open && actor.type.name !== 'ghost';
+        traps(me, level, other) {
+            if (level.compat.traps_like_lynx) {
+                // Lynx traps don't actually track open vs closed; actors are just ejected by force
+                // by a separate pass at the end of the tic that checks what's on a brown button.
+                // That means a trap held open by a button at level start won't effectively be open
+                // if whatever's on the button moves within the first tic, a quirk that CCLXP2 #17
+                // Double Trouble critically relies on!
+                // To fix this, assume that a trap can never be released on the first turn.
+                // FIXME that's not right since a block or immobile mob might be on a button...
+                if (level.tic_counter === 0)
+                    return true;
+            }
+            return ! me.presses && ! me._initially_open && other.type.name !== 'ghost';
         },
         on_power(me, level) {
             // Treat being powered or not as an extra kind of brown button press

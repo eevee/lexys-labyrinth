@@ -134,7 +134,7 @@ export class Tile {
         return false;
     }
 
-    can_push(tile, direction) {
+    can_push(tile, direction, level) {
         // This tile already has a push queued, sorry
         if (tile.pending_push)
             return false;
@@ -158,7 +158,7 @@ export class Tile {
         // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
         // which would fail, but it would still change the block's direction
         // XXX this expects to take a level but it only matters with push_mode === 'push'
-        return tile.cell.try_leaving(tile, direction);
+        return tile.cell.try_leaving(tile, direction, level);
     }
 
     can_pull(tile, direction) {
@@ -261,7 +261,7 @@ export class Cell extends Array {
         if (thin_walls && thin_walls.type.blocks_leaving && thin_walls.type.blocks_leaving(thin_walls, actor, direction)) {
             blocker = thin_walls;
         }
-        else if (terrain.type.traps && terrain.type.traps(terrain, actor)) {
+        else if (terrain.type.traps && terrain.type.traps(terrain, level, actor)) {
             blocker = terrain;
         }
         else if (terrain.type.blocks_leaving && terrain.type.blocks_leaving(terrain, actor, direction)) {
@@ -302,6 +302,7 @@ export class Cell extends Array {
         // It seems the order is thus: canopy + thin wall; terrain; actor; item.  Which is the usual
         // ordering from the top down, except that terrain is checked before actors.  Really, the
         // ordering is from "outermost" to "innermost", which makes physical sense.
+        let still_blocked = false;
         for (let layer of [
             LAYERS.canopy, LAYERS.thin_wall, LAYERS.terrain, LAYERS.swivel,
             LAYERS.actor, LAYERS.item_mod, LAYERS.item])
@@ -310,6 +311,7 @@ export class Cell extends Array {
             if (! tile)
                 continue;
 
+            let original_name = tile.type.name;
             // TODO check ignores here?
             if (tile.type.on_bumped) {
                 tile.type.on_bumped(tile, level, actor);
@@ -325,7 +327,7 @@ export class Cell extends Array {
             if (push_mode === null)
                 return false;
 
-            if (actor.can_push(tile, direction) || (
+            if (actor.can_push(tile, direction, level) || (
                 level.compat.tanks_teeth_push_ice_blocks && tile.type.name === 'ice_block' &&
                 (actor.type.name === 'teeth' || actor.type.name === 'teeth_timid' || actor.type.name === 'tank_blue')
             )) {
@@ -337,6 +339,13 @@ export class Cell extends Array {
                 if (push_mode === 'push') {
                     if (actor.type.on_blocked) {
                         actor.type.on_blocked(actor, level, direction, tile);
+                    }
+                    // Lynx (or at least TW?) allows pushing blocks off of particular wall types
+                    if (level.compat.allow_pushing_blocks_off_faux_walls &&
+                        ['fake_wall', 'wall_invisible', 'wall_appearing'].includes(original_name))
+                    {
+                        still_blocked = true;
+                        continue;
                     }
                 }
                 return false;
@@ -417,7 +426,7 @@ export class Cell extends Array {
                 return false;
         }
 
-        return true;
+        return ! still_blocked;
     }
 
     // Special railroad ability: change the direction we attempt to leave
@@ -1271,6 +1280,14 @@ export class Level extends LevelInterface {
                 terrain.type.on_stand(terrain, this, actor);
             }
         }
+        // Lynx gives everything in an open trap an extra cooldown, which makes things walk into
+        // open traps at double speed and does weird things to the ejection timing
+        if (this.compat.traps_like_lynx) {
+            let terrain = actor.cell.get_terrain();
+            if (terrain && terrain.type.name === 'trap' && terrain.presses > 0) {
+                this._do_extra_cooldown(actor);
+            }
+        }
         if (actor.just_stepped_on_teleporter) {
             this.attempt_teleport(actor);
         }
@@ -1336,25 +1353,27 @@ export class Level extends LevelInterface {
         }
 
         // Strip out any destroyed actors from the acting order
-        if (! this.compat.reuse_actor_slots) {
-            // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
-            // necessary, either; maybe only do it every few tics?
-            let p = 0;
-            for (let i = 0, l = this.actors.length; i < l; i++) {
-                let actor = this.actors[i];
-                if (actor.cell) {
-                    if (p !== i) {
-                        this.actors[p] = actor;
-                    }
-                    p++;
+        // FIXME this is O(n), where n is /usually/ small, but i still don't love it.  not strictly
+        // necessary, either; maybe only do it every few tics?
+        let p = 0;
+        for (let i = 0, l = this.actors.length; i < l; i++) {
+            let actor = this.actors[i];
+            if (actor.cell || (
+                // Don't strip out actors under Lynx, where slots were reused -- unless they're VFX,
+                // which aren't in the original game and thus are exempt
+                this.compat.reuse_actor_slots && actor.type.layer !== LAYERS.vfx))
+            {
+                if (p !== i) {
+                    this.actors[p] = actor;
                 }
-                else {
-                    let local_p = p;
-                    this._push_pending_undo(() => this.actors.splice(local_p, 0, actor));
-                }
+                p++;
             }
-            this.actors.length = p;
+            else {
+                let local_p = p;
+                this._push_pending_undo(() => this.actors.splice(local_p, 0, actor));
+            }
         }
+        this.actors.length = p;
 
         // Advance the clock
         // TODO i suspect cc2 does this at the beginning of the tic, but even if you've won?  if you
@@ -1574,7 +1593,7 @@ export class Level extends LevelInterface {
         }
         if (forced_only)
             return;
-        if (terrain.type.traps && terrain.type.traps(terrain, actor)) {
+        if (terrain.type.traps && terrain.type.traps(terrain, this, actor)) {
             // An actor in a cloner or a closed trap can't turn
             // TODO because of this, if a tank is trapped when a blue button is pressed, then
             // when released, it will make one move out of the trap and /then/ turn around and
@@ -1665,9 +1684,7 @@ export class Level extends LevelInterface {
 
     // Try to move the given actor one tile in the given direction and update their cooldown.
     // Return true if successful.
-    // ('frameskip' is an absolute number of frames subtracted from the normal speed, only used for
-    // Lynx's odd trap ejection behavior.)
-    attempt_step(actor, direction, frameskip = 0) {
+    attempt_step(actor, direction) {
         // In mid-movement, we can't even change direction!
         if (actor.movement_cooldown > 0)
             return false;
@@ -1713,7 +1730,7 @@ export class Level extends LevelInterface {
 
         let orig_cell = actor.cell;
         this._set_tile_prop(actor, 'previous_cell', orig_cell);
-        let duration = Math.max(3, speed * 3 - frameskip);
+        let duration = speed * 3;
         this._set_tile_prop(actor, 'movement_cooldown', duration);
         this._set_tile_prop(actor, 'movement_speed', duration);
         this.move_to(actor, goal_cell);
@@ -1739,14 +1756,14 @@ export class Level extends LevelInterface {
         return true;
     }
 
-    attempt_out_of_turn_step(actor, direction, frameskip = 0) {
+    attempt_out_of_turn_step(actor, direction) {
         if (actor.slide_mode === 'turntable') {
             // Something is (e.g.) pushing a block that just landed on a turntable and is waiting to
             // slide out of it.  Ignore the push direction and move in its current direction;
             // otherwise a player will push a block straight through, then turn, which sucks
             direction = actor.direction;
         }
-        let success = this.attempt_step(actor, direction, frameskip);
+        let success = this.attempt_step(actor, direction);
         if (success) {
             this._do_extra_cooldown(actor);
         }
@@ -2653,8 +2670,9 @@ export class Level extends LevelInterface {
     }
 
     add_actor(actor) {
-        if (this.compat.reuse_actor_slots) {
-            // Place the new actor in the first slot taken up by a nonexistent one
+        if (this.compat.reuse_actor_slots && actor.type.layer !== LAYERS.vfx) {
+            // Place the new actor in the first slot taken up by a nonexistent one, but not VFX
+            // which aren't supposed to impact gameplay
             for (let i = 0, l = this.actors.length; i < l; i++) {
                 let old_actor = this.actors[i];
                 if (old_actor !== this.player && ! old_actor.cell) {
@@ -2677,9 +2695,12 @@ export class Level extends LevelInterface {
         let duration = tile.type.ttl;
         if (this.compat.force_lynx_animation_lengths) {
             // Lynx animation duration is 12 tics, but it drops one if necessary to make the
-            // animation end on an even tic (???) and that takes step parity into account
-            // because I guess it uses the global clock (?????????????????)
-            duration = (12 - (this.tic_counter + this.step_parity) % 1) * 3;
+            // animation end on an odd tic (???) and that takes step parity into account
+            // because I guess it uses the global clock (?????????????????).  Also, unlike CC2, Lynx
+            // animations are removed once their cooldown goes BELOW zero, so to simulate that we
+            // make the animation one tic longer.
+            // XXX wait am i sure that cc2 doesn't work that way too?
+            duration = (12 + (this.tic_counter + this.step_parity) % 2) * 3;
         }
         this._set_tile_prop(tile, 'movement_speed', duration);
         this._set_tile_prop(tile, 'movement_cooldown', duration);
