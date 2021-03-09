@@ -597,7 +597,20 @@ class Player extends PrimaryView {
                             this.set_state('paused');
                         }
                     }
-                    this.advance_by(1, true, ev.altKey && this.level.compat.emulate_60fps);
+                    if (this.level.update_rate === 1) {
+                        if (ev.altKey) {
+                            // Advance one frame
+                            this.advance_by(1, true, true);
+                        }
+                        else {
+                            // Advance until the next decision frame, when frame_offset === 2
+                            this.advance_by((5 - this.level.frame_offset) % 3 || 3, true, true);
+                        }
+                    }
+                    else {
+                        // Advance one tic
+                        this.advance_by(1, true);
+                    }
                     this._redraw();
                 }
                 return;
@@ -1317,6 +1330,11 @@ class Player extends PrimaryView {
             this.debug.replay_recording = false;
         }
 
+        // We promise we're updating at 60fps if the level supports it, so tell the renderer
+        // (This happens here because we could technically still do 20tps if we wanted, and the
+        // renderer doesn't actually have any way to know that)
+        this.renderer.update_rate = this.level.update_rate;
+
         this.update_ui();
         // Force a redraw, which won't happen on its own since the game isn't running
         this._redraw();
@@ -1445,7 +1463,7 @@ class Player extends PrimaryView {
         // tracking fractional updates, but asking to run at 10× and only getting 2× would suck)
         let num_advances = 1;
         let dt = 1000 / (TICS_PER_SECOND * this.play_speed);
-        let use_frames = this.level.compat.emulate_60fps && this.state === 'playing';
+        let use_frames = this.state === 'playing' && this.level.update_rate === 1;
         if (use_frames) {
             dt /= 3;
         }
@@ -1484,42 +1502,37 @@ class Player extends PrimaryView {
         this.level.undo();
     }
 
-    _max_tic_offset() {
-        return this.level.compat.emulate_60fps ? 0.333 : 0.999;
-    }
-
     // Redraws every frame, unless the game isn't running
     redraw() {
-        // TODO this is not gonna be right while pausing lol
-        // TODO i'm not sure it'll be right when rewinding either
-        // TODO or if the game's speed changes.  wow!
-        let tic_offset;
-        let max = this._max_tic_offset();
+        let update_progress;
         if (this.turn_based_mode_waiting || ! this.use_interpolation) {
             // We're dawdling between tics, so nothing is actually animating, but the clock hasn't
             // advanced yet; pretend whatever's currently animating has finished
-            // FIXME this creates bizarre side effects like actors making a huge first step when
-            // stepping forwards one tic at a time, but without it you get force floors animating
-            // and then abruptly reversing in turn-based mode (maybe we should just not interpolate
-            // at all in that case??)
-            tic_offset = max;
+            update_progress = 1;
         }
         else {
-            // Note that, conveniently, when running at 60 FPS this ranges from 0 to 1/3, so nothing
-            // actually needs to change
-            tic_offset = Math.min(max, (performance.now() - this.last_advance) / 1000 * TICS_PER_SECOND * this.play_speed);
+            // Figure out how far we are between the last game update and the next one, so the
+            // renderer can interpolate appropriately.
+            let now = performance.now();
+            let elapsed = (performance.now() - this.last_advance) / 1000;
+            let speed = this.play_speed;
             if (this.state === 'rewinding') {
-                tic_offset = max - tic_offset;
+                speed *= 2;
+            }
+            update_progress = elapsed * TICS_PER_SECOND * (3 / this.level.update_rate) * speed;
+            update_progress = Math.min(1, update_progress);
+            if (this.state === 'rewinding') {
+                update_progress = 1 - update_progress;
             }
         }
 
-        this._redraw(tic_offset);
+        this._redraw(update_progress);
 
         // Check for a stopped game *after* drawing, so that when the game ends, we still animate
         // its final tic before stopping the draw loop
         // TODO stop redrawing when waiting on turn-based mode?  but then, when is it restarted
         if (this.state === 'playing' || this.state === 'rewinding' ||
-            (this.state === 'stopped' && tic_offset < 0.99))
+            (this.state === 'stopped' && update_progress < 0.99))
         {
             this._redraw_handle = requestAnimationFrame(this._redraw_bound);
         }
@@ -1530,18 +1543,19 @@ class Player extends PrimaryView {
 
     // Actually redraw.  Used to force drawing outside of normal play, in which case we don't
     // interpolate (because we're probably paused)
-    _redraw(tic_offset = null) {
-        if (tic_offset === null) {
+    _redraw(update_progress = null) {
+        if (update_progress === null) {
             // Default to drawing the "end" state of the tic when we're paused; the renderer
             // interpolates backwards, so this will show the actual state of the game
             if (this.state === 'paused') {
-                tic_offset = this._max_tic_offset();
+                update_progress = 1;
             }
             else {
-                tic_offset = 0;
+                update_progress = 0;
             }
         }
-        this.renderer.draw(tic_offset);
+        // Never try to draw past the next actual update
+        this.renderer.draw(Math.min(0.999, update_progress));
     }
 
     render_inventory_tile(name) {

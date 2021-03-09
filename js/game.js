@@ -32,21 +32,20 @@ export class Tile {
         return Object.assign(tile, tile_template);
     }
 
-    movement_progress(tic_offset, interpolate_backwards_by = 3) {
-        // FIXME this will need altering if 60fps actually updates at 60fps
-        return ((this.movement_speed - this.movement_cooldown - interpolate_backwards_by) + tic_offset * 3) / this.movement_speed;
+    movement_progress(update_progress, update_rate) {
+        return (this.movement_speed - this.movement_cooldown + update_rate * (update_progress - 1)) / this.movement_speed;
     }
 
     // Gives the effective position of an actor in motion, given smooth scrolling
-    visual_position(tic_offset = 0, interpolate_backwards_by = 0) {
+    visual_position(update_progress = 0, update_rate = 0) {
         if (! this.previous_cell || this.movement_speed === null) {
             return [this.cell.x, this.cell.y];
         }
 
         let cell = this.destination_cell ?? this.cell;
-        // For a movement speed of N, the cooldown is set to N during the tic an actor starts
-        // moving, and we interpolate it from there to N - 1 over the course of the duration
-        let p = this.movement_progress(tic_offset, interpolate_backwards_by);
+        // For a movement speed of N, the cooldown is set to N - R at the end of the frame/tic an
+        // actor starts moving, and we interpolate it from N to that
+        let p = this.movement_progress(update_progress, update_rate);
         return [
             (1 - p) * this.previous_cell.x + p * cell.x,
             (1 - p) * this.previous_cell.y + p * cell.y,
@@ -443,6 +442,15 @@ export class Level extends LevelInterface {
         super();
         this.stored_level = stored_level;
         this.restart(compat);
+    }
+
+    get update_rate() {
+        if (this.compat.use_lynx_loop && this.compat.emulate_60fps) {
+            return 1;
+        }
+        else {
+            return 3;
+        }
     }
 
     restart(compat) {
@@ -882,6 +890,14 @@ export class Level extends LevelInterface {
     advance_tic(p1_input) {
         if (this.state !== 'playing') {
             console.warn(`Attempting to advance game when state is ${this.state}`);
+            return;
+        }
+
+        // If someone is mixing tics and frames, run in frames until the end of the tic
+        if (this.frame_offset > 0) {
+            for (let i = this.frame_offset; i < 3; i++) {
+                this.advance_frame(p1_input);
+            }
             return;
         }
 

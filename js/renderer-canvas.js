@@ -4,8 +4,8 @@ import { DrawPacket } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 
 class CanvasRendererDrawPacket extends DrawPacket {
-    constructor(renderer, ctx, tic, perception) {
-        super(tic, perception);
+    constructor(renderer, ctx, perception, clock, update_progress, update_rate) {
+        super(perception, clock, update_progress, update_rate);
         this.renderer = renderer;
         this.ctx = ctx;
         // Canvas position of the cell being drawn
@@ -62,6 +62,7 @@ export class CanvasRenderer {
         this.show_actor_order = false;
         this.use_rewind_effect = false;
         this.perception = 'normal';  // normal, xray, editor, palette
+        this.update_rate = 3;
         this.use_cc2_anim_speed = false;
         this.active_player = null;
     }
@@ -140,7 +141,7 @@ export class CanvasRenderer {
         this.canvas.style.setProperty('--tile-height', `${this.tileset.size_y}px`);
     }
 
-    draw(tic_offset = 0) {
+    draw(update_progress = 0) {
         if (! this.level) {
             console.warn("CanvasRenderer.draw: No level to render");
             return;
@@ -148,9 +149,12 @@ export class CanvasRenderer {
 
         this._adjust_viewport_if_dirty();
 
-        let tic = (this.level.tic_counter ?? 0) + tic_offset;
-        let packet = new CanvasRendererDrawPacket(this, this.ctx, tic, this.perception);
-        packet.update_rate = this.level.compat.emulate_60fps ? 1 : 3;
+        // Compute the effective current time.  Note that this might come out negative before the
+        // game starts, because we're trying to interpolate backwards from 0, hence the Math.max()
+        let clock = (this.level.tic_counter ?? 0) + (
+            (this.level.frame_offset ?? 0) + (update_progress - 1) * this.update_rate) / 3;
+        let packet = new CanvasRendererDrawPacket(
+            this, this.ctx, this.perception, Math.max(0, clock), update_progress, this.update_rate);
 
         let tw = this.tileset.size_x;
         let th = this.tileset.size_y;
@@ -160,7 +164,7 @@ export class CanvasRenderer {
         // TODO what about levels smaller than the viewport...?  shrink the canvas in set_level?
         let xmargin = (this.viewport_size_x - 1) / 2;
         let ymargin = (this.viewport_size_y - 1) / 2;
-        let [px, py] = this.level.player.visual_position(tic_offset, packet.update_rate);
+        let [px, py] = this.level.player.visual_position(update_progress, packet.update_rate);
         // Figure out where to start drawing
         // TODO support overlapping regions better
         let x0 = px - xmargin;
@@ -221,7 +225,7 @@ export class CanvasRenderer {
                     continue;
 
                 // Handle smooth scrolling
-                let [vx, vy] = actor.visual_position(tic_offset, packet.update_rate);
+                let [vx, vy] = actor.visual_position(update_progress, packet.update_rate);
                 // Round this to the pixel grid too!
                 vx = Math.floor(vx * tw + 0.5) / tw;
                 vy = Math.floor(vy * th + 0.5) / th;
@@ -269,7 +273,7 @@ export class CanvasRenderer {
         }
 
         if (this.use_rewind_effect) {
-            this.draw_rewind_effect(tic);
+            this.draw_rewind_effect(packet.clock);
         }
 
         // Debug overlays
@@ -280,7 +284,7 @@ export class CanvasRenderer {
                     let actor = this.level.cell(x, y).get_actor();
                     if (! actor)
                         continue;
-                    let [vx, vy] = actor.visual_position(tic_offset, packet.update_rate);
+                    let [vx, vy] = actor.visual_position(update_progress, packet.update_rate);
                     // Don't round to the pixel grid; we want to know if the bbox is misaligned!
                     this.ctx.fillRect((vx - x0) * tw, (vy - y0) * th, 1 * tw, 1 * th);
                 }
@@ -300,7 +304,7 @@ export class CanvasRenderer {
                 if (cell.x < xf0 || cell.x > x1 || cell.y < yf0 || cell.y > y1)
                     continue;
 
-                let [vx, vy] = actor.visual_position(tic_offset, packet.update_rate);
+                let [vx, vy] = actor.visual_position(update_progress, packet.update_rate);
                 let x = (vx + 0.5 - x0) * tw;
                 let y = (vy + 0.5 - y0) * th;
                 let label = String(this.level.actors.length - 1 - n);
@@ -310,9 +314,9 @@ export class CanvasRenderer {
         }
     }
 
-    draw_rewind_effect(tic) {
+    draw_rewind_effect(clock) {
         // Shift several rows over in a recurring pattern, like a VHS, whatever that is
-        let rewind_start = tic / 20 % 1;
+        let rewind_start = clock / 20 % 1;
         for (let chunk = 0; chunk < 4; chunk++) {
             let y = Math.floor(this.canvas.height * (chunk + rewind_start) / 4);
             for (let dy = 1; dy < 5; dy++) {
@@ -329,7 +333,7 @@ export class CanvasRenderer {
     draw_static_region(x0, y0, x1, y1, destx = x0, desty = y0) {
         this._adjust_viewport_if_dirty();
 
-        let packet = new CanvasRendererDrawPacket(this, this.ctx, 0.0, this.perception);
+        let packet = new CanvasRendererDrawPacket(this, this.ctx, this.perception);
         for (let x = x0; x <= x1; x++) {
             for (let y = y0; y <= y1; y++) {
                 let cell = this.level.cell(x, y);
@@ -369,7 +373,7 @@ export class CanvasRenderer {
         let ctx = canvas.getContext('2d');
 
         // Individual tile types always reveal what they are
-        let packet = new CanvasRendererDrawPacket(this, ctx, 0.0, 'palette');
+        let packet = new CanvasRendererDrawPacket(this, ctx, 'palette');
         this.tileset.draw_type(name, tile, packet);
         return canvas;
     }
