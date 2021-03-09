@@ -475,28 +475,28 @@ export const CC2_TILESET_LAYOUT = {
 
     force_floor_n: {
         __special__: 'scroll',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         base: [0, 19],
         scroll_region: [0, 1],
     },
     force_floor_e: {
         __special__: 'scroll',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         base: [3, 19],
         scroll_region: [-1, 0],
     },
     force_floor_s: {
         __special__: 'scroll',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         base: [1, 20],
         scroll_region: [0, -1],
     },
     force_floor_w: {
         __special__: 'scroll',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         base: [2, 20],
         scroll_region: [1, 0],
@@ -544,7 +544,7 @@ export const CC2_TILESET_LAYOUT = {
 
     force_floor_all: {
         __special__: 'animated',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         all: [[0, 21], [1, 21], [2, 21], [3, 21], [4, 21], [5, 21], [6, 21], [7, 21]],
     },
@@ -1143,28 +1143,28 @@ export const LL_TILESET_LAYOUT = {
 
     force_floor_n: {
         __special__: 'scroll',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         base: [0, 8],
         scroll_region: [0, 1],
     },
     force_floor_e: {
         __special__: 'scroll',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         base: [3, 8],
         scroll_region: [-1, 0],
     },
     force_floor_s: {
         __special__: 'scroll',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         base: [1, 9],
         scroll_region: [0, -1],
     },
     force_floor_w: {
         __special__: 'scroll',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         base: [2, 9],
         scroll_region: [1, 0],
@@ -1183,7 +1183,7 @@ export const LL_TILESET_LAYOUT = {
     },
     force_floor_all: {
         __special__: 'animated',
-        duration: 20,
+        duration: 24,
         cc2_duration: 8,
         all: [[0, 10], [1, 10], [2, 10], [3, 10], [4, 10], [5, 10], [6, 10], [7, 10]],
     },
@@ -1308,7 +1308,7 @@ export const LL_TILESET_LAYOUT = {
 
     chip: {
         __special__: 'animated',
-        duration: 20,
+        duration: 24,
         all: [[8, 16], [9, 16], [10, 16], [9, 16]],
     },
     chip_extra: {
@@ -1316,14 +1316,14 @@ export const LL_TILESET_LAYOUT = {
         modes: new Set(['palette', 'editor']),
         hidden: {
             __special__: 'animated',
-            duration: 20,
+            duration: 24,
             all: [[8, 16], [9, 16], [10, 16], [9, 16]],
         },
         revealed: [8, 19],
     },
     green_chip: {
         __special__: 'animated',
-        duration: 20,
+        duration: 24,
         all: [[8, 17], [9, 17], [10, 17], [9, 17]],
     },
     bowling_ball: [9, 19],
