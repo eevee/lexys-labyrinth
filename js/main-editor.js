@@ -2202,9 +2202,9 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "Sand",
         desc: "Anything walking on it moves at half speed.  Stops all blocks.",
     },
-    halo: {
-        name: "Halo",
-        desc: "Protects the player from death once, destroying the would-be killer in the process.",
+    ankh: {
+        name: "Ankh",
+        desc: "When dropped on empty floor by a player, inscribes a sacred symbol which will save a player's life once.",
     },
     turntable_cw: {
         name: "Turntable (clockwise)",
