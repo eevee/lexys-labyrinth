@@ -93,7 +93,7 @@ export class Tile {
 
         if (this.type.blocks && this.type.blocks(this, level, other, direction))
             return true;
-        
+
         if (other.type.blocked_by && other.type.blocked_by(other, level, this))
             return true;
 
@@ -116,7 +116,7 @@ export class Tile {
 
         return false;
     }
-    
+
     slide_ignores(name) {
         if (this.type.slide_ignores && this.type.slide_ignores.has(name))
             return true;
@@ -614,7 +614,7 @@ export class Level extends LevelInterface {
         // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
         this.pending_undo = this.create_undo_entry();
     }
-    
+
     connect_button(connectable) {
         let cell = connectable.cell;
         let x = cell.x;
@@ -673,11 +673,11 @@ export class Level extends LevelInterface {
             break;
         }
     }
-    
+
     recalculate_circuitry(first_time = false, undoing = false) {
         // Build circuits out of connected wires
         // TODO document this idea
-        
+
         if (!first_time) {
             for (let circuit of this.circuits) {
                 for (let tile of circuit.tiles) {
@@ -685,7 +685,7 @@ export class Level extends LevelInterface {
                 }
             }
         }
-        
+
         this.circuits = [];
         this.power_sources = [];
         let wired_outputs = new Set;
@@ -714,7 +714,7 @@ export class Level extends LevelInterface {
             {
                 wire_directions = actor.wire_directions;
             }
-            
+
             if (! wire_directions && ! terrain.wire_tunnel_directions) {
                 // No wires, not interesting...  unless it's a logic gate, which defines its own
                 // wires!  We only care about outgoing ones here, on the off chance that they point
@@ -812,7 +812,7 @@ export class Level extends LevelInterface {
         }
         this.wired_outputs = Array.from(wired_outputs);
         this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
-        
+
         if (!first_time) {
             //update wireables
              for (var i = 0; i < this.width; ++i)
@@ -826,7 +826,7 @@ export class Level extends LevelInterface {
                     }
                 }
             }
-            
+
             if (!undoing) {
                 this._push_pending_undo(() => this.undid_past_recalculate_circuitry = true);
             }
@@ -1767,7 +1767,7 @@ export class Level extends LevelInterface {
     move_to(actor, goal_cell) {
         if (actor.cell === goal_cell)
             return;
-        
+
         if (actor.type.on_starting_move) {
             actor.type.on_starting_move(actor, this);
         }
@@ -1811,15 +1811,15 @@ export class Level extends LevelInterface {
                 // Helmet disables this, do nothing
             }
             else if (actor.type.is_real_player && tile.type.is_monster) {
-                this.fail(tile.type.name, tile, actor);
+                this.kill_actor(actor, tile);
             }
             else if (actor.type.is_monster && tile.type.is_real_player) {
-                this.fail(actor.type.name, actor, tile);
+                this.kill_actor(tile, actor);
             }
             else if (actor.type.is_block && tile.type.is_real_player && ! actor.is_pulled) {
                 // Note that blocks squish players if they move for ANY reason, even if pushed by
                 // another player!  The only exception is being pulled
-                this.fail('squished', actor, tile);
+                this.kill_actor(tile, actor, null, null, 'squished');
             }
 
             if (tile.type.on_approach) {
@@ -1852,7 +1852,7 @@ export class Level extends LevelInterface {
             this.player.movement_cooldown === this.player.movement_speed &&
             ! actor.has_item('helmet') && ! this.player.has_item('helmet'))
         {
-            this.fail(actor.type.name, actor, this.player);
+            this.kill_actor(this.player, actor);
         }
 
         if (this.compat.tiles_react_instantly) {
@@ -1865,7 +1865,7 @@ export class Level extends LevelInterface {
         if (actor.type.on_finishing_move) {
             actor.type.on_finishing_move(actor, this);
         }
-        
+
         // Step on topmost things first -- notably, it's safe to step on water with flippers on top
         // TODO is there a custom order here similar to collision checking?
         for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
@@ -2105,11 +2105,16 @@ export class Level extends LevelInterface {
                 this.remove_tile(dropping_actor);
                 this.add_tile(tile, cell);
                 if (! this.attempt_out_of_turn_step(tile, dropping_actor.direction)) {
-                    // It was unable to move, so there's nothing we can do but destroy it
-                    // TODO maybe blow it up with a nonblocking vfx?  in cc2 it just vanishes
-                    this.remove_tile(tile);
+                    // It was unable to move; if it exploded, we have a special non-blocking VFX for
+                    // that, but otherwise there's nothing we can do but erase it (as CC2 does)
+                    if (tile.type.name === 'explosion') {
+                        this.transmute_tile(tile, 'explosion_nb', true);
+                    }
+                    else {
+                        this.remove_tile(tile);
+                    }
                 }
-                else {
+                if (tile.cell) {
                     this.add_actor(tile);
                 }
                 this.add_tile(dropping_actor, cell);
@@ -2130,7 +2135,7 @@ export class Level extends LevelInterface {
             this.recalculate_circuitry_next_wire_phase = false;
             force_next_wire_phase = true;
         }
-        
+
         if (this.circuits.length === 0)
             return;
 
@@ -2302,7 +2307,7 @@ export class Level extends LevelInterface {
                 return;
         }
     }
-    
+
     //same as above, but accepts multiple tiles
     *iter_tiles_in_reading_order_multiple(start_cell, names, reverse = false) {
         let i = this.coords_to_scalar(start_cell.x, start_cell.y);
@@ -2422,7 +2427,7 @@ export class Level extends LevelInterface {
         }
         this._undo_entry(this.undo_buffer[this.undo_buffer_index]);
         this.undo_buffer[this.undo_buffer_index] = null;
-        
+
         if (this.undid_past_recalculate_circuitry) {
             this.recalculate_circuitry_next_wire_phase = true;
             this.undid_past_recalculate_circuitry = false;
@@ -2525,11 +2530,38 @@ export class Level extends LevelInterface {
     }
 
     kill_actor(actor, killer, animation_name = null, sfx = null, fail_reason = null) {
-        // FIXME use this everywhere, fail when it's a player, move on_death here
         if (actor.type.is_real_player) {
-            // FIXME move death here
-            this.fail(fail_reason, null, actor);
+            // Resurrect using the ankh tile, if possible
+            if (this.ankh_tile) {
+                let ankh_cell = this.ankh_tile.cell;
+                let existing_actor = ankh_cell.get_actor();
+                if (! existing_actor) {
+                    // FIXME water should still splash, etc
+                    this.sfx.play_once('revive');
+
+                    this._set_tile_prop(actor, 'movement_cooldown', null);
+                    this._set_tile_prop(actor, 'movement_speed', null);
+                    this.make_slide(actor, null);
+                    this.move_to(actor, ankh_cell);
+
+                    this.transmute_tile(this.ankh_tile, 'floor');
+                    this.spawn_animation(ankh_cell, 'resurrection');
+                    let old_tile = this.ankh_tile;
+                    this.ankh_tile = null;
+                    this._push_pending_undo(() => {
+                        this.ankh_tile = old_tile;
+                    });
+                    return;
+                }
+            }
+
+            // Otherwise, lose the game
+            this.fail(fail_reason || killer.type.name, null, actor);
             return;
+        }
+
+        if (actor.type.on_death) {
+            actor.type.on_death(actor, this);
         }
 
         if (sfx) {
@@ -2549,30 +2581,6 @@ export class Level extends LevelInterface {
 
         if (player === null) {
             player = this.player;
-        }
-        
-        // FIXME move to kill_actor
-        if (player != null && this.ankh_tile && reason !== 'time') {
-            let cell = this.ankh_tile.cell;
-            let actor = cell.get_actor();
-            if (! actor) {
-                // FIXME water should still splash, etc
-                this.sfx.play_once('revive');
-
-                this._set_tile_prop(player, 'movement_cooldown', null);
-                this._set_tile_prop(player, 'movement_speed', null);
-                this.make_slide(player, null);
-                this.move_to(player, cell);
-
-                this.transmute_tile(this.ankh_tile, 'floor');
-                this.spawn_animation(cell, 'resurrection');
-                let old_tile = this.ankh_tile;
-                this.ankh_tile = null;
-                this._push_pending_undo(() => {
-                    this.ankh_tile = old_tile;
-                });
-                return;
-            }
         }
 
         if (reason === 'time') {
@@ -2693,8 +2701,8 @@ export class Level extends LevelInterface {
         this.add_actor(tile);
     }
 
-    transmute_tile(tile, name) {
-        if (tile.type.ttl) {
+    transmute_tile(tile, name, force = false) {
+        if (tile.type.ttl && ! force) {
             // If this is already an animation, don't turn it into a different one; this can happen
             // if a block is pushed onto a cell containing both a mine and slime, both of which try
             // to destroy it
@@ -2732,10 +2740,7 @@ export class Level extends LevelInterface {
             }
             this._init_animation(tile);
             this._set_tile_prop(tile, 'previous_cell', null);
-        }
-        
-        if (old_type.on_death) {
-            old_type.on_death(tile, this);
+            this.make_slide(tile, null);
         }
     }
 

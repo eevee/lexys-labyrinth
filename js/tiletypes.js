@@ -820,11 +820,8 @@ const TILE_TYPES = {
                 })[other.color]);
                 level.transmute_tile(other, 'splash');
             }
-            else if (other.type.is_real_player) {
-                level.fail('drowned', me, other);
-            }
             else {
-                level.transmute_tile(other, 'splash');
+                level.kill_actor(other, me, 'splash', null, 'drowned');
             }
         },
     },
@@ -1027,11 +1024,8 @@ const TILE_TYPES = {
             if (other.type.name === 'dirt_block' || other.type.name === 'ice_block') {
                 level.transmute_tile(me, 'floor');
             }
-            else if (other.type.is_real_player) {
-                level.fail('slimed', me, other);
-            }
             else {
-                level.transmute_tile(other, 'splash_slime');
+                level.kill_actor(other, me, 'splash_slime', null, 'slimed');
             }
         },
     },
@@ -1051,13 +1045,7 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             level.remove_tile(me);
-            if (other.type.is_real_player) {
-                level.fail('exploded', me, other);
-            }
-            else {
-                level.sfx.play_once('bomb', me.cell);
-                level.transmute_tile(other, 'explosion');
-            }
+            level.kill_actor(other, me, 'explosion', 'bomb', 'exploded');
         },
     },
     hole: {
@@ -1072,12 +1060,7 @@ const TILE_TYPES = {
             }
         },
         on_arrive(me, level, other) {
-            if (other.type.is_real_player) {
-                level.fail('fell', me, other);
-            }
-            else {
-                level.transmute_tile(other, 'fall');
-            }
+            level.kill_actor(other, me, 'fall', null, 'fell');
         },
         visual_state(me) {
             return (me && me.visual_state) ?? 'open';
@@ -1087,18 +1070,17 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         on_depart(me, level, other) {
             level.spawn_animation(me.cell, 'puff');
-            level.transmute_tile(me, 'hole');
             if (other === level.player) {
                 level.sfx.play_once('popwall', me.cell);
             }
-        },
-        on_death(me, level) {
-          //update hole visual state
-          me.type.on_begin(me, level);
-          var one_south = level.cell(me.cell.x, me.cell.y + 1);
-          if (one_south !== null && one_south.get_terrain().type.name == 'hole') {
-              me.type.on_begin(one_south.get_terrain(), level);
-          }
+
+            level.transmute_tile(me, 'hole');
+            // Update hole visual state (note that me.type is hole now)
+            me.type.on_begin(me, level);
+            var one_south = level.cell(me.cell.x, me.cell.y + 1);
+            if (one_south && one_south.get_terrain().type.name === 'hole') {
+                me.type.on_begin(one_south.get_terrain(), level);
+            }
         },
     },
     thief_tools: {
@@ -1358,13 +1340,7 @@ const TILE_TYPES = {
         is_required_chip: true,
         on_arrive(me, level, other) {
             level.remove_tile(me);
-            if (other.type.is_real_player) {
-                level.fail('exploded', me, other);
-            }
-            else {
-                level.sfx.play_once('bomb', me.cell);
-                level.transmute_tile(other, 'explosion');
-            }
+            level.kill_actor(other, me, 'explosion', 'bomb', 'exploded');
         },
         // Not affected by gray buttons
     },
@@ -1508,7 +1484,17 @@ const TILE_TYPES = {
             actor._clone_release = true;
             // Wire activation allows the cloner to try every direction, searching clockwise
             for (let i = 0; i < (aggressive ? 4 : 1); i++) {
-                if (level.attempt_out_of_turn_step(actor, direction)) {
+                // If the actor successfully moves, replace it with a new clone.  As a special case,
+                // bowling balls that immediately destroy something are also considered to have
+                // successfully exited
+                let success = level.attempt_out_of_turn_step(actor, direction);
+                if (! success && actor.type.ttl && ! level.compat.cloned_bowling_balls_can_be_lost) {
+                    success = true;
+                    if (actor.type.layer === LAYERS.actor) {
+                        level.transmute_tile(actor, 'explosion_nb', true);
+                    }
+                }
+                if (success) {
                     // Surprising edge case: if the actor immediately killed the player, do NOT
                     // spawn a new template, since the move was actually aborted
                     // FIXME this is inconsistent.  the move was aborted because of an emergency
@@ -1519,7 +1505,6 @@ const TILE_TYPES = {
 
                     // FIXME add this underneath, just above the cloner, so the new actor is on top
                     let new_template = new actor.constructor(type, direction);
-                    // TODO maybe make a type method for this
                     if (type.on_clone) {
                         type.on_clone(new_template, actor);
                     }
@@ -1932,13 +1917,7 @@ const TILE_TYPES = {
             // Note that (dirt?) blocks, fireballs, and anything with fire boots are immune
             // TODO would be neat if this understood "ignores anything with fire immunity" but that
             // might be a bit too high-level for this game
-            if (other.type.is_real_player) {
-                level.fail('burned', me, other);
-            }
-            else {
-                level.sfx.play_once('bomb', me.cell);
-                level.transmute_tile(other, 'explosion');
-            }
+            level.kill_actor(other, me, 'explosion', 'bomb', 'burned');
         },
     },
     electrified_floor: {
@@ -1952,13 +1931,7 @@ const TILE_TYPES = {
             if (! me.is_active)
                 return;
 
-            if (other.type.is_real_player) {
-                level.fail('electrocuted', me, other);
-            }
-            else {
-                level.sfx.play_once('bomb', me.cell);
-                level.transmute_tile(other, 'explosion');
-            }
+            level.kill_actor(other, me, 'explosion', 'bomb', 'electrocuted');
         },
         on_power(me, level) {
             level._set_tile_prop(me, 'is_active', true);
@@ -1967,6 +1940,7 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'is_active', false);
         },
         on_death(me, level) {
+            // FIXME i probably broke this lol
             //need to remove our wires since they're an implementation detail
             level._set_tile_prop(me, 'wire_directions', 0);
             level.recalculate_circuitry_next_wire_phase = true;
@@ -2758,40 +2732,31 @@ const TILE_TYPES = {
 
                     let actor = cell.get_actor();
                     let terrain = cell.get_terrain();
-                    let item = cell.get_item();
                     let removed_anything;
                     for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
                         let tile = cell[layer];
                         if (! tile)
                             continue;
 
-                        if (tile.type.layer === LAYERS.terrain) {
-                            // Terrain gets transmuted afterwards
-                        }
-                        else if (tile.type.is_real_player) {
-                            // TODO it would be nice if i didn't have to special-case this every
-                            // time
-                            level.fail(me.type.name, me, tile);
-                        }
-                        else {
-                            //newly appearing items (e.g. dropped by a glass block) are safe
-                            if (tile.type.layer === LAYERS.item && tile !== item) {
-                              continue;
-                            }
-                            // Everything else is destroyed
-                            if (tile.type.on_death) {
-                                tile.type.on_death(tile, level);
-                            }
-                            level.remove_tile(tile);
-                            removed_anything = true;
-                        }
-
+                        // Canopy protects everything else
                         if (tile.type.name === 'canopy') {
-                            // Canopy protects everything else
                             actor = null;
                             terrain = null;
                             break;
                         }
+
+                        // Terrain is transmuted afterwards; VFX are left alone; actors are killed
+                        // after the loop (which also allows the glass block to safely drop an item)
+                        if (tile.type.layer === LAYERS.terrain ||
+                            tile.type.layer === LAYERS.actor ||
+                            tile.type.layer === LAYERS.vfx)
+                        {
+                            continue;
+                        }
+
+                        // Anything else is destroyed
+                        level.remove_tile(tile);
+                        removed_anything = true;
                     }
 
                     if (actor) {
@@ -2807,25 +2772,29 @@ const TILE_TYPES = {
                     }
                     else if (terrain) {
                         // Anything other than these babies gets blown up and turned into floor
-                        if (terrain.type.name === 'hole') {
-                            //do nothing
+                        if (terrain.type.name === 'steel' || terrain.type.name === 'socket' ||
+                            terrain.type.name === 'logic_gate' || terrain.type.name === 'floor' ||
+                            terrain.type.name === 'hole' || terrain.type.name === 'floor_ankh')
+                        {
+                            // do nothing
                         }
                         else if (terrain.type.name === 'cracked_floor') {
                             level.transmute_tile(terrain, 'hole');
                             removed_anything = true;
                         }
-                        else if (!(
-                            terrain.type.name === 'steel' || terrain.type.name === 'socket' ||
-                            terrain.type.name === 'logic_gate' || terrain.type.name === 'floor'))
-                        {
+                        else {
                             level.transmute_tile(terrain, 'floor');
                             removed_anything = true;
                         }
                     }
 
-                    // TODO maybe add a vfx nonblocking explosion
-                    if (removed_anything && ! cell.get_actor()) {
-                        level.spawn_animation(cell, 'explosion');
+                    if (removed_anything || actor) {
+                        if (actor) {
+                            level.kill_actor(actor, me, 'explosion');
+                        }
+                        else {
+                            level.spawn_animation(cell, cell.get_actor() ? 'explosion_nb' : 'explosion');
+                        }
                     }
                 }
             }
@@ -2849,6 +2818,7 @@ const TILE_TYPES = {
         is_monster: true,
         can_reveal_walls: true,
         collision_mask: COLLISION.bowling_ball,
+        blocks_collision: COLLISION.bowling_ball,
         item_pickup_priority: PICKUP_PRIORITIES.normal,
         // FIXME do i start moving immediately when dropped, or next turn?
         movement_speed: 4,
@@ -2856,38 +2826,22 @@ const TILE_TYPES = {
             return [me.direction];
         },
         on_approach(me, level, other) {
-            // Blow up anything that runs into us...  unless we're on a cloner
-            // FIXME there are other cases where this won't be right; this shouldn't happen if the
-            // cell blocks the actor, but i don't have a callback for that?
-            if (me.cell.has('cloner'))
-                return;
-            if (other.type.is_real_player) {
-                level.fail(me.type.name, me, other);
-            }
-            else {
-                level.transmute_tile(other, 'explosion');
-            }
-            level.sfx.play_once('bomb', me.cell);
-            level.transmute_tile(me, 'explosion');
+            // Blow up anything that runs into us
+            level.kill_actor(other, me, 'explosion');
+            level.kill_actor(me, me, 'explosion', 'bomb');
         },
         on_blocked(me, level, direction, obstacle) {
             // Blow up anything we run into
             if (obstacle && obstacle.type.is_actor) {
-                if (obstacle.type.is_real_player) {
-                    level.fail(me.type.name, me, obstacle);
-                }
-                else {
-                    level.transmute_tile(obstacle, 'explosion');
-                }
+                level.kill_actor(obstacle, me, 'explosion');
             }
-            else if (me.slide_mode) {
-                // Sliding bowling balls don't blow up if they hit a regular wall
+            else if (me.slide_mode || me._clone_release) {
+                // Sliding bowling balls don't blow up if they hit a regular wall, and neither do
+                // bowling balls in the process of being released from a cloner
                 return;
             }
             level.sfx.play_once('bomb', me.cell);
             level.transmute_tile(me, 'explosion');
-            // Remove our slide mode so we don't attempt to bounce if on ice
-            level.make_slide(me, null);
         },
     },
     xray_eye: {
@@ -3204,6 +3158,14 @@ const TILE_TYPES = {
         on_approach(me, level, other) {
             level.remove_tile(me);
         },
+    },
+    // Non-blocking explosion used for better handling edge cases with dynamite and bowling balls,
+    // without changing gameplay
+    explosion_nb: {
+        layer: LAYERS.vfx,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 16,
     },
     // Used as an easy way to show an invisible wall when bumped
     wall_invisible_revealed: {
