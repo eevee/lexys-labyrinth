@@ -4033,17 +4033,13 @@ async function main() {
         await main();
     }
     catch (e) {
-        let failed = document.getElementById('failed');
-        document.getElementById('loading').setAttribute('hidden', '');
-        failed.removeAttribute('hidden');
-        document.body.setAttribute('data-mode', 'failed');
-
-        failed.appendChild(mk('p',
-            "I did manage to capture this error, which you might be able to ",
-            mk('a', {href: 'https://github.com/eevee/lexys-labyrinth'}, "report somewhere"),
-            ":",
-        ));
-        failed.appendChild(mk('pre.stack-trace', e.toString(), "\n\n", (e.stack ?? "").replace(/^/mg, "  ")));
+        if (ll_log_fatal_error) {
+            ll_log_fatal_error(e);
+        }
         throw e;
+    }
+
+    if (ll_successfully_loaded) {
+        ll_successfully_loaded();
     }
 })();

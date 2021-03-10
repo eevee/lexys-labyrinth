@@ -505,6 +505,12 @@ body[data-mode=player] #editor-play {
     margin: auto;
     text-align: center;
 }
+#failed .-with-error {
+    display: none;
+}
+#failed.--got-error .-with-error {
+    display: revert;
+}
 #loading {
     font-size: 2em;
 }
