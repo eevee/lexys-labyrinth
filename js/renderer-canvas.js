@@ -16,6 +16,7 @@ class CanvasRendererDrawPacket extends DrawPacket {
         this.offsety = 0;
         // Compatibility settings
         this.use_cc2_anim_speed = renderer.use_cc2_anim_speed;
+        this.show_facing = renderer.show_facing;
     }
 
     blit(tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) {
@@ -60,6 +61,7 @@ export class CanvasRenderer {
         this.viewport_dirty = false;
         this.show_actor_bboxes = false;
         this.show_actor_order = false;
+        this.show_facing = false;
         this.use_rewind_effect = false;
         this.perception = 'normal';  // normal, xray, editor, palette
         this.hide_logic = false;

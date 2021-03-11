@@ -15,6 +15,12 @@ export const CC2_TILESET_LAYOUT = {
     '#transparent-color': [0, 0],
     '#supported-versions': new Set(['cc1', 'cc2']),
     '#wire-width': 1/16,
+    '#editor-arrows': {
+        north: [14, 31],
+        east: [14.5, 31],
+        south: [15, 31],
+        west: [15.5, 31],
+    },
 
     door_red: [0, 1],
     door_blue: [1, 1],
@@ -1009,6 +1015,12 @@ export const LL_TILESET_LAYOUT = {
     '#dimensions': [32, 32],
     '#supported-versions': new Set(['cc1', 'cc2', 'll']),
     '#wire-width': 1/16,
+    '#editor-arrows': {
+        north: [6, 1],
+        east: [6.5, 1],
+        south: [6, 1.5],
+        west: [6.5, 1.5],
+    },
 
     // ------------------------------------------------------------------------------------------------
     // Left side: tiles
@@ -2001,6 +2013,7 @@ export class DrawPacket {
         this.clock = clock;
         this.update_progress = update_progress;
         this.update_rate = update_rate;
+        this.show_facing = false;
         // this.x
         // this.y
     }
@@ -2041,6 +2054,29 @@ export class Tileset {
         }
 
         this.draw_drawspec(drawspec, name, tile, packet);
+
+        if (packet.show_facing) {
+            this._draw_facing(name, tile, packet);
+        }
+    }
+
+    // Draw the facing direction of a tile (generally used by the editor)
+    _draw_facing(name, tile, packet) {
+        if (! (tile && tile.direction && TILE_TYPES[name].is_actor))
+            return;
+
+        // These are presumed to be half-size tiles
+        let drawspec = this.layout['#editor-arrows'];
+        if (! drawspec)
+            return;
+
+        let coords = drawspec[tile.direction];
+        let dirinfo = DIRECTIONS[tile.direction];
+
+        packet.blit(
+            ...coords, 0, 0, 0.5, 0.5,
+            0.25 + dirinfo.movement[0] * 0.25,
+            0.25 + dirinfo.movement[1] * 0.25);
     }
 
     // Draw a "standard" drawspec, which is either:
@@ -2079,11 +2115,6 @@ export class Tileset {
         }
         else {
             frames = drawspec.south;
-        }
-        // Shortcut: when drawing statically, skip all of this
-        if (! tile || packet.update_progress === 0) {
-            packet.blit(...frames[drawspec.idle_frame_index ?? 0]);
-            return;
         }
 
         let is_global = drawspec.global ?? true;
