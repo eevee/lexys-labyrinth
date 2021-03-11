@@ -9,7 +9,7 @@
         "use strict";
         {
             let domloaded = false;
-            window.addEventListener('DOMContentLoaded', e => domloaded = true);
+            window.addEventListener('DOMContentLoaded', ev => domloaded = true);
 
             let _ll_log_fatal_error = (err, ev) => {
                 document.getElementById('loading').setAttribute('hidden', '');
@@ -19,7 +19,9 @@
 
                 failed.classList.add('--got-error');
                 let stack = '(origin unknown)';
-                if (err.stack) {
+                if (err.stack && err.stack.match(/\n/)) {
+                    // Chrome sometimes gives us a stack that's actually just the message without
+                    // any filenames, in which case skip it
                     stack = err.stack.replace(/^/mg, "  ");
                 }
                 else if (err.fileName) {
@@ -38,12 +40,12 @@
                     window.addEventListener('DOMContentLoaded', () => _ll_log_fatal_error(err, ev));
                 }
             };
-            let error_listener = e => {
-                if (! e.error)
+            let error_listener = ev => {
+                if (! ev.error)
                     // Not a script error
                     return;
                 try {
-                    ll_log_fatal_error(e.error, e);
+                    ll_log_fatal_error(ev.error, ev);
                 }
                 catch (err) {}
             };
