@@ -3363,9 +3363,7 @@ export class Editor extends PrimaryView {
         this.save_button = _make_button("Save", ev => {
             this.save_level();
         });
-        if (this.stored_level) {
-            this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
-        }
+
         _make_button("Download level as C2M", ev => {
             // TODO also allow download as CCL
             // TODO support getting warnings + errors out of synthesis
@@ -3831,6 +3829,9 @@ export class Editor extends PrimaryView {
         if (! stored_pack.editor_metadata)
             return;
 
+        this.modified = false;
+        this.undo_modification_offset = 0;
+
         // Update the pack itself
         // TODO maybe should keep this around, but there's a tricky order of operations thing
         // with it
@@ -3850,6 +3851,7 @@ export class Editor extends PrimaryView {
         if (this._level_browser) {
             this._level_browser.expire(this.conductor.level_index);
         }
+        this._update_ui_after_edit();
     }
 
     // ------------------------------------------------------------------------------------------------
@@ -3864,6 +3866,7 @@ export class Editor extends PrimaryView {
         this.stored_level = stored_level;
         this.update_viewport_size();
         this.update_cell_coordinates();
+        this.modified = false;
 
         // Remember current level for an editor level
         if (this.conductor.stored_game.editor_metadata) {
@@ -3893,10 +3896,6 @@ export class Editor extends PrimaryView {
         this.renderer.set_level(stored_level);
         if (this.active) {
             this.redraw_entire_level();
-        }
-
-        if (this.save_button) {
-            this.save_button.disabled = ! this.conductor.stored_game.editor_metadata;
         }
 
         if (this._done_setup) {
@@ -4260,9 +4259,8 @@ export class Editor extends PrimaryView {
     _done(redo, undo, modifies = true) {
         // TODO parallel arrays would be smaller
         this.undo_entry.push([undo, redo]);
-
-        if (this.redo_stack.length > 0) {
-            this.redo_stack.length = 0;
+        if (modifies) {
+            this.undo_entry.modifies = true;
         }
     }
 
@@ -4283,7 +4281,11 @@ export class Editor extends PrimaryView {
         this.undo_entry = [];
         this.undo_stack = [];
         this.redo_stack = [];
-        this._update_undo_redo_enabled();
+        // Number of steps we'd need to take (negative if redo, positive if undo) to reach a
+        // pristine saved state.  May also be null, meaning the pristine state is in a redo branch
+        // that has been overwritten and is thus unreachable.
+        this.undo_modification_offset = 0;
+        this._update_ui_after_edit();
     }
 
     undo() {
@@ -4293,6 +4295,7 @@ export class Editor extends PrimaryView {
         if (this.undo_entry.length > 0) {
             entry = this.undo_entry;
             this.undo_entry = [];
+            console.warn("lingering undo entry");
         }
         else if (this.undo_stack.length > 0) {
             entry = this.undo_stack.pop();
@@ -4306,7 +4309,9 @@ export class Editor extends PrimaryView {
             entry[i][0]();
         }
 
-        this._update_undo_redo_enabled();
+        this._track_undo_offset(-1, entry.modifies);
+
+        this._update_ui_after_edit();
     }
 
     redo() {
@@ -4320,21 +4325,56 @@ export class Editor extends PrimaryView {
             redo();
         }
 
-        this._update_undo_redo_enabled();
+        this._track_undo_offset(+1, entry.modifies);
+
+        this._update_ui_after_edit();
     }
 
-    commit_undo() {
-        if (this.undo_entry.length > 0) {
-            this.undo_stack.push(this.undo_entry);
-            this.undo_entry = [];
+    _track_undo_offset(delta, modifies) {
+        if (this.undo_modification_offset === null) {
+            return;
+        }
+        else if (this.undo_modification_offset === 0) {
+            if (modifies) {
+                this.modified = true;
+                this.undo_modification_offset += delta;
+            }
+        }
+        else {
+            this.undo_modification_offset += delta;
+            if (this.undo_modification_offset === 0) {
+                this.modified = false;
+            }
+        }
+    }
+
+    commit_undo(label = null) {
+        if (this.undo_entry.length === 0)
+            return;
+
+        if (this.undo_entry.modifies) {
+            this.modified = true;
+        }
+        this.undo_stack.push(this.undo_entry);
+        this.undo_entry = [];
+
+        // Doing an action always erases the redo stack
+        if (this.redo_stack.length > 0) {
+            this.redo_stack.length = 0;
+            if (this.undo_modification_offset < 0) {
+                // Pristine state was in the future, so it's now unreachable
+                this.undo_modification_offset = null;
+            }
         }
 
-        this._update_undo_redo_enabled();
+        this._update_ui_after_edit();
     }
 
-    _update_undo_redo_enabled() {
+    _update_ui_after_edit() {
         this.undo_button.disabled = this.undo_stack.length === 0;
         this.redo_button.disabled = this.redo_stack.length === 0;
+        this.save_button.disabled = ! (
+            this.stored_level && this.modified && this.conductor.stored_game.editor_metadata);
     }
 
     // ------------------------------------------------------------------------------------------------
