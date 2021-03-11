@@ -1563,7 +1563,7 @@ class Player extends PrimaryView {
     render_inventory_tile(name) {
         if (! this._inventory_tiles[name]) {
             // TODO reuse the canvas for data urls
-            let canvas = this.renderer.create_tile_type_canvas(name);
+            let canvas = this.renderer.draw_single_tile_type(name);
             this._inventory_tiles[name] = canvas.toDataURL();
         }
         return this._inventory_tiles[name];
@@ -2856,9 +2856,9 @@ class OptionsOverlay extends DialogOverlay {
         result_el.append(
             `This looks like a ${layout['#name']} tileset with ${tw}×${th} tiles.`,
             mk('br'),
-            renderer.create_tile_type_canvas('player'),
-            renderer.create_tile_type_canvas('chip'),
-            renderer.create_tile_type_canvas('exit'),
+            renderer.draw_single_tile_type('player'),
+            renderer.draw_single_tile_type('chip'),
+            renderer.draw_single_tile_type('exit'),
             mk('br'),
         );
 
@@ -2933,9 +2933,9 @@ class OptionsOverlay extends DialogOverlay {
         }
         dd.append(
             // TODO allow me to draw an arbitrary tile to an arbitrary point on a given canvas!
-            renderer.create_tile_type_canvas('player'),
-            renderer.create_tile_type_canvas('chip'),
-            renderer.create_tile_type_canvas('exit'),
+            renderer.draw_single_tile_type('player'),
+            renderer.draw_single_tile_type('chip'),
+            renderer.draw_single_tile_type('exit'),
         );
     }
 

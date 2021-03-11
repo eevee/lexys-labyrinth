@@ -622,6 +622,66 @@ class PanOperation extends MouseOperation {
 class DrawOperation extends MouseOperation {
 }
 
+// Previews should start out hidden, then show themselves on update()
+class OperationPreview {
+    constructor(editor) {
+        this.editor = editor;
+        this.editor.preview_g.textContent = '';  // just in case
+        this.hidden = false;
+    }
+
+    update(x, y) {
+        this.show();
+    }
+
+    update_preview() {}
+
+    hide() {
+        if (! this.hidden) {
+            this.hidden = true;
+            this.editor.preview_g.style.display = 'none';
+        }
+    }
+
+    show() {
+        if (this.hidden) {
+            this.hidden = false;
+            this.editor.preview_g.style.display = '';
+        }
+    }
+
+    end() {}
+}
+class PencilPreview extends OperationPreview {
+    constructor(editor) {
+        super(editor);
+
+        this.image = mk_svg('image', {
+            id: 'svg-editor-preview-tile',
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+        });
+        this.editor.preview_g.append(this.image);
+        this.update_preview();
+    }
+
+    update_preview() {
+        this.image.setAttribute('href', this.editor.selected_tile_el.toDataURL());
+    }
+
+    update(x, y) {
+        super.update(x, y);
+        this.image.setAttribute('x', x);
+        this.image.setAttribute('y', y);
+    }
+
+    end() {
+        this.image.remove();
+    }
+}
+
 class PencilOperation extends DrawOperation {
     start() {
         this.handle_cell(this.gx0, this.gy0);
@@ -686,6 +746,177 @@ class PencilOperation extends DrawOperation {
         this.editor.commit_undo();
     }
 }
+
+// FIXME still to do on this:
+// - doesn't know to update canvas size or erase results when a new level is loaded OR when the
+// level size changes (and for that matter the selection tool doesn't either)
+// - hold shift to replace all of the same tile in the whole level?  (need to know when shift is
+// toggled)
+// - ctrl-click to pick, same logic as pencil (which needs improving)
+// - right-click to erase
+// - reset the preview after a fill?  is that ever necessary?
+class FillPreview extends OperationPreview {
+    constructor(editor) {
+        super(editor);
+        let renderer = this.editor.renderer;
+        this.canvas = mk('canvas', {
+            width: renderer.canvas.width,
+            height: renderer.canvas.height,
+        });
+        this.foreign_object = mk_svg('foreignObject', {
+            x: 0, y: 0,
+            width: this.canvas.width, height: this.canvas.height,
+            transform: `scale(${1/renderer.tileset.size_x} ${1/renderer.tileset.size_y})`,
+        }, this.canvas);
+        this.editor.preview_g.append(this.foreign_object);
+
+        // array of (true: in flood, false: definitely not), or null if not yet populated
+        this.fill_state = null;
+        // Last coordinates we updated from
+        this.last_known_coords = null;
+        // Palette tile we last flooded with
+        this.last_known_tile = this.editor.palette_selection;
+    }
+
+    update(x, y) {
+        super.update(x, y);
+        this.last_known_coords = [x, y];
+        this.last_known_tile = this.editor.palette_selection;
+        this._floodfill_from(x, y);
+    }
+
+    _floodfill_from(x0, y0) {
+        let i0 = this.editor.stored_level.coords_to_scalar(x0, y0);
+        if (this.fill_state && this.fill_state[i0]) {
+            // This cell is already part of the pending fill, so there's nothing to do
+            return;
+        }
+
+        let stored_level = this.editor.stored_level;
+        let tile = this.editor.palette_selection;
+        let layer = tile.type.layer;
+        let tile0 = stored_level.linear_cells[i0][layer] ?? null;
+        let type0 = tile0 ? tile0.type : null;
+
+        if (! this.editor.selection.contains(x0, y0)) {
+            this.fill_state = null;
+            this._redraw();
+            return;
+        }
+
+        // Aaand, floodfill
+        this.fill_state = new Array(stored_level.linear_cells.length);
+        this.fill_state[i0] = true;
+        let pending = [i0];
+        let steps = 0;
+        while (pending.length > 0) {
+            let old_pending = pending;
+            pending = [];
+            for (let i of old_pending) {
+                let [x, y] = stored_level.scalar_to_coords(i);
+
+                // Check neighbors
+                for (let dirinfo of Object.values(DIRECTIONS)) {
+                    let [dx, dy] = dirinfo.movement;
+                    let nx = x + dx;
+                    let ny = y + dy;
+                    let j = stored_level.coords_to_scalar(nx, ny)
+                    if (! this.editor.selection.contains(nx, ny)) {
+                        this.fill_state[j] = false;
+                        continue;
+                    }
+
+                    let cell = this.editor.cell(nx, ny);
+                    if (cell) {
+                        if (this.fill_state[j] !== undefined)
+                            continue;
+
+                        let tile = cell[layer] ?? null;
+                        let type = tile ? tile.type : null;
+                        if (type === type0) {
+                            this.fill_state[j] = true;
+                            pending.push(j);
+                        }
+                        else {
+                            this.fill_state[j] = false;
+                        }
+                    }
+                }
+                steps++;
+                if (steps > 10000) {
+                    console.error("more steps than should be possible");
+                    return;
+                }
+            }
+        }
+
+        this._redraw();
+    }
+
+    _redraw() {
+        // Draw all the good tiles
+        let ctx = this.canvas.getContext('2d');
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (! this.fill_state)
+            return;
+
+        let stored_level = this.editor.stored_level;
+        let tileset = this.editor.renderer.tileset;
+        let source = this.editor.selected_tile_el;
+        for (let [i, ok] of this.fill_state.entries()) {
+            if (! ok)
+                continue;
+
+            let [x, y] = stored_level.scalar_to_coords(i);
+            ctx.drawImage(source, x * tileset.size_x, y * tileset.size_y);
+        }
+    }
+
+    update_preview() {
+        super.update_preview();
+
+        // Figure out whether the floodfill results changed.  If the new tile is on the same layer
+        // as the old tile, we can reuse the results and just redraw.  If not, recompute everything
+        // (unless we're hidden, in which case blow it away and just do nothing).
+        if (this.editor.palette_selection.type.layer === this.last_known_tile.type.layer) {
+            if (this.fill_state) {
+                this._redraw();
+            }
+        }
+        else {
+            this.fill_state = null;
+            if (this.last_known_coords && ! this.hidden) {
+                this._floodfill_from(...this.last_known_coords);
+            }
+        }
+    }
+
+    end() {
+        this.foreign_object.remove();
+    }
+}
+class FillOperation extends MouseOperation {
+    start() {
+        // Filling is a single-click thing, and all the work was done by the preview!
+        let preview = this.editor.mouse_hover_op;
+        if (! preview || ! preview.fill_state) {
+            // Something has gone terribly awry (or they clicked outside the level)
+            return;
+        }
+
+        let stored_level = this.editor.stored_level;
+        let template = this.editor.palette_selection;
+        for (let [i, ok] of preview.fill_state.entries()) {
+            if (! ok)
+                continue;
+
+            let cell = this.editor.cell(...stored_level.scalar_to_coords(i));
+            this.editor.place_in_cell(cell, template);
+        }
+        this.editor.commit_undo();
+    }
+}
+
 
 // TODO also, delete
 // TODO also, non-rectangular selections
@@ -1386,7 +1617,7 @@ const EDITOR_TOOLS = {
         uses_palette: true,
         op1: PencilOperation,
         op2: PencilOperation,
-        //hover: show current selection under cursor
+        hover: PencilPreview,
     },
     line: {
         // TODO not implemented
@@ -1403,11 +1634,12 @@ const EDITOR_TOOLS = {
         uses_palette: true,
     },
     fill: {
-        // TODO not implemented
         icon: 'icons/tool-fill.png',
         name: "Fill",
         desc: "Flood-fill an area with tiles",
         uses_palette: true,
+        op1: FillOperation,
+        hover: FillPreview,
     },
     select_box: {
         icon: 'icons/tool-select-box.png',
@@ -1462,7 +1694,7 @@ const EDITOR_TOOLS = {
     // slade when you have some selected?
     // TODO ah, railroads...
 };
-const EDITOR_TOOL_ORDER = ['pencil', 'select_box', 'adjust', 'force-floors', 'tracks', 'wire', 'camera'];
+const EDITOR_TOOL_ORDER = ['pencil', 'select_box', 'fill', 'adjust', 'force-floors', 'tracks', 'wire', 'camera'];
 
 // TODO this MUST use a LL tileset!
 const EDITOR_PALETTE = [{
@@ -2821,6 +3053,9 @@ export class Editor extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#editor'));
 
+        // FIXME possibly rename these lol, adding that scroll container made "viewport" a bit
+        // inappropriate
+        this.actual_viewport_el = this.root.querySelector('.editor-canvas');
         this.viewport_el = this.root.querySelector('.editor-canvas .-container');
 
         // Load editor state; we may need this before setup() since we create new levels before
@@ -2851,8 +3086,9 @@ export class Editor extends PrimaryView {
 
     setup() {
         // Add more bits to SVG overlay
+        this.preview_g = mk_svg('g', {opacity: 0.5});
         this.svg_cursor = mk_svg('rect.overlay-transient.overlay-cursor', {x: 0, y: 0, width: 1, height: 1});
-        this.svg_overlay.append(this.svg_cursor);
+        this.svg_overlay.append(this.preview_g, this.svg_cursor);
 
         // Keyboard shortcuts
         window.addEventListener('keydown', ev => {
@@ -2880,6 +3116,7 @@ export class Editor extends PrimaryView {
         });
         // Level canvas and mouse handling
         this.mouse_op = null;
+        this.mouse_hover_op = null;
         this.viewport_el.addEventListener('mousedown', ev => {
             this.cancel_mouse_operation();
 
@@ -2921,9 +3158,22 @@ export class Editor extends PrimaryView {
                 this.svg_cursor.classList.add('--visible');
                 this.svg_cursor.setAttribute('x', x);
                 this.svg_cursor.setAttribute('y', y);
+
+                if (this.mouse_hover_op) {
+                    // Only update if the mouse is actually within the canvas
+                    let rect = this.actual_viewport_el.getBoundingClientRect();
+                    let cx = ev.clientX, cy = ev.clientY;
+                    if (rect.left <= cx && cx < rect.right && rect.top <= cy && cy < rect.bottom) {
+                        this.mouse_hover_op.update(x, y);
+                    }
+                }
             }
             else {
                 this.svg_cursor.classList.remove('--visible');
+
+                if (this.mouse_hover_op) {
+                    this.mouse_hover_op.hide();
+                }
             }
 
             if (! this.mouse_op)
@@ -2935,6 +3185,11 @@ export class Editor extends PrimaryView {
 
             this.mouse_op.do_mousemove(ev);
         });
+        this.actual_viewport_el.addEventListener('mouseleave', ev => {
+            if (this.mouse_hover_op) {
+                this.mouse_hover_op.hide();
+            }
+        })
         // TODO should this happen for a mouseup anywhere?
         this.viewport_el.addEventListener('mouseup', ev => {
             if (this.mouse_op) {
@@ -2954,7 +3209,7 @@ export class Editor extends PrimaryView {
 
         // Toolbox
         // Selected tile and rotation buttons
-        this.selected_tile_el = mk('div');
+        this.selected_tile_el = this.renderer.draw_single_tile_type('floor');
         this.selected_tile_el.id = 'editor-tile';
         this.selected_tile_el.addEventListener('click', ev => {
             if (this.palette_selection && TILES_WITH_PROPS[this.palette_selection.type.name]) {
@@ -2997,8 +3252,8 @@ export class Editor extends PrimaryView {
             this.tool_button_els[toolname] = button;
             toolbox.append(button);
         }
-        this.current_tool = 'pencil';
-        this.tool_button_els['pencil'].classList.add('-selected');
+        this.current_tool = null;
+        this.select_tool('pencil');
         toolbox.addEventListener('click', ev => {
             let button = ev.target.closest('.icon-button-set button');
             if (! button)
@@ -3135,10 +3390,10 @@ export class Editor extends PrimaryView {
                 let entry;
                 if (SPECIAL_PALETTE_ENTRIES[key]) {
                     let tile = SPECIAL_PALETTE_ENTRIES[key];
-                    entry = this.renderer.create_tile_type_canvas(tile.name, tile);
+                    entry = this.renderer.draw_single_tile_type(tile.name, tile);
                 }
                 else {
-                    entry = this.renderer.create_tile_type_canvas(key);
+                    entry = this.renderer.draw_single_tile_type(key);
                 }
                 entry.setAttribute('data-palette-key', key);
                 entry.classList = 'palette-entry';
@@ -3600,9 +3855,20 @@ export class Editor extends PrimaryView {
         if (! this.tool_button_els[tool])
             return;
 
-        this.tool_button_els[this.current_tool].classList.remove('-selected');
+        if (this.current_tool) {
+            this.tool_button_els[this.current_tool].classList.remove('-selected');
+        }
+        if (this.mouse_hover_op) {
+            this.mouse_hover_op.end();
+            this.mouse_hover_op = null;
+        }
+
         this.current_tool = tool;
         this.tool_button_els[this.current_tool].classList.add('-selected');
+        if (tool && EDITOR_TOOLS[tool].hover) {
+            this.mouse_hover_op = new EDITOR_TOOLS[tool].hover(this);
+            // TODO immediately update if the cursor is over the map
+        }
     }
 
     show_palette_tooltip(key) {
@@ -3718,10 +3984,13 @@ export class Editor extends PrimaryView {
     // Drawing
 
     redraw_palette_selection() {
-        // FIXME should redraw in an existing canvas
-        this.selected_tile_el.textContent = '';
-        this.selected_tile_el.append(this.renderer.create_tile_type_canvas(
-            this.palette_selection.type.name, this.palette_selection));
+        let ctx = this.selected_tile_el.getContext('2d');
+        ctx.clearRect(0, 0, this.selected_tile_el.width, this.selected_tile_el.height);
+        this.renderer.draw_single_tile_type(
+            this.palette_selection.type.name, this.palette_selection, this.selected_tile_el);
+        if (this.mouse_hover_op) {
+            this.mouse_hover_op.update_preview();
+        }
     }
 
     mark_cell_dirty(cell) {
