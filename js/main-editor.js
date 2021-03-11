@@ -1618,6 +1618,7 @@ const EDITOR_TOOLS = {
         op1: PencilOperation,
         op2: PencilOperation,
         hover: PencilPreview,
+        shortcut: 'b',
     },
     line: {
         // TODO not implemented
@@ -1625,6 +1626,7 @@ const EDITOR_TOOLS = {
         name: "Line",
         desc: "Draw straight lines",
         uses_palette: true,
+        shortcut: 'l',
     },
     box: {
         // TODO not implemented
@@ -1632,6 +1634,7 @@ const EDITOR_TOOLS = {
         name: "Box",
         desc: "Fill a rectangular area with tiles",
         uses_palette: true,
+        shortcut: 'u',
     },
     fill: {
         icon: 'icons/tool-fill.png',
@@ -1640,12 +1643,14 @@ const EDITOR_TOOLS = {
         uses_palette: true,
         op1: FillOperation,
         hover: FillPreview,
+        shortcut: 'g',
     },
     select_box: {
         icon: 'icons/tool-select-box.png',
         name: "Box select",
         desc: "Select and manipulate rectangles.",
         op1: SelectOperation,
+        shortcut: 'm',
     },
     'force-floors': {
         icon: 'icons/tool-force-floors.png',
@@ -1666,6 +1671,7 @@ const EDITOR_TOOLS = {
         desc: "Edit existing tiles.\nLeft click: rotate actor or toggle terrain\nRight click: rotate or toggle in reverse\nShift: always target terrain\nCtrl-click: edit properties of complex tiles\n(wires, railroads, hints, etc.)",
         op1: AdjustOperation,
         op2: AdjustOperation,
+        shortcut: 'a',
     },
     connect: {
         // TODO not implemented
@@ -1695,6 +1701,12 @@ const EDITOR_TOOLS = {
     // TODO ah, railroads...
 };
 const EDITOR_TOOL_ORDER = ['pencil', 'select_box', 'fill', 'adjust', 'force-floors', 'tracks', 'wire', 'camera'];
+const EDITOR_TOOL_SHORTCUTS = {};
+for (let [tool, tooldef] of Object.entries(EDITOR_TOOLS)) {
+    if (tooldef.shortcut) {
+        EDITOR_TOOL_SHORTCUTS[tooldef.shortcut] = tool;
+    }
+}
 
 // TODO this MUST use a LL tileset!
 const EDITOR_PALETTE = [{
@@ -3095,24 +3107,47 @@ export class Editor extends PrimaryView {
             if (! this.active)
                 return;
 
-            if (ev.key === ',') {
-                if (ev.shiftKey) {
-                    this.rotate_palette_left();
+            if (ev.ctrlKey) {
+                if (ev.key === 'z') {
+                    this.undo();
                 }
-                else if (this.palette_selection) {
-                    this.rotate_tile_left(this.palette_selection);
-                    this.redraw_palette_selection();
+                else if (ev.key === 'Z' || ev.key === 'y') {
+                    this.redo();
                 }
-            }
-            else if (ev.key === '.') {
-                if (ev.shiftKey) {
-                    this.rotate_palette_right();
-                }
-                else if (this.palette_selection) {
-                    this.rotate_tile_right(this.palette_selection);
-                    this.redraw_palette_selection();
+                else {
+                    return;
                 }
             }
+            else {
+                if (ev.key === ',') {
+                    if (ev.shiftKey) {
+                        this.rotate_palette_left();
+                    }
+                    else if (this.palette_selection) {
+                        this.rotate_tile_left(this.palette_selection);
+                        this.redraw_palette_selection();
+                    }
+                }
+                else if (ev.key === '.') {
+                    if (ev.shiftKey) {
+                        this.rotate_palette_right();
+                    }
+                    else if (this.palette_selection) {
+                        this.rotate_tile_right(this.palette_selection);
+                        this.redraw_palette_selection();
+                    }
+                }
+                else if (EDITOR_TOOL_SHORTCUTS[ev.key]) {
+                    this.select_tool(EDITOR_TOOL_SHORTCUTS[ev.key]);
+                }
+                else {
+                    return;
+                }
+            }
+
+            // If we got here, we did something with the key
+            ev.stopPropagation();
+            ev.preventDefault();
         });
         // Level canvas and mouse handling
         this.mouse_op = null;
@@ -3133,6 +3168,7 @@ export class Editor extends PrimaryView {
             else if (ev.button === 1) {
                 // Middle button: always pan
                 this.mouse_op = new PanOperation(this, ev);
+                // TODO how should this impact the hover?
 
                 ev.preventDefault();
                 ev.stopPropagation();
@@ -3238,6 +3274,17 @@ export class Editor extends PrimaryView {
         this.tool_button_els = {};
         for (let toolname of EDITOR_TOOL_ORDER) {
             let tooldef = EDITOR_TOOLS[toolname];
+            let header_text = tooldef.name;
+            if (tooldef.shortcut) {
+                let shortcut;
+                if (tooldef.shortcut === tooldef.shortcut.toUpperCase()) {
+                    shortcut = `Shift-${tooldef.shortcut}`;
+                }
+                else {
+                    shortcut = tooldef.shortcut.toUpperCase();
+                }
+                header_text += ` (${shortcut})`;
+            }
             let button = mk(
                 'button', {
                     type: 'button',
@@ -3247,7 +3294,7 @@ export class Editor extends PrimaryView {
                     src: tooldef.icon,
                     alt: tooldef.name,
                 }),
-                mk('div.-help.editor-big-tooltip', mk('h3', tooldef.name), tooldef.desc),
+                mk('div.-help.editor-big-tooltip', mk('h3', header_text), tooldef.desc),
             );
             this.tool_button_els[toolname] = button;
             toolbox.append(button);
@@ -3867,7 +3914,7 @@ export class Editor extends PrimaryView {
         this.tool_button_els[this.current_tool].classList.add('-selected');
         if (tool && EDITOR_TOOLS[tool].hover) {
             this.mouse_hover_op = new EDITOR_TOOLS[tool].hover(this);
-            // TODO immediately update if the cursor is over the map
+            // FIXME immediately update if the cursor is over the map
         }
     }
 
