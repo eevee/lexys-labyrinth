@@ -1241,9 +1241,6 @@ export function parse_level(buf, number = 1) {
                         cell[type.layer] = {type};
                     }
 
-                    if (type.is_required_chip) {
-                        level.chips_required++;
-                    }
                     if (type.is_hint) {
                         // Remember all the hint tiles (in reading order) so we can map extra hints
                         // to them later.  Don't do it now, since the format doesn't technically

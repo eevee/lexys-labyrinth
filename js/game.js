@@ -482,7 +482,7 @@ export class Level extends LevelInterface {
         this.p1_input = 0;
         this.p1_released = 0xff;
         this.actors = [];
-        this.chips_remaining = this.stored_level.chips_required;
+        this.chips_remaining = this.stored_level.chips_required ?? 0;
         this.bonus_points = 0;
         this.aid = 0;
 
@@ -565,6 +565,9 @@ export class Level extends LevelInterface {
                         if (this.player === null) {
                             this.player = tile;
                         }
+                    }
+                    if (tile.type.is_required_chip && this.stored_level.chips_required === null) {
+                        this.chips_remaining++;
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);

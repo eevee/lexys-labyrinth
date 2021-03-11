@@ -177,6 +177,7 @@ function parse_level(bytes, number) {
     level.has_custom_connections = true;
     level.format = 'ccl';
     level.uses_ll_extensions = false;
+    level.chips_required = 0;
     // Map size is always fixed as 32x32 in CC1
     level.size_x = 32;
     level.size_y = 32;

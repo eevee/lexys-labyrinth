@@ -100,7 +100,9 @@ export class StoredLevel extends LevelInterface {
         this.author = '';
         this.password = null;
         this.hint = '';
-        this.chips_required = 0;
+        // A number is a specified count; the default of null means that the chips are counted on
+        // level init, as in CC2
+        this.chips_required = null;
         this.time_limit = 0;
         this.viewport_size = 9;
         this.extra_chunks = [];
