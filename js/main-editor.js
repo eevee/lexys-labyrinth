@@ -1649,6 +1649,7 @@ const EDITOR_TOOLS = {
         icon: 'icons/tool-select-box.png',
         name: "Box select",
         desc: "Select and manipulate rectangles.",
+        affects_selection: true,
         op1: SelectOperation,
         shortcut: 'm',
     },
@@ -3108,7 +3109,36 @@ export class Editor extends PrimaryView {
                 return;
 
             if (ev.ctrlKey) {
-                if (ev.key === 'z') {
+                if (ev.key === 'a') {
+                    // Select all
+                    if (this.mouse_op && EDITOR_TOOLS[this.current_tool].affects_selection) {
+                        // If we're in the middle of using a selection tool, cancel whatever it's
+                        // doing
+                        this.mouse_op.abort();
+                        this.mouse_op = null;
+                    }
+                    let new_rect = new DOMRect(0, 0, this.stored_level.size_x, this.stored_level.size_y);
+                    let old_rect = this.selection.rect;
+                    if (! (old_rect && old_rect.x === new_rect.x && old_rect.y === new_rect.y && old_rect.width === new_rect.width && old_rect.height === new_rect.height)) {
+                        this.selection.set_from_rect(new_rect);
+                        this.commit_undo();
+                    }
+                }
+                else if (ev.key === 'A') {
+                    // Deselect
+                    if (this.mouse_op && EDITOR_TOOLS[this.current_tool].affects_selection) {
+                        // If we're in the middle of using a selection tool, cancel whatever it's
+                        // doing
+                        this.mouse_op.abort();
+                        this.mouse_op = null;
+                    }
+                    if (! this.selection.is_empty) {
+                        this.selection.defloat();
+                        this.selection.clear();
+                        this.commit_undo();
+                    }
+                }
+                else if (ev.key === 'z') {
                     this.undo();
                 }
                 else if (ev.key === 'Z' || ev.key === 'y') {
