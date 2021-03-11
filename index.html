@@ -38,7 +38,7 @@
                     window.addEventListener('DOMContentLoaded', () => _ll_log_fatal_error(err, ev));
                 }
             };
-            let handle = window.addEventListener('error', e => {
+            let error_listener = e => {
                 if (! e.error)
                     // Not a script error
                     return;
@@ -46,10 +46,11 @@
                     ll_log_fatal_error(e.error, e);
                 }
                 catch (err) {}
-            }, true);
+            };
+            window.addEventListener('error', error_listener, true);
             // Once we've loaded successfully, drop the handler
             window.ll_successfully_loaded = function() {
-                window.removeEventListener('error', handle, true);
+                window.removeEventListener('error', error_listener, true);
             };
         }
     </script>
