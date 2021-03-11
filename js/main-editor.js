@@ -895,7 +895,7 @@ class FillPreview extends OperationPreview {
         this.foreign_object.remove();
     }
 }
-class FillOperation extends MouseOperation {
+class FillOperation extends DrawOperation {
     start() {
         // Filling is a single-click thing, and all the work was done by the preview!
         let preview = this.editor.mouse_hover_op;
@@ -1005,7 +1005,7 @@ class SelectOperation extends MouseOperation {
     }
 }
 
-class ForceFloorOperation extends DrawOperation {
+class ForceFloorOperation extends MouseOperation {
     start() {
         // Begin by placing an all-way force floor under the mouse
         this.editor.place_in_cell(this.cell(this.gx0, this.gy0), {type: TILE_TYPES.force_floor_all});
@@ -1077,7 +1077,7 @@ class ForceFloorOperation extends DrawOperation {
 // fix it if it wasn't there?
 // TODO gonna need an ice tool too, so maybe i can merge all three with some base thing that tracks
 // the directions the mouse is moving?  or is FF tool too different?
-class TrackOperation extends DrawOperation {
+class TrackOperation extends MouseOperation {
     start() {
         // Do nothing to start; we only lay track when the mouse leaves a cell
         this.entry_direction = null;
@@ -1165,7 +1165,7 @@ class TrackOperation extends DrawOperation {
     }
 }
 
-class WireOperation extends DrawOperation {
+class WireOperation extends MouseOperation {
     start() {
         if (this.modifier === 'ctrl') {
             // Place or remove wire tunnels
@@ -1312,7 +1312,7 @@ class WireOperation extends DrawOperation {
                 // TODO probably a better way to do this
                 if (! tile)
                     continue;
-                if (['floor', 'steel', 'button_pink', 'button_black', 'teleport_blue', 'teleport_red', 'light_switch_on', 'light_switch_off', 'circuit_block', 'teleport_blue_exit', 'turntable_cw', 'turntable_ccw'].indexOf(tile.type.name) < 0)
+                if (! tile.type.contains_wire)
                     continue;
 
                 tile = {...tile};
@@ -4165,7 +4165,27 @@ export class Editor extends PrimaryView {
             return;
         }
 
-        this._assign_tile(cell, layer, {...tile}, existing_tile);
+        let new_tile = {...tile};
+        // Special case: preserve wires when replacing one wired tile with another
+        if (new_tile.type.contains_wire &&
+            // FIXME this is hacky garbage
+            tile === this.palette_selection && this.palette_selection_from_palette)
+        {
+            if (existing_tile.type.contains_wire) {
+                new_tile.wire_directions = existing_tile.wire_directions;
+            }
+            else if (existing_tile.type.name === 'logic_gate') {
+                // Extract the wires from logic gates
+                new_tile.wire_directions = 0;
+                for (let dir of existing_tile.type.get_wires(existing_tile)) {
+                    if (dir) {
+                        new_tile.wire_directions |= DIRECTIONS[dir].bit;
+                    }
+                }
+            }
+        }
+
+        this._assign_tile(cell, layer, new_tile, existing_tile);
     }
 
     erase_tile(cell, tile = null) {
