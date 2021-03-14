@@ -376,10 +376,27 @@ const TILE_TYPES = {
     thin_walls: {
         layer: LAYERS.thin_wall,
         blocks(me, level, actor, direction) {
-            return ((me.edges & DIRECTIONS[direction].opposite_bit) !== 0) && actor.type.name !== 'ghost';
+            if (actor.type.name === 'ghost')
+                return false;
+            return (me.edges & DIRECTIONS[direction].opposite_bit) !== 0;
         },
         blocks_leaving(me, actor, direction) {
-            return ((me.edges & DIRECTIONS[direction].bit) !== 0) && actor.type.name !== 'ghost';
+            if (actor.type.name === 'ghost')
+                return false;
+            return (me.edges & DIRECTIONS[direction].bit) !== 0;
+        },
+        populate_defaults(me) {
+            me.edges = 0;  // bitmask of directions
+        },
+    },
+    // These only support one-way into the tile, so they're pretty much thin walls that can only
+    // stop something from leaving
+    one_way_walls: {
+        layer: LAYERS.thin_wall,
+        blocks_leaving(me, actor, direction) {
+            if (actor.type.name === 'ghost')
+                return false;
+            return (me.edges & DIRECTIONS[direction].bit) !== 0;
         },
         populate_defaults(me) {
             me.edges = 0;  // bitmask of directions

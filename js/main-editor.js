@@ -1906,6 +1906,7 @@ const EDITOR_PALETTE = [{
         'sokoban_block/yellow',
         'sokoban_button/yellow',
         'sokoban_wall/yellow',
+        'one_way_walls/south',
     ],
 }];
 
@@ -2584,6 +2585,7 @@ const SPECIAL_PALETTE_ENTRIES = {
     'sokoban_block/green':  { name: 'sokoban_block', color: 'green' },
     'sokoban_button/green': { name: 'sokoban_button', color: 'green' },
     'sokoban_wall/green':   { name: 'sokoban_wall', color: 'green' },
+    'one_way_walls/south':  { name: 'one_way_walls', edges: DIRECTIONS['south'].bit },
 };
 const _RAILROAD_ROTATED_LEFT = [3, 0, 1, 2, 5, 4];
 const _RAILROAD_ROTATED_RIGHT = [1, 2, 3, 0, 5, 4];
@@ -2815,6 +2817,15 @@ const SPECIAL_PALETTE_BEHAVIOR = {
             return 'sokoban_wall/' + (tile.color ?? 'red');
         },
     },
+    one_way_walls: {
+        pick_palette_entry(tile) {
+            return 'one_way_walls/south';
+        },
+    },
+};
+SPECIAL_PALETTE_BEHAVIOR['one_way_walls'] = {
+    ...SPECIAL_PALETTE_BEHAVIOR['thin_walls'],
+    ...SPECIAL_PALETTE_BEHAVIOR['one_way_walls'],
 };
 // Fill in some special behavior that boils down to rotating tiles which happen to be encoded as
 // different tile types

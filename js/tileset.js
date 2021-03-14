@@ -1154,6 +1154,11 @@ export const LL_TILESET_LAYOUT = {
         thin_walls_ns: [8, 4],
         thin_walls_ew: [8, 5],
     },
+    one_way_walls: {
+        __special__: 'thin_walls',
+        thin_walls_ns: [9, 4],
+        thin_walls_ew: [9, 5],
+    },
 
     force_floor_n: {
         __special__: 'scroll',
