@@ -2387,6 +2387,13 @@ export class Level extends LevelInterface {
             if (! neighbor)
                 continue;
 
+            let terrain = neighbor.get_terrain();
+            if (terrain.type.name === 'logic_gate' &&
+                terrain.type.get_wires(terrain).includes(dirinfo.opposite))
+            {
+                return true;
+            }
+
             let wired = neighbor.get_wired_tile();
             if (! wired)
                 continue;
