@@ -1514,8 +1514,8 @@ class AdjustOperation extends MouseOperation {
             }
             return;
         }
-        // FIXME implement shift to always target floor, or maybe start from bottom
-        for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
+        let start_layer = this.shift ? 0 : LAYERS.MAX - 1;
+        for (let layer = start_layer; layer >= 0; layer--) {
             let tile = cell[layer];
             if (! tile)
                 continue;
