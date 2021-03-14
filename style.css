@@ -301,6 +301,8 @@ dl.formgrid {
 }
 dl.formgrid > dt {
     grid-column: 1;
+    text-align: right;
+    color: hsl(225, 50%, 25%);
 }
 dl.formgrid > dd {
     grid-column: 2;
@@ -311,6 +313,21 @@ dl.formgrid > dd button {
 }
 dl.formgrid > dd button + button {
     margin-left: 0.25em;
+}
+dl.formgrid > dd.-one-field {
+    display: flex;
+}
+dl.formgrid > dd.-textarea {
+    display: flex;
+    align-self: end;  /* make the <dt> align to the top */
+}
+dl.formgrid > dd.-one-field > *,
+dl.formgrid > dd.-textarea > * {
+    flex: auto;
+}
+dl.formgrid > dd.-with-buttons {
+    display: flex;
+    justify-content: space-between;
 }
 
 /* Individual overlays */

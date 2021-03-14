@@ -1053,7 +1053,7 @@ export function parse_level(buf, number = 1) {
             type === 'CLUE' || type === 'NOTE')
         {
             // These are all singular strings (with a terminating NUL, for some reason)
-            // XXX character encoding??
+            // XXX character encoding??  seems to be latin1, ugh
             let str = util.string_from_buffer_ascii(bytes, 0, bytes.length - 1).replace(/\r\n/g, "\n");
 
             // TODO store more of this, at least for idempotence, maybe
@@ -1079,10 +1079,23 @@ export function parse_level(buf, number = 1) {
                 level.hint = str;
             }
             else if (type === 'NOTE') {
-                // Author's comments...  but might also include multiple hints for levels with
-                // multiple hint tiles, delineated by [CLUE] (anywhere in the line (!)).
-                // LL treats extra hints as tile properties, so store them for later
-                [level.comment, ...extra_hints] = str.split(/\n?^.*\[CLUE\].*$\n?/mg);
+                // Author's comments...  but might also include tags delimiting special blocks, most
+                // notably for storing multiple hints.  Note that this parsing might lose data in
+                // two cases: if other text is in the same line as the tag (which still counts!),
+                // it's silently ignored; if there are more [CLUE] blocks than the level has hints,
+                // the extras are silently dropped, because hint text is a tile prop in LL.
+                let parts = str.split(/\n?^.*\[(CLUE|JETLIFE|COM)\].*$\n?/mg);
+                level.comment = parts[0];
+                extra_hints = [];
+                for (let i = 1; i < parts.length; i += 2) {
+                    let type = parts[i];
+                    let text = parts[i + 1];
+                    if (type === 'CLUE') {
+                        extra_hints.push(text);
+                    }
+                    // TODO do something with COM (c2g commands) and JETLIFE (easter egg, make flame
+                    // jets propagate like game of life)
+                }
             }
             continue;
         }
@@ -1425,6 +1438,7 @@ class C2M {
         }
 
         if (typeof buf === 'string' || buf instanceof String) {
+            // FIXME encode as latin1, maybe with some kludge for anything that doesn't fit
             let str = buf;
             // C2M also includes the trailing NUL
             buf = new ArrayBuffer(str.length + 1);
@@ -1640,13 +1654,18 @@ export function synthesize_level(stored_level) {
     }
     map_bytes = map_bytes.subarray(0, p);
 
-    // Collect hints first so we can put them in the comment field
-    // FIXME this does not respect global hint, but then, neither does the editor.
-    hints = hints.map(hint => hint ?? '');
-    hints.push('');
-    hints.unshift('');
-    // Must use Windows linebreaks here  🙄
-    c2m.add_section('NOTE', hints.join('\r\n[CLUE]\r\n'));
+    let comment = stored_level.comment;
+    if (hints.length) {
+        // Collect hints first so we can put them in the comment field
+        // FIXME this does not respect global hint, but then, neither does the editor.
+        hints = hints.map(hint => hint ?? '');
+        hints.push('');
+        hints.unshift('');
+        // Must use Windows linebreaks here  🙄
+        comment += hints.join('\r\n[CLUE]\r\n');
+    }
+    // TODO support COM and JETLIFE
+    c2m.add_section('NOTE', comment);
 
     let compressed_map = compress(map_bytes);
     if (compressed_map) {

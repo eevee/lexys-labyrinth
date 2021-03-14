@@ -47,10 +47,15 @@ class EditorLevelMetaOverlay extends DialogOverlay {
         let dl = mk('dl.formgrid');
         this.main.append(dl);
 
-        let time_limit_input = mk('input', {name: 'time_limit', type: 'number', min: 0, max: 999, value: stored_level.time_limit});
+        let time_limit_input = mk('input', {name: 'time_limit', type: 'number', min: 0, max: 65535, value: stored_level.time_limit});
         let time_limit_output = mk('output');
         let update_time_limit = () => {
             let time_limit = parseInt(time_limit_input.value, 10);
+            // FIXME need a change event for this tbh?
+            // FIXME handle NaN; maybe block keydown of not-numbers
+            time_limit = Math.max(0, Math.min(65535, time_limit));
+            time_limit_input.value = time_limit;
+
             let text;
             if (time_limit === 0) {
                 text = "No time limit";
@@ -63,6 +68,28 @@ class EditorLevelMetaOverlay extends DialogOverlay {
         update_time_limit();
         time_limit_input.addEventListener('input', update_time_limit);
 
+        let make_size_input = (name) => {
+            let input = mk('input', {name: name, type: 'number', min: 10, max: 100, value: stored_level[name]});
+            // TODO maybe block keydown of non-numbers too?
+            // Note that this is a change event, not an input event, so we don't prevent them from
+            // erasing the whole value to type a new one
+            input.addEventListener('change', ev => {
+                let value = parseInt(ev.target.value, 10);
+                if (isNaN(value)) {
+                    ev.target.value = stored_level[name];
+                }
+                else if (value < 1) {
+                    // Smaller than 10×10 isn't supported by CC2, but LL doesn't mind, so let it
+                    // through if they try it manually
+                    ev.target.value = 1;
+                }
+                else if (value > 100) {
+                    ev.target.value = 100;
+                }
+            });
+            return input;
+        };
+
         let make_radio_set = (name, options) => {
             let elements = [];
             for (let [label, value] of options) {
@@ -72,52 +99,48 @@ class EditorLevelMetaOverlay extends DialogOverlay {
 
         dl.append(
             mk('dt', "Title"),
-            mk('dd', mk('input', {name: 'title', type: 'text', value: stored_level.title})),
+            mk('dd.-one-field', mk('input', {name: 'title', type: 'text', value: stored_level.title})),
             mk('dt', "Author"),
-            mk('dd', mk('input', {name: 'author', type: 'text', value: stored_level.author})),
+            mk('dd.-one-field', mk('input', {name: 'author', type: 'text', value: stored_level.author})),
+            mk('dt', "Comment"),
+            mk('dd.-textarea', mk('textarea', {name: 'comment', rows: 4, cols: 20}, stored_level.comment)),
             mk('dt', "Time limit"),
-            mk('dd',
-                time_limit_input,
-                " ",
-                time_limit_output,
-                mk('br'),
-                mk_button("None", ev => {
-                    this.root.elements['time_limit'].value = 0;
-                    update_time_limit();
-                }),
-                mk_button("−30s", ev => {
-                    this.root.elements['time_limit'].value = Math.max(0,
-                        parseInt(this.root.elements['time_limit'].value, 10) - 30);
-                    update_time_limit();
-                }),
-                mk_button("+30s", ev => {
-                    this.root.elements['time_limit'].value = Math.min(999,
-                        parseInt(this.root.elements['time_limit'].value, 10) + 30);
-                    update_time_limit();
-                }),
-                mk_button("Max", ev => {
-                    this.root.elements['time_limit'].value = 999;
-                    update_time_limit();
-                }),
+            mk('dd.-with-buttons',
+                mk('div.-left',
+                    time_limit_input,
+                    " ",
+                    time_limit_output,
+                ),
+                mk('div.-right',
+                    mk_button("None", ev => {
+                        this.root.elements['time_limit'].value = 0;
+                        update_time_limit();
+                    }),
+                    mk_button("−30s", ev => {
+                        this.root.elements['time_limit'].value = Math.max(0,
+                            parseInt(this.root.elements['time_limit'].value, 10) - 30);
+                        update_time_limit();
+                    }),
+                    mk_button("+30s", ev => {
+                        this.root.elements['time_limit'].value = Math.min(999,
+                            parseInt(this.root.elements['time_limit'].value, 10) + 30);
+                        update_time_limit();
+                    }),
+                    mk_button("Max", ev => {
+                        this.root.elements['time_limit'].value = 999;
+                        update_time_limit();
+                    }),
+                ),
             ),
             mk('dt', "Size"),
-            mk('dd',
-                mk('input', {name: 'size_x', type: 'number', min: 10, max: 100, value: stored_level.size_x}),
-                " × ",
-                mk('input', {name: 'size_y', type: 'number', min: 10, max: 100, value: stored_level.size_y}),
-                mk('br'),
-                mk_button("10×10", ev => {
-                    this.root.elements['size_x'].value = 10;
-                    this.root.elements['size_y'].value = 10;
-                }),
-                mk_button("32×32", ev => {
-                    this.root.elements['size_x'].value = 32;
-                    this.root.elements['size_y'].value = 32;
-                }),
-                mk_button("100×100", ev => {
-                    this.root.elements['size_x'].value = 100;
-                    this.root.elements['size_y'].value = 100;
-                }),
+            mk('dd.-with-buttons',
+                mk('div.-left', make_size_input('size_x'), " × ", make_size_input('size_y')),
+                mk('div.-right', ...[10, 32, 50, 100].map(size =>
+                    mk_button(`${size}²`, ev => {
+                        this.root.elements['size_x'].value = size;
+                        this.root.elements['size_y'].value = size;
+                    }),
+                )),
             ),
             mk('dt', "Viewport"),
             mk('dd',
@@ -181,10 +204,11 @@ class EditorLevelMetaOverlay extends DialogOverlay {
                 stored_level.author = author;
             }
 
-            stored_level.time_limit = parseInt(els.time_limit.value, 10);
+            // FIXME gotta deal with NaNs here too, sigh, might just need a teeny tiny form library
+            stored_level.time_limit = Math.max(0, Math.min(65535, parseInt(els.time_limit.value, 10)));
 
-            let size_x = parseInt(els.size_x.value, 10);
-            let size_y = parseInt(els.size_y.value, 10);
+            let size_x = Math.max(1, Math.min(100, parseInt(els.size_x.value, 10)));
+            let size_y = Math.max(1, Math.min(100, parseInt(els.size_y.value, 10)));
             if (size_x !== stored_level.size_x || size_y !== stored_level.size_y) {
                 this.conductor.editor.resize_level(size_x, size_y);
             }
@@ -192,7 +216,11 @@ class EditorLevelMetaOverlay extends DialogOverlay {
             stored_level.blob_behavior = parseInt(els.blob_behavior.value, 10);
             stored_level.hide_logic = els.hide_logic.checked;
             stored_level.use_cc1_boots = els.use_cc1_boots.checked;
-            stored_level.viewport_size = parseInt(els.viewport.value, 10);
+            let viewport_size = parseInt(els.viewport.value, 10);
+            if (viewport_size !== 9 && viewport_size !== 10) {
+                viewport_size = 10;
+            }
+            stored_level.viewport_size = viewport_size;
             this.conductor.player.update_viewport_size();
 
             this.close();
@@ -1749,7 +1777,7 @@ const EDITOR_PALETTE = [{
 
         'water', 'turtle', 'fire',
         'ice', 'ice_nw',
-        'force_floor_n', 'force_floor_all',
+        'force_floor_s', 'force_floor_all',
         'canopy',
     ],
 }, {
