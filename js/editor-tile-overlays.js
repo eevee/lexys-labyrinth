@@ -30,11 +30,12 @@ class TileEditorOverlay extends TransientOverlay {
             }
             this.editor.mark_cell_dirty(this.cell);
         }
-        else {
-            // TODO i guess i'm just kind of assuming it's the palette selection, but it doesn't
-            // necessarily have to be, if i...  do something later
+        else if (this.tile === this.editor.fg_tile) {
             // The change hasn't happened yet!  Don't redraw until we return to the event loop
-            setTimeout(() => this.editor.redraw_palette_selection(), 0);
+            setTimeout(() => this.editor.redraw_foreground_tile(), 0);
+        }
+        else if (this.tile === this.editor.bg_tile) {
+            setTimeout(() => this.editor.redraw_background_tile(), 0);
         }
     }
 
