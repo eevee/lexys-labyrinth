@@ -589,6 +589,7 @@ class MouseOperation {
 
     do_press(ev) {
         this.is_held = true;
+        this._update_modifiers(ev);
 
         this.client_x = ev.clientX;
         this.client_y = ev.clientY;
@@ -607,10 +608,10 @@ class MouseOperation {
     }
 
     do_move(ev) {
+        this._update_modifiers(ev);
         let [frac_cell_x, frac_cell_y] = this.editor.renderer.real_cell_coords_from_event(ev);
         let cell_x = Math.floor(frac_cell_x);
         let cell_y = Math.floor(frac_cell_y);
-        this._update_modifiers(ev);
 
         if (this.is_held && (ev.buttons & MOUSE_BUTTON_MASKS[this.physical_button]) === 0) {
             this.do_abort();
@@ -842,11 +843,12 @@ class PencilOperation extends MouseOperation {
         if (this.ctrl) {
             // Erase
             if (this.shift) {
+                // Wipe the whole cell
                 let new_cell = this.editor.make_blank_cell(x, y);
                 this.editor.replace_cell(cell, new_cell);
             }
             else if (template) {
-                // Erase whatever's on the same layer
+                // Erase whatever's on the same layer as the fg tile
                 this.editor.erase_tile(cell);
             }
         }
@@ -855,13 +857,13 @@ class PencilOperation extends MouseOperation {
             if (! template)
                 return;
             if (this.shift) {
-                // Aggressive mode: erase whatever's already in the cell
+                // Aggressive mode: replace whatever's already in the cell
                 let new_cell = this.editor.make_blank_cell(x, y);
                 new_cell[template.type.layer] = {...template};
                 this.editor.replace_cell(cell, new_cell);
             }
             else {
-                // Default operation: only erase whatever's on the same layer
+                // Default operation: only replace whatever's on the same layer
                 this.editor.place_in_cell(cell, template);
             }
         }
@@ -4363,7 +4365,6 @@ export class Editor extends PrimaryView {
             return;
 
         // Replace whatever's on the same layer
-        // TODO should preserve wiring if possible too
         let layer = tile.type.layer;
         let existing_tile = cell[layer];
 
@@ -4412,7 +4413,6 @@ export class Editor extends PrimaryView {
             tile = this.fg_tile;
         }
 
-        this.mark_cell_dirty(cell);
         let existing_tile = cell[tile.type.layer];
 
         // If we find a tile of the same type as the one being drawn, see if it has custom combine
@@ -4423,9 +4423,13 @@ export class Editor extends PrimaryView {
             SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
             SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase)
         {
-            let remove = SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase(tile, existing_tile);
-            if (! remove)
+            let old_tile = {...existing_tile};
+            let new_tile = existing_tile;
+            let remove = SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase(tile, new_tile);
+            if (! remove) {
+                this._assign_tile(cell, tile.type.layer, new_tile, old_tile);
                 return;
+            }
         }
 
         let new_tile = null;
