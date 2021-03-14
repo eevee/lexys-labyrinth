@@ -141,6 +141,11 @@ export class Overlay {
     close() {
         this._remove_global_event_handlers();
         this.root.closest('.overlay').remove();
+        if (document.activeElement) {
+            // The active element is almost certainly either the dialog or a control within it,
+            // which is useless as a focus target, so blur it and let the page have focus
+            document.activeElement.blur();
+        }
     }
 }
 
