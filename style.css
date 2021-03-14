@@ -12,9 +12,9 @@ body {
 
     font-family: Ubuntu, Source Sans Pro, DejaVu Sans, sans-serif;
     line-height: 1.33;
-    background: #080808;
+    background: hsl(225, 5%, 5%);
     background-image: url(background.svg);
-    background-size: 10%;
+    background-size: 12em;
     color: #ececec;
 
     --panel-bg-color: hsl(225, 10%, 15%);
@@ -572,7 +572,7 @@ pre.stack-trace {
 
 @media (max-width: 800px) {
     body > header {
-        padding: 0.25em;
+        padding: 0.125em 0.25em;
     }
     /* All these headings are way too big on phones */
     body > header h1 {
@@ -643,8 +643,9 @@ pre.stack-trace {
     grid-area: header;
     display: grid;
     grid:
-        "image  title"      2fr
-        "image  tagline"    1fr
+        "image  title   fullscreen" 2fr
+        "image  tagline fullscreen" 1fr
+        / min-content 1fr min-content
     ;
     gap: 0 2em;
 
@@ -667,6 +668,16 @@ pre.stack-trace {
     margin: 0;
     font-style: italic;
     color: #909090;
+}
+#splash-fullscreen {
+    /* FIXME this makes the title SLIGHTLY offcenter bc of grid gap */
+    display: none;
+    grid-area: fullscreen;
+    align-self: center;
+}
+#splash-fullscreen svg {
+    width: 2em;
+    height: auto;
 }
 #splash h2 {
     border-bottom: 1px solid #404040;
@@ -1038,12 +1049,15 @@ ol.packtest-summary > li {
     align-self: start;
 }
 #player-controls button,
-#player-actions button svg {
-    font-size: 1.5em;
-}
-#player-controls button {
+#player-actions button {
     padding: 0.5em;
     line-height: 1;
+}
+#player-controls button svg,
+#player-actions button svg {
+    font-size: 1.5em;
+    display: block;
+    margin: 0.125em auto;
 }
 #player-controls .radio-faux-button-set {
     margin: 0;
@@ -1051,13 +1065,6 @@ ol.packtest-summary > li {
 #player-actions {
     grid-area: actions;
     align-self: end;
-}
-#player-actions button {
-    text-align: center;
-}
-#player-actions button svg {
-    display: block;
-    margin: 0.125em auto;
 }
 #player-music {
     grid-area: music;
@@ -1099,9 +1106,12 @@ ol.packtest-summary > li {
         flex-direction: row;
         white-space: nowrap;
     }
-    #player-controls button,
+    #player-controls button svg,
     #player-actions button svg {
         font-size: 1em;
+    }
+    #player-controls .-optional-label {
+        display: none;
     }
     #player-controls button {
         padding: 0.25em 0.5em;
@@ -1125,12 +1135,12 @@ ol.packtest-summary > li {
     }
 }
 @media (orientation: portrait) and (max-width: 800px) {
-    /* On a /small/ portrait screen, also put the controls in two rows */
+    /* On a /small/ portrait screen, put the controls on their own bottom row */
     #player-main {
         grid:
             "buttons"
-            "actions"
             "game"
+            "actions"
             "music"
         ;
     }
@@ -1138,12 +1148,19 @@ ol.packtest-summary > li {
     #player-actions {
         justify-content: center;
     }
+    #player-controls button,
+    #player-actions button {
+        flex: auto;
+    }
     #player .keyhint {
         /* Hide key hints; there's nowhere to put them and they take up surprisingly a lot of space */
         display: none;
     }
 }
 @media (max-width: 800px) {
+    #splash-fullscreen {
+        display: revert;
+    }
     #player-music {
         font-size: 0.875em;
     }
@@ -1162,7 +1179,7 @@ ol.packtest-summary > li {
         "level      chips"      min-content
         "level      time"       min-content
         "level      bonus"      min-content
-        "level      hint"       1fr
+        "level      rules"      1fr
         "level      inventory"  min-content
         /* Need explicit min-content to force the hint to wrap */
         / min-content min-content
@@ -1381,25 +1398,51 @@ dl.score-chart .-star {
 }
 #player .bonus {
     visibility: hidden;
-    display: none;
+    display: flex;
 }
 #player.--bonus-visible .bonus {
     visibility: initial;
-    display: flex;
+}
+.player-rules {
+    font-size: calc(var(--tile-height) * var(--scale) / 4);
+    grid-area: rules;
+    align-self: end;
+    color: hsl(225, 20%, 80%);
+}
+.player-rules p {
+    display: none;
+    margin: 0.25em 0;
+}
+#player.--hide-logic .player-rules #player-rule-logic-hidden {
+    display: revert;
+}
+#player.--cc1-boots .player-rules #player-rule-cc1-boots {
+    display: revert;
 }
 
 /* This has a wrapper because scrollables don't work too well as the direct child of a grid or flex
  * parent; they really want to expand to their natural size, and I do not want that */
 #player-game-area > .player-hint-wrapper {
-    grid-area: hint;
+    grid-area: rules;
     align-self: stretch;
 
     display: none;
-    font-size: calc(var(--tile-height) * var(--scale) / 3);
+    position: relative;
+    overflow: hidden;
+    font-size: calc(var(--tile-height) * var(--scale) / 4);
     font-family: serif;
-    color: hsl(45, 100%, 60%);
-    background: #080808;
-    border: 2px inset #202020;
+    color: hsl(225, 20%, 80%);
+    background: url(#svg-icon-hint) hsl(225, 10%, 10%);
+    border: 3px double hsl(225, 10%, 20%);
+}
+#player-game-area > .player-hint-wrapper > .player-hint-bg-icon {
+    position: absolute;
+    width: 8em;
+    height: auto;
+    bottom: -2em;
+    right: -2em;
+    opacity: 0.05;
+    transform: rotate(-30deg);
 }
 #player-game-area > .player-hint-wrapper > .player-hint {
     overflow: auto;
@@ -1410,7 +1453,8 @@ dl.score-chart .-star {
     min-height: 100%;
     width: 0;
     min-width: 100%;
-    padding: 0.25em 0.5em;
+    padding: 0.5em 0.625em;
+    line-height: 1.5;
 }
 #player-game-area > .player-hint-wrapper.--visible {
     display: initial;
@@ -1453,12 +1497,13 @@ dl.score-chart .-star {
     #player-game-area {
         /* Rearrange the grid to be vertical */
         grid:
-            "level      level"
-            "inventory  chips" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "inventory  time" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            "inventory  bonus" calc((var(--tile-height) * var(--scale) * 2 - 1em) / 3)
-            / min-content 1fr
+            "level      level   level"
+            "inventory  rules   chips" calc((var(--tile-height) * var(--scale) * (2 - 1/6)) / 3)
+            "inventory  rules   time" calc((var(--tile-height) * var(--scale) * (2 - 1/6)) / 3)
+            "inventory  rules   bonus" calc((var(--tile-height) * var(--scale) * (2 - 1/6)) / 3)
+            / min-content min-content 1fr
         ;
+        row-gap: calc(var(--tile-height) * var(--scale) / 6);
     }
     #player .inventory {
         /* stick me in the center right */
@@ -1470,6 +1515,17 @@ dl.score-chart .-star {
         grid-column: level;
         z-index: 1;
         font-size: calc(var(--tile-height) * var(--scale) / 2.5);
+    }
+    #player-game-area > .player-hint-wrapper > .player-hint {
+        padding: 0.25em 0.33em;
+        line-height: 1.33;
+    }
+    .player-rules {
+        align-self: center;
+    }
+    .player-rules p span {
+        /* There's only room for the icons, since there's no dedicated hint space */
+        display: none;
     }
 }
 

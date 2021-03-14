@@ -1331,6 +1331,8 @@ class Player extends PrimaryView {
         this.root.classList.remove('--replay-playback');
         this.root.classList.remove('--replay-recording');
         this.root.classList.remove('--bonus-visible');
+        this.root.classList.toggle('--hide-logic', this.level.stored_level.hide_logic);
+        this.root.classList.toggle('--cc1-boots', this.level.stored_level.use_cc1_boots);
 
         if (this.debug.enabled) {
             this.debug.replay = null;
@@ -2337,6 +2339,16 @@ class Splash extends PrimaryView {
     }
 
     setup() {
+        this.root.querySelector('#splash-fullscreen').addEventListener('click', ev => {
+            let html = document.documentElement;
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+            }
+            else {
+                (html.requestFullscreen || html.webkitRequestFullscreen).call(html);
+            }
+        });
+
         // Editor interface
         // (this has to be handled here because we need to examine the editor,
         // which hasn't yet been created in our constructor)

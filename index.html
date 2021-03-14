@@ -95,6 +95,11 @@
             <path d="M 8,13 13,11 8,9 3,11 Z m 0,2 7,-3 V 11 L 8,8 1,11 v 1 z"></path>
             <ellipse cx="5.5" cy="11" rx="0.75" ry="0.5"></ellipse>
         </g>
+        <g id="svg-icon-hint">
+            <path d="M1,8 a7,7 0 1,1 14,0 7,7 0 1,1 -14,0 M2,8 a6,6 0 1,0 12,0 6,6 0 1,0 -12,0"></path>
+            <path d="M5,6 a1,1 0 0,0 2,0 a1,1 0 1,1 1,1 a1,1 0 0,0 -1,1 v1 a1,1 0 1,0 2,0 v-0.17 A3,3 0 1,0 5,6"></path>
+            <circle cx="8" cy="12" r="1"></circle>
+        </g>
     </defs>
     </svg>
     <header id="header-main">
@@ -149,7 +154,15 @@
         <header>
             <img src="og-preview.png" alt="">
             <h1>Lexy's Labyrinth</h1>
-            <p>an unauthorized <strong>Chip's Challenge</strong>® emulator</p>
+            <p>an unofficial <strong>Chip's Challenge</strong>® emulator</p>
+            <button id="splash-fullscreen" type="button" title="Toggle fullscreen">
+                <svg class="svg-icon" viewBox="0 0 16 16">
+                    <path d="m 11,1 h 4 V 5 L 14,4 12,6 10,4 12,2 Z"></path>
+                    <path d="m 11,15 h 4 v -4 l -1,1 -2,-2 -2,2 2,2 z"></path>
+                    <path d="M 5,1 H 1 V 5 L 2,4 4,6 6,4 4,2 Z"></path>
+                    <path d="M 5,15 H 1 v -4 l 1,1 2,-2 2,2 -2,2 z"></path>
+                </svg>
+            </button>
         </header>
         <div id="splash-links">
             <a href="https://github.com/eevee/lexys-labyrinth/wiki">About</a>
@@ -195,16 +208,18 @@
             <div id="player-controls">
                 <button class="control-pause" type="button" title="pause">
                     <svg class="svg-icon" viewBox="0 0 16 16"><path d="M2,1 h4 v14 h-4 z M10,1 h4 v14 h-4 z"></path></svg>
-                    <span class="keyhint"><kbd>p</kbd></span></button>
+                    <span class="-optional-label">pause</span> <span class="keyhint"><kbd>p</kbd></span></button>
                 <button class="control-restart" type="button" title="restart">
                     <svg class="svg-icon" viewBox="0 0 16 16"><path d="M13,13 A 7,7 270 1,1 13,3 L15,1 15,7 9,7 11,5 A 4,4 270 1,0 11,11 z"></path></svg>
+                    <span class="-optional-label">retry</span>
                     </button>
                 <button class="control-undo" type="button" title="undo">
                     <svg class="svg-icon" viewBox="0 0 16 16"><path d="M6,5 6,2 1,7 6,12 6,9 A 10,10 60 0,1 15,12 A 10,10 90 0,0 6,5"></path></svg>
+                    <span class="-optional-label">undo</span>
                     </button>
                 <button class="control-rewind" type="button" title="rewind">
                     <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></path></svg>
-                    <span class="keyhint"><kbd>z</kbd></span></button>
+                    <span class="-optional-label">rewind</span> <span class="keyhint"><kbd>z</kbd></span></button>
                 <div class="radio-faux-button-set">
                     <label><input class="control-turn-based" type="checkbox"> <span>Turn <br>based <br>mode</span></label>
                 </div>
@@ -230,6 +245,7 @@
                 </div>
                 <div class="player-hint-wrapper">
                     <div class="player-hint"></div>
+                    <svg class="player-hint-bg-icon svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-hint"></use></svg>
                 </div>
                 <div class="chips">
                     <h3>
@@ -262,6 +278,20 @@
                         </svg>
                     </h3>
                     <output></output>
+                </div>
+                <div class="player-rules">
+                    <p id="player-rule-compat-lynx" title="This level is known to have compatibility issues with the default Lexy rules, but is playable with the rules it was designed for.">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="M 5,1 C 4,1 3,2 3,3 v 9 c 0,1 0,1 -1,1 -1,0 -1,2 0,2 h 9 c 1,0 2,-1 2,-2 V 4 c 0,-1 0,-1 1,-1 1,0 1,-2 0,-2 z m 0,2 h 6 V 4 H 5 Z m 0,3 h 6 V 7 H 5 Z m 0,3 h 6 v 1 H 5 Z m 0,3 h 6 v 1 H 5 Z"></path></svg>
+                        <span>May require Lynx rules</span>
+                    </p>
+                    <p id="player-rule-logic-hidden" title="In this level, wires and logic gates are invisible.  X-ray glasses will reveal them.">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 a7,7 0 0,1 14,0 7,7 0 0,1 -14,0 M3,8 a5,5 0 0,1 10,0 5,5 0 0,1 -10,0"></path><path d="M2,7 h5 v-5 h2 v5 h5 v2 h-5 v5 h-2 v-5 h-5 v-2"></path><path d="M1,14 L14,1 l1,1 L2,15 l-1,-1"></path></svg>
+                        <span>Logic hidden</span>
+                    </p>
+                    <p id="player-rule-cc1-boots" title="In this level, tools cannot be dropped, and only the tools available in CC1 (cleats, suction boots, fire boots, and flippers) can be picked up.">
+                        <svg class="svg-icon" viewBox="0 0 16 16"><path d="m 1,12 v 3 h 3 l 5,-5 h 3 L 15,7 V 4 L 12,7 H 11 L 9,5 V 4 L 12,1 H 9 L 6,4 v 3 z"></path></svg>
+                        <span>Retro tool mode</span>
+                    </p>
                 </div>
                 <div class="inventory"></div>
             </section>
@@ -365,7 +395,6 @@
                 <!-- populated in js -->
             </div>
             <p>Tip: Middle-click to teleport.</p>
-
             <!-- TODO?
                 - inspect with mouse
                     - list of actors, or currently pointed-to actor?
@@ -383,70 +412,15 @@
         </form>
     </main>
     <main id="editor" hidden>
-        <header>
-            <!-- TODO
-            - close
-            - export
-            - delete??
-
-            - zoom
-
-            also deal with levels vs level /packs/ somehow, not sure how that'll work (including downloading them, yeargh?)
-            -->
-        </header>
+        <header></header>
         <div class="editor-canvas">
             <div class="-container">
                 <!-- level canvas and any overlays go here -->
                 <!-- the container is to allow them to scroll as a single unit -->
             </div>
         </div>
-        <nav class="controls">
-            <!--
-            <p style>
-                Tip: Right click to color drop.<br>
-                Tip: Ctrl-click with terrain to replace only the current tile's terrain, rather than overwriting the whole tile.
-            </p>
-
-            <p>Layer: [all/auto] [terrain] [item] [actor] [overlay]</p>
-
-            <p>Actor direction: [north] [south] [east] [west]</p>
-
-            <p>[ ] Show connections</p>
-            <p>[ ] Toggle green objects</p>
-            <p>[ ] Show monster pathing</p>
-            <p>[ ] Show circuits???</p>
-
-            <pre>
-            Metadata: 
-            xxx / yyy chips required
-            Time limit: [____]
-            Title: [__________]
-            Author: [__________]
-            map size
-            </pre>
-            -->
-        </nav>
+        <nav class="controls"></nav>
         <div class="palette"></div>
-        <!-- TODO:
-        controls
-        - play!
-        - object palette
-        - choose direction
-        - choose layer to /modify/: terrain, item, creature, overlay
-        - stack (place item atop whatever terrain), or replace (placing a tile overwrites the whole cell)
-        [XXX mode that allows arbitrary stacking of objects?]
-        - level metadata
-        - change size
-
-        XXX how do i handle thin walls?  treat specially, allow drawing/erasing them along edges instead of tiles?  ehh then you can't control which tile they're in though...  but the game seems to prefer south+east so maybe that works...
-
-        hotkeys
-        - mod a tile on the board: rotate a creature, alter thin walls??
-        - "pick up" a tile
-
-        cool stuff
-        - set chip count by hand, set extra ones automatically
-        -->
     </main>
 </body>
 </html>
