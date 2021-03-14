@@ -302,6 +302,12 @@ class SFXPlayer {
             'get-chip-last': 'sfx/get-chip-last.ogg',
             // https://jummbus.bitbucket.io/#j2N07get-keyn100s0k0l00e00t3Mmfa3g00j07i0r1O_U0o5T0v0pL0OD0Ou00q1d5f8y0z2C0w1c0h0b4p1dFyW85CbwwzBg0
             'get-key': 'sfx/get-key.ogg',
+            // https://jummbus.bitbucket.io/#j3N0jget-stopwatch-bonusn100s1k0l00e00t50mca3g00j07i0r1O_U0o5T0v0pL0OaD0Ou00q0d1f7y1z2C1w4c0h8b4p19FyUsmIVk0
+            'get-stopwatch-bonus': 'sfx/get-stopwatch-bonus.ogg',
+            // https://jummbus.bitbucket.io/#j3N0lget-stopwatch-penaltyn100s1k0l00e00t50mca3g00j07i0r1O_U0o5T0v0pL0OaD0Ou00q0d1f7y1z2C1w4c0h8b4p19FyWxp8Vk0
+            'get-stopwatch-penalty': 'sfx/get-stopwatch-penalty.ogg',
+            // https://jummbus.bitbucket.io/#j3N0kget-stopwatch-togglen100s0k0l00e00t50mca3g00j07i0r1O_U0o5T0v0pL0OaD0Ou00q0d1f7y1z2C1w4c0h8b4p19FyWxq3Bg0
+            'get-stopwatch-toggle': 'sfx/get-stopwatch-toggle.ogg',
             // https://jummbus.bitbucket.io/#j2N08get-tooln100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o2T0v0pL0OD0Ou00q1d1f4y2z9C0w2c0h0b4p1bGqKNW4isVk0
             'get-tool': 'sfx/get-tool.ogg',
             // https://jummbus.bitbucket.io/#j3N07popwalln110s0k0l00e00t3Mm2a3g00j07i0r1O_U00o40T0v0zL0OaD0Ou10q0d0f8y0z1C2w2c0Gc0h0T2v0aL0OaD0Ou02q1d5f1y0z3C1w1h0b4gp190ap6Ker00
@@ -349,6 +355,8 @@ class SFXPlayer {
             tick: 'sfx/tick.ogg',
             // https://jummbus.bitbucket.io/#j2N06timeupn100s0k0l00e00t3Mm4a3g00j07i0r1O_U0o3T1v0pL0OD0Ou01q1d5f4y1z8C1c0A0F0B0V1Q38e0Pa610E0861b4p1dIyfgKPcLucqU0
             timeup: 'sfx/timeup.ogg',
+            // https://jummbus.bitbucket.io/#j3N04exitn200s0k0l00e00t2wm9a3g00j07i0r1O_U00o32T0v0uL0OaD0Ou00q1d1f5y1z1C2w1c2Gc0h0T0v0fL0OaD0Ou00q0d1f2y1z2C0w2c3h0b4gp1rFyW4xo2FGNixYe30kOesCnOjwM0
+            exit: 'sfx/exit.ogg',
             // https://jummbus.bitbucket.io/#j2N03winn200s0k0l00e00t2wm9a3g00j07i0r1O_U00o32T0v0EL0OD0Ou00q1d1f5y1z1C2w1c2h0T0v0pL0OD0Ou00q0d1f2y1z2C0w2c3h0b4gp1xFyW4xo31pe0MaCHCbwLbM5cFDgapBOyY0
             win: 'sfx/win.ogg',
             //from Ableton Retro Synths

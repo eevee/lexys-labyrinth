@@ -2415,6 +2415,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
+            level.sfx.play_once('get-stopwatch-bonus', me.cell);
             level.adjust_timer(+10);
             return true;
         },
@@ -2424,6 +2425,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
+            level.sfx.play_once('get-stopwatch-penalty', me.cell);
             level.adjust_timer(-10);
             return true;
         },
@@ -2433,6 +2435,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
         item_priority: PICKUP_PRIORITIES.player,
         on_pickup(me, level, other) {
+            level.sfx.play_once('get-stopwatch-toggle', me.cell);
             level.pause_timer();
             return false;
         },
@@ -3183,6 +3186,7 @@ const TILE_TYPES = {
                     if (other === level.player) {
                         level.swap_player1 = true;
                     }
+                    level.sfx.play_once('exit', me.cell);
                     level.transmute_tile(other, other.type.name === 'player' ? 'player1_exit' : 'player2_exit');
                 }
             }
