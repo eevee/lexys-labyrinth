@@ -475,27 +475,7 @@ class Player extends PrimaryView {
         });
         this.undo_button = this.root.querySelector('.control-undo');
         this.undo_button.addEventListener('click', ev => {
-            let player_cell = this.level.player.cell;
-            // Keep undoing until (a) we're on another cell and (b) we're not sliding, i.e. we're
-            // about to make a conscious move.  Note that this means undoing all the way through
-            // force floors, even if you could override them!
-            let moved = false;
-            while (this.level.has_undo() &&
-                ! (moved && this.level.player.slide_mode === null))
-            {
-                this.undo();
-                if (player_cell !== this.level.player.cell) {
-                    moved = true;
-                }
-            }
-            // TODO set back to waiting if we hit the start of the level?  but
-            // the stack trims itself so how do we know that
-            if (this.state === 'stopped') {
-                // Be sure to undo any success or failure
-                this.set_state('playing');
-            }
-            this.update_ui();
-            this._redraw();
+            this.undo_last_move();
             ev.target.blur();
         });
         this.rewind_button = this.root.querySelector('.control-rewind');
@@ -665,6 +645,14 @@ class Player extends PrimaryView {
                     (this.state === 'stopped' || this.state === 'playing' || this.state === 'paused'))
                 {
                     this.set_state('rewinding');
+                }
+                return;
+            }
+            if (ev.key === 'u') {
+                if (this.level.has_undo() &&
+                    (this.state === 'stopped' || this.state === 'playing' || this.state === 'paused'))
+                {
+                    this.undo_last_move();
                 }
             }
 
@@ -1512,6 +1500,30 @@ class Player extends PrimaryView {
 
     undo() {
         this.level.undo();
+    }
+
+    undo_last_move() {
+        let player_cell = this.level.player.cell;
+        // Keep undoing until (a) we're on another cell and (b) we're not sliding, i.e. we're
+        // about to make a conscious move.  Note that this means undoing all the way through
+        // force floors, even if you could override them!
+        let moved = false;
+        while (this.level.has_undo() &&
+            ! (moved && this.level.player.slide_mode === null))
+        {
+            this.undo();
+            if (player_cell !== this.level.player.cell) {
+                moved = true;
+            }
+        }
+        // TODO set back to waiting if we hit the start of the level?  but
+        // the stack trims itself so how do we know that
+        if (this.state === 'stopped') {
+            // Be sure to undo any success or failure
+            this.set_state('playing');
+        }
+        this.update_ui();
+        this._redraw();
     }
 
     // Redraws every frame, unless the game isn't running
