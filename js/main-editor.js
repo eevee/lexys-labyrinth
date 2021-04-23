@@ -3255,7 +3255,8 @@ export class Editor extends PrimaryView {
         // Populate status bar (needs doing before the mouse stuff, which tries to update it)
         let statusbar = this.root.querySelector('#editor-statusbar');
         this.statusbar_zoom = mk('div.-zoom');
-        statusbar.append(this.statusbar_zoom);
+        this.statusbar_cursor = mk('div.-mouse', "—");
+        statusbar.append(this.statusbar_zoom, this.statusbar_cursor);
 
         // Keyboard shortcuts
         window.addEventListener('keydown', ev => {
@@ -3395,9 +3396,12 @@ export class Editor extends PrimaryView {
                 this.svg_cursor.classList.add('--visible');
                 this.svg_cursor.setAttribute('x', x);
                 this.svg_cursor.setAttribute('y', y);
+
+                this.statusbar_cursor.textContent = `(${x}, ${y})`;
             }
             else {
                 this.svg_cursor.classList.remove('--visible');
+                this.statusbar_cursor.textContent = `—`;
             }
 
             if (! this.mouse_op)

@@ -2012,7 +2012,17 @@ body.--debug #player-debug {
 #editor #editor-statusbar {
     grid-area: status;
     display: flex;
-    height: 1em;
+    gap: 0.5em;
+    /* Try very hard to minimize reflow, since this is updated frequently */
+    height: 1.25em;
+    line-height: 1.25;
+    overflow: hidden;
+}
+#editor #editor-statusbar > .-zoom {
+    width: 4em;
+}
+#editor #editor-statusbar > .-cursor {
+    width: 5em;
 }
 
 .editor-level-browser {
