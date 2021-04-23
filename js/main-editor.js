@@ -3201,6 +3201,7 @@ class Selection {
 //     - key
 //       title
 //       last_modified
+const EDITOR_ZOOM_LEVELS = [0.0625, 0.125, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 10, 12, 16];
 export class Editor extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#editor'));
@@ -3246,6 +3247,11 @@ export class Editor extends PrimaryView {
         this.preview_g = mk_svg('g', {opacity: 0.5});
         this.svg_cursor = mk_svg('rect.overlay-transient.overlay-cursor', {x: 0, y: 0, width: 1, height: 1});
         this.svg_overlay.append(this.preview_g, this.svg_cursor);
+
+        // Populate status bar (needs doing before the mouse stuff, which tries to update it)
+        let statusbar = this.root.querySelector('#editor-statusbar');
+        this.statusbar_zoom = mk('div.-zoom');
+        statusbar.append(this.statusbar_zoom);
 
         // Keyboard shortcuts
         window.addEventListener('keydown', ev => {
@@ -3422,6 +3428,46 @@ export class Editor extends PrimaryView {
         });
         window.addEventListener('mouseleave', ev => {
             this.mouse_coords = null;
+        });
+        // Mouse wheel to zoom
+        this.set_canvas_zoom(1);
+        this.viewport_el.addEventListener('wheel', ev => {
+            // The delta is platform and hardware dependent and ultimately kind of useless, so just
+            // treat each event as a click and hope for the best
+            if (ev.deltaY === 0)
+                return;
+            ev.stopPropagation();
+            ev.preventDefault();
+
+            let index = EDITOR_ZOOM_LEVELS.findIndex(el => el >= this.zoom);
+            if (index < 0) {
+                index = EDITOR_ZOOM_LEVELS.length - 1;
+            }
+
+            let new_zoom;
+            if (ev.deltaY > 0) {
+                // Zoom out
+                if (EDITOR_ZOOM_LEVELS[index] !== this.zoom) {
+                    // If we're between levels, pretend we're one level in
+                    index++;
+                }
+                if (index <= 0)
+                    return;
+                new_zoom = EDITOR_ZOOM_LEVELS[index - 1];
+            }
+            else {
+                // Zoom in
+                if (EDITOR_ZOOM_LEVELS[index] !== this.zoom) {
+                    index--;
+                }
+                if (index >= EDITOR_ZOOM_LEVELS.length - 1)
+                    return;
+                new_zoom = EDITOR_ZOOM_LEVELS[index + 1];
+            }
+            // FIXME preserve the panning such that the point under the cursor doesn't move
+            // (possibly difficult given that i can't pan at all if there are no scrollbars??)
+            // FIXME add a widget to status bar
+            this.set_canvas_zoom(new_zoom, ev.clientX, ev.clientY);
         });
 
         // Toolbox
@@ -4112,6 +4158,13 @@ export class Editor extends PrimaryView {
     }
 
     // ------------------------------------------------------------------------------------------------
+
+    set_canvas_zoom(zoom, origin_x = null, origin_y = null) {
+        this.zoom = zoom;
+        this.renderer.canvas.style.setProperty('--scale', this.zoom);
+        this.renderer.canvas.classList.toggle('--crispy', this.zoom >= 1);
+        this.statusbar_zoom.textContent = `${this.zoom * 100}%`;
+    }
 
     open_level_browser() {
         if (! this._level_browser) {

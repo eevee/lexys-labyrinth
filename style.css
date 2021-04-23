@@ -1759,6 +1759,7 @@ body.--debug #player-debug {
     grid:
         "controls   controls"   min-content
         "palette    level"      1fr
+        "palette    status"     min-content
         / min-content 1fr
     ;
     gap: 0.5em;
@@ -1798,6 +1799,10 @@ body.--debug #player-debug {
     --viewport-width: 9;
     --viewport-height: 9;
     --scale: 1;
+}
+#editor .editor-canvas canvas.--crispy {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
 }
 /* SVG overlays */
 #editor svg.level-editor-overlay {
@@ -2002,6 +2007,11 @@ body.--debug #player-debug {
     margin-left: 1em;
     transition-delay: 0.5s;
     transition-timing-function: ease-in;
+}
+#editor #editor-statusbar {
+    grid-area: status;
+    display: flex;
+    height: 1em;
 }
 
 .editor-level-browser {
