@@ -736,9 +736,11 @@ class MouseOperation {
 
 class PanOperation extends MouseOperation {
     handle_drag(client_x, client_y) {
-        let target = this.editor.viewport_el.parentNode;
-        target.scrollLeft -= client_x - this.prev_client_x;
-        target.scrollTop -= client_y - this.prev_client_y;
+        let target = this.editor.actual_viewport_el;
+        let dx = this.prev_client_x - client_x;
+        let dy = this.prev_client_y - client_y;
+        target.scrollLeft += dx;
+        target.scrollTop += dy;
     }
 }
 
@@ -3240,6 +3242,8 @@ export class Editor extends PrimaryView {
         // This is done more correctly in setup(), but we need a sensible default so levels can be
         // created before switching to the editor
         this.bg_tile = {type: TILE_TYPES.floor};
+
+        this.level_changed_while_inactive = false;
     }
 
     setup() {
@@ -3763,8 +3767,19 @@ export class Editor extends PrimaryView {
 
     activate() {
         super.activate();
-        this.redraw_entire_level();
         this._schedule_redraw_loop();
+
+        // Do some final heavyweight or DOM-related setup if the level changed while the editor
+        // wasn't showing
+        if (this.level_changed_while_inactive) {
+            this.level_changed_while_inactive = false;
+
+            this.redraw_entire_level();
+
+            // Reset the scroll position; this happens when loading a level, but if a level is
+            // loaded before we're initially visible, all the DOM sizes are zero and it breaks
+            this.reset_viewport_scroll();
+        }
     }
 
     deactivate() {
@@ -4108,6 +4123,9 @@ export class Editor extends PrimaryView {
         this.update_viewport_size();
         this.update_cell_coordinates();
         this.modified = false;
+        if (! this.active) {
+            this.level_changed_while_inactive = true;
+        }
 
         // Remember current level for an editor level
         if (this.conductor.stored_game.editor_metadata) {
@@ -4138,6 +4156,7 @@ export class Editor extends PrimaryView {
         if (this.active) {
             this.redraw_entire_level();
         }
+        this.reset_viewport_scroll();
 
         if (this._done_setup) {
             // XXX this doesn't work yet if setup hasn't run because the undo button won't exist
@@ -4160,10 +4179,55 @@ export class Editor extends PrimaryView {
     // ------------------------------------------------------------------------------------------------
 
     set_canvas_zoom(zoom, origin_x = null, origin_y = null) {
+        // Adjust scrolling so that the point under the mouse cursor remains fixed
+        let scroll_adjust_x = null;
+        let scroll_adjust_y = null;
+        if (origin_x !== null && this.zoom) {
+            // FIXME possible sign of a bad api
+            let [frac_cell_x, frac_cell_y] = this.renderer.real_cell_coords_from_event({clientX: origin_x, clientY: origin_y});
+            // Zooming is really just resizing a DOM element, which doesn't affect either the
+            // transparent border or the scroll position, so zooming from Z1 to Z2 will move a point
+            // from X * Z1 to X * Z2.  To keep it at the same client point, the scroll position
+            // thus needs to change by X * (Z2 - Z1).
+            scroll_adjust_x = frac_cell_x * (zoom - this.zoom) * this.renderer.tileset.size_x;
+            scroll_adjust_y = frac_cell_y * (zoom - this.zoom) * this.renderer.tileset.size_y;
+        }
+
         this.zoom = zoom;
         this.renderer.canvas.style.setProperty('--scale', this.zoom);
-        this.renderer.canvas.classList.toggle('--crispy', this.zoom >= 1);
+        this.actual_viewport_el.classList.toggle('--crispy', this.zoom >= 1);
         this.statusbar_zoom.textContent = `${this.zoom * 100}%`;
+
+        // Only actually adjust the scroll position after changing the zoom, or it might not be
+        // possible to scroll that far yet
+        if (scroll_adjust_x !== null) {
+            this.actual_viewport_el.scrollLeft += scroll_adjust_x;
+            this.actual_viewport_el.scrollTop += scroll_adjust_y;
+        }
+    }
+
+    reset_viewport_scroll() {
+        // Position the level within the viewport; the default is no scroll, which will mostly show
+        // empty space.  Try to put a 1-cell margin around it; if it fits, center it; if not, put
+        // the top-left corner at the top-left of the viewport.
+        let canvas_width = this.renderer.canvas.offsetWidth;
+        let canvas_height = this.renderer.canvas.offsetHeight;
+        let padded_canvas_width = canvas_width * (1 + 2 / this.stored_level.size_x);
+        let padded_canvas_height = canvas_height * (1 + 2 / this.stored_level.size_y);
+        let area_width = this.viewport_el.offsetWidth;
+        let area_height = this.viewport_el.offsetHeight;
+        let viewport_width = this.actual_viewport_el.offsetWidth;
+        let viewport_height = this.actual_viewport_el.offsetHeight;
+        if (padded_canvas_width < viewport_width && padded_canvas_height < viewport_height) {
+            // It fits; center it
+            this.actual_viewport_el.scrollLeft = (area_width - viewport_width) / 2;
+            this.actual_viewport_el.scrollTop = (area_height - viewport_height) / 2;
+        }
+        else {
+            // It don't; top-left
+            this.actual_viewport_el.scrollLeft = (area_width - padded_canvas_width) / 2;
+            this.actual_viewport_el.scrollTop = (area_height - padded_canvas_height) / 2;
+        }
     }
 
     open_level_browser() {

@@ -1784,14 +1784,19 @@ body.--debug #player-debug {
      * easily in a scrolling element */
     box-shadow: inset 0 0 3px black;
 }
+#editor .editor-canvas.--crispy {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
 #editor .editor-canvas .-container {
     position: relative;
     margin: auto;
     /* Give the canvas/overlay a bit of a margin; it has to be a border because, due to some quirk
      * of overflowing flexboxes I guess, padding and margins won't extend the scroll area on the
-     * right and bottom */
-    /* TODO padding should be half a cell? */
-    border: 2em solid transparent;
+     * right and bottom.  It's 75vmin because that /ROUGHLY/ allows panning the level to the edge of
+     * the viewport but not completely off of it. */
+    /* TODO probably a better way to measure this; i really want parent size minus a cell? */
+    border: 75vmin solid transparent;
 }
 #editor .editor-canvas canvas {
     display: block;
@@ -1799,10 +1804,6 @@ body.--debug #player-debug {
     --viewport-width: 9;
     --viewport-height: 9;
     --scale: 1;
-}
-#editor .editor-canvas canvas.--crispy {
-    image-rendering: crisp-edges;
-    image-rendering: pixelated;
 }
 /* SVG overlays */
 #editor svg.level-editor-overlay {
