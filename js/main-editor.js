@@ -3254,9 +3254,33 @@ export class Editor extends PrimaryView {
 
         // Populate status bar (needs doing before the mouse stuff, which tries to update it)
         let statusbar = this.root.querySelector('#editor-statusbar');
-        this.statusbar_zoom = mk('div.-zoom');
+        this.statusbar_zoom = mk('output');
+        this.statusbar_zoom_input = mk('input', {type: 'range', min: 0, max: EDITOR_ZOOM_LEVELS.length - 1});
+        this.statusbar_zoom_input.addEventListener('input', ev => {
+            let index = parseInt(ev.target.value, 10);
+            if (index < 0) {
+                index = 0;
+            }
+            else if (index >= EDITOR_ZOOM_LEVELS.length) {
+                index = EDITOR_ZOOM_LEVELS.length - 1;
+            }
+            // Center the zoom on the center of the viewport
+            let rect = this.actual_viewport_el.getBoundingClientRect();
+            this.set_canvas_zoom(
+                EDITOR_ZOOM_LEVELS[index],
+                (rect.left + rect.right) / 2,
+                (rect.top + rect.bottom) / 2);
+        });
         this.statusbar_cursor = mk('div.-mouse', "—");
-        statusbar.append(this.statusbar_zoom, this.statusbar_cursor);
+        statusbar.append(
+            mk('div.-zoom',
+                mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
+                    mk_svg('use', {href: `#svg-icon-zoom`})),
+                this.statusbar_zoom_input,
+                this.statusbar_zoom,
+            ),
+            this.statusbar_cursor,
+        );
 
         // Keyboard shortcuts
         window.addEventListener('keydown', ev => {
@@ -4201,6 +4225,12 @@ export class Editor extends PrimaryView {
         this.renderer.canvas.style.setProperty('--scale', this.zoom);
         this.actual_viewport_el.classList.toggle('--crispy', this.zoom >= 1);
         this.statusbar_zoom.textContent = `${this.zoom * 100}%`;
+
+        let index = EDITOR_ZOOM_LEVELS.findIndex(el => el >= this.zoom);
+        if (index < 0) {
+            index = EDITOR_ZOOM_LEVELS.length - 1;
+        }
+        this.statusbar_zoom_input.value = index;
 
         // Only actually adjust the scroll position after changing the zoom, or it might not be
         // possible to scroll that far yet

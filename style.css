@@ -2012,6 +2012,7 @@ body.--debug #player-debug {
 #editor #editor-statusbar {
     grid-area: status;
     display: flex;
+    align-items: center;
     gap: 0.5em;
     /* Try very hard to minimize reflow, since this is updated frequently */
     height: 1.25em;
@@ -2019,6 +2020,16 @@ body.--debug #player-debug {
     overflow: hidden;
 }
 #editor #editor-statusbar > .-zoom {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    width: 11.5em;
+}
+#editor #editor-statusbar > .-zoom > input {
+    width: 6em;
+    margin: 0;
+}
+#editor #editor-statusbar > .-zoom > output {
     width: 4em;
 }
 #editor #editor-statusbar > .-cursor {
