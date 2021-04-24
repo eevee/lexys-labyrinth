@@ -1772,31 +1772,50 @@ body.--debug #player-debug {
     grid-area: level;
     overflow: auto;
     position: relative;
-    /* Flex layout to center the canvas and overlay together */
-    display: flex;
-    /* This isn't supported in Chrome (still!!), so use auto margins on the child instead
-    align-items: safe center;
-    justify-content: safe center;
-    */
     background: #101010;
     border: 0.125em solid black;
-    /* FIXME would love if this were above the canvas too, but can't figure out how to do that
-     * easily in a scrolling element */
-    box-shadow: inset 0 0 3px black;
+}
+#editor .editor-canvas::before {
+    /* Clever abuse of sticky positioning to draw a box shadow on top of the container and inside
+     * the scrollbars (thanks, leafo!) */
+    content: '';
+    display: block;
+    position: sticky;
+    top: 0;
+    left: 0;
+    height: 100%;
+    box-shadow: inset 0 0 0.5em black;
+    z-index: 1;
+    pointer-events: none;
 }
 #editor .editor-canvas.--crispy {
     image-rendering: crisp-edges;
     image-rendering: pixelated;
 }
 #editor .editor-canvas .-container {
-    position: relative;
+    /* The shadow overlay is sticky-positioned, meaning it defaults to being in-flow, so this
+     * container needs to compensate by absolutely positioning itself back up top.  It'll still
+     * create scrollbars, so this shouldn't cause any issues. */
+    position: absolute;
+    top: 0;
     margin: auto;
     /* Give the canvas/overlay a bit of a margin; it has to be a border because, due to some quirk
      * of overflowing flexboxes I guess, padding and margins won't extend the scroll area on the
      * right and bottom.  It's 75vmin because that /ROUGHLY/ allows panning the level to the edge of
      * the viewport but not completely off of it. */
-    /* TODO probably a better way to measure this; i really want parent size minus a cell? */
-    border: 75vmin solid transparent;
+    /* NOTE: This MUST be large enough to guarantee being bigger than the viewport; we aren't in a
+     * flex container, so if the canvas + border aren't sufficiently tall, we won't even fill the
+     * viewport and the canvas will be off-center.  Also, with no border at all, a mysterious
+     * interaction with the sticky box-shadow causes the top of the canvas to go off the top of the
+     * viewport entirely!  So, twiddle this with care. */
+    /* TODO probably a better way to measure this; i really want relative to parent size, but
+     * percentage padding and margins are specifically relative to our width */
+    border: 50vmax solid transparent;
+    /* This is necessary to force us to be as wide as the canvas; without it, we have an auto width,
+     * and there's technically no space left after our border, so we become zero width and the
+     * canvas is entirely overflow, which fucks up positioning of the SVG overlay */
+    width: -moz-fit-content;
+    width: fit-content;
 }
 #editor .editor-canvas canvas {
     display: block;
