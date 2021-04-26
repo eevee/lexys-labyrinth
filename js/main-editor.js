@@ -4252,16 +4252,8 @@ export class Editor extends PrimaryView {
         let area_height = this.viewport_el.offsetHeight;
         let viewport_width = this.actual_viewport_el.offsetWidth;
         let viewport_height = this.actual_viewport_el.offsetHeight;
-        if (padded_canvas_width < viewport_width && padded_canvas_height < viewport_height) {
-            // It fits; center it
-            this.actual_viewport_el.scrollLeft = (area_width - viewport_width) / 2;
-            this.actual_viewport_el.scrollTop = (area_height - viewport_height) / 2;
-        }
-        else {
-            // It don't; top-left
-            this.actual_viewport_el.scrollLeft = (area_width - padded_canvas_width) / 2;
-            this.actual_viewport_el.scrollTop = (area_height - padded_canvas_height) / 2;
-        }
+        this.actual_viewport_el.scrollLeft = (area_width - Math.max(viewport_width, padded_canvas_width)) / 2;
+        this.actual_viewport_el.scrollTop = (area_height - Math.max(viewport_height, padded_canvas_height)) / 2;
     }
 
     open_level_browser() {
