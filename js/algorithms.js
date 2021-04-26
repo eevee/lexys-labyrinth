@@ -118,3 +118,28 @@ export function find_matching_wire_tunnel(level, x, y, direction) {
         }
     }
 }
+
+// TODO make this guy work generically for orange, red, brown buttons?  others...?
+export function find_implicit_connection() {
+}
+
+// Iterates over a grid in a diamond pattern, spreading out from the given start cell (but not
+// including it).  Only used for connecting orange buttons.
+export function* iter_cells_in_diamond(levelish, x0, y0) {
+    let max_search_radius = Math.max(levelish.size_x, levelish.size_y) + 1;
+    for (let dist = 1; dist <= max_search_radius; dist++) {
+        // Start east and move counterclockwise
+        let sx = x0 + dist;
+        let sy = y0;
+        for (let direction of [[-1, -1], [-1, 1], [1, 1], [1, -1]]) {
+            for (let i = 0; i < dist; i++) {
+                let cell = levelish.cell(sx, sy);
+                if (cell) {
+                    yield cell;
+                }
+                sx += direction[0];
+                sy += direction[1];
+            }
+        }
+    }
+}

@@ -660,7 +660,9 @@ export class Level extends LevelInterface {
 
         // Orange buttons do a really weird diamond search
         if (connectable.type.connect_order === 'diamond') {
-            for (let cell of this.iter_cells_in_diamond(connectable.cell)) {
+            for (let cell of algorithms.iter_cells_in_diamond(
+                this, connectable.cell.x, connectable.cell.y))
+            {
                 let target = null;
                 for (let tile of cell) {
                     if (tile && goals.has(tile.type.name)) {
@@ -2352,27 +2354,6 @@ export class Level extends LevelInterface {
 
             if (cell === start_cell)
                 return;
-        }
-    }
-
-    // Iterates over the grid in a diamond pattern, spreading out from the given start cell (but not
-    // including it).  Only used for connecting orange buttons.
-    *iter_cells_in_diamond(start_cell) {
-        let max_search_radius = Math.max(this.size_x, this.size_y) + 1;
-        for (let dist = 1; dist <= max_search_radius; dist++) {
-            // Start east and move counterclockwise
-            let sx = start_cell.x + dist;
-            let sy = start_cell.y;
-            for (let direction of [[-1, -1], [-1, 1], [1, 1], [1, -1]]) {
-                for (let i = 0; i < dist; i++) {
-                    let cell = this.cell(sx, sy);
-                    if (cell) {
-                        yield cell;
-                    }
-                    sx += direction[0];
-                    sy += direction[1];
-                }
-            }
         }
     }
 
