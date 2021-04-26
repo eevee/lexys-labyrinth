@@ -103,8 +103,9 @@ class HintTileEditor extends TileEditorOverlay {
         this.root.append(mk('h3', "Hint text"));
         this.text = mk('textarea.editor-hint-tile-text');
         this.root.append(this.text);
-        this.text.addEventListener('input', ev => {
-            if (this.tile) {
+        this.text.addEventListener('change', ev => {
+            if (this.tile && this.text.value !== this.tile.hint_text) {
+                this.mark_dirty();
                 this.tile.hint_text = this.text.value;
             }
         });
