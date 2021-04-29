@@ -5,7 +5,7 @@ import { TILES_WITH_PROPS } from './editor-tile-overlays.js';
 import * as format_base from './format-base.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
-import { PrimaryView, TransientOverlay, DialogOverlay, AlertOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
+import { PrimaryView, MenuOverlay, DialogOverlay, AlertOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
 import { SVG_NS, mk, mk_button, mk_svg, string_from_buffer_ascii, bytestring_to_buffer, walk_grid } from './util.js';
@@ -3622,123 +3622,97 @@ export class Editor extends PrimaryView {
             this.save_level();
         });
 
-        _make_button("Download level as C2M", ev => {
-            // TODO support getting warnings + errors out of synthesis
-            let buf = c2g.synthesize_level(this.stored_level);
-            let blob = new Blob([buf]);
-            let url = URL.createObjectURL(blob);
-            // To download a file, um, make an <a> and click it.  Not kidding
-            let a = mk('a', {
-                href: url,
-                download: (this.stored_level.title || 'untitled') + '.c2m',
-            });
-            document.body.append(a);
-            a.click();
-            // Absolutely no idea when I'm allowed to revoke this, but surely a minute is safe
-            window.setTimeout(() => {
-                a.remove();
-                URL.revokeObjectURL(url);
-            }, 60 * 1000);
-        });
-        _make_button("Download level as MSCC DAT", ev => {
-            // TODO support getting warnings out of synthesis?
-            let buf;
-            try {
-                buf = dat.synthesize_level(this.stored_level);
-            }
-            catch (errs) {
-                if (errs instanceof dat.CCLEncodingErrors) {
-                    new EditorExportFailedOverlay(this.conductor, errs.errors).open();
-                    return;
+        let export_items = [
+            ["Share this level with a link", () => {
+                // FIXME enable this once gliderbot can understand it
+                //let data = util.b64encode(fflate.zlibSync(new Uint8Array(c2g.synthesize_level(this.stored_level))));
+                let data = util.b64encode(c2g.synthesize_level(this.stored_level));
+                let url = new URL(location);
+                url.searchParams.delete('level');
+                url.searchParams.delete('setpath');
+                url.searchParams.append('level', data);
+                new EditorShareOverlay(this.conductor, url.toString()).open();
+            }],
+            ["Download level as C2M", () => {
+                // TODO support getting warnings + errors out of synthesis
+                let buf = c2g.synthesize_level(this.stored_level);
+                util.trigger_local_download((this.stored_level.title || 'untitled') + '.c2m', new Blob([buf]));
+            }],
+            ["Download level as MSCC DAT/CCL", () => {
+                // TODO support getting warnings out of synthesis?
+                let buf;
+                try {
+                    buf = dat.synthesize_level(this.stored_level);
                 }
-                throw errs;
-            }
-
-            let blob = new Blob([buf]);
-            let url = URL.createObjectURL(blob);
-            // To download a file, um, make an <a> and click it.  Not kidding
-            let a = mk('a', {
-                href: url,
-                download: (this.stored_level.title || 'untitled') + '.ccl',
-            });
-            document.body.append(a);
-            a.click();
-            // Absolutely no idea when I'm allowed to revoke this, but surely a minute is safe
-            window.setTimeout(() => {
-                a.remove();
-                URL.revokeObjectURL(url);
-            }, 60 * 1000);
-        });
-        _make_button("Download pack", ev => {
-            let stored_pack = this.conductor.stored_game;
-
-            // This is pretty heckin' best-effort for now; TODO move into format-c2g?
-            let lines = [];
-            let safe_title = (stored_pack.title || "untitled").replace(/[""]/g, "'").replace(/[\x00-\x1f]+/g, "_");
-            lines.push(`game "${safe_title}"`);
-
-            let files = {};
-            let count = stored_pack.level_metadata.length;
-            let levelnumlen = String(count).length;
-            for (let [i, meta] of stored_pack.level_metadata.entries()) {
-                let c2m;
-                if (i === this.conductor.level_index) {
-                    // Use the current state of the current level even if it's not been saved
-                    c2m = new Uint8Array(c2g.synthesize_level(this.stored_level));
+                catch (errs) {
+                    if (errs instanceof dat.CCLEncodingErrors) {
+                        new EditorExportFailedOverlay(this.conductor, errs.errors).open();
+                        return;
+                    }
+                    throw errs;
                 }
-                else if (meta.key) {
-                    // This is already in localStorage as a c2m
-                    c2m = fflate.strToU8(localStorage.getItem(meta.key), true);
-                }
-                else {
-                    let stored_level = stored_pack.load_level(i);
-                    c2m = new Uint8Array(c2g.synthesize_level(stored_level));
+                util.trigger_local_download((this.stored_level.title || 'untitled') + '.ccl', new Blob([buf]));
+            }],
+            ["Download pack as C2G", () => {
+                let stored_pack = this.conductor.stored_game;
+
+                // This is pretty heckin' best-effort for now; TODO move into format-c2g?
+                let lines = [];
+                let safe_title = (stored_pack.title || "untitled").replace(/[""]/g, "'").replace(/[\x00-\x1f]+/g, "_");
+                lines.push(`game "${safe_title}"`);
+
+                let files = {};
+                let count = stored_pack.level_metadata.length;
+                let levelnumlen = String(count).length;
+                for (let [i, meta] of stored_pack.level_metadata.entries()) {
+                    let c2m;
+                    if (i === this.conductor.level_index) {
+                        // Use the current state of the current level even if it's not been saved
+                        c2m = new Uint8Array(c2g.synthesize_level(this.stored_level));
+                    }
+                    else if (meta.key) {
+                        // This is already in localStorage as a c2m
+                        c2m = fflate.strToU8(localStorage.getItem(meta.key), true);
+                    }
+                    else {
+                        let stored_level = stored_pack.load_level(i);
+                        c2m = new Uint8Array(c2g.synthesize_level(stored_level));
+                    }
+
+                    let safe_title = meta.title.replace(/[\x00-\x1f<>:""\/\\|?*]+/g, '_');
+                    let dirchunk = i - i % 50;
+                    let dirname = (
+                        String(dirchunk + 1).padStart(levelnumlen, '0') + '-' +
+                        String(Math.min(count, dirchunk + 50)).padStart(levelnumlen, '0'));
+                    let filename = `${dirname}/${i + 1} - ${safe_title}.c2m`;
+                    files[filename] = c2m;
+
+                    lines.push(`map "${filename}"`);
                 }
 
-                let safe_title = meta.title.replace(/[\x00-\x1f<>:""\/\\|?*]+/g, '_');
-                let dirchunk = i - i % 50;
-                let dirname = (
-                    String(dirchunk + 1).padStart(levelnumlen, '0') + '-' +
-                    String(Math.min(count, dirchunk + 50)).padStart(levelnumlen, '0'));
-                let filename = `${dirname}/${i + 1} - ${safe_title}.c2m`;
-                files[filename] = c2m;
+                // TODO utf8 encode this
+                safe_title = safe_title.replace(/[\x00-\x1f<>:""\/\\|?*]+/g, '_');
+                lines.push("");
+                files[safe_title + '.c2g'] = fflate.strToU8(lines.join("\n"));
+                let u8array = fflate.zipSync(files);
 
-                lines.push(`map "${filename}"`);
-            }
-
-            // TODO utf8 encode this
-            safe_title = safe_title.replace(/[\x00-\x1f<>:""\/\\|?*]+/g, '_');
-            lines.push("");
-            files[safe_title + '.c2g'] = fflate.strToU8(lines.join("\n"));
-            let u8array = fflate.zipSync(files);
-
-            // TODO also allow download as CCL
-            // TODO support getting warnings + errors out of synthesis
-            let blob = new Blob([u8array]);
-            let url = URL.createObjectURL(blob);
-            // To download a file, um, make an <a> and click it.  Not kidding
-            let a = mk('a', {
-                href: url,
-                download: (stored_pack.title || 'untitled') + '.zip',
-            });
-            document.body.append(a);
-            a.click();
-            // Absolutely no idea when I'm allowed to revoke this, but surely a minute is safe
-            window.setTimeout(() => {
-                a.remove();
-                URL.revokeObjectURL(url);
-            }, 60 * 1000);
+                // TODO support getting warnings + errors out of synthesis
+                util.trigger_local_download((stored_pack.title || 'untitled') + '.zip', new Blob([u8array]));
+            }],
+        ];
+        this.export_menu = new MenuOverlay(
+            this.conductor,
+            export_items,
+            item => item[0],
+            item => item[1](),
+        );
+        let export_menu_button = _make_button("Export ", ev => {
+            this.export_menu.open(ev.currentTarget);
         });
-        _make_button("Share", ev => {
-            // FIXME enable this once gliderbot can understand it
-            //let data = util.b64encode(fflate.zlibSync(new Uint8Array(c2g.synthesize_level(this.stored_level))));
-            let data = util.b64encode(c2g.synthesize_level(this.stored_level));
-            let url = new URL(location);
-            url.searchParams.delete('level');
-            url.searchParams.delete('setpath');
-            url.searchParams.append('level', data);
-            new EditorShareOverlay(this.conductor, url.toString()).open();
-        });
+        export_menu_button.append(
+            mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
+                mk_svg('use', {href: `#svg-icon-menu-chevron`})),
+        );
         //_make_button("Toggle green objects");
 
         // Tile palette
@@ -4821,6 +4795,7 @@ export class Editor extends PrimaryView {
         overlay.edit_tile(tile, cell);
         overlay.open();
 
+        // Fixed-size balloon positioning
         // FIXME move this into TransientOverlay or some other base class
         let root = overlay.root;
         let spacing = 2;

@@ -130,6 +130,11 @@ export class Overlay {
         // Use capture, which runs before any other event handler
         window.addEventListener('keydown', this.keydown_handler, true);
 
+        // Block mouse movement as well
+        overlay.addEventListener('mousemove', ev => {
+            ev.stopPropagation();
+        });
+
         return overlay;
     }
 
@@ -156,6 +161,59 @@ export class TransientOverlay extends Overlay {
         let overlay = super.open();
         overlay.classList.add('--transient');
         return overlay;
+    }
+}
+
+export class MenuOverlay extends TransientOverlay {
+    constructor(conductor, items, make_label, onclick) {
+        super(conductor, mk('ol.popup-menu'));
+        for (let [i, item] of items.entries()) {
+            this.root.append(mk('li', {'data-index': i}, make_label(item)));
+        }
+
+        this.root.addEventListener('click', ev => {
+            let li = ev.target.closest('li');
+            if (! li || ! this.root.contains(li))
+                return;
+
+            let i = parseInt(li.getAttribute('data-index'), 10);
+            let item = items[i];
+            onclick(item);
+            this.close();
+        });
+    }
+
+    open(relto) {
+        super.open();
+
+        let anchor = relto.getBoundingClientRect();
+        let rect = this.root.getBoundingClientRect();
+
+        // Prefer left anchoring, but use right if that would go off the screen
+        if (anchor.left + rect.width > document.body.clientWidth) {
+            this.root.style.right = `${document.body.clientWidth - anchor.right}px`;
+        }
+        else {
+            this.root.style.left = `${anchor.left}px`;
+        }
+
+        // Open vertically in whichever direction has more space (with a slight bias towards opening
+        // downwards).  If we would then run off the screen, also set the other anchor to constrain
+        // the height.
+        let top_space = anchor.top - 0;
+        let bottom_space = document.body.clientHeight - anchor.bottom;
+        if (top_space > bottom_space) {
+            this.root.style.bottom = `${document.body.clientHeight - anchor.top}px`;
+            if (rect.height > top_space) {
+                this.root.style.top = `${0}px`;
+            }
+        }
+        else {
+            this.root.style.top = `${anchor.bottom}px`;
+            if (rect.height > bottom_space) {
+                this.root.style.bottom = `${0}px`;
+            }
+        }
     }
 }
 

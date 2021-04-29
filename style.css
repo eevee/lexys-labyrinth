@@ -240,6 +240,20 @@ svg.svg-icon {
     justify-content: start;
     background: none;
 }
+.popup-menu {
+    position: absolute;
+    border: 1px solid black;
+    color: black;
+    background: hsl(225, 10%, 90%);
+    box-shadow: 0 1px 3px 1px #0009;
+}
+.popup-menu > li {
+    padding: 0.25em 0.5em;
+    cursor: pointer;
+}
+.popup-menu > li:hover {
+    background: hsl(225, 40%, 75%);
+}
 .dialog {
     display: flex;
     flex-direction: column;
