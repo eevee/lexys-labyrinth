@@ -472,6 +472,8 @@ export function synthesize_level(stored_level) {
     let top_layer = [];
     let bottom_layer = [];
     let hint_text = null;
+    let trap_cxns = [];
+    let cloner_cxns = [];
     let monster_coords = [];
     let error_found_wires = false;
     // TODO i could be a little kinder and support, say, items on terrain; do those work in mscc?  tw lynx?
@@ -546,6 +548,28 @@ export function synthesize_level(stored_level) {
                         errors.push(`All hints must contain the same text`);
                     }
                 }
+
+                let cxn_target;
+                // FIXME one begins to wonder if the lady doth repeat herself
+                if (other.type.name === 'button_red') {
+                    cxn_target = 'cloner';
+                }
+                else if (other.type.name === 'button_brown') {
+                    cxn_target = 'trap';
+                }
+                if (cxn_target && i in stored_level.custom_connections) {
+                    let dest = stored_level.custom_connections[i];
+                    let dest_cell = stored_level.linear_cells[dest];
+                    if (dest_cell && dest_cell[LAYERS.terrain].type.name === cxn_target) {
+                        if (other.type.name === 'button_red') {
+                            cloner_cxns.push(x, y, ...stored_level.scalar_to_coords(dest));
+                        }
+                        else {
+                            // Traps have an extra zero!
+                            trap_cxns.push(x, y, ...stored_level.scalar_to_coords(dest), 0);
+                        }
+                    }
+                }
             }
             else {
                 errors.push(`Can't encode tile: ${other.type.name}`);
@@ -580,6 +604,7 @@ export function synthesize_level(stored_level) {
     function add_block(type, contents) {
         let len = 2 + contents.byteLength;
         let bytes = new Uint8Array(len);
+        // TODO this copy is annoying
         bytes[0] = type;
         bytes[1] = contents.byteLength;
         bytes.set(new Uint8Array(contents), 2);
@@ -590,8 +615,21 @@ export function synthesize_level(stored_level) {
     // Level name
     // TODO do something with not-ascii; does TW support utf8 or latin1 or anything?
     add_block(3, util.bytestring_to_buffer(stored_level.title.substring(0, 63) + "\0"));
-    // TODO 4: trap links
-    // TODO 5: cloner links
+    // Trap and cloner connections
+    function to_words(cxns) {
+        let words = new ArrayBuffer(cxns.length * 2);
+        let view = new DataView(words);
+        for (let [i, val] of cxns.entries()) {
+            view.setUint16(i * 2, val, true);
+        }
+        return words;
+    }
+    if (trap_cxns.length > 0) {
+        add_block(4, to_words(trap_cxns));
+    }
+    if (cloner_cxns.length > 0) {
+        add_block(5, to_words(cloner_cxns));
+    }
     // Password
     // TODO support this for real lol
     add_block(6, util.bytestring_to_buffer("XXXX\0"));
