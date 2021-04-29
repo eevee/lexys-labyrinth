@@ -100,7 +100,6 @@ export class StoredLevel extends LevelInterface {
         this.author = '';
         this.password = null;
         this.comment = '';
-        this.hint = '';  // XXX does this actually belong here, since hints contain the text?  does anything set it?
         // A number is a specified count; the default of null means that the chips are counted on
         // level init, as in CC2
         this.chips_required = null;

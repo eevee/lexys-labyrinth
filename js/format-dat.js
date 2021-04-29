@@ -201,10 +201,6 @@ export function parse_level_metadata(bytes) {
             // Password, with trailing NUL, and XORed with 0x99 (???)
             meta.password = decode_password(bytes, p, field_length - 1);
         }
-        else if (field_type === 0x07) {
-            // Hint, including trailing NUL, of course
-            meta.hint = util.string_from_buffer_ascii(bytes, p, field_length - 1);
-        }
         p += field_length;
     }
 
@@ -236,6 +232,7 @@ function parse_level(bytes, number) {
     let unknown = view.getUint16(6, true);
     // Same structure twice, for the two layers
     let p = 8;
+    let hint_tiles = [];
     for (let l = 0; l < 2; l++) {
         let layer_length = view.getUint16(p, true);
         p += 2;
@@ -299,7 +296,11 @@ function parse_level(bytes, number) {
                     continue;
                 }
 
-                cell[tile.type.layer] = {...tile};
+                let new_tile = {...tile};
+                cell[tile.type.layer] = new_tile;
+                if (new_tile.type.name === 'hint') {
+                    hint_tiles.push(new_tile);
+                }
             }
         }
         if (c !== 1024)
@@ -369,7 +370,10 @@ function parse_level(bytes, number) {
         }
         else if (field_type === 0x07) {
             // Hint, including trailing NUL, of course
-            level.hint = util.string_from_buffer_ascii(bytes, p, field_length - 1);
+            let hint = util.string_from_buffer_ascii(bytes, p, field_length - 1);
+            for (let tile of hint_tiles) {
+                tile.hint_text = hint;
+            }
         }
         else if (field_type === 0x08) {
             // Password, but not encoded
@@ -455,6 +459,7 @@ export function synthesize_level(stored_level) {
     let magic = 0x0002aaac;
     let top_layer = [];
     let bottom_layer = [];
+    let hint_text = null;
     let error_found_wires = false;
     // TODO i could be a little kinder and support, say, items on terrain; do those work in mscc?  tw lynx?
     for (let [i, cell] of stored_level.linear_cells.entries()) {
@@ -515,6 +520,15 @@ export function synthesize_level(stored_level) {
                 else {
                     other_byte = rev_spec['all'];
                 }
+
+                if (other.type.name === 'hint') {
+                    if (hint_text === null) {
+                        hint_text = other.hint_text;
+                    }
+                    else if (hint_text !== other.hint_text) {
+                        errors.push(`All hints must contain the same text`);
+                    }
+                }
             }
             else {
                 errors.push(`Can't encode tile: ${other.type.name}`);
@@ -565,9 +579,11 @@ export function synthesize_level(stored_level) {
     // TODO support this for real lol
     add_block(6, util.bytestring_to_buffer("XXXX\0"));
     // Hint
-    // TODO uh, yeah, this too
-    // TODO do something with not-ascii; does TW support utf8 or latin1 or anything?
-    add_block(7, util.bytestring_to_buffer("TODO hints aren't yet supported".substring(0, 127) + "\0"));
+    // TODO tile world seems to do latin-1 (just sort of, inherently); this will do modulo on
+    // anything outside it (yyyyikes!), probably should sub with ? or something
+    if (hint_text !== null) {
+        add_block(7, util.bytestring_to_buffer(hint_text.substring(0, 127) + "\0"));
+    }
     // Monster positions
     // TODO this is dumb as hell but do it too
     add_block(10, new ArrayBuffer);

@@ -1045,6 +1045,7 @@ export function parse_level(buf, number = 1) {
     let level = new format_base.StoredLevel(number);
     level.format = 'c2m';
     level.uses_ll_extensions = false;  // we'll update this if it changes
+    let default_hint = '';
     let extra_hints = [];
     let hint_tiles = [];
     for (let [type, bytes] of read_c2m_sections(buf)) {
@@ -1076,7 +1077,7 @@ export function parse_level(buf, number = 1) {
             }
             else if (type === 'CLUE') {
                 // Level hint
-                level.hint = str;
+                default_hint = str;
             }
             else if (type === 'NOTE') {
                 // Author's comments...  but might also include tags delimiting special blocks, most
@@ -1319,7 +1320,7 @@ export function parse_level(buf, number = 1) {
         }
         else {
             // Fall back to regular hint
-            tile.hint_text = null;
+            tile.hint_text = default_hint;
         }
     }
 

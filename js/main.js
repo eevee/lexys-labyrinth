@@ -1637,7 +1637,7 @@ class Player extends PrimaryView {
             this.hint_el.parentNode.classList.toggle('--visible', !! hint_tile);
             if (hint_tile) {
                 // Parse out %X sequences and replace them with <kbd> elements
-                let hint_text = hint_tile.hint_text ?? this.level.stored_level.hint;
+                let hint_text = hint_tile.hint_text;
                 for (let [i, chunk] of hint_text.split(/%(\w)/).entries()) {
                     if (i % 2 === 0) {
                         this.hint_el.append(chunk);
