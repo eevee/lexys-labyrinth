@@ -121,6 +121,45 @@ const TILE_ENCODING = {
     0x6f: ['player', 'east'],
 };
 
+const REVERSE_TILE_ENCODING = {};
+for (let [tile_byte, spec] of Object.entries(TILE_ENCODING)) {
+    tile_byte = parseInt(tile_byte, 10);  // these are keys so they get stringified ugh
+    if (0x36 <= tile_byte && tile_byte <= 0x37) {
+        // These are unused tiles which get turned into invisible walls; don't encode invisible
+        // walls as them!  (0x38 is also "unused", but pgchip turns it into ice block.)
+        continue;
+    }
+
+    let name, arg;
+    if (spec instanceof Array) {
+        [name, arg] = spec;
+    }
+    else {
+        name = spec;
+        arg = null;
+    }
+
+    let rev_spec = REVERSE_TILE_ENCODING[name];
+    if (! rev_spec) {
+        rev_spec = {};
+        REVERSE_TILE_ENCODING[name] = rev_spec;
+    }
+
+    if (arg === null || tile_byte === 0x0a) {
+        // Special case: 0x0a is MSCC's undirected dirt block, which needs to coexist with the
+        // directed "clone" blocks
+        rev_spec['all'] = tile_byte;
+    }
+    else if (typeof arg === 'string') {
+        // This is a direction
+        rev_spec[arg] = tile_byte;
+    }
+    else {
+        // This is the thin_walls argument structure
+        rev_spec[arg.edges] = tile_byte;
+    }
+}
+
 function decode_password(bytes, start, len) {
     let password = [];
     for (let i = 0; i < len; i++) {
@@ -394,4 +433,193 @@ export function parse_game(buf) {
     }
 
     return game;
+}
+
+export class CCLEncodingErrors extends util.LLError {
+    constructor(errors) {
+        super("Failed to encode level as CCL");
+        this.errors = errors;
+    }
+}
+
+export function synthesize_level(stored_level) {
+    let errors = [];
+    if (stored_level.size_x !== 32) {
+        errors.push(`Level width must be 32, not ${stored_level.size_x}`);
+    }
+    if (stored_level.size_y !== 32) {
+        errors.push(`Level width must be 32, not ${stored_level.size_y}`);
+    }
+
+    // TODO might also want the tile world "lynx mode" magic number, or pgchip's ice block rules
+    let magic = 0x0002aaac;
+    let top_layer = [];
+    let bottom_layer = [];
+    let error_found_wires = false;
+    // TODO i could be a little kinder and support, say, items on terrain; do those work in mscc?  tw lynx?
+    for (let [i, cell] of stored_level.linear_cells.entries()) {
+        let actor = null;
+        let other = null;
+        for (let tile of cell) {
+            if (! tile)
+                continue;
+            if (tile.wire_directions || tile.wire_tunnel_directions) {
+                error_found_wires = true;
+            }
+
+            if (tile.type.layer === LAYERS.actor) {
+                actor = tile;
+            }
+            else if (tile.type.name === 'floor') {
+                // This is the default anyway, so don't count it against the number of tiles
+                continue;
+            }
+            else if (other) {
+                let [x, y] = stored_level.scalar_to_coords(i);
+                errors.push(`A cell can only contain one static tile, but cell (${x}, ${y}) has both ${other.type.name} and ${tile.type.name}`);
+            }
+            else {
+                other = tile;
+            }
+        }
+
+        let actor_byte = null;
+        let other_byte = null;
+        if (actor) {
+            let rev_spec = REVERSE_TILE_ENCODING[actor.type.name];
+            if (rev_spec) {
+                // Special case: dirt blocks only have a direction when on a cloner
+                if (actor.type.name === 'dirt_block' && ! (other && other.type.name === 'cloner')) {
+                    actor_byte = rev_spec['all'];
+                }
+                else {
+                    actor_byte = rev_spec[actor.direction];
+                }
+            }
+            else {
+                errors.push(`Can't encode tile: ${actor.type.name}`);
+            }
+        }
+        if (other) {
+            let rev_spec = REVERSE_TILE_ENCODING[other.type.name];
+            if (rev_spec) {
+                // Special case: thin walls only come in one of a few configurations
+                if (other.type.name === 'thin_walls') {
+                    if (other.edges in rev_spec) {
+                        other_byte = rev_spec[other.edges];
+                    }
+                    else {
+                        errors.push(`Thin walls may only have one edge, or be a lower-right corner`);
+                    }
+                }
+                else {
+                    other_byte = rev_spec['all'];
+                }
+            }
+            else {
+                errors.push(`Can't encode tile: ${other.type.name}`);
+            }
+        }
+
+        if (other_byte === null) {
+            other_byte = 0x00;  // floor
+        }
+
+        if (actor_byte === null) {
+            top_layer.push(other_byte);
+            bottom_layer.push(0x00);
+        }
+        else {
+            top_layer.push(actor_byte);
+            bottom_layer.push(other_byte);
+        }
+    }
+    if (error_found_wires) {
+        errors.push(`Wires are not supported`);
+    }
+
+    // TODO RLE
+    let top_layer_bytes = top_layer;
+    let bottom_layer_bytes = bottom_layer;
+
+    // Assemble metadata fields.  You'd think this would deserve a little wrapper like I have for
+    // the C2M sections, but you're wrong!
+    let metadata_blocks = [];
+    let metadata_length = 0;
+    function add_block(type, contents) {
+        let len = 2 + contents.byteLength;
+        let bytes = new Uint8Array(len);
+        bytes[0] = type;
+        bytes[1] = contents.byteLength;
+        bytes.set(new Uint8Array(contents), 2);
+        metadata_blocks.push(bytes);
+        metadata_length += len;
+    }
+
+    // Level name
+    // TODO do something with not-ascii; does TW support utf8 or latin1 or anything?
+    add_block(3, util.bytestring_to_buffer(stored_level.title.substring(0, 63) + "\0"));
+    // TODO 4: trap links
+    // TODO 5: cloner links
+    // Password
+    // TODO support this for real lol
+    add_block(6, util.bytestring_to_buffer("XXXX\0"));
+    // Hint
+    // TODO uh, yeah, this too
+    // TODO do something with not-ascii; does TW support utf8 or latin1 or anything?
+    add_block(7, util.bytestring_to_buffer("TODO hints aren't yet supported".substring(0, 127) + "\0"));
+    // Monster positions
+    // TODO this is dumb as hell but do it too
+    add_block(10, new ArrayBuffer);
+
+    if (errors.length > 0) {
+        throw new CCLEncodingErrors(errors);
+    }
+
+    // OK, almost done, serialize for real
+    let level_length = (
+        10 +        // level header
+        2 + top_layer_bytes.length +
+        2 + bottom_layer_bytes.length +
+        2 + metadata_length
+    );
+    let total_length = (
+        6 +             // game header
+        level_length
+    );
+    let ret = new ArrayBuffer(total_length);
+    let array = new Uint8Array(ret);
+    let view = new DataView(ret);
+    view.setUint32(0, magic, true);
+    view.setUint16(4, 1, true);  // level count, teehee
+
+    let p = 6;
+    view.setUint16(p, level_length - 2, true);  // doesn't include this field
+    view.setUint16(p + 2, 1, true);  // level number
+    view.setUint16(p + 4, stored_level.time_limit, true);
+    view.setUint16(p + 6, stored_level.chips_required || 0, true);  // FIXME
+    view.setUint16(p + 8, 1, true);  // always 1?  indicates compressed map data?
+    p += 10;
+
+    // Map data
+    view.setUint16(p, top_layer_bytes.length, true);
+    array.set(new Uint8Array(top_layer_bytes), p + 2);
+    p += 2 + top_layer_bytes.length;
+    view.setUint16(p, bottom_layer_bytes.length, true);
+    array.set(new Uint8Array(bottom_layer_bytes), p + 2);
+    p += 2 + bottom_layer_bytes.length;
+
+    // Metadata
+    view.setUint16(p, metadata_length, true);
+    p += 2;
+    for (let block of metadata_blocks) {
+        array.set(block, p);
+        p += block.byteLength;
+    }
+
+    if (p !== total_length) {
+        console.error("Something has gone very awry:", total_length, p);
+    }
+
+    return ret;
 }

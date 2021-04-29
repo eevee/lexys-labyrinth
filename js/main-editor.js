@@ -4,6 +4,7 @@ import { DIRECTIONS, LAYERS, TICS_PER_SECOND } from './defs.js';
 import { TILES_WITH_PROPS } from './editor-tile-overlays.js';
 import * as format_base from './format-base.js';
 import * as c2g from './format-c2g.js';
+import * as dat from './format-dat.js';
 import { PrimaryView, TransientOverlay, DialogOverlay, AlertOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import CanvasRenderer from './renderer-canvas.js';
 import TILE_TYPES from './tiletypes.js';
@@ -537,6 +538,25 @@ class EditorShareOverlay extends DialogOverlay {
             this.close();
         });
         this.footer.append(ok);
+    }
+}
+
+class EditorExportFailedOverlay extends DialogOverlay {
+    constructor(conductor, errors, warnings) {
+        // TODO support warnings i guess
+        super(conductor);
+        this.set_title("export didn't go so well");
+        this.main.append(mk('p', "Whoops!  I tried very hard to export your level, but it didn't work out.  Sorry."));
+        let ul = mk('ul.editor-export-errors');
+        // TODO structure the errors better and give them names out here, also reduce duplication,
+        // also be clear about which are recoverable or not
+        for (let error of errors) {
+            ul.append(mk('li', error));
+        }
+        this.main.append(ul);
+        this.add_button("oh well", ev => {
+            this.close();
+        });
     }
 }
 
@@ -3603,7 +3623,6 @@ export class Editor extends PrimaryView {
         });
 
         _make_button("Download level as C2M", ev => {
-            // TODO also allow download as CCL
             // TODO support getting warnings + errors out of synthesis
             let buf = c2g.synthesize_level(this.stored_level);
             let blob = new Blob([buf]);
@@ -3612,6 +3631,35 @@ export class Editor extends PrimaryView {
             let a = mk('a', {
                 href: url,
                 download: (this.stored_level.title || 'untitled') + '.c2m',
+            });
+            document.body.append(a);
+            a.click();
+            // Absolutely no idea when I'm allowed to revoke this, but surely a minute is safe
+            window.setTimeout(() => {
+                a.remove();
+                URL.revokeObjectURL(url);
+            }, 60 * 1000);
+        });
+        _make_button("Download level as MSCC DAT", ev => {
+            // TODO support getting warnings out of synthesis?
+            let buf;
+            try {
+                buf = dat.synthesize_level(this.stored_level);
+            }
+            catch (errs) {
+                if (errs instanceof dat.CCLEncodingErrors) {
+                    new EditorExportFailedOverlay(this.conductor, errs.errors).open();
+                    return;
+                }
+                throw errs;
+            }
+
+            let blob = new Blob([buf]);
+            let url = URL.createObjectURL(blob);
+            // To download a file, um, make an <a> and click it.  Not kidding
+            let a = mk('a', {
+                href: url,
+                download: (this.stored_level.title || 'untitled') + '.ccl',
             });
             document.body.append(a);
             a.click();
