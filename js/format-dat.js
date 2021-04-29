@@ -348,7 +348,13 @@ function parse_level(bytes, number) {
                 let trap_y = field_view.getUint16(q + 6, true);
                 // Fifth u16 is always zero, possibly live game state
                 q += 10;
-                level.custom_trap_wiring[button_x + button_y * level.size_x] = trap_x + trap_y * level.size_x;
+                // Connections are ignored if they're on the wrong tiles anyway, and we use a single
+                // mapping that's a bit more flexible, so only store valid connections
+                let s = level.coords_to_scalar(button_x, button_y);
+                let d = level.coords_to_scalar(trap_x, trap_y);
+                if (level.linear_cells[s][LAYERS.terrain].type.name === 'button_brown') {
+                    level.custom_connections[s] = d;
+                }
             }
         }
         else if (field_type === 0x05) {
@@ -361,7 +367,13 @@ function parse_level(bytes, number) {
                 let cloner_x = field_view.getUint16(q + 4, true);
                 let cloner_y = field_view.getUint16(q + 6, true);
                 q += 8;
-                level.custom_cloner_wiring[button_x + button_y * level.size_x] = cloner_x + cloner_y * level.size_x;
+                // Connections are ignored if they're on the wrong tiles anyway, and we use a single
+                // mapping that's a bit more flexible, so only store valid connections
+                let s = level.coords_to_scalar(button_x, button_y);
+                let d = level.coords_to_scalar(cloner_x, cloner_y);
+                if (level.linear_cells[s][LAYERS.terrain].type.name === 'button_red') {
+                    level.custom_connections[s] = d;
+                }
             }
         }
         else if (field_type === 0x06) {
@@ -460,9 +472,11 @@ export function synthesize_level(stored_level) {
     let top_layer = [];
     let bottom_layer = [];
     let hint_text = null;
+    let monster_coords = [];
     let error_found_wires = false;
     // TODO i could be a little kinder and support, say, items on terrain; do those work in mscc?  tw lynx?
     for (let [i, cell] of stored_level.linear_cells.entries()) {
+        let [x, y] = stored_level.scalar_to_coords(i);
         let actor = null;
         let other = null;
         for (let tile of cell) {
@@ -480,11 +494,14 @@ export function synthesize_level(stored_level) {
                 continue;
             }
             else if (other) {
-                let [x, y] = stored_level.scalar_to_coords(i);
                 errors.push(`A cell can only contain one static tile, but cell (${x}, ${y}) has both ${other.type.name} and ${tile.type.name}`);
             }
             else {
                 other = tile;
+            }
+
+            if (tile.type.is_monster) {
+                monster_coords.push(x, y);
             }
         }
 
@@ -584,9 +601,14 @@ export function synthesize_level(stored_level) {
     if (hint_text !== null) {
         add_block(7, util.bytestring_to_buffer(hint_text.substring(0, 127) + "\0"));
     }
-    // Monster positions
-    // TODO this is dumb as hell but do it too
-    add_block(10, new ArrayBuffer);
+    // Monster positions (dumb as hell and only used in MS mode)
+    if (monster_coords.length > 0) {
+        if (monster_coords.length > 256) {
+            errors.push(`Level has ${monster_coords.length >> 1} monsters, but MS only supports up to 128`);
+            monster_coords.length = 256;
+        }
+        add_block(10, new Uint8Array(monster_coords).buffer);
+    }
 
     if (errors.length > 0) {
         throw new CCLEncodingErrors(errors);

@@ -1839,7 +1839,7 @@ body.--debug #player-debug {
     --scale: 1;
 }
 /* SVG overlays */
-#editor svg.level-editor-overlay {
+svg.level-editor-overlay {
     position: absolute;
     top: 0;
     bottom: 0;
@@ -1852,21 +1852,21 @@ body.--debug #player-debug {
     stroke-width: 0.0625;
     fill: none;
 }
-#editor .level-editor-overlay .overlay-transient {
+svg.level-editor-overlay .overlay-transient {
     display: none;
 }
-#editor .level-editor-overlay .overlay-transient.--visible {
+svg.level-editor-overlay .overlay-transient.--visible {
     display: initial;
 }
-#editor .level-editor-overlay rect.overlay-cursor {
+svg.level-editor-overlay rect.overlay-cursor {
     x-stroke: hsla(225, 100%, 60%, 0.5);
     fill: hsla(225, 100%, 75%, 0.25);
 }
-#editor .level-editor-overlay rect.overlay-pending-selection {
+svg.level-editor-overlay rect.overlay-pending-selection {
     stroke: hsla(225, 100%, 60%, 0.5);
     fill: hsla(225, 100%, 75%, 0.25);
 }
-#editor .level-editor-overlay rect.overlay-selection {
+svg.level-editor-overlay rect.overlay-selection {
     stroke: #000c;
     fill: hsla(225, 0%, 75%, 0.25);
     stroke-dasharray: 0.125, 0.125;
@@ -1882,22 +1882,26 @@ body.--debug #player-debug {
         stroke-dashoffset: 0;
     }
 }
-#editor .level-editor-overlay rect.overlay-cxn {
-    stroke: red;
+#overlay-arrowhead {
+    fill: hsl(345, 75%, 75%);
 }
-#editor .level-editor-overlay line.overlay-cxn {
-    stroke: red;
+svg.level-editor-overlay g.overlay-connection {
+    stroke: hsl(345, 75%, 75%);
+    filter: url(#overlay-filter-outline);
 }
-#editor .level-editor-overlay rect.overlay-camera {
+svg.level-editor-overlay g.overlay-connection line.-arrow {
+    marker-end: url(#overlay-arrowhead);
+}
+svg.level-editor-overlay rect.overlay-camera {
     stroke: #808080;
     fill: #80808040;
     pointer-events: auto;
 }
-#editor .level-editor-overlay text {
+svg.level-editor-overlay text {
     /* Each cell is one "pixel", so text needs to be real small */
     font-size: 1px;
 }
-#editor .level-editor-overlay text.overlay-edit-tip {
+svg.level-editor-overlay text.overlay-edit-tip {
     stroke: none;
     fill: black;
 }

@@ -1313,6 +1313,103 @@ class TrackOperation extends MouseOperation {
     }
 }
 
+class SVGConnection {
+    constructor(sx, sy, dx, dy) {
+        this.source = mk_svg('rect.-source', {width: 1, height: 1});
+        this.line = mk_svg('line.-arrow', {});
+        this.element = mk_svg('g.overlay-connection', this.source, this.line);
+        this.set_source(sx, sy);
+        this.set_dest(dx, dy);
+    }
+
+    set_source(sx, sy) {
+        this.sx = sx;
+        this.sy = sy;
+        this.source.setAttribute('x', sx);
+        this.source.setAttribute('y', sy);
+        this.line.setAttribute('x1', sx + 0.5);
+        this.line.setAttribute('y1', sy + 0.5);
+    }
+
+    set_dest(dx, dy) {
+        this.dx = dx;
+        this.dy = dy;
+        this.line.setAttribute('x2', dx + 0.5);
+        this.line.setAttribute('y2', dy + 0.5);
+    }
+}
+class ConnectOperation extends MouseOperation {
+    handle_press(x, y, ev) {
+        // TODO restrict to button/cloner unless holding shift
+        // TODO what do i do when you erase a button/cloner?  can i detect if you're picking it up?
+        let src = this.editor.stored_level.coords_to_scalar(x, y);
+        if (this.alt_mode) {
+            // Auto connect using Lynx rules
+            let cell = this.cell(x, y);
+            let terrain = cell[LAYERS.terrain];
+            let other = null;
+            let swap = false;
+            if (terrain.type.name === 'button_red') {
+                other = this.search_for(src, 'cloner', 1);
+            }
+            else if (terrain.type.name === 'cloner') {
+                other = this.search_for(src, 'button_red', -1);
+                swap = true;
+            }
+            else if (terrain.type.name === 'button_brown') {
+                other = this.search_for(src, 'trap', 1);
+            }
+            else if (terrain.type.name === 'trap') {
+                other = this.search_for(src, 'button_brown', -1);
+                swap = true;
+            }
+
+            if (other !== null) {
+                if (swap) {
+                    this.editor.set_custom_connection(other, src);
+                }
+                else {
+                    this.editor.set_custom_connection(src, other);
+                }
+                this.editor.commit_undo();
+            }
+            return;
+        }
+        this.pending_cxn = new SVGConnection(x, y, x, y);
+        this.editor.svg_overlay.append(this.pending_cxn.element);
+    }
+    // FIXME this is hella the sort of thing that should be on Editor, or in algorithms
+    search_for(i0, name, dir) {
+        let l = this.editor.stored_level.linear_cells.length;
+        let i = i0;
+        while (true) {
+            i += dir;
+            if (i < 0) {
+                i += l;
+            }
+            else if (i >= l) {
+                i -= l;
+            }
+            if (i === i0)
+                return null;
+
+            let cell = this.editor.stored_level.linear_cells[i];
+            let tile = cell[LAYERS.terrain];
+            if (tile.type.name === name) {
+                return i;
+            }
+        }
+    }
+    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+    }
+    commit_press() {
+    }
+    abort_press() {
+        this.pending_cxn.element.remove();
+    }
+    cleanup_press() {
+    }
+}
 class WireOperation extends MouseOperation {
     handle_press(x, y) {
         if (this.alt_mode) {
@@ -1825,13 +1922,16 @@ const EDITOR_TOOLS = {
         shortcut: 'a',
     },
     connect: {
-        // TODO not implemented
         icon: 'icons/tool-connect.png',
         name: "Connect",
-        desc: "Set up CC1 clone and trap connections",
+        // XXX shouldn't you be able to drag the destination?
+        // TODO mod + right click for RRO or diamond alg?  ah but we only have ctrl available
+        desc: "Set up CC1-style clone and trap connections.\n(WIP)\nNOTE: Not supported in CC2!\nRight click: auto link using Lynx rules",
+        //desc: "Set up CC1-style clone and trap connections.\nNOTE: Not supported in CC2!\nLeft drag: link button with valid target\nCtrl-click: erase link\nRight click: auto link using Lynx rules",
+        op1: ConnectOperation,
+        op2: ConnectOperation,
     },
     wire: {
-        // TODO not implemented
         icon: 'icons/tool-wire.png',
         name: "Wire",
         desc: "Edit CC2 wiring.\nLeft click: draw wires\nCtrl-click: erase wires\nRight click: toggle tunnels (floor only)",
@@ -1851,7 +1951,7 @@ const EDITOR_TOOLS = {
     // slade when you have some selected?
     // TODO ah, railroads...
 };
-const EDITOR_TOOL_ORDER = ['pencil', 'select_box', 'fill', 'adjust', 'force-floors', 'tracks', 'wire', 'camera'];
+const EDITOR_TOOL_ORDER = ['pencil', 'select_box', 'fill', 'adjust', 'force-floors', 'tracks', 'connect', 'wire', 'camera'];
 const EDITOR_TOOL_SHORTCUTS = {};
 for (let [tool, tooldef] of Object.entries(EDITOR_TOOLS)) {
     if (tooldef.shortcut) {
@@ -3256,7 +3356,20 @@ export class Editor extends PrimaryView {
         // FIXME need this in load_level which is called even if we haven't been setup yet
         this.connections_g = mk_svg('g');
         // This SVG draws vectors on top of the editor, like monster paths and button connections
-        this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'}, this.connections_g);
+        this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'},
+            mk_svg('defs',
+                mk_svg('marker', {id: 'overlay-arrowhead', markerWidth: 4, markerHeight: 4, refX: 3, refY: 2, orient: 'auto'},
+                    mk_svg('polygon', {points: '0 0, 4 2, 0 4'}),
+                ),
+            ),
+            mk_svg('filter', {id: 'overlay-filter-outline'},
+                mk_svg('feMorphology', {'in': 'SourceAlpha', result: 'dilated', operator: 'dilate', radius: 0.03125}),
+                mk_svg('feFlood', {'flood-color': '#0009', result: 'fill'}),
+                mk_svg('feComposite', {'in': 'fill', in2: 'dilated', operator: 'in'}),
+                mk_svg('feComposite', {'in': 'SourceGraphic'}),
+            ),
+            this.connections_g,
+        );
         this.viewport_el.append(this.renderer.canvas, this.svg_overlay);
 
         // This is done more correctly in setup(), but we need a sensible default so levels can be
@@ -3436,12 +3549,20 @@ export class Editor extends PrimaryView {
             this.mouse_coords = [ev.clientX, ev.clientY];
             // TODO move this into MouseOperation
             let [x, y] = this.renderer.cell_coords_from_event(ev);
-            if (this.is_in_bounds(x, y)) {
+            // TODO only do this stuff if the cell coords changed
+            let cell = this.cell(x, y);
+            if (cell) {
                 this.svg_cursor.classList.add('--visible');
                 this.svg_cursor.setAttribute('x', x);
                 this.svg_cursor.setAttribute('y', y);
 
                 this.statusbar_cursor.textContent = `(${x}, ${y})`;
+
+                // TODO don't /always/ do this.  maybe make it optionally always visible, and have
+                // an inspection tool that does it on point
+                let terrain = cell[LAYERS.terrain];
+                if (terrain.type.name === 'button_gray') {
+                }
             }
             else {
                 this.svg_cursor.classList.remove('--visible');
@@ -3633,27 +3754,12 @@ export class Editor extends PrimaryView {
                 url.searchParams.append('level', data);
                 new EditorShareOverlay(this.conductor, url.toString()).open();
             }],
-            ["Download level as C2M", () => {
+            ["Download level as C2M (new CC2 format)", () => {
                 // TODO support getting warnings + errors out of synthesis
                 let buf = c2g.synthesize_level(this.stored_level);
                 util.trigger_local_download((this.stored_level.title || 'untitled') + '.c2m', new Blob([buf]));
             }],
-            ["Download level as MSCC DAT/CCL", () => {
-                // TODO support getting warnings out of synthesis?
-                let buf;
-                try {
-                    buf = dat.synthesize_level(this.stored_level);
-                }
-                catch (errs) {
-                    if (errs instanceof dat.CCLEncodingErrors) {
-                        new EditorExportFailedOverlay(this.conductor, errs.errors).open();
-                        return;
-                    }
-                    throw errs;
-                }
-                util.trigger_local_download((this.stored_level.title || 'untitled') + '.ccl', new Blob([buf]));
-            }],
-            ["Download pack as C2G", () => {
+            ["Download pack as C2G (new CC2 format)", () => {
                 let stored_pack = this.conductor.stored_game;
 
                 // This is pretty heckin' best-effort for now; TODO move into format-c2g?
@@ -3698,6 +3804,21 @@ export class Editor extends PrimaryView {
 
                 // TODO support getting warnings + errors out of synthesis
                 util.trigger_local_download((stored_pack.title || 'untitled') + '.zip', new Blob([u8array]));
+            }],
+            ["Download level as CCL (old CC1 format)", () => {
+                // TODO support getting warnings out of synthesis?
+                let buf;
+                try {
+                    buf = dat.synthesize_level(this.stored_level);
+                }
+                catch (errs) {
+                    if (errs instanceof dat.CCLEncodingErrors) {
+                        new EditorExportFailedOverlay(this.conductor, errs.errors).open();
+                        return;
+                    }
+                    throw errs;
+                }
+                util.trigger_local_download((this.stored_level.title || 'untitled') + '.ccl', new Blob([buf]));
             }],
         ];
         this.export_menu = new MenuOverlay(
@@ -4186,15 +4307,17 @@ export class Editor extends PrimaryView {
         }
 
         // Load connections
-        // TODO cloners too
+        // TODO what if the source tile is not connectable?
+        // TODO there's a has_custom_connections flag, is that important here or is it just because
+        // i can't test an object as a bool
         this.connections_g.textContent = '';
-        for (let [src, dest] of Object.entries(this.stored_level.custom_trap_wiring)) {
+        this.connections_elements = {};
+        for (let [src, dest] of Object.entries(this.stored_level.custom_connections)) {
             let [sx, sy] = this.stored_level.scalar_to_coords(src);
             let [dx, dy] = this.stored_level.scalar_to_coords(dest);
-            this.connections_g.append(
-                mk_svg('rect.overlay-cxn', {x: sx, y: sy, width: 1, height: 1}),
-                mk_svg('line.overlay-cxn', {x1: sx + 0.5, y1: sy + 0.5, x2: dx + 0.5, y2: dy + 0.5}),
-            );
+            let el = new SVGConnection(sx, sy, dx, dy).element;
+            this.connections_elements[src] = el;
+            this.connections_g.append(el);
         }
         // TODO why are these in connections_g lol
         for (let [i, region] of this.stored_level.camera_regions.entries()) {
@@ -4505,16 +4628,11 @@ export class Editor extends PrimaryView {
     // Utility/inspection
 
     is_in_bounds(x, y) {
-        return 0 <= x && x < this.stored_level.size_x && 0 <= y && y < this.stored_level.size_y;
+        return this.stored_level.is_point_within_bounds(x, y);
     }
 
     cell(x, y) {
-        if (this.is_in_bounds(x, y)) {
-            return this.stored_level.linear_cells[this.stored_level.coords_to_scalar(x, y)];
-        }
-        else {
-            return null;
-        }
+        return this.stored_level.cell(x, y);
     }
 
     // ------------------------------------------------------------------------------------------------
@@ -4653,6 +4771,35 @@ export class Editor extends PrimaryView {
             this.redraw_entire_level();
         });
         this.commit_undo();
+    }
+
+    // Create a connection between two cells and update the UI accordingly.  If dest is null or
+    // undefined, delete any existing connection instead.
+    set_custom_connection(src, dest) {
+        let prev = this.stored_level.custom_connections[src];
+        this._do(
+            () => this._set_custom_connection(src, dest),
+            () => this._set_custom_connection(src, prev),
+        );
+    }
+    _set_custom_connection(src, dest) {
+        if (this.connections_elements[src]) {
+            this.connections_elements[src].remove();
+        }
+
+        if ((dest ?? null) === null) {
+            delete this.stored_level.custom_connections[src];
+            delete this.connections_elements[src];
+        }
+        else {
+            this.stored_level.custom_connections[src] = dest;
+            let el = new SVGConnection(
+                ...this.stored_level.scalar_to_coords(src),
+                ...this.stored_level.scalar_to_coords(dest),
+            ).element;
+            this.connections_elements[src] = el;
+            this.connections_g.append(el);
+        }
     }
 
     // ------------------------------------------------------------------------------------------------

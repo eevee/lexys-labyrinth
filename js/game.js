@@ -637,14 +637,12 @@ export class Level extends LevelInterface {
 
         // Check for custom wiring, for MSCC .DAT levels
         // TODO would be neat if this applied to orange buttons too
+        // TODO RAINBOW TELEPORTER, ARBITRARY TILE TARGET HAHA
         if (this.stored_level.has_custom_connections) {
             let n = this.stored_level.coords_to_scalar(x, y);
             let target_cell_n = null;
-            if (connectable.type.name === 'button_brown') {
-                target_cell_n = this.stored_level.custom_trap_wiring[n] ?? null;
-            }
-            else if (connectable.type.name === 'button_red') {
-                target_cell_n = this.stored_level.custom_cloner_wiring[n] ?? null;
+            if (connectable.type.name === 'button_brown' || connectable.type.name === 'button_red') {
+                target_cell_n = this.stored_level.custom_connections[n] ?? null;
             }
             if (target_cell_n && target_cell_n < this.width * this.height) {
                 let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);

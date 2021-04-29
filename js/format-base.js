@@ -127,12 +127,9 @@ export class StoredLevel extends LevelInterface {
         this.size_y = 0;
         this.linear_cells = [];
 
-        // Maps of button positions to trap/cloner positions, as scalar indexes
-        // in the linear cell list
-        // TODO merge these imo
+        // Maps of button positions to trap/cloner positions, as scalars
         this.has_custom_connections = false;
-        this.custom_trap_wiring = {};
-        this.custom_cloner_wiring = {};
+        this.custom_connections = {};
 
         // New LL feature: custom camera regions, as lists of {x, y, width, height}
         this.camera_regions = [];

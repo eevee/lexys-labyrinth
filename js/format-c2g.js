@@ -1307,6 +1307,20 @@ export function parse_level(buf, number = 1) {
                 p += 4;
             }
         }
+        else if (type === 'LXCX') {
+            // Custom connections, like MSCC (but more!  maybe)
+            if (bytes.length % 4 !== 0)
+                throw new Error(`Expected LXCX chunk to be a multiple of 4 bytes; got ${bytes.length}`);
+
+            level.has_custom_connections = true;
+            let p = 0;
+            while (p < bytes.length) {
+                let src = view.getUint16(p, true);
+                let dest = view.getUint16(p + 2, true);
+                level.custom_connections[src] = dest;
+                p += 4;
+            }
+        }
         else {
             console.warn(`Unrecognized section type '${type}' at offset ${bytes.byteOffset}`, view);
             // TODO save it, persist when editing level
@@ -1534,6 +1548,21 @@ export function synthesize_level(stored_level) {
             p += 4;
         }
         c2m.add_section('LXCM', bytes.buffer);
+    }
+
+    // Store MSCC-like custom connections
+    // TODO LL feature, should be distinguished somehow
+    let num_connections = Object.keys(stored_level.custom_connections).length;
+    if (num_connections > 0) {
+        let buf = new ArrayBuffer(4 * num_connections);
+        let view = new DataView(buf);
+        let p = 0;
+        for (let [src, dest] of Object.entries(stored_level.custom_connections)) {
+            view.setUint16(p + 0, src, true);
+            view.setUint16(p + 2, dest, true);
+            p += 4;
+        }
+        c2m.add_section('LXCX', buf);
     }
 
     let map_bytes = new Uint8Array(1024);

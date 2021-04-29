@@ -48,6 +48,22 @@ export function mk_svg(tag_selector, ...children) {
     return _mk(el, children);
 }
 
+export function trigger_local_download(filename, blob) {
+    let url = URL.createObjectURL(blob);
+    // To download a file, um, make an <a> and click it.  Not kidding
+    let a = mk('a', {
+        href: url,
+        download: filename,
+    });
+    document.body.append(a);
+    a.click();
+    // Absolutely no idea when I'm allowed to revoke this, but surely a minute is safe
+    window.setTimeout(() => {
+        a.remove();
+        URL.revokeObjectURL(url);
+    }, 60 * 1000);
+}
+
 export function handle_drop(element, options) {
     let dropzone_class = options.dropzone_class ?? null;
     let on_drop = options.on_drop;
