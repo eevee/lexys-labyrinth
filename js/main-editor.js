@@ -2098,20 +2098,20 @@ const EDITOR_TILE_DESCRIPTIONS = {
         desc: "Turns into a normal wall when bumped.",
     },
     fake_floor: {
-        name: "Fake floor",
-        desc: "Looks like a fake wall, but turns to floor when bumped.  Stops dirt blocks and monsters.",
+        name: "Illusory floor",
+        desc: "Looks like an illusory wall, but turns to floor when bumped.  Stops dirt blocks and monsters.",
     },
     fake_wall: {
-        name: "Fake wall",
+        name: "Illusory wall",
         desc: "Turns to wall when bumped.",
     },
     popdown_floor: {
         name: "Popdown floor",
-        desc: "Looks like a popdown wall, but presses down into floor while something's on it.  Stops all blocks.",
+        desc: "Presses down into floor while something's on it.  Stops all blocks.",
     },
     popdown_wall: {
-        name: "Popdown wall",
-        desc: "Acts like a normal wall, but is indistinguishable from a popdown floor.",
+        name: "Fake popdown floor",
+        desc: "Looks like a popdown floor, but acts like a normal wall.",
     },
     floor_letter: {
         name: "Letter tile",
