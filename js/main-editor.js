@@ -1315,9 +1315,10 @@ class TrackOperation extends MouseOperation {
 
 class SVGConnection {
     constructor(sx, sy, dx, dy) {
-        this.source = mk_svg('rect.-source', {width: 1, height: 1});
+        this.source = mk_svg('circle.-source', {r: 0.5});
         this.line = mk_svg('line.-arrow', {});
-        this.element = mk_svg('g.overlay-connection', this.source, this.line);
+        this.dest = mk_svg('rect.-dest', {width: 1, height: 1});
+        this.element = mk_svg('g.overlay-connection', this.source, this.line, this.dest);
         this.set_source(sx, sy);
         this.set_dest(dx, dy);
     }
@@ -1325,8 +1326,8 @@ class SVGConnection {
     set_source(sx, sy) {
         this.sx = sx;
         this.sy = sy;
-        this.source.setAttribute('x', sx);
-        this.source.setAttribute('y', sy);
+        this.source.setAttribute('cx', sx + 0.5);
+        this.source.setAttribute('cy', sy + 0.5);
         this.line.setAttribute('x1', sx + 0.5);
         this.line.setAttribute('y1', sy + 0.5);
     }
@@ -1336,6 +1337,8 @@ class SVGConnection {
         this.dy = dy;
         this.line.setAttribute('x2', dx + 0.5);
         this.line.setAttribute('y2', dy + 0.5);
+        this.dest.setAttribute('x', dx);
+        this.dest.setAttribute('y', dy);
     }
 }
 class ConnectOperation extends MouseOperation {
@@ -1926,6 +1929,12 @@ const EDITOR_TOOLS = {
         name: "Connect",
         // XXX shouldn't you be able to drag the destination?
         // TODO mod + right click for RRO or diamond alg?  ah but we only have ctrl available
+        // ok lemme think then
+        // left drag: create a new connection (supported connections only)
+        // ctrl-click: erase all connections
+        // shift-drag: create a new connection (arbitrary cells)
+        // right drag: move a connection endpoint
+        // ctrl-right drag: move the other endpoint (if a cell is both source and dest)
         desc: "Set up CC1-style clone and trap connections.\n(WIP)\nNOTE: Not supported in CC2!\nRight click: auto link using Lynx rules",
         //desc: "Set up CC1-style clone and trap connections.\nNOTE: Not supported in CC2!\nLeft drag: link button with valid target\nCtrl-click: erase link\nRight click: auto link using Lynx rules",
         op1: ConnectOperation,

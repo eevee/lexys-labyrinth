@@ -1883,10 +1883,10 @@ svg.level-editor-overlay rect.overlay-selection {
     }
 }
 #overlay-arrowhead {
-    fill: hsl(345, 75%, 75%);
+    fill: white;
 }
 svg.level-editor-overlay g.overlay-connection {
-    stroke: hsl(345, 75%, 75%);
+    stroke: white;
     filter: url(#overlay-filter-outline);
 }
 svg.level-editor-overlay g.overlay-connection line.-arrow {
