@@ -92,12 +92,12 @@ export const COLLISION = {
     monster_generic:    0x0100,
     fireball:           0x0200,
     bug:                0x0400,
+    yellow_tank:        0x0800,
     rover:              0x1000,
     ghost:              0x8000,
     // For a tile's COLLISION, use one of these bit combinations
-    monster_general:    0x6f00,  // everything but ghost and rover
-    monster_solid:      0x7f00,  // everything but ghost
-    monster_any:        0xff00,  // everything including ghost
+    monster_typical:    0x6f00,  // everything but ghost and rover
+    monster_any:        0xff00,  // everything including ghost (only used for monster/fire compat flag)
 
     // Combo masks used for matching
     all_but_ghost:          0xffff & ~0x8000,
@@ -110,6 +110,8 @@ export const COLLISION = {
 export const PICKUP_PRIORITIES = {
     never: 4,   // cc2 blocks, never pick anything up
     always: 3,  // all actors; blue keys, yellow teleporters (everything picks up except cc2 blocks)
+    // TODO is this even necessary?  in cc2 the general rule seems to be that anything stepping on
+    // an item picks it up, and collision is used to avoid that most of the time
     normal: 2,  // actors with inventories; most items
     player: 1,  // players and doppelgangers; red keys (ignored by everything else)
     real_player: 0,

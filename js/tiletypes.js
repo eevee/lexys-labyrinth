@@ -52,7 +52,7 @@ function _define_door(key) {
     return {
         layer: LAYERS.terrain,
         // Doors can be opened by ice blocks, but not dirt blocks or monsters
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         blocks(me, level, other) {
             if (other.type.name === 'ghost')
                 return false;
@@ -73,7 +73,7 @@ function _define_gate(key) {
     return {
         layer: LAYERS.item,
         // Doors can be opened by ice blocks, but not dirt blocks or monsters
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         blocks(me, level, other) {
             if (other.type.name === 'ghost')
                 return false;
@@ -244,7 +244,7 @@ const COMMON_TOOL = {
     layer: LAYERS.item,
     is_item: true,
     is_tool: true,
-    blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+    blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
     item_priority: PICKUP_PRIORITIES.normal,
 };
 
@@ -343,7 +343,7 @@ const TILE_TYPES = {
     },
     popwall: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         on_ready(me, level) {
             if (! level.compat.no_auto_convert_ccl_popwalls &&
                 level.stored_level.format === 'ccl' &&
@@ -366,7 +366,7 @@ const TILE_TYPES = {
     // with popwall behavior between Lynx and Steam
     popwall2: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         on_depart(me, level, other) {
             level.spawn_animation(me.cell, 'puff');
             level.transmute_tile(me, 'popwall');
@@ -424,7 +424,7 @@ const TILE_TYPES = {
     },
     fake_floor: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         reveal(me, level, other) {
             level.spawn_animation(me.cell, 'puff');
             level.transmute_tile(me, 'floor');
@@ -694,7 +694,7 @@ const TILE_TYPES = {
     // Terrain
     dirt: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         blocks(me, level, other) {
             return ((other.type.name === 'player2' || other.type.name === 'doppelganger2') &&
                 ! other.has_item('hiking_boots'));
@@ -711,7 +711,7 @@ const TILE_TYPES = {
     },
     gravel: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.monster_general,
+        blocks_collision: COLLISION.monster_typical,
         blocks(me, level, other) {
             return ((other.type.name === 'player2' || other.type.name === 'doppelganger2') &&
                 ! other.has_item('hiking_boots'));
@@ -778,7 +778,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         // Fire blocks most monsters, except in MS where they walk right in and get roasted
         blocks(me, level, other) {
-            if (other.type.collision_mask & (COLLISION.fireball | COLLISION.ghost))
+            if (other.type.collision_mask & (COLLISION.fireball | COLLISION.yellow_tank | COLLISION.ghost))
                 return false;
             if (other.type.collision_mask & COLLISION.monster_any) {
                 return ! level.compat.fire_allows_monsters;
@@ -1036,7 +1036,7 @@ const TILE_TYPES = {
         // TODO ms: this is random, and an acting wall to monsters (!)
         blocks(me, level, other) {
             return (level.compat.rff_blocks_monsters &&
-                (other.type.collision_mask & COLLISION.monster_general));
+                (other.type.collision_mask & COLLISION.monster_typical));
         },
         on_arrive(me, level, other) {
             level.set_actor_direction(other, level.get_force_floor_direction());
@@ -1115,7 +1115,7 @@ const TILE_TYPES = {
     },
     thief_tools: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         on_arrive(me, level, other) {
             if (level.take_tool_from_actor(other, 'bribe')) {
                 if (other === level.player) {
@@ -1138,7 +1138,7 @@ const TILE_TYPES = {
     },
     thief_keys: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         on_arrive(me, level, other) {
             if (level.take_tool_from_actor(other, 'bribe')) {
                 if (other === level.player) {
@@ -1163,7 +1163,6 @@ const TILE_TYPES = {
     no_sign: {
         layer: LAYERS.item_mod,
         item_modifier: 'ignore',
-        collision_allow: COLLISION.monster_solid,
         blocks(me, level, other) {
             let item = me.cell.get_item();
             return item && other.has_item(item.type.name);
@@ -1357,7 +1356,7 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         is_chip: true,
         is_required_chip: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
             level.collect_chip();
@@ -1488,7 +1487,7 @@ const TILE_TYPES = {
     // Floor mechanisms
     cloner: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.real_player | COLLISION.block_cc1 | COLLISION.monster_typical,
         populate_defaults(me) {
             me.arrows = 0;  // bitmask of glowing arrows (visual, no gameplay impact)
         },
@@ -2429,7 +2428,7 @@ const TILE_TYPES = {
     // Time alteration
     stopwatch_bonus: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
             level.sfx.play_once('get-stopwatch-bonus', me.cell);
@@ -2439,7 +2438,7 @@ const TILE_TYPES = {
     },
     stopwatch_penalty: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
             level.sfx.play_once('get-stopwatch-penalty', me.cell);
@@ -2449,7 +2448,7 @@ const TILE_TYPES = {
     },
     stopwatch_toggle: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.player,
         on_pickup(me, level, other) {
             level.sfx.play_once('get-stopwatch-toggle', me.cell);
@@ -2522,6 +2521,7 @@ const TILE_TYPES = {
     },
     tank_yellow: {
         ...COMMON_MONSTER,
+        collision_mask: COLLISION.yellow_tank,
         pushes: {
             dirt_block: true,
             ice_block: true,
@@ -2704,14 +2704,14 @@ const TILE_TYPES = {
         is_item: true,
         is_key: true,
         // FIXME ok this is ghastly
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
     },
     key_green: {
         layer: LAYERS.item,
         is_item: true,
         is_key: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
     },
     // Boots
@@ -3081,7 +3081,7 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         is_chip: true,
         is_required_chip: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
             level.collect_chip();
@@ -3091,7 +3091,7 @@ const TILE_TYPES = {
     chip_extra: {
         layer: LAYERS.item,
         is_chip: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
             level.collect_chip();
@@ -3102,7 +3102,7 @@ const TILE_TYPES = {
     // actually add to the player's bonus
     score_10: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
         on_pickup(me, level, other) {
             if (other.type.name === 'ghost')
@@ -3116,7 +3116,7 @@ const TILE_TYPES = {
     },
     score_100: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
         on_pickup(me, level, other) {
             if (other.type.name === 'ghost')
@@ -3130,7 +3130,7 @@ const TILE_TYPES = {
     },
     score_1000: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
         on_pickup(me, level, other) {
             if (other.type.name === 'ghost')
@@ -3144,7 +3144,7 @@ const TILE_TYPES = {
     },
     score_2x: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
         on_pickup(me, level, other) {
             if (other.type.name === 'ghost')
@@ -3158,7 +3158,7 @@ const TILE_TYPES = {
     },
     score_5x: {
         layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
         on_pickup(me, level, other) {
             if (other.type.name === 'ghost')
@@ -3174,14 +3174,14 @@ const TILE_TYPES = {
     hint: {
         layer: LAYERS.terrain,
         is_hint: true,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_solid,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         populate_defaults(me) {
             me.hint_text = null;  // optional, may use level's hint instead
         },
     },
     socket: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         blocks(me, level, other) {
             return ! (other.type.name === 'ghost' || level.chips_remaining <= 0);
         },
@@ -3195,7 +3195,7 @@ const TILE_TYPES = {
     },
     exit: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         on_arrive(me, level, other) {
             if (other.type.is_real_player) {
                 level.remaining_players -= 1;
