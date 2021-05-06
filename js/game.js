@@ -157,8 +157,7 @@ export class Tile {
         direction = tile.cell.redirect_exit(tile, direction);
         // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
         // which would fail, but it would still change the block's direction
-        // XXX this expects to take a level but it only matters with push_mode === 'push'
-        return tile.cell.try_leaving(tile, direction, level);
+        return level.can_actor_leave_cell(tile, tile.cell, direction);
     }
 
     can_pull(tile, direction) {
@@ -250,185 +249,6 @@ export class Cell extends Array {
         return current && current.type.name === name;
     }
 
-    // FIXME honestly no longer sure why these two are on Cell, or even separate really
-    try_leaving(actor, direction, level, push_mode) {
-        // The only tiles that can trap us are thin walls and terrain, so for perf (this is very hot
-        // code), only bother checking those)
-        let terrain = this[LAYERS.terrain];
-        let thin_walls = this[LAYERS.thin_wall];
-        let blocker;
-
-        if (thin_walls && thin_walls.type.blocks_leaving && thin_walls.type.blocks_leaving(thin_walls, actor, direction)) {
-            blocker = thin_walls;
-        }
-        else if (terrain.type.traps && terrain.type.traps(terrain, level, actor)) {
-            blocker = terrain;
-        }
-        else if (terrain.type.blocks_leaving && terrain.type.blocks_leaving(terrain, actor, direction)) {
-            blocker = terrain;
-        }
-
-        if (blocker) {
-            if (push_mode === 'push') {
-                if (actor.type.on_blocked) {
-                    actor.type.on_blocked(actor, level, direction, blocker);
-                }
-            }
-            return false;
-        }
-
-        return true;
-    }
-
-    // Check if this actor can move this direction into this cell.  Returns true on success.  May
-    // have side effects, depending on the value of push_mode:
-    // - null: Default.  Do not impact game state.  Treat pushable objects as blocking.
-    // - 'bump': Fire bump triggers.  Don't move pushable objects, but do check whether they /could/
-    //   be pushed, recursively if necessary.
-    // - 'slap': Like 'bump', but also sets the 'decision' of pushable objects.
-    // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
-    try_entering(actor, direction, level, push_mode = null) {
-        let pushable_tiles = [];
-        // Subtleties ahoy!  This is **EXTREMELY** sensitive to ordering.  Consider:
-        // - An actor with foil MUST NOT bump a wall on the other side of a thin wall.
-        // - A ghost with foil MUST bump a wall (even on the other side of a thin wall) and be
-        //   deflected by the resulting steel.
-        // - A bowling ball MUST NOT destroy an actor on the other side of a thin wall, or on top of
-        //   a regular wall.
-        // - A fireball MUST melt an ice block AND ALSO still be deflected by it, even if the ice
-        //   block is on top of an item (which blocks the fireball), but NOT one on the other side
-        //   of a thin wall.
-        // - A rover MUST NOT bump walls underneath a canopy (which blocks it).
-        // It seems the order is thus: canopy + thin wall; terrain; actor; item.  Which is the usual
-        // ordering from the top down, except that terrain is checked before actors.  Really, the
-        // ordering is from "outermost" to "innermost", which makes physical sense.
-        let still_blocked = false;
-        for (let layer of [
-            LAYERS.canopy, LAYERS.thin_wall, LAYERS.terrain, LAYERS.swivel,
-            LAYERS.actor, LAYERS.item_mod, LAYERS.item])
-        {
-            let tile = this[layer];
-            if (! tile)
-                continue;
-
-            let original_name = tile.type.name;
-            // TODO check ignores here?
-            if (tile.type.on_bumped) {
-                tile.type.on_bumped(tile, level, actor);
-            }
-
-            if (! tile.blocks(actor, direction, level))
-                continue;
-
-            if (tile.type.on_after_bumped) {
-                tile.type.on_after_bumped(tile, level, actor);
-            }
-
-            if (push_mode === null)
-                return false;
-
-            if (actor.can_push(tile, direction, level) || (
-                level.compat.tanks_teeth_push_ice_blocks && tile.type.name === 'ice_block' &&
-                (actor.type.name === 'teeth' || actor.type.name === 'teeth_timid' || actor.type.name === 'tank_blue')
-            )) {
-                // Collect pushables for later, so we don't inadvertently push through a wall
-                pushable_tiles.push(tile);
-            }
-            else {
-                // It's in our way and we can't push it, so we're done here
-                if (push_mode === 'push') {
-                    if (actor.type.on_blocked) {
-                        actor.type.on_blocked(actor, level, direction, tile);
-                    }
-                    // Lynx (or at least TW?) allows pushing blocks off of particular wall types
-                    if (level.compat.allow_pushing_blocks_off_faux_walls &&
-                        ['fake_wall', 'wall_invisible', 'wall_appearing'].includes(original_name))
-                    {
-                        still_blocked = true;
-                        continue;
-                    }
-                }
-                return false;
-            }
-        }
-
-        // If we got this far, all that's left is to deal with pushables
-        if (pushable_tiles.length > 0) {
-            // This ends recursive push attempts, which can happen with a row of ice clogged by ice
-            // blocks that are trying to slide
-            actor._trying_to_push = true;
-            try {
-                for (let tile of pushable_tiles) {
-                    if (tile._trying_to_push)
-                        return false;
-                    if (push_mode === 'bump' || push_mode === 'slap') {
-                        // FIXME this doesn't take railroad curves into account, e.g. it thinks a
-                        // rover can't push a block through a curve
-                        if (tile.movement_cooldown > 0 ||
-                            ! level.check_movement(tile, tile.cell, direction, push_mode))
-                        {
-                            return false;
-                        }
-                        else if (push_mode === 'slap') {
-                            if (actor === level.player) {
-                                level._set_tile_prop(actor, 'is_pushing', true);
-                                level.sfx.play_once('push');
-                            }
-                            tile.decision = direction;
-                        }
-                    }
-                    else if (push_mode === 'push') {
-                        if (actor === level.player) {
-                            level._set_tile_prop(actor, 'is_pushing', true);
-                        }
-                        // We can't directly push a sliding block, even one on a force floor that's
-                        // stuck on a wall.  Instead, it becomes a pending move for the block, which
-                        // will use this as a decision next time it's allowed to move
-                        // FIXME this is clumsy and creates behavior dependent on actor order.  my
-                        // original implementation only did this if the push /failed/; is that worth
-                        // a compat option?  also, how does any of this work under lynx rules?
-                        if (tile.slide_mode === 'force' ||
-                            (tile.slide_mode !== null && tile.movement_cooldown > 0))
-                        {
-                            level._set_tile_prop(tile, 'pending_push', direction);
-                            // FIXME if the block has already made a decision then this is necessary
-                            // to override it.  but i don't like it; (a) it might cause blocks to
-                            // get stuck against walls on force floors, because the code to fix that
-                            // is at decision time; (b) it's done for pulling too and just feels
-                            // hacky?
-                            tile.decision = direction;
-                            return false;
-                        }
-
-                        if (level.attempt_out_of_turn_step(tile, direction)) {
-                            if (actor === level.player) {
-                                level.sfx.play_once('push');
-                            }
-                        }
-                        else {
-                            return false;
-                        }
-                    }
-                }
-            }
-            finally {
-                delete actor._trying_to_push;
-            }
-
-            // In push mode, check one last time for being blocked, in case we e.g. pushed a block
-            // off of a recessed wall
-            // TODO unclear if this is the right way to emulate spring mining, but without the check
-            // for a player, it happens /too/ often; try allowing for ann actors and running the 163
-            // BLOX replay, and right at the end ice blocks spring mine each other.  also, the wiki
-            // suggests something about another actor moving away at the same time?
-            if (! (level.compat.emulate_spring_mining && actor.type.is_real_player) &&
-                push_mode === 'push' && this.some(tile => tile && tile.blocks(actor, direction, level)))
-                return false;
-        }
-
-        return ! still_blocked;
-    }
-
     // Special railroad ability: change the direction we attempt to leave
     redirect_exit(actor, direction) {
         let terrain = this.get_terrain();
@@ -461,6 +281,8 @@ export class Level extends LevelInterface {
             return 3;
         }
     }
+
+    // Level setup ------------------------------------------------------------------------------------
 
     restart(compat) {
         this.compat = compat;
@@ -853,6 +675,8 @@ export class Level extends LevelInterface {
                 this.player.slide_mode === 'force' && this.player.last_move_was_force));
     }
 
+    // Randomness -------------------------------------------------------------------------------------
+
     // Lynx PRNG, used unchanged in CC2
     prng() {
         let n = (this._rng1 >> 2) - this._rng1;
@@ -879,10 +703,8 @@ export class Level extends LevelInterface {
         let mod = this._blob_modifier;
 
         if (this.stored_level.blob_behavior === 1) {
-            // "4 patterns" just increments by 1 every time (but /after/ returning)
-            //this._blob_modifier = (this._blob_modifier + 1) % 4;
+            // "4 patterns" just increments by 1 every time
             mod = (mod + 1) % 4;
-            this._blob_modifier = mod;
         }
         else {
             // Other modes do this curious operation
@@ -891,11 +713,13 @@ export class Level extends LevelInterface {
                 mod ^= 0x1d;
             }
             mod &= 0xff;
-            this._blob_modifier = mod;
         }
 
+        this._blob_modifier = mod;
         return mod;
     }
+
+    // Main loop --------------------------------------------------------------------------------------
 
     // Move the game state forwards by one tic.
     // Input is a bit mask of INPUT_BITS.
@@ -1369,7 +1193,7 @@ export class Level extends LevelInterface {
                 if (p !== i) {
                     this.actors[p] = actor;
                 }
-                p++;
+                p += 1;
             }
             else {
                 let local_p = p;
@@ -1637,6 +1461,186 @@ export class Level extends LevelInterface {
         }
     }
 
+    // Actor movement ---------------------------------------------------------------------------------
+
+    can_actor_leave_cell(actor, cell, direction, push_mode) {
+        // The only tiles that can trap us are thin walls and terrain, so for perf (this is very hot
+        // code), only bother checking those)
+        let terrain = cell[LAYERS.terrain];
+        let thin_walls = cell[LAYERS.thin_wall];
+        let blocker;
+
+        if (thin_walls && thin_walls.type.blocks_leaving && thin_walls.type.blocks_leaving(thin_walls, actor, direction)) {
+            blocker = thin_walls;
+        }
+        else if (terrain.type.traps && terrain.type.traps(terrain, this, actor)) {
+            blocker = terrain;
+        }
+        else if (terrain.type.blocks_leaving && terrain.type.blocks_leaving(terrain, actor, direction)) {
+            blocker = terrain;
+        }
+
+        if (blocker) {
+            if (push_mode === 'push') {
+                if (actor.type.on_blocked) {
+                    actor.type.on_blocked(actor, this, direction, blocker);
+                }
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    // Check if this actor can move this direction into this cell.  Returns true on success.  May
+    // have side effects, depending on the value of push_mode:
+    // - null: Default.  Do not impact game state.  Treat pushable objects as blocking.
+    // - 'bump': Fire bump triggers.  Don't move pushable objects, but do check whether they /could/
+    //   be pushed, recursively if necessary.
+    // - 'slap': Like 'bump', but also sets the 'decision' of pushable objects.
+    // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
+    can_actor_enter_cell(actor, cell, direction, push_mode = null) {
+        let pushable_tiles = [];
+        // Subtleties ahoy!  This is **EXTREMELY** sensitive to ordering.  Consider:
+        // - An actor with foil MUST NOT bump a wall on the other side of a thin wall.
+        // - A ghost with foil MUST bump a wall (even on the other side of a thin wall) and be
+        //   deflected by the resulting steel.
+        // - A bowling ball MUST NOT destroy an actor on the other side of a thin wall, or on top of
+        //   a regular wall.
+        // - A fireball MUST melt an ice block AND ALSO still be deflected by it, even if the ice
+        //   block is on top of an item (which blocks the fireball), but NOT one on the other side
+        //   of a thin wall.
+        // - A rover MUST NOT bump walls underneath a canopy (which blocks it).
+        // It seems the order is thus: canopy + thin wall; terrain; actor; item.  Which is the usual
+        // ordering from the top down, except that terrain is checked before actors.  Really, the
+        // ordering is from "outermost" to "innermost", which makes physical sense.
+        let still_blocked = false;
+        for (let layer of [
+            LAYERS.canopy, LAYERS.thin_wall, LAYERS.terrain, LAYERS.swivel,
+            LAYERS.actor, LAYERS.item_mod, LAYERS.item])
+        {
+            let tile = cell[layer];
+            if (! tile)
+                continue;
+
+            let original_name = tile.type.name;
+            // TODO check ignores here?
+            if (tile.type.on_bumped) {
+                tile.type.on_bumped(tile, this, actor);
+            }
+
+            if (! tile.blocks(actor, direction, this))
+                continue;
+
+            if (tile.type.on_after_bumped) {
+                tile.type.on_after_bumped(tile, this, actor);
+            }
+
+            if (push_mode === null)
+                return false;
+
+            if (actor.can_push(tile, direction, this) || (
+                this.compat.tanks_teeth_push_ice_blocks && tile.type.name === 'ice_block' &&
+                (actor.type.name === 'teeth' || actor.type.name === 'teeth_timid' || actor.type.name === 'tank_blue')
+            )) {
+                // Collect pushables for later, so we don't inadvertently push through a wall
+                pushable_tiles.push(tile);
+            }
+            else {
+                // It's in our way and we can't push it, so we're done here
+                if (push_mode === 'push') {
+                    if (actor.type.on_blocked) {
+                        actor.type.on_blocked(actor, this, direction, tile);
+                    }
+                    // Lynx (or at least TW?) allows pushing blocks off of particular wall types
+                    if (this.compat.allow_pushing_blocks_off_faux_walls &&
+                        ['fake_wall', 'wall_invisible', 'wall_appearing'].includes(original_name))
+                    {
+                        still_blocked = true;
+                        continue;
+                    }
+                }
+                return false;
+            }
+        }
+
+        // If we got this far, all that's left is to deal with pushables
+        if (pushable_tiles.length > 0) {
+            // This ends recursive push attempts, which can happen with a row of ice clogged by ice
+            // blocks that are trying to slide
+            actor._trying_to_push = true;
+            try {
+                for (let tile of pushable_tiles) {
+                    if (tile._trying_to_push)
+                        return false;
+                    if (push_mode === 'bump' || push_mode === 'slap') {
+                        // FIXME this doesn't take railroad curves into account, e.g. it thinks a
+                        // rover can't push a block through a curve
+                        if (tile.movement_cooldown > 0 ||
+                            ! this.check_movement(tile, tile.cell, direction, push_mode))
+                        {
+                            return false;
+                        }
+                        else if (push_mode === 'slap') {
+                            if (actor === this.player) {
+                                this._set_tile_prop(actor, 'is_pushing', true);
+                                this.sfx.play_once('push');
+                            }
+                            tile.decision = direction;
+                        }
+                    }
+                    else if (push_mode === 'push') {
+                        if (actor === this.player) {
+                            this._set_tile_prop(actor, 'is_pushing', true);
+                        }
+                        // We can't directly push a sliding block, even one on a force floor that's
+                        // stuck on a wall.  Instead, it becomes a pending move for the block, which
+                        // will use this as a decision next time it's allowed to move
+                        // FIXME this is clumsy and creates behavior dependent on actor order.  my
+                        // original implementation only did this if the push /failed/; is that worth
+                        // a compat option?  also, how does any of this work under lynx rules?
+                        if (tile.slide_mode === 'force' ||
+                            (tile.slide_mode !== null && tile.movement_cooldown > 0))
+                        {
+                            this._set_tile_prop(tile, 'pending_push', direction);
+                            // FIXME if the block has already made a decision then this is necessary
+                            // to override it.  but i don't like it; (a) it might cause blocks to
+                            // get stuck against walls on force floors, because the code to fix that
+                            // is at decision time; (b) it's done for pulling too and just feels
+                            // hacky?
+                            tile.decision = direction;
+                            return false;
+                        }
+
+                        if (this.attempt_out_of_turn_step(tile, direction)) {
+                            if (actor === this.player) {
+                                this.sfx.play_once('push');
+                            }
+                        }
+                        else {
+                            return false;
+                        }
+                    }
+                }
+            }
+            finally {
+                delete actor._trying_to_push;
+            }
+
+            // In push mode, check one last time for being blocked, in case we e.g. pushed a block
+            // off of a recessed wall
+            // TODO unclear if this is the right way to emulate spring mining, but without the check
+            // for a player, it happens /too/ often; try allowing for ann actors and running the 163
+            // BLOX replay, and right at the end ice blocks spring mine each other.  also, the wiki
+            // suggests something about another actor moving away at the same time?
+            if (! (this.compat.emulate_spring_mining && actor.type.is_real_player) &&
+                push_mode === 'push' && cell.some(tile => tile && tile.blocks(actor, direction, this)))
+                return false;
+        }
+
+        return ! still_blocked;
+    }
+
     check_movement(actor, orig_cell, direction, push_mode) {
         // Lynx: Players can't override backwards on force floors, and it functions like blocking,
         // but does NOT act like a bonk (hence why it's here)
@@ -1657,8 +1661,8 @@ export class Level extends LevelInterface {
         }
 
         let success = (
-            orig_cell.try_leaving(actor, direction, this, push_mode) &&
-            dest_cell.try_entering(actor, direction, this, push_mode));
+            this.can_actor_leave_cell(actor, orig_cell, direction, push_mode) &&
+            this.can_actor_enter_cell(actor, dest_cell, direction, push_mode));
 
         // If we have the hook, pull anything behind us, now that we're out of the way.
         // In CC2, this has to happen here to make hook-slapping work and allow hooking a moving
@@ -1989,7 +1993,6 @@ export class Level extends LevelInterface {
         // teleporting through it) it may not have been applied
         this.make_slide(actor, 'teleport');
 
-        let original_direction = actor.direction;
         let success = false;
         let dest, direction;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
@@ -2058,6 +2061,8 @@ export class Level extends LevelInterface {
             this.player2_move = direction;
         }
     }
+
+    // Inventory handling -----------------------------------------------------------------------------
 
     cycle_inventory(actor) {
         if (this.stored_level.use_cc1_boots)
@@ -2146,6 +2151,8 @@ export class Level extends LevelInterface {
 
         return true;
     }
+
+    // Wiring -----------------------------------------------------------------------------------------
 
     _do_wire_phase() {
         let force_next_wire_phase = false;
@@ -2290,13 +2297,10 @@ export class Level extends LevelInterface {
         });
     }
 
-    // -------------------------------------------------------------------------
-    // Board inspection
+    // Level inspection -------------------------------------------------------------------------------
 
     get_neighboring_cell(cell, direction) {
         let move = DIRECTIONS[direction].movement;
-        let goal_x = cell.x + move[0];
-        let goal_y = cell.y + move[1];
         return this.cell(cell.x + move[0], cell.y + move[1]);
     }
 
@@ -2390,8 +2394,7 @@ export class Level extends LevelInterface {
         return false;
     }
 
-    // -------------------------------------------------------------------------
-    // Undo handling
+    // Undo/redo --------------------------------------------------------------------------------------
 
     create_undo_entry() {
         let entry = [];
@@ -2467,10 +2470,9 @@ export class Level extends LevelInterface {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Level alteration methods.  EVERYTHING that changes the state of a level,
-    // including the state of a single tile, should do it through one of these
-    // for undo/rewind purposes
+    // Level alteration -------------------------------------------------------------------------------
+    // EVERYTHING that changes the state of a level, including the state of a single tile, should do
+    // it through one of these for undo/rewind purposes
 
     _set_tile_prop(tile, key, val) {
         if (Number.isNaN(val)) throw new Error(`got a NaN for ${key} on ${tile.type.name} at ${tile.cell.x}, ${tile.cell.y}`);
@@ -2598,11 +2600,15 @@ export class Level extends LevelInterface {
 
         this._push_pending_undo(() => {
             this.fail_reason = null;
-            if (player != null) { player.fail_reason = null; }
+            if (player) {
+                player.fail_reason = null;
+            }
         });
         this.state = 'failure';
         this.fail_reason = reason;
-        if (player != null) { player.fail_reason = reason; }
+        if (player) {
+            player.fail_reason = reason;
+        }
     }
 
     win() {

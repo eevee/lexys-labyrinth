@@ -28,7 +28,7 @@ function on_begin_force_floor(me, level) {
     // doing this here; decision time hasn't happened yet, but we need to know what direction we're
     // moving to know whether bestowal happens?  so what IS the cause of item bestowal?
     let neighbor = level.get_neighboring_cell(me.cell, actor.direction);
-    if (neighbor && neighbor.try_entering(actor, actor.direction, level))
+    if (neighbor && level.can_actor_enter_cell(actor, neighbor, actor.direction))
         return;
     let item = me.cell.get_item();
     if (! item)
