@@ -2125,6 +2125,7 @@ const EDITOR_PALETTE = [{
         'boulder',
         'glass_block',
         'logic_gate/diode',
+        'shark',
         'sokoban_block/red',
         'sokoban_button/red',
         'sokoban_wall/red',
@@ -2137,7 +2138,17 @@ const EDITOR_PALETTE = [{
         'sokoban_block/yellow',
         'sokoban_button/yellow',
         'sokoban_wall/yellow',
-        'one_way_walls/south',
+		'one_way_walls/south',
+        'cloud',
+        'cloud_player',
+        'cloud_block',
+        'cloud_water',
+        'cloud_nonplayer',
+        'hidden_item',
+        'hidden_item_robust',
+        'bucket_water',
+        'bucket_lava',
+        'bucket_gravel',
     ],
 }];
 
@@ -2714,7 +2725,7 @@ const EDITOR_TILE_DESCRIPTIONS = {
     },
     sand: {
         name: "Sand",
-        desc: "Anything walking on it moves at half speed.  Stops all blocks.",
+        desc: "Anything walking on it without hiking boots moves at half speed.  Stops all blocks.",
     },
     ankh: {
         name: "Ankh",
@@ -2768,6 +2779,10 @@ const EDITOR_TILE_DESCRIPTIONS = {
         name: "Glass block",
         desc: "Similar to a dirt block, but stores the first item it moves over, dropping it when destroyed and cloning it in a cloning machine. Has ice block/frame block collision. Turns into floor in water. Doesn't have dirt block immunities.",
     },
+    shark: {
+        name: "Shark",
+        desc: "Swims through any terrain, only emerging to kill the player. Can bite adjacent players if a normal monster could make that move. Can't change between types of terrain under its own power. Follows the left wall, unless the player is within 2 tiles, then it chases the player. If it loses track of the player, it will continue moving forward until it finds a wall to follow. Moves at half speed while not chasing. Ignores the damaging (except flame jet/electrified floor), permanent transformation and sliding/speed change (except teleporters/turntable) effects of terrain. Can be hooked between terrain types. Dies if it touches a hook. Eats doppelgangers. If holding boots, can enter that boots' terrain types.",
+    },
     sokoban_block: {
         name: "Sokoban block",
         desc: "Similar to a dirt block.  Turns to colored floor in water.  Can't pass over colored floor of a different color.  Has no effect on sokoban buttons of a different color.",
@@ -2779,6 +2794,46 @@ const EDITOR_TILE_DESCRIPTIONS = {
     sokoban_wall: {
         name: "Sokoban wall",
         desc: "Acts like wall.  Turns to floor while all sokoban buttons of the same color are pressed.",
+    },
+    cloud: {
+        name: "Cloud",
+        desc: "Acts like floor. Hides and negates the properties of the terrain underneath (but NOT the item) until after the first time it's stepped on. If stepped on by a non-block non-player actor, turns into floor instead.",
+    },
+    cloud_player: {
+        name: "Cloud (Dirt)",
+        desc: "Acts like dirt. Hides and negates the properties of the terrain underneath (but NOT the item) until after it's cleared.",
+    },
+    cloud_block: {
+        name: "Cloud (block only)",
+        desc: "Hides and negates the properties of the terrain underneath (but NOT the item) until after the first time it's stepped on. Can only be stepped on by blocks.",
+    },
+    cloud_water: {
+        name: "Cloud (Water)",
+        desc: "Acts like water. Hides and negates the properties of the terrain underneath (but NOT the item). Underlying terrain is erased by swimming actors. When filled by a block, turns into Cloud or Cloud (Dirt) instead of Floor/Dirt.",
+    },
+    cloud_nonplayer: {
+        name: "Cloud (non-player only)",
+        desc: "Hides and negates the properties of the terrain underneath (but NOT the item) until after the first time it's stepped on. Can only be stepped on by non-player actors.",
+    },
+    hidden_item: {
+        name: "Hidden item",
+        desc: "Hides and negates the properties of the item underneath until after the first time it's stepped on. When stepped on by a non-block non-player actor, is erased.",
+    },
+    hidden_item_robust: {
+        name: "Hidden item (robust)",
+        desc: "Hides and negates the properties of the item underneath until after the first time it's stepped on. Unlike regular hidden item, can't be erased.",
+    },
+    bucket_water: {
+        name: "Bucket (water)",
+        desc: "When dropped and left behind by a player, turns the tile into water.",
+    },
+    bucket_lava: {
+        name: "Bucket (laval)",
+        desc: "When dropped and left behind by a player, turns the tile into lava.",
+    },
+    bucket_gravel: {
+        name: "Bucket (gravel)",
+        desc: "When dropped and left behind by a player, turns the tile into gravel.",
     },
 };
 
@@ -3064,7 +3119,6 @@ for (let cycle of [
     ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
     ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
     ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
-    ['terraformer_n', 'terraformer_e', 'terraformer_s', 'terraformer_w'],
     ['turntable_cw', 'turntable_ccw'],
 ]) {
     for (let [i, name] of cycle.entries()) {

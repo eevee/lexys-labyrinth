@@ -258,6 +258,13 @@ const OBITUARIES = {
         "down for the ten-count",
         "watch out, pinhead",
     ],
+    shark: [
+        "hummed the jaws theme too loudly",
+        "blood in the water (or other terrain)",
+        "pleased to eat you",
+        "do not feed the sharks",
+        "you were brave, and also tasty",
+    ]
 };
 // Helper class used to let the game play sounds without knowing too much about the Player
 class SFXPlayer {

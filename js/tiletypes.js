@@ -48,13 +48,58 @@ function blocks_leaving_thin_walls(me, actor, direction) {
     return me.type.thin_walls.has(direction) && actor.type.name !== 'ghost';
 }
 
+function water_splash(me, level, other) {
+    // TODO cc1 allows items under water, i think; water was on the upper layer
+    //(should now supported by water cloud/hidden item combo)
+    level.sfx.play_once('splash', me.cell);
+    var cloud_water = me.type.name === 'cloud_water_after';
+    if (other.type.name === 'dirt_block') {
+        level.transmute_tile(other, 'splash');
+        level.transmute_tile(me, cloud_water ? 'cloud_player_after' : 'dirt');
+    }
+    else if (other.type.name === 'frame_block') {
+        level.transmute_tile(other, 'splash');
+        level.transmute_tile(me, cloud_water ? 'cloud_after' : 'floor');
+    }
+    else if (other.type.name === 'glass_block') {
+        level.transmute_tile(other, 'splash');
+        level.transmute_tile(me, cloud_water ? 'cloud_after' : 'floor');
+    }
+    else if (other.type.name === 'ice_block') {
+        level.transmute_tile(other, 'splash');
+        level.transmute_tile(me, 'ice');
+    }
+    else if (other.type.name === 'boulder') {
+        level.transmute_tile(other, 'splash');
+        level.transmute_tile(me, 'gravel');
+    }
+    else if (other.type.name === 'circuit_block') {
+        level.transmute_tile(me, cloud_water ? 'cloud_after' : 'floor');
+        level._set_tile_prop(me, 'wire_directions', other.wire_directions);
+        level.transmute_tile(other, 'splash');
+        level.recalculate_circuitry_next_wire_phase = true;
+    }
+    else if (other.type.name === 'sokoban_block') {
+        level.transmute_tile(me, ({
+            red: 'floor_custom_pink',
+            blue: 'floor_custom_blue',
+            yellow: 'floor_custom_yellow',
+            green: 'floor_custom_green',
+        })[other.color]);
+        level.transmute_tile(other, 'splash');
+    }
+    else {
+        level.kill_actor(other, me, 'splash', null, 'drowned');
+    }
+}
+
 function _define_door(key) {
     return {
         layer: LAYERS.terrain,
         // Doors can be opened by ice blocks, but not dirt blocks or monsters
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         blocks(me, level, other) {
-            if (other.type.name === 'ghost')
+            if (other.type.name === 'ghost' || other.type.name === 'shark')
                 return false;
             return ! ((other.has_item(key) || other.has_item('skeleton_key')));
         },
@@ -149,7 +194,7 @@ function player_visual_state(me) {
     // This is slightly complicated.  We should show a swimming pose while still in water, or moving
     // away from water (as CC2 does), but NOT when stepping off a lilypad (which will already have
     // been turned into water), and NOT without flippers (which can happen if we start on water)
-    else if (me.cell && (me.previous_cell || me.cell).has('water') &&
+    else if (me.cell && ((me.previous_cell || me.cell).has('water') || (me.previous_cell || me.cell).has('cloud_water_after')) &&
         ! me.not_swimming && me.has_item('flippers'))
     {
         return 'swimming';
@@ -247,6 +292,94 @@ const COMMON_TOOL = {
     blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
     item_priority: PICKUP_PRIORITIES.normal,
 };
+
+const COMMON_CLOUD_BEFORE = {
+    layer: LAYERS.canopy,
+    on_ready(me, level) {
+        let terrain = me.cell.get_terrain();
+        if (terrain && (me.hidden_tile === undefined || me.hidden_tile === null)) {
+            level._set_tile_prop(me, "hidden_tile", terrain);
+            //Surprise! Now WE'RE the floor.
+            level.remove_tile(terrain);
+            level.transmute_tile(me, me.type.name + '_after');
+        }
+    },
+};
+
+const COMMON_CLOUD_AFTER = {
+    layer: LAYERS.terrain,
+    get_rid_of_hidden_item(me, level) {
+        if (me.cell.get_item_mod() && me.cell.get_item_mod().type.name === 'hidden_item') {
+            level._set_tile_prop(me.cell.get_item_mod(), 'dont_reveal', true);
+            level.remove_tile(me.cell.get_item_mod());
+        }
+    },
+    on_arrive(me, level, other) {
+        //water check
+        if (me.type.name === 'cloud_water_after') {
+            me.dont_reveal = true;
+            if (other.ignores('water')) {
+                //erase bottom
+                this.get_rid_of_hidden_item(me, level);
+                level.transmute_tile(me, 'water');
+            }
+            else {
+                water_splash(me, level, other);
+            }
+            me.dont_reveal = false;
+            return;
+        }
+        //MSCC bomb/X illegal tiles turn into floor/X illegal tiles not straight into X
+        if (other.type.ttl) { return; }
+        //silly dirt check
+        if (me.type.name === 'cloud_player_after' && other.type.name === 'ghost' && ! other.has_item('hiking_boots')) {
+          me.dont_reveal = true;
+          this.get_rid_of_hidden_item(me, level);
+          level.transmute_tile(me, 'dirt');
+          me.dont_reveal = false;
+          return;
+        }
+         
+        var mscc_erasure = me.type.name !== 'cloud_block_after' && me.type.name !== 'cloud_nonplayer_after'
+         
+        //MSCC: when a non-player non-block actor steps on an illegal tile the lower layer is erased instead of revealed
+        //TODO: block on item/hidden terrain leaves the item and erases the terrain. (block on item/item erases the bottom item but I can't place that yet.) (TODO: I think for hidden item/hidden terrain you erase the item and leave the terrain, just to be different)
+        if (mscc_erasure && !(other.type.is_player || other.type.is_block)) {
+            me.dont_reveal = true;
+            this.get_rid_of_hidden_item(me, level);
+            level.transmute_tile(me, 'floor');
+            me.dont_reveal = false;
+            return;
+        }
+        //MSCC: when a block steps on an illegal tile and both sides aren't floor, the bottom side is erased
+        //block item/hidden terrain erases the terrain.
+        //I've decided block on hidden item/hidden terrain erases the item to be different.
+        //terrain/terrain and item/item don't really matter yet.
+        if (mscc_erasure && other.type.is_block) {
+            if (me.cell.get_item_mod() && me.cell.get_item_mod().type.name == 'hidden_item') {
+                this.get_rid_of_hidden_item(me, level);
+            }
+            else if (me.cell.get_item()) {
+                me.dont_reveal = true;
+                level.transmute_tile(me, 'floor');
+                me.dont_reveal = false;
+            return;
+            }
+        }
+        //guess I'll always play this
+        if (other === level.player) {
+            level.sfx.play_once('step-gravel', me.cell);
+        }
+        this.on_death(me, level);
+    },
+    on_death(me, level) {
+        if (me.hidden_tile && !me.dont_reveal) {
+            var cell = me.cell;
+            level.remove_tile(me);
+            level.add_tile(me.hidden_tile, cell);
+        }
+    }
+}
 
 const TILE_TYPES = {
     // Floors and walls
@@ -813,46 +946,7 @@ const TILE_TYPES = {
                 return true;
         },
         on_arrive(me, level, other) {
-            // TODO cc1 allows items under water, i think; water was on the upper layer
-            level.sfx.play_once('splash', me.cell);
-            if (other.type.name === 'dirt_block') {
-                level.transmute_tile(other, 'splash');
-                level.transmute_tile(me, 'dirt');
-            }
-            else if (other.type.name === 'frame_block') {
-                level.transmute_tile(other, 'splash');
-                level.transmute_tile(me, 'floor');
-            }
-            else if (other.type.name === 'glass_block') {
-                level.transmute_tile(other, 'splash');
-                level.transmute_tile(me, 'floor');
-            }
-            else if (other.type.name === 'ice_block') {
-                level.transmute_tile(other, 'splash');
-                level.transmute_tile(me, 'ice');
-            }
-            else if (other.type.name === 'boulder') {
-                level.transmute_tile(other, 'splash');
-                level.transmute_tile(me, 'gravel');
-            }
-            else if (other.type.name === 'circuit_block') {
-                level.transmute_tile(me, 'floor');
-                level._set_tile_prop(me, 'wire_directions', other.wire_directions);
-                level.transmute_tile(other, 'splash');
-                level.recalculate_circuitry_next_wire_phase = true;
-            }
-            else if (other.type.name === 'sokoban_block') {
-                level.transmute_tile(me, ({
-                    red: 'floor_custom_pink',
-                    blue: 'floor_custom_blue',
-                    yellow: 'floor_custom_yellow',
-                    green: 'floor_custom_green',
-                })[other.color]);
-                level.transmute_tile(other, 'splash');
-            }
-            else {
-                level.kill_actor(other, me, 'splash', null, 'drowned');
-            }
+            water_splash(me, level, other);
         },
     },
     turtle: {
@@ -1171,6 +1265,99 @@ const TILE_TYPES = {
     gift_bow: {
         layer: LAYERS.item_mod,
         item_modifier: 'pickup',
+    },
+    //hidden tiles
+    hidden_item: {
+        layer: LAYERS.item_mod,
+        on_ready(me, level) {
+            let item = me.cell.get_item();
+            if (item) {
+                level._set_tile_prop(me, "hidden_tile", item);
+                level.remove_tile(item);
+            }
+        },
+        after_arrive(me, level, other) {
+            //nevermind if something blew up while entering our tile
+            if (other.type.ttl) { return; }
+            //if we're still part of an illegal tile, we get erased
+            if (me.cell.get_terrain().type.name.startsWith("cloud")) {
+                level._set_tile_prop(me, "dont_reveal", true);
+            }
+            //MSCC: when a non-player non-block actor steps on an illegal tile the lower layer is erased instead of revealed
+            if (!(other.type.is_player || other.type.is_block))    {
+                level._set_tile_prop(me, "dont_reveal", true);
+            }
+            this.on_death(me, level);
+            level.remove_tile(me);
+        },
+        on_death(me, level) {
+            if (me.hidden_tile && !me.dont_reveal) {
+                level.add_tile(me.hidden_tile, me.cell);
+            }
+        }
+    },
+    hidden_item_robust: {
+        layer: LAYERS.item_mod,
+        on_ready(me, level) {
+            let item = me.cell.get_item();
+            if (item) {
+                level._set_tile_prop(me, "hidden_tile", item);
+                level.remove_tile(item);
+            }
+        },
+        after_arrive(me, level, other) {
+            //nevermind if something blew up while entering our tile
+            if (other.type.ttl) { return; }
+            this.on_death(me, level);
+            level.remove_tile(me);
+        },
+        on_death(me, level) {
+            if (me.hidden_tile) {
+                level.add_tile(me.hidden_tile, me.cell);
+            }
+        }
+    },
+    cloud: {
+        ...COMMON_CLOUD_BEFORE,
+    },
+    cloud_player: {
+        ...COMMON_CLOUD_BEFORE,
+    },
+    cloud_block: {
+        ...COMMON_CLOUD_BEFORE,
+    },
+    cloud_water: {
+        ...COMMON_CLOUD_BEFORE,
+    },
+    cloud_nonplayer: {
+        ...COMMON_CLOUD_BEFORE,
+    },
+    cloud_after: {
+        ...COMMON_CLOUD_AFTER,
+    },
+    cloud_player_after: {
+        ...COMMON_CLOUD_AFTER,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_general,
+        blocks(me, level, other) {
+            return ((other.type.name === 'player2' || other.type.name === 'doppelganger2') &&
+                ! other.has_item('hiking_boots'));
+        },
+    },
+    cloud_block_after: {
+        ...COMMON_CLOUD_AFTER,
+        blocks_collision: ~(COLLISION.block_cc1 | COLLISION.block_cc2),
+    },
+    cloud_water_after: {
+        ...COMMON_CLOUD_AFTER,
+        blocks(me, level, other) {
+            // Water blocks ghosts...  unless they have flippers
+            if (other.type.name === 'ghost' && ! other.has_item('flippers'))
+                return true;
+        },
+    },
+    cloud_nonplayer_after: {
+        ...COMMON_CLOUD_AFTER,
+        blocks_collision: COLLISION.playerlike,
     },
 
     // Mechanisms
@@ -1571,7 +1758,7 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
         },
         add_press(me, level, is_wire = false) {
-            level._set_tile_prop(me, 'presses', me.presses + 1);
+            level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
             if (me.presses === 1 && ! is_wire) {
                 // Free any actor on us, if we went from 0 to 1 presses (i.e. closed to open)
                 let actor = me.cell.get_actor();
@@ -1583,7 +1770,7 @@ const TILE_TYPES = {
             }
         },
         remove_press(me, level) {
-            level._set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
+            level._set_tile_prop(me, 'presses', Math.max(0, (me.presses ?? 0) - 1));
             if (me._initially_open) {
                 level._set_tile_prop(me, '_initially_open', false);
             }
@@ -1962,6 +2149,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
         on_begin(me, level) {
+            level._set_tile_prop(me, 'is_active', false);
             level._set_tile_prop(me, 'wire_directions', 15);
             level.recalculate_circuitry_next_wire_phase = true;
         },
@@ -2683,6 +2871,189 @@ const TILE_TYPES = {
             }
         },
     },
+    shark: {
+        ...COMMON_MONSTER,
+        //speeds up while pursuing (game.js attempt_step)
+        movement_speed: 8,
+        //phases through everything by default, then defines its own exceptions
+        collision_mask: 0x0000,
+        ignores: new Set([
+            //permanent transformations
+            'wall_invisible', 'wall_appearing',
+            'fake_floor', 'fake_wall',
+            'door_blue', 'door_red', 'door_yellow', 'door_green',
+            'socket',
+            'popwall',
+            'dirt',
+            //TODO: clouds or nah?
+            
+            //damaging/forcing terrain (and 3 more permanent transformations)
+            'slime',
+            'water', 'turtle',
+            'fire',
+            'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice',
+            'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w','force_floor_all',
+            'hole', 'cracked_floor',
+            //deliberate exceptions: flame_jet_on, electrified_floor, 4 teleports, 2 turntables
+            
+            //speed terrain (this is the most arbitrary category, I think, but I like sand sharks being difficult to outrun and dash sharks being easy to outrun and it feels similar to them not sliding on ice or force floors)
+            'sand', 'dash_floor',
+        ]),
+        on_ready(me, level) {
+            level._set_tile_prop(me, 'visual_state', 'normal');
+            level._set_tile_prop(me, 'mood', 'bug');
+        },
+        on_clone(me, original) {
+            me.visual_state = 'normal';
+            me.mood = 'bug';
+        },
+        can_enter_terrain(shark, dest) {
+            //sets are basically: floor-like, wall-like, water, ice, force floor, blue wall, green wall
+            //floor-like and wall-like are the most and second most up for debate, I'd say
+            //use custom walls/floors if you want to break up a wallshark/floorshark's accessible area
+            //ALSO, sharks can move freely into or out of cloners, because that's kickass
+            let t1 = shark.cell.get_terrain().type.name;
+            let t2 = dest.cell.get_terrain().type.name;
+            if (t1 === t2) {
+                return true;
+            }
+            if (t1 === 'cloner' || t2 === 'cloner') {
+                return true;
+            }
+            if (shark.is_pulled) {
+                return true;
+            }
+            //canopy-sharks and swivel sharks!
+            if (shark.cell[LAYERS.canopy] && dest.cell[LAYERS.canopy]) {
+              return true;
+            }
+            if (shark.cell[LAYERS.swivel] && dest.cell[LAYERS.swivel]) {
+              return true;
+            }
+            
+            //TODO cache?
+            //TODO clouds?
+            let floor_set = new Set(['floor', 'floor_letter', 'green_floor', 'purple_floor', 'button_green', 'button_blue', 'button_yellow', 'button_red', 'button_brown', 'trap', 'button_orange', 'flame_jet_off', 'flame_jet_on', 'teleport_blue', 'teleport_red', 'teleport_green', 'teleport_yellow', 'logic_gate', 'button_pink', 'button_black', 'light_switch_off', 'light_switch_on', 'button_gray', 'cracked_floor', 'turntable_cw', 'turntable_ccw', 'teleport_blue_exit', 'electrified_floor', 'sokoban_button', 'sokoban_floor']);
+            let wall_set = new Set(['wall', 'wall_invisible', 'wall_appearing', 'green_wall', 'purple_wall', 'sokoban_wall']);
+            let waters = new Set(['water', 'turtle']);
+            let ices = new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']);
+            let force_floors = new Set([
+            'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all']);
+            let blue_walls = new Set(['fake_floor', 'fake_wall']);
+            let green_walls = new Set(['popdown_floor', 'popdown_wall']);
+            let array_of_sets = [floor_set, wall_set, waters, ices, force_floors, blue_walls, green_walls];
+            
+            for (var i = 0; i < array_of_sets.length; ++i)
+            {
+                if (array_of_sets[i].has(t1) && array_of_sets[i].has(t2)) {
+                    return true;
+                }
+            }
+            
+            //for hiking boots check
+            let hikeables = new Set(['dirt', 'gravel', 'spikes', 'sand']);
+            
+            if (shark.has_item('fire_boots') && t2 === 'fire') {
+                return true;
+            }
+            if (shark.has_item('flippers') && waters.has(t2)) {
+                return true;
+            }
+            if (shark.has_item('cleats') && ices.has(t2)) {
+                return true;
+            }
+            if (shark.has_item('suction_boots') && force_floors.has(t2)) {
+                return true;
+            }
+            if (shark.has_item('hiking_boots') && hikeables.has(t2)) {
+                return true;
+            }
+            
+            return false;
+        },
+        blocked_by(me, level, other) {
+            //ignore everything that's not terrain - we'll do our check when we find the terrain on the whole cell
+            if (other.type.layer !== LAYERS.terrain) {
+                return false;
+            }
+            //Tiles with players on them don't block if their tile is our home OR a normal monster could enter it.
+            //Tiles without players don't block if their tile is our home.
+            //Tiles with actors (who aren't the player) block us (I think the reason why we need to define this back in is because we phase too well?)
+            //Except for doppels, which sharks eat.
+            let has_player = false;
+            let has_doppel = false;
+            if (other.cell.get_actor() !== null) {
+                has_player = other.cell.get_actor() === level.player;
+                has_doppel = other.cell.get_actor().type.name === 'doppelganger1' || other.cell.get_actor().type.name === 'doppelganger2';
+                if (!has_player && !has_doppel) {
+                    return true;
+                }
+            }
+            let result = true;
+            if (this.can_enter_terrain(me, other)) {
+                result = false;
+            }
+            //'shark bite' mechanic - bite a player on an adjacent tile who's finished moving and could be entered by a normal monster
+            if (result && has_player && other.cell.get_actor().movement_cooldown === 0 && !(other.type.blocks_collision & COLLISION.monster_general)) {
+                //probe tile to see if it'd accept a generic monster (covers fire and rff edge cases)
+                if (other.type.blocks) {
+                    let old_type = me.type;
+                    me.type = TILE_TYPES['ball'];
+                    if (!other.type.blocks(other, level, me)) {
+                        result = false;
+                    }
+                    me.type = old_type;
+                }
+                else
+                {
+                    result = false;
+                }
+            }
+            if (has_player && !result) {
+                level._set_tile_prop(me, 'visual_state', 'killer');
+            }
+            if (has_doppel && !result) {
+                //eat the doppel!
+                level._set_tile_prop(me, 'visual_state', 'killer');
+                level.sfx.play_once('splash', other.cell);
+                level.transmute_tile(other.cell.get_actor(), 'splash_nb');
+            }
+            //turn from lance back to bug when we find a wall
+            if (result && me.mood === 'lance') {
+                level._set_tile_prop(me, 'mood', 'bug');
+            }
+            return result;
+        },
+        decide_movement(me, level) {
+            //change to normal animation at the start of a move
+            level._set_tile_prop(me, 'visual_state', 'normal');
+            // can we smell blood?
+            if (Math.abs(level.player.cell.x - me.cell.x) < 3 && Math.abs(level.player.cell.y - me.cell.y) < 3) {
+                level._set_tile_prop(me, 'mood', 'teeth');
+                return pursue_player(me, level);
+            }
+            else {
+                if (me.mood === 'teeth')
+                {
+                    level._set_tile_prop(me, 'mood', 'lance');
+                }
+            }
+            //otherwise, bug or lance (lance lasts until we get blocked once)
+            //(lance is a movement type that doesn't exist in base CC2: forward else right else back else left)
+            if (me.mood === 'lance') {
+                let d = DIRECTIONS[me.direction];
+                return [me.direction, d.right, d.opposite, d.left];
+            }
+            else {
+                let d = DIRECTIONS[me.direction];
+                return [d.left, me.direction, d.right, d.opposite];
+            }
+        },
+        //hook/shark explosion is handled in hook on_approach
+        visual_state(me) {
+            return (me && me.visual_state) ?? 'normal';
+        },
+    },
 
     // Keys, whose behavior varies
     key_red: {
@@ -2941,6 +3312,13 @@ const TILE_TYPES = {
     },
     hook: {
         ...COMMON_TOOL,
+        on_approach(me, level, other) {
+            if (other.type.name === 'shark') {
+                //Dropped hooks blow up sharks
+                level.sfx.play_once('splash', other.cell);
+                level.transmute_tile(other, 'splash');
+            }
+        },
     },
     skeleton_key: {
         ...COMMON_TOOL,
@@ -2950,7 +3328,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             let terrain = me.cell.get_terrain();
             if (other.type.is_real_player && terrain && terrain.type.name === 'floor' &&
-                terrain.wire_directions === 0 && terrain.wire_tunnel_directions === 0)
+                terrain.wire_directions === 0 && terrain.wire_tunnel_directions === 0 && !me.cell.get_item_mod())
             {
                 if (level.ankh_tile) {
                     level.transmute_tile(level.ankh_tile, 'floor');
@@ -2970,6 +3348,45 @@ const TILE_TYPES = {
     floor_ankh: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_real_player,
+    },
+    bucket_water: {
+      ...COMMON_TOOL,
+      on_depart(me, level, other) {
+            let terrain = me.cell.get_terrain();
+            if (other.type.is_real_player && !me.cell.get_item_mod())
+            {
+                level.sfx.play_once('splash', me.cell);
+                level.transmute_tile(terrain, 'water');
+                level.spawn_animation(me.cell, 'splash');
+                level.remove_tile(me);
+            }
+        },
+    },
+    bucket_lava: {
+      ...COMMON_TOOL,
+      on_depart(me, level, other) {
+            let terrain = me.cell.get_terrain();
+            if (other.type.is_real_player && !me.cell.get_item_mod())
+            {
+                level.sfx.play_once('bomb', me.cell);
+                level.transmute_tile(terrain, 'fire');
+                level.spawn_animation(me.cell, 'explosion');
+                level.remove_tile(me);
+            }
+        },
+    },
+    bucket_gravel: {
+      ...COMMON_TOOL,
+      on_depart(me, level, other) {
+            let terrain = me.cell.get_terrain();
+            if (other.type.is_real_player && !me.cell.get_item_mod())
+            {
+                level.sfx.play_once('step-gravel', me.cell);
+                level.transmute_tile(terrain, 'gravel');
+                level.spawn_animation(me.cell, 'puff');
+                level.remove_tile(me);
+            }
+        },
     },
 
     // Progression
@@ -3183,7 +3600,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         blocks(me, level, other) {
-            return ! (other.type.name === 'ghost' || level.chips_remaining <= 0);
+            return ! (other.type.name === 'ghost' || other.type.name === 'shark' || level.chips_remaining <= 0);
         },
         on_arrive(me, level, other) {
             if (level.chips_remaining === 0) {
@@ -3236,6 +3653,12 @@ const TILE_TYPES = {
     // Non-blocking explosion used for better handling edge cases with dynamite and bowling balls,
     // without changing gameplay
     explosion_nb: {
+        layer: LAYERS.vfx,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 16,
+    },
+    splash_nb: {
         layer: LAYERS.vfx,
         is_actor: true,
         collision_mask: 0,

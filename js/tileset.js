@@ -160,6 +160,7 @@ export const CC2_TILESET_LAYOUT = {
     explosion_nb: [[0, 5], [1, 5], [2, 5], [3, 5]],
     splash_slime: [[0, 5], [1, 5], [2, 5], [3, 5]],
     splash: [[4, 5], [5, 5], [6, 5], [7, 5]],
+    splash_nb: [[4, 5], [5, 5], [6, 5], [7, 5]],
     flame_jet_off: [8, 5],
     flame_jet_on: {
         __special__: 'animated',
@@ -908,6 +909,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     bogus_player_burned: [3, 5],
     explosion: [3, 6],
     explosion_nb: [3, 6],
+    splash_nb: [3, 3],
     explosion_other: [3, 7],  // TODO ???
     // 3, 8 unused
     bogus_player_win: [3, 9],  // TODO 10 and 11 too?  does this animate?
@@ -1111,6 +1113,78 @@ export const LL_TILESET_LAYOUT = {
         hidden: [9, 2],
         revealed: [9, 3],
     },
+    cloud: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [8, 15],
+        revealed: [8, 14],
+    },
+    cloud_player: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [9, 15],
+        revealed: [9, 14],
+    },
+    cloud_block: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [10, 15],
+        revealed: [10, 14],
+    },
+    cloud_water: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [11, 15],
+        revealed: [11, 14],
+    },
+    cloud_nonplayer: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [12, 15],
+        revealed: [12, 14],
+    },
+    cloud_after: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [8, 15],
+        revealed: [8, 14],
+    },
+    cloud_player_after: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [9, 15],
+        revealed: [9, 14],
+    },
+    cloud_block_after: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [10, 15],
+        revealed: [10, 14],
+    },
+    cloud_water_after: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [11, 15],
+        revealed: [11, 14],
+    },
+    cloud_nonplayer_after: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [12, 15],
+        revealed: [12, 14],
+    },
+    hidden_item: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [8, 18],
+        revealed: [8, 18],
+    },
+    hidden_item_robust: {
+        __special__: 'perception_2',
+        modes: new Set(['editor', 'xray']),
+        hidden: [9, 18],
+        revealed: [9, 18],
+    },
     no_player1_sign: [10, 2],
     no_player2_sign: [10, 3],
     '#active-player-background': [11, 2],
@@ -1311,6 +1385,9 @@ export const LL_TILESET_LAYOUT = {
     foil: [2, 17],
     xray_eye: [3, 17],
     helmet: [4, 17],
+    bucket_lava: [5, 17],
+    bucket_water: [6, 17],
+    bucket_gravel: [7, 17],
     skeleton_key: [0, 18],
     ankh: [1, 18],
     floor_ankh: [2, 18],
@@ -1813,6 +1890,16 @@ export const LL_TILESET_LAYOUT = {
         south: [29, 10],
         west: [29, 11],
     },
+    shark: {
+        __special__: 'visual-state',
+        normal: {
+        north: [30, 8],
+        east: [30, 9],
+        south: [30, 10],
+        west: [30, 11],
+        },
+        killer: [31, 10],
+    },
 
     blob: {
         __special__: 'animated',
@@ -1992,6 +2079,7 @@ export const LL_TILESET_LAYOUT = {
     explosion: [[16, 26], [17, 26], [18, 26], [19, 26]],
     explosion_nb: [[16, 26], [17, 26], [18, 26], [19, 26]],
     splash: [[16, 27], [17, 27], [18, 27], [19, 27]],
+    splash_nb: [[16, 27], [17, 27], [18, 27], [19, 27]],
     splash_slime: [[16, 28], [17, 28], [18, 28], [19, 28]],
     fall: [[16, 29], [17, 29], [18, 29], [19, 29]],
     player1_exit: [[20, 28], [21, 28], [22, 28], [23, 28]],
@@ -2172,7 +2260,10 @@ export class Tileset {
             // This is an actor that's not moving, so use the idle frame
             n = drawspec.idle_frame_index ?? 0;
         }
-
+        if (n < 0) {
+            //should never happen, but happens when bulk tests fail for some reason
+            n = 0;
+        }
         packet.blit(...frames[n]);
     }
 
@@ -2631,6 +2722,17 @@ export class Tileset {
             }
             else if (drawspec.__special__ === 'perception') {
                 if (drawspec.modes.has(packet.perception)) {
+                    this.draw_drawspec(drawspec.revealed, name, tile, packet);
+                }
+                else {
+                    this.draw_drawspec(drawspec.hidden, name, tile, packet);
+                }
+            }
+            else if (drawspec.__special__ === 'perception_2') {
+                if (drawspec.modes.has(packet.perception)) {
+                    if (tile.hidden_tile) {
+                        this.draw_drawspec(this.layout[tile.hidden_tile.type.name], tile.hidden_tile.type.name, tile, packet);
+                    }
                     this.draw_drawspec(drawspec.revealed, name, tile, packet);
                 }
                 else {

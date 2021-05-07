@@ -853,6 +853,7 @@ const TILE_ENCODING = {
         extra_args: [arg_direction],
         is_extension: true,
     },
+    //0xdb-0xdf
     0xe0: {
         name: 'gift_bow',
         has_next: true,
@@ -894,6 +895,7 @@ const TILE_ENCODING = {
         name: 'sand',
         is_extension: true,
     },
+    //0xe8-0xec
     0xed: {
         name: 'ankh',
         has_next: true,
@@ -924,6 +926,62 @@ const TILE_ENCODING = {
     0xf3: {
         name: 'sokoban_wall',
         modifier: modifier_color,
+        is_extension: true,
+    },
+    0xf4: {
+        name: 'shark',
+        has_next: true,
+        is_extension: true,
+        extra_args: [arg_direction],
+    },
+    0xf5: {
+        name: 'cloud',
+        has_next: true,
+        is_extension: true,
+    },
+    0xf6: {
+        name: 'cloud_player',
+        has_next: true,
+        is_extension: true,
+    },
+    0xf7: {
+        name: 'cloud_block',
+        has_next: true,
+        is_extension: true,
+    },
+    0xf8: {
+        name: 'hidden_item',
+        has_next: true,
+        is_extension: true,
+    },
+    0xf9: {
+        name: 'cloud_water',
+        has_next: true,
+        is_extension: true,
+    },
+    0xfa: {
+        name: 'cloud_nonplayer',
+        has_next: true,
+        is_extension: true,
+    },
+    0xfb: {
+        name: 'hidden_item_robust',
+        has_next: true,
+        is_extension: true,
+    },
+    0xfc: {
+        name: 'bucket_water',
+        has_next: true,
+        is_extension: true,
+    },
+    0xfd: {
+        name: 'bucket_lava',
+        has_next: true,
+        is_extension: true,
+    },
+    0xfe: {
+        name: 'bucket_gravel',
+        has_next: true,
         is_extension: true,
     },
 };

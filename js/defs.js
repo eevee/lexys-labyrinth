@@ -71,6 +71,7 @@ export const LAYERS = {
 };
 
 export const COLLISION = {
+    none:               0x0000,
     real_player1:       0x0001,
     real_player2:       0x0002,
     real_player:        0x0003,

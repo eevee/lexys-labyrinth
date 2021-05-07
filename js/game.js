@@ -101,8 +101,11 @@ export class Tile {
     }
 
     ignores(name) {
-        if (this.type.ignores && this.type.ignores.has(name))
+        if (
+        (this.type.ignores && this.type.ignores.has(name)))
+        {
             return true;
+        }
 
         if (this.toolbelt) {
             for (let item of this.toolbelt) {
@@ -165,6 +168,9 @@ export class Tile {
         // FIXME starting to think fx should not count as actors
         if (tile.type.ttl)
             return false;
+        if (tile.type.name === 'shark') {
+            return true;
+        }
 
         // FIXME i don't actually know the precise rules here.  dirt blocks and ghosts can pull
         // other blocks even though they can't usually push them.  given the existence of monster
@@ -1730,6 +1736,10 @@ export class Level extends LevelInterface {
         {
             speed /= 2;
         }
+        //sharks move at double speed while pursuing
+        if (actor.mood && actor.mood == 'teeth') {
+            speed /= 2;
+        }
 
         let orig_cell = actor.cell;
         this._set_tile_prop(actor, 'previous_cell', orig_cell);
@@ -1745,7 +1755,7 @@ export class Level extends LevelInterface {
             let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
-                if (behind_actor && actor.can_pull(behind_actor, direction) && behind_actor.type.is_block) {
+                if (behind_actor && actor.can_pull(behind_actor, direction) && (behind_actor.type.is_block || behind_actor.type.name === 'shark')) {
                     this._set_tile_prop(behind_actor, 'is_pulled', true);
                     this.attempt_out_of_turn_step(behind_actor, direction);
                 }
@@ -1927,6 +1937,21 @@ export class Level extends LevelInterface {
                 tile.type.on_arrive(tile, this, actor);
             }
         }
+        
+        //can't think of a cleaner implementation - second pass for hidden tiles
+        for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
+            let tile = cell[layer];
+            if (! tile)
+                continue;
+            if (tile === actor)
+                continue;
+            if (actor.ignores(tile.type.name))
+                continue;
+                
+            if (tile.type.after_arrive) {
+                tile.type.after_arrive(tile, this, actor);
+            }
+        }
 
         // Play step sound
         if (actor === this.player) {
@@ -1943,7 +1968,7 @@ export class Level extends LevelInterface {
             else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad') {
                 this.sfx.play_once('step-gravel');
             }
-            else if (terrain.type.name === 'water') {
+            else if (terrain.type.name === 'water' || terrain.type.name === 'cloud_water_after') {
                 if (actor.ignores(terrain.type.name)) {
                     this.sfx.play_once('step-water');
                 }
@@ -2720,6 +2745,13 @@ export class Level extends LevelInterface {
         }
 
         let old_type = tile.type;
+        if (old_type.on_death) {
+            old_type.on_death(tile, this);
+            //might have been destroyed by that
+            if (tile.cell == null) {
+                return;
+            }
+        }
         let new_type = TILE_TYPES[name];
         if (old_type.layer !== new_type.layer) {
             // Move it to the right layer!
