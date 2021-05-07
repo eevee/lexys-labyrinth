@@ -55,28 +55,14 @@ export class Tile {
     // TODO don't love that the arg order is different here vs tile type, but also don't love that
     // the name is the same?
     blocks(other, direction, level) {
-        // Extremely awkward special case: items don't block monsters if the cell also contains an
-        // item modifier (i.e. "no" sign) or a real player
-        // TODO would love to get this outta here
-        if ((this.type.is_item || this.type.is_chip) && ! level.compat.monsters_blocked_by_items) {
-            let item_mod = this.cell.get_item_mod();
-            if (item_mod && item_mod.type.item_modifier)
-                return false;
-
-            let actor = this.cell.get_actor();
-            if (actor && actor.type.is_real_player)
-                return false;
-        }
+        // Special case: item layer collision is ignored if the cell has an item mod
+        if (this.type.layer === LAYERS.item && this.cell.get_item_mod())
+            return false;
 
         if (level.compat.monsters_ignore_keys && this.type.is_key)
             return false;
 
         if (this.type.blocks_collision & other.type.collision_mask)
-            return true;
-
-        // FIXME bowling ball isn't affected by helmet?  also not sure bowling ball is stopped by
-        // helmet?
-        if (this.has_item('helmet') || (this.type.is_actor && ! this.type.ttl && other.has_item('helmet')))
             return true;
 
         // Blocks being pulled are blocked by their pullers (which are, presumably, the only things
@@ -950,7 +936,7 @@ export class Level extends LevelInterface {
             if (actor.type.ttl) {
                 // Animations, bizarrely, do their cooldown at decision time, so they're removed
                 // early on the tic that they expire
-                this._do_actor_cooldown(actor, this.compat.emulate_60fps ? 1 : 3);
+                this._do_actor_cooldown(actor, this.update_rate);
                 continue;
             }
 
@@ -1430,10 +1416,19 @@ export class Level extends LevelInterface {
         if (actor.type.decide_movement) {
             direction_preference = actor.type.decide_movement(actor, this);
         }
-
-        // Check which of those directions we *can*, probably, move in
         if (! direction_preference)
             return;
+
+        // In CC2, some monsters can only ever have one direction to choose from, so they don't
+        // bother checking collision at all.  (Unfortunately, this causes spring mining.)
+        // TODO compat flag for this
+        if (actor.type.skip_decision_time_collision_check) {
+            actor.decision = direction_preference[0] ?? null;
+            return;
+        }
+
+        // Check which of those directions we *can*, probably, move in
+        let push_mode = this.compat.no_early_push ? 'slap' : 'push';
         for (let [i, direction] of direction_preference.entries()) {
             if (! direction) {
                 // This actor is giving up!  Alas.
@@ -1447,7 +1442,7 @@ export class Level extends LevelInterface {
 
             direction = actor.cell.redirect_exit(actor, direction);
 
-            if (this.check_movement(actor, actor.cell, direction, 'bump')) {
+            if (this.check_movement(actor, actor.cell, direction, push_mode)) {
                 // We found a good direction!  Stop here
                 actor.decision = direction;
                 break;
@@ -1505,19 +1500,19 @@ export class Level extends LevelInterface {
         // - An actor with foil MUST NOT bump a wall on the other side of a thin wall.
         // - A ghost with foil MUST bump a wall (even on the other side of a thin wall) and be
         //   deflected by the resulting steel.
+        // - An actor with foil MUST NOT bump a wall under a "no foil" sign.
         // - A bowling ball MUST NOT destroy an actor on the other side of a thin wall, or on top of
         //   a regular wall.
         // - A fireball MUST melt an ice block AND ALSO still be deflected by it, even if the ice
         //   block is on top of an item (which blocks the fireball), but NOT one on the other side
         //   of a thin wall.
         // - A rover MUST NOT bump walls underneath a canopy (which blocks it).
-        // It seems the order is thus: canopy + thin wall; terrain; actor; item.  Which is the usual
-        // ordering from the top down, except that terrain is checked before actors.  Really, the
-        // ordering is from "outermost" to "innermost", which makes physical sense.
+        // It seems the order is thus: canopy + thin wall + item mod (indistinguishable); terrain;
+        // actor; item.  In other words, some physically logical sense of "outer" to "inner".
         let still_blocked = false;
         for (let layer of [
-            LAYERS.canopy, LAYERS.thin_wall, LAYERS.terrain, LAYERS.swivel,
-            LAYERS.actor, LAYERS.item_mod, LAYERS.item])
+            LAYERS.canopy, LAYERS.thin_wall, LAYERS.item_mod, LAYERS.terrain, LAYERS.swivel,
+            LAYERS.actor, LAYERS.item])
         {
             let tile = cell[layer];
             if (! tile)
@@ -1527,6 +1522,16 @@ export class Level extends LevelInterface {
             // TODO check ignores here?
             if (tile.type.on_bumped) {
                 tile.type.on_bumped(tile, this, actor);
+            }
+
+            // Death happens here: if a monster or block even thinks about moving into a player, or
+            // a player thinks about moving into a monster, the player dies.  A player standing on a
+            // wall is only saved by the wall being checked first.  This is also why standing on an
+            // item won't save you: actors are checked before items!
+            // In Lynx, on the other hand, this is deferred until later (and only happens if the
+            // move is allowed), so hold off.
+            if (layer === LAYERS.actor && ! this.compat.player_dies_during_movement) {
+                this._check_for_player_death(actor, tile);
             }
 
             if (! tile.blocks(actor, direction, this))
@@ -1628,17 +1633,44 @@ export class Level extends LevelInterface {
             }
 
             // In push mode, check one last time for being blocked, in case we e.g. pushed a block
-            // off of a recessed wall
-            // TODO unclear if this is the right way to emulate spring mining, but without the check
-            // for a player, it happens /too/ often; try allowing for ann actors and running the 163
-            // BLOX replay, and right at the end ice blocks spring mine each other.  also, the wiki
-            // suggests something about another actor moving away at the same time?
-            if (! (this.compat.emulate_spring_mining && actor.type.is_real_player) &&
-                push_mode === 'push' && cell.some(tile => tile && tile.blocks(actor, direction, this)))
+            // off of a recessed wall.
+            // This is the check that prevents spring mining, the phenomenon where (a) actor pushes
+            // a block off of a recessed wall or lilypad, (b) the wall/lilypad becomes blocking as a
+            // result, (c) the actor moves into the cell anyway.  In most cases this is prevented on
+            // accident, because pushes happen at decision time during the collision check, and then
+            // the actual movement happens later with a second collision check.
+            // Note that there is one exception: CC2 does seem to have spring mining prevention when
+            // pushing a row of ice blocks, so we keep the check if we're a block.  See BLOX replay;
+            // without this, ice blocks spring mine around 61.9s.
+            if ((! this.compat.emulate_spring_mining || actor.type.is_block) &&
+                push_mode === 'push' &&
+                cell.some(tile => tile && tile.blocks(actor, direction, this)))
                 return false;
         }
 
         return ! still_blocked;
+    }
+
+    _check_for_player_death(actor, tile) {
+        if (actor.has_item('helmet') || tile.has_item('helmet')) {
+            // Helmet disables this, do nothing.  In most cases, normal collision will kick
+            // in.  Note that this doesn't protect you from bowling balls, which aren't
+            // blocked by anything.
+        }
+        else if (tile.type.is_real_player) {
+            if (actor.type.is_monster) {
+                this.kill_actor(tile, actor);
+                return true;
+            }
+            else if (actor.type.is_block && ! actor.is_pulled) {
+                this.kill_actor(tile, actor, null, null, 'squished');
+                return true;
+            }
+        }
+        else if (actor.type.is_real_player && tile.type.is_monster) {
+            this.kill_actor(actor, tile);
+            return true;
+        }
     }
 
     check_movement(actor, orig_cell, direction, push_mode) {
@@ -1721,9 +1753,17 @@ export class Level extends LevelInterface {
         if (! success)
             return false;
 
+        // In Lynx, checking for player trampling happens right about here, more or less.
+        let goal_cell = this.get_neighboring_cell(actor.cell, direction);
+        if (this.compat.player_dies_during_movement) {
+            let tramplee = goal_cell.get_actor();
+            if (tramplee && this._check_for_player_death(actor, tramplee))
+                // We stepped on the player (or vice versa); don't move, or we'll erase something
+                return false;
+        }
+
         // We're clear!  Compute our speed and move us
         // FIXME this feels clunky
-        let goal_cell = this.get_neighboring_cell(actor.cell, direction);
         let terrain = goal_cell.get_terrain();
         if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)) {
             speed /= terrain.type.speed_factor;
@@ -1778,7 +1818,7 @@ export class Level extends LevelInterface {
     }
 
     _do_extra_cooldown(actor) {
-        this._do_actor_cooldown(actor, this.compat.emulate_60fps ? 1 : 3);
+        this._do_actor_cooldown(actor, this.update_rate);
         // Only Lexy has double-cooldown protection
         if (! this.compat.use_lynx_loop) {
             this._set_tile_prop(actor, 'last_extra_cooldown_tic', this.tic_counter);
@@ -1830,22 +1870,6 @@ export class Level extends LevelInterface {
             if (actor.slide_ignores(tile.type.name))
                 continue;
 
-            // Possibly kill a player
-            if (actor.has_item('helmet') || tile.has_item('helmet')) {
-                // Helmet disables this, do nothing
-            }
-            else if (actor.type.is_real_player && tile.type.is_monster) {
-                this.kill_actor(actor, tile);
-            }
-            else if (actor.type.is_monster && tile.type.is_real_player) {
-                this.kill_actor(tile, actor);
-            }
-            else if (actor.type.is_block && tile.type.is_real_player && ! actor.is_pulled) {
-                // Note that blocks squish players if they move for ANY reason, even if pushed by
-                // another player!  The only exception is being pulled
-                this.kill_actor(tile, actor, null, null, 'squished');
-            }
-
             if (tile.type.on_approach) {
                 tile.type.on_approach(tile, this, actor);
             }
@@ -1864,19 +1888,6 @@ export class Level extends LevelInterface {
         }
         else {
             this.add_tile(actor, goal_cell);
-        }
-
-        // If we're a monster stepping on the player's tail, that also kills her immediately; the
-        // player and a monster must be strictly more than 4 tics apart
-        // FIXME this only works for the /current/ player but presumably applies to all of them,
-        // though i'm having trouble coming up with a test
-        // TODO the rules in lynx might be slightly different?
-        if (actor.type.is_monster && goal_cell === this.player.previous_cell &&
-            // Player has decided to leave their cell, but hasn't actually taken a step yet
-            this.player.movement_cooldown === this.player.movement_speed &&
-            ! actor.has_item('helmet') && ! this.player.has_item('helmet'))
-        {
-            this.kill_actor(this.player, actor);
         }
 
         if (this.compat.tiles_react_instantly) {
@@ -2564,7 +2575,7 @@ export class Level extends LevelInterface {
             }
 
             // Otherwise, lose the game
-            this.fail(fail_reason || killer.type.name, null, actor);
+            this.fail(fail_reason || killer.type.name, killer, actor);
             return;
         }
 
@@ -2603,11 +2614,17 @@ export class Level extends LevelInterface {
             if (player) {
                 player.fail_reason = null;
             }
+            if (killer) {
+                killer.is_killer = false;
+            }
         });
         this.state = 'failure';
         this.fail_reason = reason;
         if (player) {
             player.fail_reason = reason;
+        }
+        if (killer) {
+            killer.is_killer = true;
         }
     }
 

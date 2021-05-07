@@ -149,6 +149,10 @@ export const COMPAT_FLAGS = [
     label: "Player always moves last",
     rulesets: new Set(['lynx', 'ms']),
 }, {
+    key: 'player_dies_during_movement',
+    label: "Players can't get trampled when standing on items",
+    rulesets: new Set(['lynx']),
+}, {
     key: 'emulate_60fps',
     label: "Game runs at 60 FPS",
     rulesets: new Set(['steam', 'steam-strict']),
@@ -203,16 +207,12 @@ export const COMPAT_FLAGS = [
     key: 'monsters_ignore_keys',
     label: "Monsters completely ignore keys",
     rulesets: new Set(['ms']),
-}, {
-    key: 'monsters_blocked_by_items',
-    label: "Monsters can't step on items to get the player",
-    rulesets: new Set(['lynx']),
 },
 
 // Blocks
 {
     key: 'no_early_push',
-    label: "Player pushes blocks at move time",
+    label: "Pushing blocks happens at move time",
     rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'use_legacy_hooking',

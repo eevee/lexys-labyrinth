@@ -235,7 +235,7 @@ const COMMON_MONSTER = {
     is_actor: true,
     is_monster: true,
     collision_mask: COLLISION.monster_generic,
-    blocks_collision: COLLISION.all_but_real_player,
+    blocks_collision: COLLISION.all,
     // Despite the name, this means we only pick up items that are always picked up
     item_pickup_priority: PICKUP_PRIORITIES.always,
     movement_speed: 4,
@@ -2517,7 +2517,7 @@ const TILE_TYPES = {
                 return null;
             }
             return [direction];
-        }
+        },
     },
     tank_yellow: {
         ...COMMON_MONSTER,
@@ -2535,17 +2535,20 @@ const TILE_TYPES = {
             if (me.pending_decision) {
                 let decision = me.pending_decision;
                 level._set_tile_prop(me, 'pending_decision', null);
-                // Yellow tanks don't keep trying to move if blocked
+                // Yellow tanks don't keep trying to move if blocked, but they DO turn regardless
+                // XXX consider a compat flag; this is highly unintuitive to me
+                level.set_actor_direction(me, decision);
                 return [decision, null];
             }
             else {
                 return null;
             }
-        }
+        },
     },
     blob: {
         ...COMMON_MONSTER,
         movement_speed: 8,
+        skip_decision_time_collision_check: true,
         decide_movement(me, level) {
             // move completely at random
             let d;
@@ -2781,7 +2784,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_monster: true,
         collision_mask: COLLISION.block_cc1,
-        blocks_collision: COLLISION.all_but_real_player,
+        blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
         // FIXME especially for buttons, destroyed actors should on_depart (behind compat flag)
@@ -2979,7 +2982,7 @@ const TILE_TYPES = {
         is_player: true,
         is_real_player: true,
         collision_mask: COLLISION.real_player1,
-        blocks_collision: COLLISION.real_player,
+        blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.real_player,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -3003,7 +3006,7 @@ const TILE_TYPES = {
         is_player: true,
         is_real_player: true,
         collision_mask: COLLISION.real_player2,
-        blocks_collision: COLLISION.real_player,
+        blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.real_player,
         can_reveal_walls: true,
         movement_speed: 4,
@@ -3028,7 +3031,8 @@ const TILE_TYPES = {
         is_player: true,
         is_monster: true,
         collision_mask: COLLISION.doppel1,
-        blocks_collision: COLLISION.all_but_real_player,
+        blocks_collision: COLLISION.all,
+        skip_decision_time_collision_check: true,
         item_pickup_priority: PICKUP_PRIORITIES.player,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
@@ -3055,7 +3059,8 @@ const TILE_TYPES = {
         is_player: true,
         is_monster: true,
         collision_mask: COLLISION.doppel2,
-        blocks_collision: COLLISION.all_but_real_player,
+        blocks_collision: COLLISION.all,
+        skip_decision_time_collision_check: true,
         item_pickup_priority: PICKUP_PRIORITIES.player,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
