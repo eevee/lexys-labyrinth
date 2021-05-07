@@ -2,19 +2,19 @@
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
 import * as fflate from './vendor/fflate.js';
 
-import { COMPAT_FLAGS, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, DIRECTIONS, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
+import { COMPAT_FLAGS, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
 import * as format_tws from './format-tws.js';
 import { Level } from './game.js';
-import { PrimaryView, Overlay, DialogOverlay, ConfirmOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
-import { Editor } from './main-editor.js';
+import { PrimaryView, DialogOverlay, ConfirmOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
+import { Editor } from './editor/main.js';
 import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
-import { Tileset, CC2_TILESET_LAYOUT, LL_TILESET_LAYOUT, TILE_WORLD_TILESET_LAYOUT, TILESET_LAYOUTS } from './tileset.js';
+import { Tileset, TILESET_LAYOUTS } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
-import { random_choice, mk, mk_svg, promise_event } from './util.js';
+import { random_choice, mk, mk_svg } from './util.js';
 import * as util from './util.js';
 
 const PAGE_TITLE = "Lexy's Labyrinth";
@@ -55,21 +55,6 @@ function simplify_number(number) {
 
 // TODO:
 // - level password, if any
-const ACTION_LABELS = {
-    up: '⬆️\ufe0f',
-    down: '⬇️\ufe0f',
-    left: '⬅️\ufe0f',
-    right: '➡️\ufe0f',
-    drop: '🚮',
-    cycle: '🔄',
-    swap: '👫',
-};
-const ACTION_DIRECTIONS = {
-    up: 'north',
-    down: 'south',
-    left: 'west',
-    right: 'east',
-};
 const OBITUARIES = {
     drowned: [
         "you tried out water cooling",
@@ -687,7 +672,7 @@ class Player extends PrimaryView {
         // Similarly, grab touch events and translate them to directions
         this.current_touches = {};  // ident => action
         this.touch_restart_delay = new util.DelayTimer;
-        let touch_target = this.root.querySelector('#player-game-area');
+        let touch_target = this.root.querySelector('#player-game-area');  // FIXME should be .level but the message overlay blocks touching, whoops!
         let collect_touches = ev => {
             ev.stopPropagation();
             ev.preventDefault();
@@ -3114,6 +3099,7 @@ class CompatOverlay extends DialogOverlay {
     }
 }
 
+// FIXME this breaks if you add more levels, since it only reloads the list ui after a pack change
 class PackTestDialog extends DialogOverlay {
     constructor(conductor) {
         super(conductor);
@@ -3701,6 +3687,9 @@ class Conductor {
                     "Enable debug mode?  This will give you lots of toys to play with, " +
                     "but disable all saving of scores until you reload the page!",
                     () => {
+                        // FIXME this breaks if you do it from the editor bc update_tileset hasn't
+                        // been called yet bc that happens in load_level which is deferred...  but
+                        // then why does it work from splash??
                         this.player.setup_debug();
                     },
                 ).open();

@@ -1,5 +1,5 @@
-import { TransientOverlay } from './main-base.js';
-import { mk, mk_svg } from './util.js';
+import { TransientOverlay } from '../main-base.js';
+import { mk, mk_svg } from '../util.js';
 
 // FIXME could very much stand to have a little animation when appearing
 class TileEditorOverlay extends TransientOverlay {
