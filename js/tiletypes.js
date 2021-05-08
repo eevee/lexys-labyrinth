@@ -1897,14 +1897,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
         *teleport_dest_order(me, level, other) {
-            let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
-            if (all.length <= 1) {
-                // If this is the only teleporter, just walk out the other side — and, crucially, do
-                // NOT advance the PRNG
-                yield [me, other.direction];
-                return;
-            }
-            // The green teleporter scheme is:
+            // The CC2 green teleporter scheme is:
             // 1. Use the PRNG to pick another green teleporter
             // 2. Use the PRNG to pick an exit direction
             // 3. Search the selected exit teleporter for a viable exit direction
@@ -1912,21 +1905,50 @@ const TILE_TYPES = {
             // 5. When we reach the entry teleporter, stop and give up
             // This means that completely blocked green teleporters are skipped, BUT if the only
             // available teleporters are between the entry and chosen exit, they'll never be tried.
-            // TODO that sucks actually; compat option?
+            // Also, due to what appears to be a bug, CC2 picks an index from among all other
+            // teleporters, but then only iterates over "unclogged" ones (those without actors on
+            // them) to find that particular teleporter.  Since the list of unclogged ones includes
+            // the source, this means some rolls will fail to teleport entirely, even if the next
+            // teleporter in RRO is open.
+            // This is clearly buggy as hell, so it's squirrelled away behind a compat option.
 
-            // The iterator starts on the /next/ teleporter, so the origin is last, and we can index
+            // This iterator starts on the /next/ teleporter, so we appear last, and we can index
             // from zero to the second-to-last element.
+            let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
+            if (all.length <= 1) {
+                // If this is the only teleporter, just walk out the other side — and, crucially, do
+                // NOT advance the PRNG
+                yield [me, other.direction];
+                return;
+            }
             let start_index = level.prng() % (all.length - 1);
             // Also pick the initial exit direction
             let exit_direction = DIRECTION_ORDER[level.prng() % 4];
 
-            // Due to what appears to be a bug, CC2 picks a teleporter index from all available
-            // ones, but then only iterates over "unclogged" ones (those without actors on them) to
-            // find that particular teleporter.
-            let candidates = all.filter(tile => tile === me || ! tile.cell.get_actor());
-            start_index %= candidates.length;
+            let candidates;
+            if (level.compat.green_teleports_can_fail) {
+                // CC2 bug emulation: only look through "unclogged" exits
+                candidates = all.filter(tile => tile === me || ! tile.cell.get_actor());
+                start_index %= candidates.length;
+            }
+            else {
+                candidates = all;
+            }
 
-            for (let index = start_index; index < candidates.length - 1; index++) {
+            for (let i = 0; i < candidates.length; i++) {
+                let index = start_index + i;
+                if (index === candidates.length - 1)
+                    // This is us, skip for now
+                    continue;
+                if (level.compat.green_teleports_can_fail) {
+                    // CC2: Only check from the selected teleporter to the entrance
+                    if (index >= candidates.length)
+                        break;
+                }
+                else {
+                    // Lexy: Try them all, only stopping once we loop back to our first choice
+                    index %= candidates.length;
+                }
                 let target = candidates[index];
 
                 // Green teleporters allow exiting in any direction, similar to red

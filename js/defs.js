@@ -188,6 +188,10 @@ export const COMPAT_FLAGS = [
     key: 'blue_floors_vanish_on_arrive',
     label: "Fake blue walls vanish on arrival",
     rulesets: new Set(['lynx']),
+}, {
+    key: 'green_teleports_can_fail',
+    label: "Green teleporters sometimes fail",
+    rulesets: new Set(['steam-strict']),
 },
 
 // Items
