@@ -1877,8 +1877,10 @@ export class Level extends LevelInterface {
         // spawned from stepping off of a lilypad
         this.remove_tile(actor, true);
 
-        // Announce we're leaving, for the handful of tiles that care about it
-        for (let tile of original_cell) {
+        // Announce we're leaving, for the handful of tiles that care about it.  Do so from the top
+        // down, specifically so dynamite becomes lit before a lilypad tries to splash
+        for (let l = original_cell.length - 1; l >= 0; l--) {
+            let tile = original_cell[l];
             if (! tile)
                 continue;
             if (tile === actor)
@@ -1886,8 +1888,6 @@ export class Level extends LevelInterface {
             if (actor.ignores(tile.type.name))
                 continue;
 
-            // FIXME ah, stepping off a lilypad will add a splash but we're still here?  but then
-            // why did the warning not catch it
             if (tile.type.on_depart) {
                 tile.type.on_depart(tile, this, actor);
             }
