@@ -2730,6 +2730,11 @@ export class Level extends LevelInterface {
         }
         let tile = new Tile(type);
         this._init_animation(tile);
+        // Note that newly-spawned animations don't have their cooldown decremented right away, and
+        // in the case of lilypads, this has gameplay implications.  I can't just not tick them down
+        // or the renderer will break, so cheat by extending the duration by a tic
+        this._set_tile_prop(tile, 'movement_speed', tile.movement_speed + 3);
+        this._set_tile_prop(tile, 'movement_cooldown', tile.movement_cooldown + 3);
         this.add_tile(tile, cell);
         this.add_actor(tile);
     }
