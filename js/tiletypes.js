@@ -355,6 +355,11 @@ const TILE_TYPES = {
             }
         },
         on_depart(me, level, other) {
+            // Inexplicable CC2 quirk: nothing happens if there's dynamite on us
+            // TODO compat?  this makes no sense to me
+            if (me.cell.has('dynamite_lit'))
+                return;
+
             level.spawn_animation(me.cell, 'puff');
             level.transmute_tile(me, 'wall');
             if (other === level.player) {
@@ -859,6 +864,11 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.ghost | COLLISION.fireball,
         on_depart(me, level, other) {
+            // Inexplicable CC2 quirk: nothing happens if there's dynamite on us
+            // TODO compat?  this makes no sense to me
+            if (me.cell.has('dynamite_lit'))
+                return;
+
             level.transmute_tile(me, 'water');
             level.spawn_animation(me.cell, 'splash');
             level.sfx.play_once('splash', me.cell);
