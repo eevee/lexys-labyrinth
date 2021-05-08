@@ -2092,6 +2092,8 @@ export class Level extends LevelInterface {
         // Now physically move the actor, but their movement waits until next decision phase
         this.remove_tile(actor, true);
         this.add_tile(actor, dest.cell);
+        // Erase this to prevent tail-biting through a teleport
+        this._set_tile_prop(actor, 'previous_cell', null);
     }
 
     remember_player_move(direction) {
