@@ -1914,14 +1914,20 @@ const TILE_TYPES = {
             // available teleporters are between the entry and chosen exit, they'll never be tried.
             // TODO that sucks actually; compat option?
 
-            // The iterator starts on the /next/ teleporter, so there's an implicit +1 here.  The -1
-            // avoids spitting us back out of the same teleporter, which will be last in the list
+            // The iterator starts on the /next/ teleporter, so the origin is last, and we can index
+            // from zero to the second-to-last element.
             let start_index = level.prng() % (all.length - 1);
             // Also pick the initial exit direction
             let exit_direction = DIRECTION_ORDER[level.prng() % 4];
 
-            for (let index = start_index; index < all.length - 1; index++) {
-                let target = all[index];
+            // Due to what appears to be a bug, CC2 picks a teleporter index from all available
+            // ones, but then only iterates over "unclogged" ones (those without actors on them) to
+            // find that particular teleporter.
+            let candidates = all.filter(tile => tile === me || ! tile.cell.get_actor());
+            start_index %= candidates.length;
+
+            for (let index = start_index; index < candidates.length - 1; index++) {
+                let target = candidates[index];
 
                 // Green teleporters allow exiting in any direction, similar to red
                 yield [target, exit_direction];

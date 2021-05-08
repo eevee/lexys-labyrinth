@@ -55,6 +55,11 @@ export class Tile {
     // TODO don't love that the arg order is different here vs tile type, but also don't love that
     // the name is the same?
     blocks(other, direction, level) {
+        // This can happen occasionally, like when testing teleports, where the actor's movement is
+        // being tested from a cell it's not actually in
+        if (this === other)
+            return false;
+
         // Special case: item layer collision is ignored if the cell has an item mod
         if (this.type.layer === LAYERS.item && this.cell.get_item_mod())
             return false;
@@ -2037,8 +2042,7 @@ export class Level extends LevelInterface {
         let dest, direction;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
-            // FIXME should check collision?  otherwise this catches non-blocking vfx...
-            if (dest.cell.some(tile => tile && tile.type.is_actor && tile !== actor && ! tile.type.ttl))
+            if (dest !== teleporter && dest.cell.get_actor())
                 continue;
 
             // XXX lynx treats this as a slide and does it in a pass in the main loop
