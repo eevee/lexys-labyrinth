@@ -792,6 +792,7 @@ export class Level extends LevelInterface {
         }
 
         this._swap_players();
+        this._do_post_actor_phase();
 
         // Wire updates every frame, which means thrice per tic
         this._do_wire_phase();
@@ -805,6 +806,7 @@ export class Level extends LevelInterface {
     _advance_tic_lynx() {
         this._do_decision_phase();
         this._do_combined_action_phase(3);
+        this._do_post_actor_phase();
         this._do_wire_phase();
         this._do_wire_phase();
         this._do_wire_phase();
@@ -817,16 +819,19 @@ export class Level extends LevelInterface {
     _advance_tic_lynx60() {
         this._do_decision_phase(true);
         this._do_combined_action_phase(1, true);
+        this._do_post_actor_phase();
         this._do_wire_phase();
 
         this.frame_offset = 1;
         this._do_decision_phase(true);
         this._do_combined_action_phase(1, true);
+        this._do_post_actor_phase();
         this._do_wire_phase();
 
         this.frame_offset = 2;
         this._do_decision_phase();
         this._do_combined_action_phase(1);
+        this._do_post_actor_phase();
         this._do_wire_phase();
 
         this.frame_offset = 0;
@@ -846,6 +851,7 @@ export class Level extends LevelInterface {
 
             this._do_decision_phase(! is_decision_frame);
             this._do_combined_action_phase(1, ! is_decision_frame);
+            this._do_post_actor_phase();
             this._do_wire_phase();
 
             if (this.frame_offset === 2) {
@@ -903,6 +909,7 @@ export class Level extends LevelInterface {
         }
 
         this.sfx.set_player_position(this.player.cell);
+        this.pending_green_toggle = false;
     }
 
     // Decision phase: all actors decide on their movement "simultaneously"
@@ -1150,6 +1157,31 @@ export class Level extends LevelInterface {
                     break;
                 }
             }
+        }
+    }
+
+    _do_post_actor_phase() {
+        if (this.pending_green_toggle) {
+            // Swap green floors and walls
+            // TODO could probably make this more compact for undo purposes
+            for (let cell of this.linear_cells) {
+                let terrain = cell.get_terrain();
+                if (terrain.type.name === 'green_floor') {
+                    this.transmute_tile(terrain, 'green_wall');
+                }
+                else if (terrain.type.name === 'green_wall') {
+                    this.transmute_tile(terrain, 'green_floor');
+                }
+
+                let item = cell.get_item();
+                if (item && item.type.name === 'green_chip') {
+                    this.transmute_tile(item, 'green_bomb');
+                }
+                else if (item && item.type.name === 'green_bomb') {
+                    this.transmute_tile(item, 'green_chip');
+                }
+            }
+            this.pending_green_toggle = false;
         }
     }
 

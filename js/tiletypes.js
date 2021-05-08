@@ -1335,6 +1335,13 @@ const TILE_TYPES = {
     },
     green_floor: {
         layer: LAYERS.terrain,
+        blocks(me, level, other) {
+            // Toggle walls don't toggle until the end of the frame, but the collision takes into
+            // account whether a toggle is coming
+            return (
+                level.pending_green_toggle &&
+                (other.type.collision_mask & COLLISION.all_but_ghost));
+        },
         on_gray_button(me, level) {
             level.transmute_tile(me, 'green_wall');
         },
@@ -1344,7 +1351,12 @@ const TILE_TYPES = {
     },
     green_wall: {
         layer: LAYERS.terrain,
-        blocks_collision: COLLISION.all_but_ghost,
+        blocks(me, level, other) {
+            // Same as above
+            return (
+                ! level.pending_green_toggle &&
+                (other.type.collision_mask & COLLISION.all_but_ghost));
+        },
         on_gray_button(me, level) {
             level.transmute_tile(me, 'green_floor');
         },
@@ -2034,25 +2046,7 @@ const TILE_TYPES = {
     button_green: {
         layer: LAYERS.terrain,
         do_button(level) {
-            // Swap green floors and walls
-            // TODO could probably make this more compact for undo purposes
-            for (let cell of level.linear_cells) {
-                let terrain = cell.get_terrain();
-                if (terrain.type.name === 'green_floor') {
-                    level.transmute_tile(terrain, 'green_wall');
-                }
-                else if (terrain.type.name === 'green_wall') {
-                    level.transmute_tile(terrain, 'green_floor');
-                }
-
-                let item = cell.get_item();
-                if (item && item.type.name === 'green_chip') {
-                    level.transmute_tile(item, 'green_bomb');
-                }
-                else if (item && item.type.name === 'green_bomb') {
-                    level.transmute_tile(item, 'green_chip');
-                }
-            }
+            level.pending_green_toggle = ! level.pending_green_toggle;
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
