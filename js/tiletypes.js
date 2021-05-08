@@ -1533,6 +1533,7 @@ const TILE_TYPES = {
             // This temporary flag tells us to let it leave; it doesn't need to be undoable, since
             // it doesn't persist for more than a tic
             actor._clone_release = true;
+            let cloned = false;
             // Wire activation allows the cloner to try every direction, searching clockwise
             for (let i = 0; i < (aggressive ? 4 : 1); i++) {
                 // If the actor successfully moves, replace it with a new clone.  As a special case,
@@ -1546,14 +1547,6 @@ const TILE_TYPES = {
                     }
                 }
                 if (success) {
-                    // Surprising edge case: if the actor immediately killed the player, do NOT
-                    // spawn a new template, since the move was actually aborted
-                    // FIXME this is inconsistent.  the move was aborted because of an emergency
-                    // failure handling case in move_to, but that doesn't make the step count as a
-                    // failure.  would this be fixed by making the player block all other actors?
-                    if (level.state === 'failure')
-                        break;
-
                     // FIXME add this underneath, just above the cloner, so the new actor is on top
                     let new_template = new actor.constructor(type, direction);
                     if (type.on_clone) {
@@ -1561,9 +1554,14 @@ const TILE_TYPES = {
                     }
                     level.add_tile(new_template, me.cell);
                     level.add_actor(new_template);
+                    cloned = true;
                     break;
                 }
                 direction = DIRECTIONS[direction].right;
+            }
+            if (aggressive && ! cloned) {
+                // Restore original facing
+                level.set_actor_direction(actor, direction);
             }
             delete actor._clone_release;
         },
