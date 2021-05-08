@@ -634,6 +634,9 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'entered_direction', other.direction);
         },
         on_depart(me, level, other) {
+            if (other.type.name === 'ghost')
+                // Ghosts do not switch tracks
+                return;
             if (! level.is_tile_wired(me, false)) {
                 // Only switch if both the entering and the leaving are CURRENTLY valid directions
                 // (which has some quirky implications for the railroad sign)
