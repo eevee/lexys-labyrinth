@@ -956,6 +956,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
+        allow_player_override: true,
         on_begin: on_begin_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'north');
@@ -979,6 +980,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
+        allow_player_override: true,
         on_begin: on_begin_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'east');
@@ -1000,6 +1002,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
+        allow_player_override: true,
         on_begin: on_begin_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'south');
@@ -1021,6 +1024,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
+        allow_player_override: true,
         on_begin: on_begin_force_floor,
         on_arrive(me, level, other) {
             level.set_actor_direction(other, 'west');
@@ -1042,6 +1046,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
+        allow_player_override: true,
         on_begin: on_begin_force_floor,
         // TODO ms: this is random, and an acting wall to monsters (!)
         blocks(me, level, other) {
@@ -1839,7 +1844,7 @@ const TILE_TYPES = {
         slide_mode: 'teleport',
         contains_wire: true,
         wire_propagation_mode: 'none',
-        teleport_allow_override: true,
+        allow_player_override: true,
         on_begin(me, level) {
             // FIXME must be connected to something that can convey current: a wire, a switch, a
             // blue teleporter, etc; NOT nothing, a wall, a transmogrifier, a force floor, etc.
@@ -1934,7 +1939,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         item_priority: PICKUP_PRIORITIES.always,
         slide_mode: 'teleport',
-        teleport_allow_override: true,
+        allow_player_override: true,
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;
             for (let dest of level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true)) {

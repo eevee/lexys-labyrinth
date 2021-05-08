@@ -658,7 +658,7 @@ export class Level extends LevelInterface {
         // not in an un-overrideable slide
         return this.player.movement_cooldown === 0 &&
             (this.player.slide_mode === null || (
-                this.player.slide_mode === 'force' && this.player.last_move_was_force));
+                this.player.slide_mode === 'force' && this.player.can_override_slide));
     }
 
     // Randomness -------------------------------------------------------------------------------------
@@ -1297,10 +1297,7 @@ export class Level extends LevelInterface {
         //   as an override.
         let terrain = actor.cell.get_terrain();
         let may_move = ! forced_only && (
-            ! actor.slide_mode ||
-            (actor.slide_mode === 'force' && actor.last_move_was_force) ||
-            ((actor.slide_mode === 'teleport' || actor.slide_mode === 'teleport-forever') &&
-                actor.cell.get_terrain().type.teleport_allow_override));
+            ! actor.slide_mode || (actor.can_override_slide && terrain.type.allow_player_override));
         let [dir1, dir2] = this._extract_player_directions(input);
 
         // Check for special player actions, which can only happen at decision time.  Dropping can
@@ -1333,7 +1330,7 @@ export class Level extends LevelInterface {
             actor.decision = actor.direction;
 
             if (actor.slide_mode === 'force') {
-                this._set_tile_prop(actor, 'last_move_was_force', true);
+                this._set_tile_prop(actor, 'can_override_slide', true);
             }
         }
         else if (dir1 === null || forced_only) {
@@ -1397,12 +1394,12 @@ export class Level extends LevelInterface {
             // If we're overriding a force floor but the direction we're moving in is blocked, this
             // counts as a forced move (but only under the CC2 behavior of instant bonking)
             if (actor.slide_mode === 'force' && ! open && ! this.compat.bonking_isnt_instant) {
-                this._set_tile_prop(actor, 'last_move_was_force', true);
+                this._set_tile_prop(actor, 'can_override_slide', true);
             }
             else {
                 // Otherwise this is 100% a conscious move so we lose our override power next tic
                 // TODO how does this interact with teleports
-                this._set_tile_prop(actor, 'last_move_was_force', false);
+                this._set_tile_prop(actor, 'can_override_slide', false);
             }
         }
 
@@ -1611,18 +1608,20 @@ export class Level extends LevelInterface {
                     if (tile._trying_to_push)
                         return false;
                     if (push_mode === 'bump' || push_mode === 'slap') {
-                        // FIXME this doesn't take railroad curves into account, e.g. it thinks a
-                        // rover can't push a block through a curve
-                        if (tile.movement_cooldown > 0 ||
-                            ! this.check_movement(tile, tile.cell, direction, push_mode))
-                        {
+                        if (tile.movement_cooldown > 0)
                             return false;
-                        }
-                        else if (push_mode === 'slap') {
+
+                        let redirected_direction = tile.cell.redirect_exit(tile, direction);
+                        if (! this.check_movement(tile, tile.cell, redirected_direction, push_mode))
+                            return false;
+
+                        if (push_mode === 'slap') {
                             if (actor === this.player) {
                                 this._set_tile_prop(actor, 'is_pushing', true);
                                 this.sfx.play_once('push');
                             }
+                            // FIXME we get here for monsters in lynx mode!  check this is actually
+                            // possible
                             tile.decision = direction;
                         }
                     }
@@ -2026,17 +2025,15 @@ export class Level extends LevelInterface {
             // other actors cannot.  (Normally, a teleport slide ends after one decision phase.)
             // XXX this is useful when the exit is briefly blocked, but it can also get monsters
             // stuck forever  :(
+            // XXX kind of repeating myself here, there must be a more natural approach
             this.make_slide(actor, 'teleport-forever');
+            if (actor.type.is_real_player && teleporter.type.allow_player_override) {
+                this._set_tile_prop(actor, 'can_override_slide', true);
+            }
             // Also, there's no sound and whatnot, so everything else is skipped outright.
             return;
         }
 
-        // Explicitly set us as teleport sliding, since in some very obscure cases (auto-dropping a
-        // yellow teleporter because you picked up an item with a full inventory and immediately
-        // teleporting through it) it may not have been applied
-        this.make_slide(actor, 'teleport');
-
-        let success = false;
         let dest, direction;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
@@ -2046,29 +2043,8 @@ export class Level extends LevelInterface {
 
             // XXX lynx treats this as a slide and does it in a pass in the main loop
 
-            // FIXME bleugh hardcode
-            if (dest === teleporter && teleporter.type.name === 'teleport_yellow') {
-                break;
-            }
-            // Note that this uses 'bump' even for players; it would be very bad if we could
-            // initiate movement in this pass (in Lexy rules, anyway), because we might try to push
-            // something that's still waiting to teleport itself!
-            // XXX is this correct?  it does mean you won't try to teleport to a teleporter that's
-            // "blocked" by a block that won't be there anyway by the time you try to move, but that
-            // seems very obscure and i haven't run into a case with it yet.  offhand i don't think
-            // it can even come up under cc2 rules, since teleporting is done after an actor cools
-            // down and before the next actor even gets a chance to act
-            if (this.check_movement(actor, dest.cell, direction, 'bump')) {
-                success = true;
-                // Sound plays from the origin cell simply because that's where the sfx player
-                // thinks the player is currently; position isn't updated til next turn
-                this.sfx.play_once('teleport', teleporter.cell);
-                break;
-            }
-        }
-
-        if (! success) {
-            if (teleporter.type.item_priority !== undefined &&
+            if (dest === teleporter &&
+                teleporter.type.item_priority !== undefined &&
                 teleporter.type.item_priority >= actor.type.item_pickup_priority &&
                 this.allow_taking_yellow_teleporters)
             {
@@ -2080,6 +2056,30 @@ export class Level extends LevelInterface {
                 }
                 return;
             }
+
+            // Note that this uses 'bump' even for players; it would be very bad if we could
+            // initiate movement in this pass (in Lexy rules, anyway), because we might try to push
+            // something that's still waiting to teleport itself!
+            // XXX is this correct?  it does mean you won't try to teleport to a teleporter that's
+            // "blocked" by a block that won't be there anyway by the time you try to move, but that
+            // seems very obscure and i haven't run into a case with it yet.  offhand i don't think
+            // it can even come up under cc2 rules, since teleporting is done after an actor cools
+            // down and before the next actor even gets a chance to act
+            if (this.check_movement(actor, dest.cell, direction, 'bump')) {
+                // Sound plays from the origin cell simply because that's where the sfx player
+                // thinks the player is currently; position isn't updated til next turn
+                this.sfx.play_once('teleport', teleporter.cell);
+                break;
+            }
+        }
+
+        // Explicitly set us as teleport sliding, since in some very obscure cases (auto-dropping a
+        // yellow teleporter because you picked up an item with a full inventory and immediately
+        // teleporting through it) it may not have been applied
+        this.make_slide(actor, 'teleport');
+        // Real players might be able to immediately override the resulting slide
+        if (actor.type.is_real_player && teleporter.type.allow_player_override) {
+            this._set_tile_prop(actor, 'can_override_slide', true);
         }
 
         this.set_actor_direction(actor, direction);
