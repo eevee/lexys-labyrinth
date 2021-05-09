@@ -5,8 +5,8 @@ import * as format_dat from '../format-dat.js';
 import * as format_tws from '../format-tws.js';
 import * as util from '../util.js';
 
-import { stdout } from 'process';
-import { opendir, readFile } from 'fs/promises';
+import { argv, exit, stderr, stdout } from 'process';
+import { opendir, readFile, stat } from 'fs/promises';
 import { performance } from 'perf_hooks';
 
 // TODO arguments:
@@ -56,9 +56,13 @@ function pad(s, n) {
 }
 
 const RESULT_TYPES = {
-    'no-replay': {
+    skipped: {
         color: "\x1b[90m",
         symbol: "-",
+    },
+    'no-replay': {
+        color: "\x1b[90m",
+        symbol: "0",
     },
     success: {
         color: "\x1b[92m",
@@ -83,7 +87,7 @@ const RESULT_TYPES = {
 };
 const ANSI_RESET = "\x1b[39m";
 
-async function test_pack(pack, ruleset) {
+async function test_pack(pack, ruleset, level_filter = null) {
     let dummy_sfx = {
         set_player_position() {},
         play() {},
@@ -106,7 +110,7 @@ async function test_pack(pack, ruleset) {
         let record_result = (token, short_status, include_canvas, comment) => {
             let result_stuff = RESULT_TYPES[token];
             stdout.write(result_stuff.color + result_stuff.symbol);
-            if (token === 'failure' || token === 'short') {
+            if (token === 'failure' || token === 'short' || token === 'error') {
                 failures.push({
                     token,
                     short_status,
@@ -117,8 +121,8 @@ async function test_pack(pack, ruleset) {
                     fail_reason: level ? level.fail_reason : null,
                     time_elapsed: performance.now() - level_start_time,
                     time_expected: stored_level ? stored_level.replay.duration / 20 : null,
-                    title: stored_level.title ?? "[error]",
-                    time_simulated: level.tic_counter / 20,
+                    title: stored_level ? stored_level.title : "[error]",
+                    time_simulated: level ? level.tic_counter / 20 : null,
                 });
             }
             if (level) {
@@ -161,6 +165,11 @@ async function test_pack(pack, ruleset) {
                 total_tics += level.tic_counter;
             }
         };
+
+        if (level_filter && ! level_filter.has(i + 1)) {
+            record_result('skipped', "Skipped");
+            continue;
+        }
 
         try {
             stored_level = pack.load_level(i);
@@ -228,7 +237,8 @@ async function test_pack(pack, ruleset) {
             }
         }
         catch (e) {
-            //console.error(e);
+            console.error(e);
+            // FIXME this does not seem to work
             record_result(
                 'error', "Error", true,
                 `Replay failed due to internal error (see console for traceback): ${e}`);
@@ -249,8 +259,10 @@ async function test_pack(pack, ruleset) {
             String(failure.index + 1).padStart(5),
             pad(failure.title.replace(/[\r\n]+/, " "), 32),
             RESULT_TYPES[failure.token].color + pad(short_status, 20) + ANSI_RESET,
-            "ran for" + util.format_duration(failure.time_simulated).padStart(6, " "),
         ];
+        if (failure.time_simulated !== null) {
+            parts.push("ran for" + util.format_duration(failure.time_simulated).padStart(6, " "));
+        }
         if (failure.token === 'failure') {
             parts.push("  with" + util.format_duration(failure.time_expected - failure.time_simulated).padStart(6, " ") + " still to go");
         }
@@ -266,62 +278,6 @@ async function test_pack(pack, ruleset) {
     };
 }
 
-
-const TESTABLE_PACKS = [{
-// FIXME lynx cc1...
-/*
-    title: "CC1",
-    pack_path: 'levels/CC1.ccl',
-    solutions_path: 'levels/public_CHIPS-lynx.dac.tws',
-    ruleset: 'lynx',
-}, {
-*/
-// FIXME the solution files aren't committed yet
-/*
-    title: "CCLXP2",
-    pack_path: 'levels/CCLXP2.ccl',
-    solutions_path: 'levels/public_CCLXP2.dac.tws',
-    ruleset: 'lynx',
-}, {
-    title: "CCLP3",
-    pack_path: 'levels/CCLP3.ccl',
-    solutions_path: 'levels/public_CCLP3-lynx.dac.tws',
-    ruleset: 'lynx',
-}, {
-    title: "CCLP4",
-    pack_path: 'levels/CCLP4.ccl',
-    solutions_path: 'levels/public_CCLP4-lynx.dac.tws',
-    ruleset: 'lynx',
-}, {
-    title: "CCLP1",
-    pack_path: 'levels/CCLP1.ccl',
-    solutions_path: 'levels/public_CCLP1-lynx.dac.tws',
-    ruleset: 'lynx',
-}, {
-*/
-    title: "CC2LP1",
-    pack_path: 'levels/CC2LP1.zip',
-    ruleset: 'steam-strict',
-// FIXME add steam cc1, cc2, but optionally and from command line or something
-// (these are just local symlinks to my steam directory lol)
-    /*
-}, {
-    title: "CC1 (Steam)",
-    pack_path: 'levels/cc1',
-    ruleset: 'steam-strict',
-    isdir: true,
-}, {
-    title: "CC2",
-    pack_path: 'levels/cc2',
-    ruleset: 'steam-strict',
-    isdir: true,
-}, {
-    title: "CC2LP1-Voting",
-    pack_path: '_local-levels/CC2LP1-Voting',
-    ruleset: 'steam-strict',
-    isdir: true,
-    */
-}];
 async function _scan_source(source) {
     // FIXME copied wholesale from Splash.search_multi_source; need a real filesystem + searching api!
 
@@ -356,7 +312,113 @@ async function _scan_source(source) {
     }
     // TODO else...?  complain we couldn't find anything?  list what we did find??  idk
 }
+
+// -------------------------------------------------------------------------------------------------
+
+const USAGE = `\
+Usage: bulktest.mjs [OPTION]... [FILE]...
+Runs replays for the given level packs and report results.
+With no FILE given, default to the built-in copy of CC2LP1.
+
+Arguments may be repeated, and apply to any subsequent pack, so different packs
+may be run with different compat modes.
+  -c            compatibility mode; one of
+                  lexy (default), steam, steam-strict, lynx, ms
+  -r            path to a file containing replays; for CCL/DAT packs, which
+                  don't support built-in replays, this must be a TWS file
+  -l            level range to play back; either 'all' or a string like '1-4,10'
+  -f            force the next argument to be interpreted as a file path, if for
+                    some perverse reason you have a level file named '-c'
+  -h, --help    ignore other arguments and show this message
+
+Supports the same filetypes as Lexy's Labyrinth: DAT/CCL, C2M, or a directory
+containing a C2G.
+`;
+class ArgParseError extends Error {}
+function parse_level_range(string) {
+    if (string === 'all') {
+        return null;
+    }
+
+    let res = new Set;
+    let parts = string.split(/,/);
+    for (let part of parts) {
+        let endpoints = part.match(/^(\d+)(?:-(\d+))?$/);
+        if (endpoints === null)
+            throw new ArgParseError(`Bad syntax in level range: ${part}`);
+        let a = parseInt(endpoints[1], 10);
+        let b = endpoints.length < 3 ? a : parseInt(endpoints[2], 10);
+        if (a > b)
+            throw new ArgParseError(`Backwards span in level range: ${part}`);
+        for (let n = a; n <= b; n++) {
+            res.add(n);
+        }
+    }
+
+    return res;
+}
+function parse_args() {
+    // Parse arguments
+    let test_template = {
+        ruleset: 'lexy',
+        solutions_path: null,
+        level_filter: null,
+    };
+    let tests = [];
+
+    try {
+        let i;
+        let next_arg = () => {
+            i += 1;
+            if (i >= argv.length)
+                throw new ArgParseError(`Missing argument after ${argv[i - 1]}`);
+            return argv[i];
+        };
+        for (i = 2; i < argv.length; i++) {
+            let arg = argv[i];
+            if (arg === '-h' || arg === '--help') {
+                stdout.write(USAGE);
+                exit(0);
+            }
+
+            if (arg === '-c') {
+                let ruleset = next_arg();
+                if (['lexy', 'steam', 'steam-strict', 'lynx', 'ms'].indexOf(ruleset) === -1)
+                    throw new ArgParseError(`Unrecognized compat mode: ${ruleset}`);
+                test_template.ruleset = ruleset;
+            }
+            else if (arg === '-r') {
+                test_template.solutions_path = next_arg();
+            }
+            else if (arg === '-l') {
+                test_template.level_filter = parse_level_range(next_arg());
+            }
+            else if (arg === '-f') {
+                tests.push({ pack_path: next_arg(), ...test_template });
+            }
+            else {
+                tests.push({ pack_path: arg, ...test_template });
+            }
+        }
+    }
+    catch (e) {
+        if (e instanceof ArgParseError) {
+            stderr.write(e.message);
+            stderr.write("\n");
+            exit(2);
+        }
+    }
+
+    if (tests.length === 0) {
+        tests.push({ pack_path: 'levels/CC2LP1.zip', ...test_template });
+    }
+
+    return tests;
+}
+
 async function main() {
+    let tests = parse_args();
+
     let overall = {
         num_passed: 0,
         num_missing: 0,
@@ -364,9 +426,9 @@ async function main() {
         time_elapsed: 0,
         time_simulated: 0,
     };
-    for (let testdef of TESTABLE_PACKS) {
+    for (let testdef of tests) {
         let pack;
-        if (testdef.isdir) {
+        if ((await stat(testdef.pack_path)).isDirectory()) {
             let source = new LocalDirectorySource(testdef.pack_path);
             pack = await _scan_source(source);
         }
@@ -385,8 +447,17 @@ async function main() {
             }
         }
 
-        pack.title = testdef.title;
-        let result = await test_pack(pack, testdef.ruleset);
+        if (! pack.title) {
+            let match = testdef.pack_path.match(/(?:^|\/)([^/.]+)(?:\..*)?\/?$/);
+            if (match) {
+                pack.title = match[1];
+            }
+            else {
+                pack.title = testdef.pack_path;
+            }
+        }
+
+        let result = await test_pack(pack, testdef.ruleset, testdef.level_filter);
         for (let key of Object.keys(overall)) {
             overall[key] += result[key];
         }
