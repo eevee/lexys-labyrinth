@@ -60,13 +60,13 @@ function _define_force_floor(direction, opposite_type) {
         slide_automatically: true,
         allow_player_override: true,
         get_slide_direction(me, level, other) {
+            if (level.compat.force_floors_inert_on_first_tic && level.tic_counter === 0) {
+                // Lynx: Force floors don't push on the first tic
+                return null;
+            }
             return direction;
         },
         force_floor_direction: direction,
-        on_arrive(me, level, other) {
-            // Necessary for compat.force_floor_only_on_arrive, which disables slide_automatically
-            level._set_tile_prop(other, 'is_pending_slide', true);
-        },
         activate(me, level) {
             level.transmute_tile(me, opposite_type);
         },
@@ -983,15 +983,15 @@ const TILE_TYPES = {
         speed_factor: 2,
         allow_player_override: true,
         get_slide_direction(me, level, _other) {
+            if (level.compat.force_floors_inert_on_first_tic && level.tic_counter === 0) {
+                // Lynx: Force floors don't push on the first tic
+                return null;
+            }
             return level.get_force_floor_direction();
         },
         blocks(me, level, other) {
             return (level.compat.rff_blocks_monsters &&
                 (other.type.collision_mask & COLLISION.monster_typical));
-        },
-        on_arrive(me, level, other) {
-            // Necessary for compat.force_floor_only_on_arrive, which disables slide_automatically
-            level._set_tile_prop(other, 'is_pending_slide', true);
         },
     },
     slime: {
@@ -1524,6 +1524,11 @@ const TILE_TYPES = {
         },
         on_arrive(me, level, other) {
             // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
+            if (level.compat.traps_like_lynx) {
+                level.attempt_out_of_turn_step(other, other.direction);
+            }
+        },
+        on_stand(me, level, other) {
             if (level.compat.traps_like_lynx) {
                 level.attempt_out_of_turn_step(other, other.direction);
             }

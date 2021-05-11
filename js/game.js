@@ -837,13 +837,13 @@ export class Level extends LevelInterface {
     // only be made every third frame
     _advance_tic_lynx60() {
         this._do_decision_phase(true);
-        this._do_combined_action_phase(1, true);
+        this._do_combined_action_phase(1);
         this._do_post_actor_phase();
         this._do_wire_phase();
 
         this.frame_offset = 1;
         this._do_decision_phase(true);
-        this._do_combined_action_phase(1, true);
+        this._do_combined_action_phase(1);
         this._do_post_actor_phase();
         this._do_wire_phase();
 
@@ -869,7 +869,7 @@ export class Level extends LevelInterface {
             let is_decision_frame = this.frame_offset === 2;
 
             this._do_decision_phase(! is_decision_frame);
-            this._do_combined_action_phase(1, ! is_decision_frame);
+            this._do_combined_action_phase(1);
             this._do_post_actor_phase();
             this._do_wire_phase();
 
@@ -996,7 +996,7 @@ export class Level extends LevelInterface {
     }
 
     // Lynx's combined action phase: each actor attempts to move, then cools down, in order
-    _do_combined_action_phase(cooldown, forced_only = false) {
+    _do_combined_action_phase(cooldown) {
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
             if (! actor.cell)
@@ -1332,7 +1332,7 @@ export class Level extends LevelInterface {
             return null;
         if (! terrain.type.get_slide_direction)
             return null;
-        if (! actor.is_pending_slide && ! (terrain.type.slide_automatically && ! this.compat.force_floor_only_on_arrive))
+        if (! (actor.is_pending_slide || terrain.type.slide_automatically))
             return null;
         if (actor.ignores(terrain.type.name))
             return null;
@@ -1523,6 +1523,11 @@ export class Level extends LevelInterface {
             // TODO because of this, if a tank is trapped when a blue button is pressed, then
             // when released, it will make one move out of the trap and /then/ turn around and
             // go back into the trap.  this is consistent with CC2 but not ms/lynx
+            return;
+        }
+        if (this.compat.traps_like_lynx && terrain.type.name === 'trap') {
+            // Lynx traps don't allow actors to turn even while open; instead they get ejected
+            // during their idle step
             return;
         }
         if (actor.type.decide_movement) {

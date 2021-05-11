@@ -181,8 +181,8 @@ export const COMPAT_FLAGS = [
     label: "Player can't override backwards on a force floor",
     rulesets: new Set(['lynx']),
 }, {
-    key: 'force_floor_only_on_arrive',
-    label: "Force floors only affect actors when stepped on",
+    key: 'force_floors_inert_on_first_tic',
+    label: "Force floors don't trigger on the first tic",
     rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'traps_like_lynx',
