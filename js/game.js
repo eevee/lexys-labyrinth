@@ -1081,15 +1081,16 @@ export class Level extends LevelInterface {
                 // function, as a bonking monster will notice the item now and take it.
                 this.step_on_cell(actor, actor.cell);
 
-                // Note that ghosts bonk even on ice corners, which they can otherwise pass through!
-                let forced_move = this.get_forced_move(actor, terrain);
-                if (actor.type.name === 'ghost') {
-                    forced_move = actor.direction;
-                }
-                // If we got a new direction, try moving again
-                // FIXME in compat case, i guess we just set direction?
-                if (forced_move && direction !== forced_move && ! this.compat.bonking_isnt_instant) {
-                    success = this.attempt_step(actor, forced_move);
+                if (! this.compat.bonking_isnt_instant) {
+                    // Note that ghosts bonk even on ice corners, which they can otherwise pass through!
+                    let forced_move = this.get_forced_move(actor, terrain);
+                    if (actor.type.name === 'ghost') {
+                        forced_move = actor.direction;
+                    }
+                    // If we got a new direction, try moving again
+                    if (forced_move && direction !== forced_move) {
+                        success = this.attempt_step(actor, forced_move);
+                    }
                 }
             }
             else if (terrain.type.name === 'teleport_red' && ! terrain.is_active) {
