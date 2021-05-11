@@ -347,7 +347,7 @@ function parse_level_range(string) {
         if (endpoints === null)
             throw new ArgParseError(`Bad syntax in level range: ${part}`);
         let a = parseInt(endpoints[1], 10);
-        let b = endpoints.length < 3 ? a : parseInt(endpoints[2], 10);
+        let b = endpoints[2] === undefined ? a : parseInt(endpoints[2], 10);
         if (a > b)
             throw new ArgParseError(`Backwards span in level range: ${part}`);
         for (let n = a; n <= b; n++) {
