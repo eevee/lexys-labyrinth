@@ -129,14 +129,16 @@ export const COMPAT_RULESET_ORDER = ['lexy', 'steam', 'steam-strict', 'lynx', 'm
 // FIXME some of the names of the flags themselves kinda suck
 export const COMPAT_FLAGS = [
 // Level loading
+// TODO? /strictly/ speaking, these should be turned on for lynx+ms/lynx respectively, but then i'd
+// have to also alter the behavior of the corresponding terrain, which seems kind of silly
 {
     key: 'no_auto_convert_ccl_popwalls',
     label: "Recessed walls under actors in CCL levels are left alone",
-    rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+    rulesets: new Set(['steam-strict']),
 }, {
     key: 'no_auto_convert_ccl_blue_walls',
     label: "Blue walls under blocks in CCL levels are left alone",
-    rulesets: new Set(['steam-strict', 'lynx']),
+    rulesets: new Set(['steam-strict']),
 },
 
 // Core
