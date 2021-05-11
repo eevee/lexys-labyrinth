@@ -349,6 +349,30 @@ export class Level extends LevelInterface {
         // possibility of needing to undo and b) the overhead is noticable.
         this.undo_enabled = true;
 
+        // Order in which actors try to collide with tiles.
+        // Subtleties ahoy!  This is **EXTREMELY** sensitive to ordering.  Consider:
+        // - An actor with foil MUST NOT bump a wall on the other side of a thin wall.
+        // - A ghost with foil MUST bump a wall (even on the other side of a thin wall) and be
+        //   deflected by the resulting steel.
+        // - An actor with foil MUST NOT bump a wall under a "no foil" sign.
+        // - A bowling ball MUST NOT destroy an actor on the other side of a thin wall, or on top of
+        //   a regular wall.
+        // - A fireball MUST melt an ice block AND ALSO still be deflected by it, even if the ice
+        //   block is on top of an item (which blocks the fireball), but NOT one on the other side
+        //   of a thin wall.
+        // - A rover MUST NOT bump walls underneath a canopy (which blocks it).
+        // It seems the order is thus: canopy + thin wall + item mod (indistinguishable); terrain;
+        // actor; item.  In other words, some physically logical sense of "outer" to "inner".
+        // (In Lynx, however, everything was on the same layer, so actors must come last.)
+        this.layer_collision_order = [
+            LAYERS.canopy, LAYERS.thin_wall, LAYERS.item_mod, LAYERS.terrain, LAYERS.swivel];
+        if (this.compat.player_protected_by_items) {
+            this.layer_collision_order.push(LAYERS.item, LAYERS.actor);
+        }
+        else {
+            this.layer_collision_order.push(LAYERS.actor, LAYERS.item);
+        }
+
         let n = 0;
         let connectables = [];
         this.remaining_players = 0;
@@ -1613,24 +1637,8 @@ export class Level extends LevelInterface {
     // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
     can_actor_enter_cell(actor, cell, direction, push_mode = null) {
         let pushable_tiles = [];
-        // Subtleties ahoy!  This is **EXTREMELY** sensitive to ordering.  Consider:
-        // - An actor with foil MUST NOT bump a wall on the other side of a thin wall.
-        // - A ghost with foil MUST bump a wall (even on the other side of a thin wall) and be
-        //   deflected by the resulting steel.
-        // - An actor with foil MUST NOT bump a wall under a "no foil" sign.
-        // - A bowling ball MUST NOT destroy an actor on the other side of a thin wall, or on top of
-        //   a regular wall.
-        // - A fireball MUST melt an ice block AND ALSO still be deflected by it, even if the ice
-        //   block is on top of an item (which blocks the fireball), but NOT one on the other side
-        //   of a thin wall.
-        // - A rover MUST NOT bump walls underneath a canopy (which blocks it).
-        // It seems the order is thus: canopy + thin wall + item mod (indistinguishable); terrain;
-        // actor; item.  In other words, some physically logical sense of "outer" to "inner".
         let still_blocked = false;
-        for (let layer of [
-            LAYERS.canopy, LAYERS.thin_wall, LAYERS.item_mod, LAYERS.terrain, LAYERS.swivel,
-            LAYERS.actor, LAYERS.item])
-        {
+        for (let layer of this.layer_collision_order) {
             let tile = cell[layer];
             if (! tile)
                 continue;
@@ -1645,9 +1653,7 @@ export class Level extends LevelInterface {
             // a player thinks about moving into a monster, the player dies.  A player standing on a
             // wall is only saved by the wall being checked first.  This is also why standing on an
             // item won't save you: actors are checked before items!
-            // In Lynx, on the other hand, this is deferred until later (and only happens if the
-            // move is allowed), so hold off.
-            if (layer === LAYERS.actor && ! this.compat.player_dies_during_movement) {
+            if (layer === LAYERS.actor) {
                 this._check_for_player_death(actor, tile);
             }
 
@@ -1875,17 +1881,9 @@ export class Level extends LevelInterface {
         if (! success)
             return false;
 
-        // In Lynx, checking for player trampling happens right about here, more or less.
-        let goal_cell = this.get_neighboring_cell(actor.cell, direction);
-        if (this.compat.player_dies_during_movement) {
-            let tramplee = goal_cell.get_actor();
-            if (tramplee && this._check_for_player_death(actor, tramplee))
-                // We stepped on the player (or vice versa); don't move, or we'll erase something
-                return false;
-        }
-
         // We're clear!  Compute our speed and move us
         // FIXME this feels clunky
+        let goal_cell = this.get_neighboring_cell(actor.cell, direction);
         let terrain = goal_cell.get_terrain();
         if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)) {
             speed /= terrain.type.speed_factor;

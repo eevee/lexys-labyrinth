@@ -149,7 +149,7 @@ export const COMPAT_FLAGS = [
     label: "Player always moves last",
     rulesets: new Set(['lynx', 'ms']),
 }, {
-    key: 'player_dies_during_movement',
+    key: 'player_protected_by_items',
     label: "Players can't get trampled when standing on items",
     rulesets: new Set(['lynx']),
 }, {
