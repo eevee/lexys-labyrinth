@@ -1522,13 +1522,8 @@ const TILE_TYPES = {
                 level._set_tile_prop(me, 'presses', 0);
             }
         },
-        on_arrive(me, level, other) {
-            // Lynx (not cc2): open traps immediately eject their contents on arrival, if possible
-            if (level.compat.traps_like_lynx) {
-                level.attempt_out_of_turn_step(other, other.direction);
-            }
-        },
         on_stand(me, level, other) {
+            // Lynx: open traps eject their contents at the end of each tic
             if (level.compat.traps_like_lynx) {
                 level.attempt_out_of_turn_step(other, other.direction);
             }
