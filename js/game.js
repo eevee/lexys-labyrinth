@@ -11,11 +11,6 @@ export class Tile {
         }
         this.cell = null;
 
-        if (type.is_actor) {
-            this.slide_mode = null;
-            this.movement_cooldown = 0;
-        }
-
         // Pre-seed actors who are expected to have inventories, with one
         // TODO do i need this at all?
         if (type.item_pickup_priority <= PICKUP_PRIORITIES.normal) {
@@ -138,7 +133,7 @@ export class Tile {
 
         // CC2 strikes again: blocks cannot push sliding blocks, except that frame blocks can push
         // sliding dirt blocks!
-        if (this.type.is_block && tile.slide_mode && ! (
+        if (this.type.is_block && tile.is_sliding && ! (
             this.type.name === 'frame_block' && tile.type.name === 'dirt_block'))
         {
             return false;
@@ -173,10 +168,19 @@ export class Tile {
         }
     }
 }
-Tile.prototype.emitting_edges = 0;
-Tile.prototype.powered_edges = 0;
-Tile.prototype.wire_directions = 0;
-Tile.prototype.wire_tunnel_directions = 0;
+Object.assign(Tile.prototype, {
+    // Wire stuff, to avoid a lot of boring checks in circuit code
+    emitting_edges: 0,
+    powered_edges: 0,
+    wire_directions: 0,
+    wire_tunnel_directions: 0,
+    // Actor defaults
+    movement_cooldown: 0,
+    is_sliding: false,
+    is_pending_slide: false,
+    can_override_slide: false,
+});
+
 
 export class Cell extends Array {
     constructor(x, y) {
@@ -661,9 +665,17 @@ export class Level extends LevelInterface {
     can_accept_input() {
         // We can accept input anytime the player can move, i.e. when they're not already moving and
         // not in an un-overrideable slide
-        return this.player.movement_cooldown === 0 &&
-            (this.player.slide_mode === null || (
-                this.player.slide_mode === 'force' && this.player.can_override_slide));
+        if (this.player.movement_cooldown > 0)
+            return false;
+        if (! this.player.pending_slide)
+            return true;
+        if (! this.player.can_override_slide)
+            return false;
+
+        let terrain = this.player.cell.get_terrain();
+        if (terrain.type.allow_player_override)
+            return true;
+        return false;
     }
 
     // Randomness -------------------------------------------------------------------------------------
@@ -748,6 +760,8 @@ export class Level extends LevelInterface {
     _advance_tic_lexy() {
         // Under CC2 rules, there are two wire updates at the very beginning of the game before the
         // player can actually move.  That means the first tic has five wire phases total.
+        // FIXME this breaks item bestowal contraptions that immediately flip a force floor, since
+        // the critters on the force floors don't get a bonk before this happens
         if (this.tic_counter === 0) {
             this._do_wire_phase();
             this._do_wire_phase();
@@ -973,6 +987,11 @@ export class Level extends LevelInterface {
             else {
                 this.make_actor_decision(actor, forced_only);
             }
+
+            // This only persists until the next decision
+            if (actor.is_pending_slide) {
+                this._set_tile_prop(actor, 'is_pending_slide', false);
+            }
         }
     }
 
@@ -1010,10 +1029,6 @@ export class Level extends LevelInterface {
         if (actor.pending_push) {
             this._set_tile_prop(actor, 'pending_push', null);
         }
-        // Turntable slide wears off after a single /attempted/ move
-        if (actor.slide_mode === 'turntable') {
-            this.make_slide(actor, null);
-        }
 
         // Actor is allowed to move, so do so
         let success = this.attempt_step(actor, direction);
@@ -1031,29 +1046,33 @@ export class Level extends LevelInterface {
                 (terrain.type.slide_mode === 'ice' && (
                     ! actor.ignores(terrain.type.name) || actor.type.name === 'ghost')) ||
                 // But they only bonk on a force floor if it affects them
-                (terrain.type.slide_mode === 'force' &&
-                    actor.slide_mode && ! actor.ignores(terrain.type.name))))
+                (terrain.type.slide_mode === 'force' && ! actor.ignores(terrain.type.name))))
             {
                 // Turn the actor around so ice corners bonk correctly
+                // XXX this is jank as hell
                 if (terrain.type.slide_mode === 'ice') {
                     this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
                 }
-                // Pretend they stepped on the tile again
-                // Note that ghosts bonk even on ice corners, which they can otherwise pass through,
-                // argh!
-                if (terrain.type.on_arrive && actor.type.name !== 'ghost') {
-                    terrain.type.on_arrive(terrain, this, actor);
+                // Pretend they stepped on the cell again -- this is what allows item bestowal to
+                // function, as a bonking monster will notice the item now and take it.
+                this.step_on_cell(actor, actor.cell);
+
+                // Note that ghosts bonk even on ice corners, which they can otherwise pass through!
+                let forced_move = this.get_forced_move(actor, terrain);
+                if (actor.type.name === 'ghost') {
+                    forced_move = actor.direction;
                 }
                 // If we got a new direction, try moving again
-                if (direction !== actor.direction && ! this.compat.bonking_isnt_instant) {
-                    success = this.attempt_step(actor, actor.direction);
+                // FIXME in compat case, i guess we just set direction?
+                if (forced_move && direction !== forced_move && ! this.compat.bonking_isnt_instant) {
+                    success = this.attempt_step(actor, forced_move);
                 }
             }
-            else if (actor.slide_mode === 'teleport') {
-                // Failed teleport slides only last for a single attempt.  (Successful teleports
-                // continue the slide until landing on a new tile, as normal; otherwise you couldn't
-                // push a block coming out of a teleporter.)
-                this.make_slide(actor, null);
+            else if (terrain.type.name === 'teleport_red' && ! terrain.is_active) {
+                // Curious special-case red teleporter behavior: if you pass through a wired but
+                // inactive one, you keep sliding indefinitely.  Players can override out of it, but
+                // other actors are just stuck.  So, set this again.
+                this._set_tile_prop(actor, 'is_pending_slide', true);
             }
         }
 
@@ -1085,6 +1104,42 @@ export class Level extends LevelInterface {
                 // This is an animation that just finished, so destroy it
                 this.remove_tile(actor);
                 return;
+            }
+
+            // Play step sound when the player completes a move
+            if (actor === this.player) {
+                let terrain = actor.cell.get_terrain();
+                if (actor.is_sliding && terrain.type.slide_mode === 'ice') {
+                    this.sfx.play_once('slide-ice');
+                }
+                else if (actor.is_sliding && terrain.type.slide_mode === 'force') {
+                    this.sfx.play_once('slide-force');
+                }
+                else if (terrain.type.name === 'popdown_floor') {
+                    this.sfx.play_once('step-popdown');
+                }
+                else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad') {
+                    this.sfx.play_once('step-gravel');
+                }
+                else if (terrain.type.name === 'water') {
+                    if (actor.ignores(terrain.type.name)) {
+                        this.sfx.play_once('step-water');
+                    }
+                }
+                else if (terrain.type.name === 'fire') {
+                    if (actor.has_item('fire_boots')) {
+                        this.sfx.play_once('step-fire');
+                    }
+                }
+                else if (terrain.type.slide_mode === 'force') {
+                    this.sfx.play_once('step-force');
+                }
+                else if (terrain.type.slide_mode === 'ice') {
+                    this.sfx.play_once('step-ice');
+                }
+                else {
+                    this.sfx.play_once('step-floor');
+                }
             }
 
             if (! this.compat.tiles_react_instantly) {
@@ -1269,6 +1324,22 @@ export class Level extends LevelInterface {
         return [dir1, dir2];
     }
 
+    get_forced_move(actor, terrain = null) {
+        if (! terrain) {
+            terrain = actor.cell.get_terrain();
+        }
+        if (! terrain.type.slide_mode)
+            return null;
+        if (! terrain.type.get_slide_direction)
+            return null;
+        if (! (actor.is_pending_slide || terrain.type.slide_automatically))
+            return null;
+        if (actor.ignores(terrain.type.name))
+            return null;
+
+        return terrain.type.get_slide_direction(terrain, this, actor);
+    }
+
     make_player_decision(actor, input, forced_only = false) {
         // Only reset the player's is_pushing between movement, so it lasts for the whole push
         this._set_tile_prop(actor, 'is_pushing', false);
@@ -1301,8 +1372,9 @@ export class Level extends LevelInterface {
         //   succeed, even if overriding in the same direction we're already moving, that does count
         //   as an override.
         let terrain = actor.cell.get_terrain();
+        let forced_move = this.get_forced_move(actor, terrain);
         let may_move = ! forced_only && (
-            ! actor.slide_mode || (actor.can_override_slide && terrain.type.allow_player_override));
+            ! forced_move || (actor.can_override_slide && terrain.type.allow_player_override));
         let [dir1, dir2] = this._extract_player_directions(input);
 
         // Check for special player actions, which can only happen at decision time.  Dropping can
@@ -1330,11 +1402,11 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (actor.slide_mode && ! (may_move && dir1)) {
+        if (forced_move && ! (may_move && dir1)) {
             // This is a forced move and we're not overriding it, so we're done
-            actor.decision = actor.direction;
+            actor.decision = forced_move;
 
-            if (actor.slide_mode === 'force') {
+            if (terrain.type.slide_mode === 'force') {
                 this._set_tile_prop(actor, 'can_override_slide', true);
             }
         }
@@ -1357,16 +1429,17 @@ export class Level extends LevelInterface {
                 // one, UNLESS it's blocked AND the other isn't.
                 // Note that if this is an override, then the forced direction is still used to
                 // interpret our input!
-                if (dir1 === actor.direction || dir2 === actor.direction) {
-                    let other_direction = dir1 === actor.direction ? dir2 : dir1;
-                    let curr_open = try_direction(actor.direction, push_mode);
+                let current_direction = forced_move ?? actor.direction;
+                if (dir1 === current_direction || dir2 === current_direction) {
+                    let other_direction = dir1 === current_direction ? dir2 : dir1;
+                    let curr_open = try_direction(current_direction, push_mode);
                     let other_open = try_direction(other_direction, push_mode);
                     if (! curr_open && other_open) {
                         actor.decision = other_direction;
                         open = true;
                     }
                     else {
-                        actor.decision = actor.direction;
+                        actor.decision = current_direction;
                         open = curr_open;
                     }
                 }
@@ -1396,14 +1469,16 @@ export class Level extends LevelInterface {
                 }
             }
 
-            // If we're overriding a force floor but the direction we're moving in is blocked, this
-            // counts as a forced move (but only under the CC2 behavior of instant bonking)
-            if (actor.slide_mode === 'force' && ! open && ! this.compat.bonking_isnt_instant) {
+            // If we're overriding a force floor but the direction we're moving in is blocked, we
+            // keep our override power (but only under the CC2 behavior of instant bonking).
+            // Notably, this happens even if we do end up able to move!
+            if (forced_move && terrain.type.slide_mode === 'force' && ! open &&
+                ! this.compat.bonking_isnt_instant)
+            {
                 this._set_tile_prop(actor, 'can_override_slide', true);
             }
             else {
-                // Otherwise this is 100% a conscious move so we lose our override power next tic
-                // TODO how does this interact with teleports
+                // Otherwise this is 100% a conscious move, so we lose override
                 this._set_tile_prop(actor, 'can_override_slide', false);
             }
         }
@@ -1429,12 +1504,15 @@ export class Level extends LevelInterface {
 
         let direction_preference;
         let terrain = actor.cell.get_terrain();
-        if (actor.slide_mode ||
+        let forced_move = this.get_forced_move(actor, terrain);
+        if (forced_move) {
+            // Actors can't make voluntary moves while sliding; they just, ah, slide.
+            actor.decision = forced_move;
+            return;
+        }
+        else if (actor.type.name === 'ghost' && terrain.type.slide_mode === 'ice') {
             // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
             // FIXME and if they have cleats, they get stuck instead (?!)
-            (actor.type.name === 'ghost' && terrain.type.slide_mode === 'ice'))
-        {
-            // Actors can't make voluntary moves while sliding; they just, ah, slide.
             actor.decision = actor.direction;
             return;
         }
@@ -1640,8 +1718,8 @@ export class Level extends LevelInterface {
                         // FIXME this is clumsy and creates behavior dependent on actor order.  my
                         // original implementation only did this if the push /failed/; is that worth
                         // a compat option?  also, how does any of this work under lynx rules?
-                        if (tile.slide_mode === 'force' ||
-                            (tile.slide_mode !== null && tile.movement_cooldown > 0))
+                        if (tile.is_sliding && ! tile.is_pulled && (tile.movement_cooldown > 0 ||
+                            tile.cell.get_terrain().type.slide_mode === 'force'))
                         {
                             this._set_tile_prop(tile, 'pending_push', direction);
                             // FIXME if the block has already made a decision then this is necessary
@@ -1710,12 +1788,15 @@ export class Level extends LevelInterface {
     }
 
     check_movement(actor, orig_cell, direction, push_mode) {
-        // Lynx: Players can't override backwards on force floors, and it functions like blocking,
-        // but does NOT act like a bonk (hence why it's here)
-        if (this.compat.no_backwards_override && actor === this.player &&
-            actor.slide_mode === 'force' && direction === DIRECTIONS[actor.direction].opposite)
-        {
-            return false;
+        // Lynx: Nothing can move backwards on force floors, and it functions like blocking, but
+        // does NOT act like a bonk (hence why it's here)
+        if (this.compat.no_backwards_override) {
+            let terrain = orig_cell.get_terrain()
+            if (terrain.type.slide_mode === 'force' && ! actor.ignores(terrain.type.name) &&
+                direction === DIRECTIONS[actor.direction].opposite)
+            {
+                return false;
+            }
         }
 
         let dest_cell = this.get_neighboring_cell(orig_cell, direction);
@@ -1818,6 +1899,11 @@ export class Level extends LevelInterface {
         this._set_tile_prop(actor, 'movement_speed', duration);
         this.move_to(actor, goal_cell);
 
+        // Whether we're sliding is determined entirely by whether we most recently moved onto a
+        // sliding tile that we don't ignore.  This could /almost/ be computed on the fly, except
+        // that an actor that starts on e.g. ice or a teleporter is not considered sliding.
+        this._set_tile_prop(actor, 'is_sliding', terrain.type.slide_mode && ! actor.ignores(terrain.type.name));
+
         // Do Lexy-style hooking here: only attempt to pull things just after we've actually moved
         // successfully, which means the hook can never stop us from moving and hook slapping is not
         // a thing, and also make them a real move rather than a weird pending thing
@@ -1840,7 +1926,10 @@ export class Level extends LevelInterface {
     }
 
     attempt_out_of_turn_step(actor, direction) {
-        if (actor.slide_mode === 'turntable') {
+        if (actor.is_sliding && actor.cell.get_terrain().type.slide_mode === 'turntable') {
+            // FIXME where should this be?  should a block on a turntable ignore pushes?  but then
+            // if it gets blocked it's stuck, right?
+            // FIXME ok that is already the case, oops
             // Something is (e.g.) pushing a block that just landed on a turntable and is waiting to
             // slide out of it.  Ignore the push direction and move in its current direction;
             // otherwise a player will push a block straight through, then turn, which sucks
@@ -1893,9 +1982,7 @@ export class Level extends LevelInterface {
             }
         }
 
-        // Announce we're approaching.  Slide mode is set here, since it's about the tile we're
-        // moving towards and needs to last through our next decision
-        this.make_slide(actor, null);
+        // Announce we're approaching
         for (let tile of goal_cell) {
             if (! tile)
                 continue;
@@ -1908,9 +1995,6 @@ export class Level extends LevelInterface {
 
             if (tile.type.on_approach) {
                 tile.type.on_approach(tile, this, actor);
-            }
-            if (tile.type.slide_mode) {
-                this.make_slide(actor, tile.type.slide_mode);
             }
         }
 
@@ -1973,45 +2057,14 @@ export class Level extends LevelInterface {
                     continue;
                 }
             }
-
             else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
             }
-        }
 
-        // Play step sound
-        if (actor === this.player) {
-            let terrain = cell.get_terrain();
-            if (actor.slide_mode === 'ice') {
-                this.sfx.play_once('slide-ice');
-            }
-            else if (actor.slide_mode === 'force') {
-                this.sfx.play_once('slide-force');
-            }
-            else if (terrain.type.name === 'popdown_floor') {
-                this.sfx.play_once('step-popdown');
-            }
-            else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad') {
-                this.sfx.play_once('step-gravel');
-            }
-            else if (terrain.type.name === 'water') {
-                if (actor.ignores(terrain.type.name)) {
-                    this.sfx.play_once('step-water');
-                }
-            }
-            else if (terrain.type.name === 'fire') {
-                if (actor.has_item('fire_boots')) {
-                    this.sfx.play_once('step-fire');
-                }
-            }
-            else if (terrain.type.slide_mode === 'force') {
-                this.sfx.play_once('step-force');
-            }
-            else if (terrain.type.slide_mode === 'ice') {
-                this.sfx.play_once('step-ice');
-            }
-            else {
-                this.sfx.play_once('step-floor');
+            if (tile.type.slide_automatically) {
+                // This keeps a player on force floor consistently using their sliding pose, even if
+                // drawn between moves.  It also simplifies checks elsewhere, so that's nice
+                this._set_tile_prop(actor, 'is_pending_slide', true);
             }
         }
     }
@@ -2024,22 +2077,7 @@ export class Level extends LevelInterface {
         // movement towards the teleporter it just stepped on, not the teleporter it's moved to
         this._set_tile_prop(actor, 'destination_cell', actor.cell);
 
-        if (teleporter.type.name === 'teleport_red' && ! teleporter.is_active) {
-            // Curious special-case red teleporter behavior: if you pass through a wired but
-            // inactive one, you keep sliding indefinitely.  Players can override out of it, but
-            // other actors cannot.  (Normally, a teleport slide ends after one decision phase.)
-            // XXX this is useful when the exit is briefly blocked, but it can also get monsters
-            // stuck forever  :(
-            // XXX kind of repeating myself here, there must be a more natural approach
-            this.make_slide(actor, 'teleport-forever');
-            if (actor.type.is_real_player && teleporter.type.allow_player_override) {
-                this._set_tile_prop(actor, 'can_override_slide', true);
-            }
-            // Also, there's no sound and whatnot, so everything else is skipped outright.
-            return;
-        }
-
-        let dest, direction;
+        let dest, direction, success;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
             if (dest !== teleporter && dest.cell.get_actor())
@@ -2053,7 +2091,6 @@ export class Level extends LevelInterface {
                 this.allow_taking_yellow_teleporters)
             {
                 // Super duper special yellow teleporter behavior: you pick it the fuck up
-                this.make_slide(actor, null);
                 this.attempt_take(actor, teleporter);
                 if (actor === this.player) {
                     this.sfx.play_once('get-tool', teleporter.cell);
@@ -2070,17 +2107,14 @@ export class Level extends LevelInterface {
             // it can even come up under cc2 rules, since teleporting is done after an actor cools
             // down and before the next actor even gets a chance to act
             if (this.check_movement(actor, dest.cell, direction, 'bump')) {
-                // Sound plays from the origin cell simply because that's where the sfx player
-                // thinks the player is currently; position isn't updated til next turn
-                this.sfx.play_once('teleport', teleporter.cell);
+                success = true;
                 break;
             }
         }
 
-        // Explicitly set us as teleport sliding, since in some very obscure cases (auto-dropping a
-        // yellow teleporter because you picked up an item with a full inventory and immediately
-        // teleporting through it) it may not have been applied
-        this.make_slide(actor, 'teleport');
+        // Teleport slides happen when coming out of a teleporter, but not other times, so need to
+        // be noted explicitly
+        this._set_tile_prop(actor, 'is_pending_slide', true);
         // Real players might be able to immediately override the resulting slide
         if (actor.type.is_real_player && teleporter.type.allow_player_override) {
             this._set_tile_prop(actor, 'can_override_slide', true);
@@ -2088,16 +2122,22 @@ export class Level extends LevelInterface {
 
         this.set_actor_direction(actor, direction);
 
-        this.spawn_animation(actor.cell, 'teleport_flash');
-        if (dest.cell !== actor.cell) {
-            this.spawn_animation(dest.cell, 'teleport_flash');
-        }
+        if (success) {
+            // Sound plays from the origin cell simply because that's where the sfx player thinks
+            // the player is currently; position isn't updated til next turn
+            this.sfx.play_once('teleport', teleporter.cell);
 
-        // Now physically move the actor, but their movement waits until next decision phase
-        this.remove_tile(actor, true);
-        this.add_tile(actor, dest.cell);
-        // Erase this to prevent tail-biting through a teleport
-        this._set_tile_prop(actor, 'previous_cell', null);
+            this.spawn_animation(actor.cell, 'teleport_flash');
+            if (dest.cell !== actor.cell) {
+                this.spawn_animation(dest.cell, 'teleport_flash');
+            }
+
+            // Now physically move the actor, but their movement waits until next decision phase
+            this.remove_tile(actor, true);
+            this.add_tile(actor, dest.cell);
+            // Erase this to prevent tail-biting through a teleport
+            this._set_tile_prop(actor, 'previous_cell', null);
+        }
     }
 
     remember_player_move(direction) {
@@ -2598,7 +2638,8 @@ export class Level extends LevelInterface {
 
                     this._set_tile_prop(actor, 'movement_cooldown', null);
                     this._set_tile_prop(actor, 'movement_speed', null);
-                    this.make_slide(actor, null);
+                    this._set_tile_prop(actor, 'is_sliding', false);
+                    this._set_tile_prop(actor, 'is_pending_slide', false);
                     this.move_to(actor, ankh_cell);
 
                     this.transmute_tile(this.ankh_tile, 'floor');
@@ -2816,7 +2857,8 @@ export class Level extends LevelInterface {
             }
             this._init_animation(tile);
             this._set_tile_prop(tile, 'previous_cell', null);
-            this.make_slide(tile, null);
+            this._set_tile_prop(tile, 'is_sliding', false);
+            this._set_tile_prop(tile, 'is_pending_slide', false);
         }
     }
 
@@ -2929,14 +2971,6 @@ export class Level extends LevelInterface {
                 actor.toolbelt.push(name);
                 this._push_pending_undo(() => actor.toolbelt.pop());
             }
-
-            // FIXME hardcodey, but, this doesn't seem to fit anywhere else
-            if (name === 'cleats' && actor.slide_mode === 'ice') {
-                this.make_slide(actor, null);
-            }
-            else if (name === 'suction_boots' && actor.slide_mode === 'force') {
-                this.make_slide(actor, null);
-            }
         }
         return true;
     }
@@ -2986,11 +3020,6 @@ export class Level extends LevelInterface {
             actor.toolbelt = [];
             return true;
         }
-    }
-
-    // Mark an actor as sliding
-    make_slide(actor, mode) {
-        this._set_tile_prop(actor, 'slide_mode', mode);
     }
 
     // Change an actor's direction

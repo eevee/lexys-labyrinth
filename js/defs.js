@@ -112,7 +112,7 @@ export const PICKUP_PRIORITIES = {
     always: 3,  // all actors; blue keys, yellow teleporters (everything picks up except cc2 blocks)
     // TODO is this even necessary?  in cc2 the general rule seems to be that anything stepping on
     // an item picks it up, and collision is used to avoid that most of the time
-    normal: 2,  // actors with inventories; most items
+    normal: 3,  // actors with inventories; most items
     player: 1,  // players and doppelgangers; red keys (ignored by everything else)
     real_player: 0,
 };

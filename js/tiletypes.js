@@ -1,47 +1,9 @@
 import { COLLISION, DIRECTIONS, DIRECTION_ORDER, LAYERS, TICS_PER_SECOND, PICKUP_PRIORITIES } from './defs.js';
-import { random_choice } from './util.js';
 
 // TODO factor out some repeated stuff: common monster bits, common item bits, repeated collision
 // masks
 function activate_me(me, level) {
     me.type.activate(me, level);
-}
-
-function on_begin_force_floor(me, level) {
-    // At the start of the level, if there's an actor on a force floor:
-    // - use on_arrive to set the actor's direction
-    // - set the slide_mode (normally done by the main game loop)
-    // - item bestowal: if they're being pushed into a wall and standing on an item, pick up the
-    //   item, even if they couldn't normally pick items up
-    // FIXME get rid of this
-    let actor = me.cell.get_actor();
-    if (! actor)
-        return;
-
-    me.type.on_arrive(me, level, actor);
-    if (me.type.slide_mode) {
-        level._set_tile_prop(actor, 'slide_mode', me.type.slide_mode);
-    }
-
-    // Item bestowal
-    // TODO seemingly lynx/cc2 only pick RFF direction at decision time, but that's in conflict with
-    // doing this here; decision time hasn't happened yet, but we need to know what direction we're
-    // moving to know whether bestowal happens?  so what IS the cause of item bestowal?
-    let neighbor = level.get_neighboring_cell(me.cell, actor.direction);
-    if (neighbor && level.can_actor_enter_cell(actor, neighbor, actor.direction))
-        return;
-    let item = me.cell.get_item();
-    if (! item)
-        return;
-    if (item.type.item_priority < actor.type.item_pickup_priority)
-        return;
-    if (! level.attempt_take(actor, item))
-        return;
-    if (actor.ignores(me.type.name)) {
-        // If they just picked up suction boots, they're no longer sliding
-        // TODO this feels hacky, shouldn't the slide mode be erased some other way?
-        level._set_tile_prop(actor, 'slide_mode', null);
-    }
 }
 
 function blocks_leaving_thin_walls(me, actor, direction) {
@@ -90,6 +52,23 @@ function _define_gate(key) {
         },
     };
 }
+function _define_force_floor(direction, opposite_type) {
+    return {
+        layer: LAYERS.terrain,
+        slide_mode: 'force',
+        speed_factor: 2,
+        slide_automatically: true,
+        allow_player_override: true,
+        get_slide_direction(me, level, other) {
+            return direction;
+        },
+        activate(me, level) {
+            level.transmute_tile(me, opposite_type);
+        },
+        on_gray_button: activate_me,
+        on_power: activate_me,
+    };
+}
 
 function update_wireable(me, level) {
     if (me.is_wired === undefined) {
@@ -125,53 +104,54 @@ function player_visual_state(me) {
     if (me.fail_reason === 'drowned') {
         return 'drowned';
     }
-    else if (me.fail_reason === 'burned') {
+    if (me.fail_reason === 'burned') {
         return 'burned';
     }
-    else if (me.fail_reason === 'exploded') {
+    if (me.fail_reason === 'exploded') {
         return 'exploded';
     }
-    else if (me.fail_reason === 'slimed') {
+    if (me.fail_reason === 'slimed') {
         return 'slimed';
     }
-    else if (me.fail_reason === 'electrocuted') {
+    if (me.fail_reason === 'electrocuted') {
         return 'burned'; //same gfx for now
     }
-    else if (me.fail_reason === 'fell') {
+    if (me.fail_reason === 'fell') {
         return 'fell';
     }
-    else if (me.fail_reason) {
+    if (me.fail_reason) {
         return 'failed';
     }
-    else if (me.exited) {
+    if (me.exited) {
         return 'exited';
     }
     // This is slightly complicated.  We should show a swimming pose while still in water, or moving
     // away from water (as CC2 does), but NOT when stepping off a lilypad (which will already have
     // been turned into water), and NOT without flippers (which can happen if we start on water)
-    else if (me.cell && (me.previous_cell || me.cell).has('water') &&
+    if (me.cell && (me.previous_cell || me.cell).has('water') &&
         ! me.not_swimming && me.has_item('flippers'))
     {
         return 'swimming';
     }
-    else if (me.slide_mode === 'ice') {
-        return 'skating';
+    if (me.is_sliding || me.is_pending_slide) {
+        let terrain = me.cell.get_terrain();
+        if (terrain.type.slide_mode === 'ice') {
+            return 'skating';
+        }
+        else if (terrain.type.slide_mode === 'force') {
+            return 'forced';
+        }
     }
-    else if (me.slide_mode === 'force') {
-        return 'forced';
-    }
-    else if (me.is_blocked) {
+    if (me.is_blocked) {
         return 'blocked';
     }
-    else if (me.is_pushing) {
+    if (me.is_pushing) {
         return 'pushing';
     }
-    else if (me.movement_speed) {
+    if (me.movement_speed) {
         return 'moving';
     }
-    else {
-        return 'normal';
-    }
+    return 'normal';
 }
 
 function button_visual_state(me) {
@@ -750,12 +730,16 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         contains_wire: true,
         wire_propagation_mode: 'all',
+        slide_mode: 'turntable',
+        get_slide_direction(me, level, other) {
+            return other.direction;
+        },
         on_arrive(me, level, other) {
+            level._set_tile_prop(other, 'is_pending_slide', true);
             level.set_actor_direction(other, DIRECTIONS[other.direction].right);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'right');
             }
-            level.make_slide(other, 'turntable');
         },
         activate(me, level) {
             level.transmute_tile(me, 'turntable_ccw');
@@ -767,12 +751,16 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         contains_wire: true,
         wire_propagation_mode: 'all',
+        slide_mode: 'turntable',
+        get_slide_direction(me, level, other) {
+            return other.direction;
+        },
         on_arrive(me, level, other) {
+            level._set_tile_prop(other, 'is_pending_slide', true);
             level.set_actor_direction(other, DIRECTIONS[other.direction].left);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'left');
             }
-            level.make_slide(other, 'turntable');
         },
         activate(me, level) {
             level.transmute_tile(me, 'turntable_cw');
@@ -883,7 +871,13 @@ const TILE_TYPES = {
     cracked_ice: {
         layer: LAYERS.terrain,
         slide_mode: 'ice',
+        get_slide_direction(me, level, other) {
+            return other.direction;
+        },
         speed_factor: 2,
+        on_arrive(me, level, other) {
+            level._set_tile_prop(other, 'is_pending_slide', true);
+        },
         on_depart(me, level, other) {
             level.transmute_tile(me, 'water');
             level.spawn_animation(me.cell, 'splash');
@@ -893,171 +887,102 @@ const TILE_TYPES = {
     ice: {
         layer: LAYERS.terrain,
         slide_mode: 'ice',
+        get_slide_direction(me, level, other) {
+            return other.direction;
+        },
         speed_factor: 2,
+        on_arrive(me, level, other) {
+            level._set_tile_prop(other, 'is_pending_slide', true);
+        },
     },
     ice_sw: {
         layer: LAYERS.terrain,
         thin_walls: new Set(['south', 'west']),
         slide_mode: 'ice',
+        get_slide_direction(me, level, other) {
+            return {
+                north: 'north',
+                south: 'east',
+                east: 'east',
+                west: 'north',
+            }[other.direction];
+        },
         speed_factor: 2,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
-            if (other.direction === 'south') {
-                level.set_actor_direction(other, 'east');
-            }
-            else if (other.direction === 'west') {
-                level.set_actor_direction(other, 'north');
-            }
+            level._set_tile_prop(other, 'is_pending_slide', true);
         },
     },
     ice_nw: {
         layer: LAYERS.terrain,
         thin_walls: new Set(['north', 'west']),
         slide_mode: 'ice',
+        get_slide_direction(me, level, other) {
+            return {
+                north: 'east',
+                south: 'south',
+                east: 'east',
+                west: 'south',
+            }[other.direction];
+        },
         speed_factor: 2,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
-            if (other.direction === 'north') {
-                level.set_actor_direction(other, 'east');
-            }
-            else if (other.direction === 'west') {
-                level.set_actor_direction(other, 'south');
-            }
+            level._set_tile_prop(other, 'is_pending_slide', true);
         },
     },
     ice_ne: {
         layer: LAYERS.terrain,
         thin_walls: new Set(['north', 'east']),
         slide_mode: 'ice',
+        get_slide_direction(me, level, other) {
+            return {
+                north: 'west',
+                south: 'south',
+                east: 'south',
+                west: 'west',
+            }[other.direction];
+        },
         speed_factor: 2,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
-            if (other.direction === 'north') {
-                level.set_actor_direction(other, 'west');
-            }
-            else if (other.direction === 'east') {
-                level.set_actor_direction(other, 'south');
-            }
+            level._set_tile_prop(other, 'is_pending_slide', true);
         },
     },
     ice_se: {
         layer: LAYERS.terrain,
         thin_walls: new Set(['south', 'east']),
         slide_mode: 'ice',
+        get_slide_direction(me, level, other) {
+            return {
+                north: 'north',
+                south: 'west',
+                east: 'north',
+                west: 'west',
+            }[other.direction];
+        },
         speed_factor: 2,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
-            if (other.direction === 'south') {
-                level.set_actor_direction(other, 'west');
-            }
-            else if (other.direction === 'east') {
-                level.set_actor_direction(other, 'north');
-            }
+            level._set_tile_prop(other, 'is_pending_slide', true);
         },
     },
-    force_floor_n: {
-        layer: LAYERS.terrain,
-        slide_mode: 'force',
-        speed_factor: 2,
-        allow_player_override: true,
-        on_begin: on_begin_force_floor,
-        on_arrive(me, level, other) {
-            level.set_actor_direction(other, 'north');
-        },
-        activate(me, level) {
-            level.transmute_tile(me, 'force_floor_s');
-            let actor = me.cell.get_actor();
-            if (actor && actor.movement_cooldown <= 0) {
-                level.set_actor_direction(actor, 'south');
-                // If we're using the Lynx loop, then decisions have already happened, and the new
-                // direction will be overwritten if this actor has yet to move
-                if (actor.decision && ! actor.ignores(me.type.name)) {
-                    actor.decision = actor.direction;
-                }
-            }
-        },
-        on_gray_button: activate_me,
-        on_power: activate_me,
-    },
-    force_floor_e: {
-        layer: LAYERS.terrain,
-        slide_mode: 'force',
-        speed_factor: 2,
-        allow_player_override: true,
-        on_begin: on_begin_force_floor,
-        on_arrive(me, level, other) {
-            level.set_actor_direction(other, 'east');
-        },
-        activate(me, level) {
-            level.transmute_tile(me, 'force_floor_w');
-            let actor = me.cell.get_actor();
-            if (actor && actor.movement_cooldown <= 0) {
-                level.set_actor_direction(actor, 'west');
-                if (actor.decision && ! actor.ignores(me.type.name)) {
-                    actor.decision = actor.direction;
-                }
-            }
-        },
-        on_gray_button: activate_me,
-        on_power: activate_me,
-    },
-    force_floor_s: {
-        layer: LAYERS.terrain,
-        slide_mode: 'force',
-        speed_factor: 2,
-        allow_player_override: true,
-        on_begin: on_begin_force_floor,
-        on_arrive(me, level, other) {
-            level.set_actor_direction(other, 'south');
-        },
-        activate(me, level) {
-            level.transmute_tile(me, 'force_floor_n');
-            let actor = me.cell.get_actor();
-            if (actor && actor.movement_cooldown <= 0) {
-                level.set_actor_direction(actor, 'north');
-                if (actor.decision && ! actor.ignores(me.type.name)) {
-                    actor.decision = actor.direction;
-                }
-            }
-        },
-        on_gray_button: activate_me,
-        on_power: activate_me,
-    },
-    force_floor_w: {
-        layer: LAYERS.terrain,
-        slide_mode: 'force',
-        speed_factor: 2,
-        allow_player_override: true,
-        on_begin: on_begin_force_floor,
-        on_arrive(me, level, other) {
-            level.set_actor_direction(other, 'west');
-        },
-        activate(me, level) {
-            level.transmute_tile(me, 'force_floor_e');
-            let actor = me.cell.get_actor();
-            if (actor && actor.movement_cooldown <= 0) {
-                level.set_actor_direction(actor, 'east');
-                if (actor.decision && ! actor.ignores(me.type.name)) {
-                    actor.decision = actor.direction;
-                }
-            }
-        },
-        on_gray_button: activate_me,
-        on_power: activate_me,
-    },
+    force_floor_n: _define_force_floor('north', 'force_floor_s'),
+    force_floor_s: _define_force_floor('south', 'force_floor_n'),
+    force_floor_e: _define_force_floor('east', 'force_floor_w'),
+    force_floor_w: _define_force_floor('west', 'force_floor_e'),
     force_floor_all: {
         layer: LAYERS.terrain,
         slide_mode: 'force',
+        slide_automatically: true,
         speed_factor: 2,
         allow_player_override: true,
-        on_begin: on_begin_force_floor,
-        // TODO ms: this is random, and an acting wall to monsters (!)
+        get_slide_direction(me, level, _other) {
+            return level.get_force_floor_direction();
+        },
         blocks(me, level, other) {
             return (level.compat.rff_blocks_monsters &&
                 (other.type.collision_mask & COLLISION.monster_typical));
-        },
-        on_arrive(me, level, other) {
-            level.set_actor_direction(other, level.get_force_floor_direction());
         },
     },
     slime: {
@@ -1758,6 +1683,9 @@ const TILE_TYPES = {
     teleport_blue: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
+        get_slide_direction(me, level, other) {
+            return other.direction;
+        },
         contains_wire: true,
         wire_propagation_mode: 'all',
         *teleport_dest_order(me, level, other) {
@@ -1845,6 +1773,9 @@ const TILE_TYPES = {
     teleport_red: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
+        get_slide_direction(me, level, other) {
+            return other.direction;
+        },
         contains_wire: true,
         wire_propagation_mode: 'none',
         allow_player_override: true,
@@ -1899,6 +1830,9 @@ const TILE_TYPES = {
     teleport_green: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
+        get_slide_direction(me, level, other) {
+            return other.direction;
+        },
         *teleport_dest_order(me, level, other) {
             // The CC2 green teleporter scheme is:
             // 1. Use the PRNG to pick another green teleporter
@@ -1970,6 +1904,9 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         item_priority: PICKUP_PRIORITIES.always,
         slide_mode: 'teleport',
+        get_slide_direction(me, level, other) {
+            return other.direction;
+        },
         allow_player_override: true,
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;
@@ -2810,10 +2747,6 @@ const TILE_TYPES = {
                 if (terrain && terrain.type.on_arrive && ! me.ignores(terrain.type.name)) {
                     terrain.type.on_arrive(terrain, level, me);
                 }
-                // FIXME Ugh should this just be step_on or what?  but it doesn't slide on ice
-                if (terrain && terrain.type.slide_mode === 'force') {
-                    level.make_slide(me, terrain.type.slide_mode);
-                }
             }
         },
     },
@@ -2949,7 +2882,7 @@ const TILE_TYPES = {
             if (obstacle && obstacle.type.is_actor) {
                 level.kill_actor(obstacle, me, 'explosion');
             }
-            else if (me.slide_mode || me._clone_release) {
+            else if (me.is_sliding || me._clone_release) {
                 // Sliding bowling balls don't blow up if they hit a regular wall, and neither do
                 // bowling balls in the process of being released from a cloner
                 return;

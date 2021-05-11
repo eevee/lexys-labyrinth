@@ -1074,7 +1074,10 @@ class Player extends PrimaryView {
                 let header = mk('h3');
                 let dl = mk('dl');
                 let props = {};
-                for (let key of ['direction', 'movement_speed', 'movement_cooldown', 'slide_mode']) {
+                for (let key of [
+                    'direction', 'movement_speed', 'movement_cooldown',
+                    'is_sliding', 'is_pending_slide', 'can_override_slide',
+                ]) {
                     let dd = mk('dd');
                     props[key] = dd;
                     dl.append(mk('dt', key), dd);
@@ -1494,7 +1497,7 @@ class Player extends PrimaryView {
         // force floors, even if you could override them!
         let moved = false;
         while (this.level.has_undo() &&
-            ! (moved && this.level.player.slide_mode === null))
+            ! (moved && ! this.level.player.is_pending_slide))
         {
             this.undo();
             if (player_cell !== this.level.player.cell) {
