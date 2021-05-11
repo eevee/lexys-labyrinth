@@ -1332,7 +1332,7 @@ export class Level extends LevelInterface {
             return null;
         if (! terrain.type.get_slide_direction)
             return null;
-        if (! (actor.is_pending_slide || terrain.type.slide_automatically))
+        if (! actor.is_pending_slide && ! (terrain.type.slide_automatically && ! this.compat.force_floor_only_on_arrive))
             return null;
         if (actor.ignores(terrain.type.name))
             return null;
@@ -1792,8 +1792,8 @@ export class Level extends LevelInterface {
         // does NOT act like a bonk (hence why it's here)
         if (this.compat.no_backwards_override) {
             let terrain = orig_cell.get_terrain()
-            if (terrain.type.slide_mode === 'force' && ! actor.ignores(terrain.type.name) &&
-                direction === DIRECTIONS[actor.direction].opposite)
+            if (! actor.ignores(terrain.type.name) &&
+                terrain.type.force_floor_direction === DIRECTIONS[direction].opposite)
             {
                 return false;
             }

@@ -181,6 +181,10 @@ export const COMPAT_FLAGS = [
     label: "Player can't override backwards on a force floor",
     rulesets: new Set(['lynx']),
 }, {
+    key: 'force_floor_only_on_arrive',
+    label: "Force floors only affect actors when stepped on",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
     key: 'traps_like_lynx',
     label: "Traps eject faster, and even when already open",
     rulesets: new Set(['lynx']),

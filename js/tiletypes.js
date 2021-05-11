@@ -62,6 +62,11 @@ function _define_force_floor(direction, opposite_type) {
         get_slide_direction(me, level, other) {
             return direction;
         },
+        force_floor_direction: direction,
+        on_arrive(me, level, other) {
+            // Necessary for compat.force_floor_only_on_arrive, which disables slide_automatically
+            level._set_tile_prop(other, 'is_pending_slide', true);
+        },
         activate(me, level) {
             level.transmute_tile(me, opposite_type);
         },
@@ -983,6 +988,10 @@ const TILE_TYPES = {
         blocks(me, level, other) {
             return (level.compat.rff_blocks_monsters &&
                 (other.type.collision_mask & COLLISION.monster_typical));
+        },
+        on_arrive(me, level, other) {
+            // Necessary for compat.force_floor_only_on_arrive, which disables slide_automatically
+            level._set_tile_prop(other, 'is_pending_slide', true);
         },
     },
     slime: {
