@@ -1654,7 +1654,11 @@ export class Level extends LevelInterface {
             // a player thinks about moving into a monster, the player dies.  A player standing on a
             // wall is only saved by the wall being checked first.  This is also why standing on an
             // item won't save you: actors are checked before items!
-            if (layer === LAYERS.actor) {
+            if (layer === LAYERS.actor &&
+                // Lynx: Touching a monster at decision time doesn't kill you, and pushing doesn't
+                // happen at decision time thanks to no_early_push
+                (! this.compat.player_safe_at_decision_time || push_mode === 'push'))
+            {
                 this._check_for_player_death(actor, tile);
             }
 

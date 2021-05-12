@@ -152,7 +152,12 @@ export const COMPAT_FLAGS = [
     rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'player_protected_by_items',
-    label: "Players can't get trampled when standing on items",
+    label: "Players can't be trampled when standing on items",
+    rulesets: new Set(['lynx']),
+}, {
+    // Note that this requires no_early_push as well
+    key: 'player_safe_at_decision_time',
+    label: "Players can't be trampled at decision time",
     rulesets: new Set(['lynx']),
 }, {
     key: 'emulate_60fps',
