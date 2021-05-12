@@ -3303,7 +3303,9 @@ class PackTestDialog extends DialogOverlay {
                         record_result('failure', "Lost", true);
                         break;
                     }
-                    else if (level.tic_counter >= replay.duration + 200) {
+                    else if (level.tic_counter >= replay.duration + 220) {
+                        // This threshold of 11 seconds was scientifically calculated by noticing
+                        // that the TWS of Southpole runs 11 seconds past its last input
                         record_result('short', "Out of input", true);
                         break;
                     }
