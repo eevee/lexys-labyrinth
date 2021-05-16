@@ -12,17 +12,17 @@ body {
 
     font-family: Ubuntu, Source Sans Pro, DejaVu Sans, sans-serif;
     line-height: 1.33;
-    background: hsl(225, 5%, 5%);
+    background: hsl(210, 5%, 5%);
     background-image: url(background.svg);
     background-size: 12em;
     color: #ececec;
 
-    --panel-bg-color: hsl(225, 10%, 15%);
-    --button-bg-color: hsl(225, 10%, 25%);
-    --button-bg-hover-color: hsl(225, 15%, 30%);
-    --generic-bg-hover-on-white: hsl(225, 60%, 90%);
-    --generic-bg-selected-on-white: hsl(225, 60%, 85%);
-    --generic-border-selected-on-white: hsl(225, 60%, 75%);
+    --panel-bg-color: hsl(210, 10%, 15%);
+    --button-bg-color: hsl(210, 10%, 25%);
+    --button-bg-hover-color: hsl(210, 15%, 30%);
+    --generic-bg-hover-on-white: hsl(210, 60%, 90%);
+    --generic-bg-selected-on-white: hsl(210, 60%, 85%);
+    --generic-border-selected-on-white: hsl(210, 60%, 75%);
 }
 
 /* Generic element styling */
@@ -48,10 +48,10 @@ button,
     font-family: inherit;
     color: white;
     background: var(--button-bg-color);
-    border: 1px solid hsl(225, 10%, 10%);
+    border: 1px solid hsl(210, 10%, 10%);
     box-shadow:
-        inset 0 0 0 1px hsl(225, 10%, 33%),
-        0 1px 1px hsl(225, 10%, 10%);
+        inset 0 0 0 1px hsl(210, 10%, 33%),
+        0 1px 1px hsl(210, 10%, 10%);
     border-radius: 0.25em;
     text-transform: lowercase;
     cursor: pointer;
@@ -70,8 +70,8 @@ button:disabled {
     color: #606060;
     background: #202020;
     box-shadow:
-        inset 0 0 2px 1px hsl(225, 0%, 10%),
-        0 1px 0 hsl(225, 10%, 10%);
+        inset 0 0 2px 1px hsl(210, 0%, 10%),
+        0 1px 0 hsl(210, 10%, 10%);
     cursor: auto;
 }
 button.button-big {
@@ -81,7 +81,7 @@ button.button-big {
     padding: 1em;
 }
 button.--button-glow-ok {
-    background: hsl(225, 100%, 50%);
+    background: hsl(210, 100%, 50%);
 }
 button.--button-glow {
     transition: background-color 0.5s ease-out;
@@ -144,7 +144,7 @@ a:visited {
     text-decoration: underline dotted;
 }
 a:link {
-    color: hsl(225, 50%, 75%);
+    color: hsl(210, 50%, 75%);
 }
 a:visited {
     color: hsl(255, 50%, 75%);
@@ -201,11 +201,11 @@ svg.svg-icon {
     border-bottom-right-radius: 0.25em;
 }
 .radio-faux-button-set > label > input:checked + span {
-    background: hsl(225, 80%, 50%);
+    background: hsl(210, 80%, 50%);
     box-shadow:
-        inset 0 0 1px 1px hsl(225, 50%, 40%),
-        inset 0 -0.125em 0.5em 0.25em hsl(225, 50%, 30%),
-        0 1px 1px hsl(225, 10%, 10%);
+        inset 0 0 1px 1px hsl(210, 50%, 40%),
+        inset 0 -0.125em 0.5em 0.25em hsl(210, 50%, 30%),
+        0 1px 1px hsl(210, 10%, 10%);
 }
 
 .button-row {
@@ -242,17 +242,19 @@ svg.svg-icon {
 }
 .popup-menu {
     position: absolute;
-    border: 1px solid black;
+    min-width: 10vw;
+    border: 1px solid #444;
     color: black;
-    background: hsl(225, 10%, 90%);
+    background: hsl(210, 20%, 95%);
     box-shadow: 0 1px 3px 1px #0009;
 }
 .popup-menu > li {
-    padding: 0.25em 0.5em;
+    padding: 0.375em 0.625em;
     cursor: pointer;
 }
 .popup-menu > li:hover {
-    background: hsl(225, 40%, 75%);
+    color: hsl(210, 90%, 10%);
+    background: hsl(210, 90%, 75%);
 }
 .dialog {
     display: flex;
@@ -269,7 +271,7 @@ svg.svg-icon {
 .dialog > header {
     padding: 0.5em;
     line-height: 1;
-    background: hsl(225, 20%, 40%);
+    background: hsl(210, 20%, 40%);
     color: white;
 }
 .dialog > header h1 {
@@ -301,7 +303,7 @@ svg.svg-icon {
     padding: 0.5em 1em;
 }
 .dialog a:link {
-    color: hsl(225, 50%, 50%);
+    color: hsl(210, 50%, 50%);
 }
 .dialog a:visited {
     color: hsl(255, 50%, 50%);
@@ -316,7 +318,7 @@ dl.formgrid {
 dl.formgrid > dt {
     grid-column: 1;
     text-align: right;
-    color: hsl(225, 50%, 25%);
+    color: hsl(210, 50%, 25%);
 }
 dl.formgrid > dd {
     grid-column: 2;
@@ -358,7 +360,7 @@ table.level-browser thead {
     background: #f4f4f4;  /* match dialog background */
 }
 table.level-browser thead tr th {
-    border-bottom: 2px solid hsl(225, 20%, 60%);
+    border-bottom: 2px solid hsl(210, 20%, 60%);
 }
 table.level-browser tfoot {
     position: sticky;
@@ -366,7 +368,7 @@ table.level-browser tfoot {
     background: #f4f4f4;  /* match dialog background */
 }
 table.level-browser tfoot tr th {
-    border-top: 2px solid hsl(225, 20%, 60%);
+    border-top: 2px solid hsl(210, 20%, 60%);
     text-align: right;
 }
 table.level-browser th,
@@ -405,7 +407,7 @@ table.level-browser tbody tr:hover {
     background: var(--generic-bg-hover-on-white);
 }
 table.level-browser tbody tr:nth-child(10n) td {
-    border-bottom: 2px solid hsl(225, 20%, 80%);
+    border-bottom: 2px solid hsl(210, 20%, 80%);
 }
 
 /* Compat dialog */
@@ -810,13 +812,13 @@ pre.stack-trace {
     white-space: pre-wrap;
 }
 .played-pack-list > li > button:enabled {
-    background: hsl(225, 30%, 25%);
+    background: hsl(210, 30%, 25%);
     box-shadow:
-        inset 0 0 0 1px hsl(225, 30%, 33%),
-        0 1px 1px hsl(225, 10%, 10%);
+        inset 0 0 0 1px hsl(210, 30%, 33%),
+        0 1px 1px hsl(210, 10%, 10%);
 }
 .played-pack-list > li > button:enabled:hover {
-    background: hsl(225, 40%, 30%);
+    background: hsl(210, 40%, 30%);
 }
 .played-pack-list p {
     color: #c0c0c0;
@@ -842,7 +844,7 @@ pre.stack-trace {
     position: relative;
     z-index: 1;
     padding: 0.25em;
-    border: 1px solid hsl(225, 25%, 40%);
+    border: 1px solid hsl(210, 25%, 40%);
     text-shadow: 0 1px 1px black;
     text-align: center;
 }
@@ -857,11 +859,11 @@ pre.stack-trace {
 }
 .played-pack-list .-progress > .-levels::before {
     width: calc(var(--cleared) * 100%);
-    background: hsl(225, 25%, 30%);
+    background: hsl(210, 25%, 30%);
 }
 .played-pack-list .-progress > .-levels::after {
     width: calc(var(--aidless) * 100%);
-    background: hsl(225, 25%, 40%);
+    background: hsl(210, 25%, 40%);
 }
 .played-pack-list .-progress > .-score {
     grid-area: score;
@@ -1202,7 +1204,7 @@ ol.packtest-summary > li {
     row-gap: calc(var(--tile-height) * var(--scale) / 4);
 
     padding: calc(var(--tile-height) * var(--scale) / 4) calc(var(--tile-width) * var(--scale) / 4);
-    background: hsl(225, 10%, 20%);
+    background: hsl(210, 10%, 20%);
     box-shadow: 0 0.25em 1em black;
 }
 
@@ -1269,8 +1271,8 @@ body.--debug .overlay-message {
     box-shadow: inset 0 0 calc(4 * var(--tile-width)) var(--tile-width) black;
 }
 #player .overlay-message[data-reason=success] {
-    background: hsla(225, 50%, 25%, 0.5);
-    box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(225, 50%, 25%);
+    background: hsla(210, 50%, 25%, 0.5);
+    box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(210, 50%, 25%);
 }
 #player .overlay-message[data-reason=ended] {
     /* Shove the middle + bottom parts down so they don't overlay the busiest part of the ending image */
@@ -1278,7 +1280,7 @@ body.--debug .overlay-message {
     overflow: hidden;
     x-color: black;
     background: url(ending.png) no-repeat center center / cover;
-    box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(225, 50%, 25%);
+    box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(210, 50%, 25%);
     x-text-shadow: 0 0 2px white, 0 2px 2px white;
 }
 #player .overlay-message[data-reason=ended] .-middle {
@@ -1366,7 +1368,7 @@ dl.score-chart .-star {
     order: 2;
     font-size: 1.5em;
     line-height: 1;
-    color: hsl(225, 20%, 80%);
+    color: hsl(210, 20%, 80%);
 }
 .chips output,
 .time output,
@@ -1378,7 +1380,7 @@ dl.score-chart .-star {
     line-height: 1;
     text-align: right;
     font-family: monospace;
-    color: hsl(225, 20%, 60%);
+    color: hsl(210, 20%, 60%);
 }
 /* nb: the hex colors are all taken from the lexy palette */
 .chips output {
@@ -1405,7 +1407,7 @@ dl.score-chart .-star {
 }
 .chips output.--done,
 .time output.--frozen {
-    color: hsl(225, 10%, 30%);
+    color: hsl(210, 10%, 30%);
 }
 .bonus output {
     color: #e2c9ff;
@@ -1421,7 +1423,7 @@ dl.score-chart .-star {
     font-size: calc(var(--tile-height) * var(--scale) / 4);
     grid-area: rules;
     align-self: end;
-    color: hsl(225, 20%, 80%);
+    color: hsl(210, 20%, 80%);
 }
 .player-rules p {
     display: none;
@@ -1445,9 +1447,9 @@ dl.score-chart .-star {
     overflow: hidden;
     font-size: calc(var(--tile-height) * var(--scale) / 4);
     font-family: serif;
-    color: hsl(225, 20%, 80%);
-    background: url(#svg-icon-hint) hsl(225, 10%, 10%);
-    border: 3px double hsl(225, 10%, 20%);
+    color: hsl(210, 20%, 80%);
+    background: url(#svg-icon-hint) hsl(210, 10%, 10%);
+    border: 3px double hsl(210, 10%, 20%);
 }
 #player-game-area > .player-hint-wrapper > .player-hint-bg-icon {
     position: absolute;
@@ -1469,6 +1471,7 @@ dl.score-chart .-star {
     min-width: 100%;
     padding: 0.5em 0.625em;
     line-height: 1.5;
+    white-space: pre-wrap;
 }
 #player-game-area > .player-hint-wrapper.--visible {
     display: initial;
@@ -1732,7 +1735,7 @@ body.--debug #player-debug {
     padding: 0.33em 0.75em;
     border: 1px solid black;
     color: #d8d8d8;
-    background: hsl(225, 10%, 20%);
+    background: hsl(210, 10%, 20%);
     box-shadow: 0 1px 2px 1px #0004;
 
     opacity: 0.9;
@@ -1859,16 +1862,16 @@ svg.level-editor-overlay .overlay-transient.--visible {
     display: initial;
 }
 svg.level-editor-overlay rect.overlay-cursor {
-    x-stroke: hsla(225, 100%, 60%, 0.5);
-    fill: hsla(225, 100%, 75%, 0.25);
+    x-stroke: hsla(210, 100%, 60%, 0.5);
+    fill: hsla(210, 100%, 75%, 0.25);
 }
 svg.level-editor-overlay rect.overlay-pending-selection {
-    stroke: hsla(225, 100%, 60%, 0.5);
-    fill: hsla(225, 100%, 75%, 0.25);
+    stroke: hsla(210, 100%, 60%, 0.5);
+    fill: hsla(210, 100%, 75%, 0.25);
 }
 svg.level-editor-overlay rect.overlay-selection {
     stroke: #000c;
-    fill: hsla(225, 0%, 75%, 0.25);
+    fill: hsla(210, 0%, 75%, 0.25);
     stroke-dasharray: 0.125, 0.125;
     animation: marching-ants 1s linear infinite;
     pointer-events: auto;
@@ -1926,7 +1929,7 @@ svg.level-editor-overlay text.overlay-edit-tip {
     text-transform: none;
     text-align: left;
     color: #d8d8d8;
-    background: hsl(225, 10%, 20%);
+    background: hsl(210, 10%, 20%);
     box-shadow: 0 1px 2px 1px #0004;
 }
 .editor-big-tooltip h3 {
@@ -2024,7 +2027,7 @@ svg.level-editor-overlay text.overlay-edit-tip {
 .palette-entry {
 }
 .palette-entry:hover {
-    box-shadow: 0 0 0 1px black, 0 0 0 3px hsl(225, 100%, 75%);
+    box-shadow: 0 0 0 1px black, 0 0 0 3px hsl(210, 100%, 75%);
 }
 .palette-entry.--selected {
     z-index: 1;
@@ -2190,8 +2193,8 @@ ol.editor-letter-tile-picker input[type=radio] {
     display: none;
 }
 ol.editor-letter-tile-picker input[type=radio]:checked + .-glyph {
-    background: hsl(225, 75%, 90%);
-    outline: 2px solid hsl(225, 75%, 80%);
+    background: hsl(210, 75%, 90%);
+    outline: 2px solid hsl(210, 75%, 80%);
 }
 /* Hint tiles accept prose */
 textarea.editor-hint-tile-text {
@@ -2216,7 +2219,7 @@ textarea.editor-hint-tile-text {
     stroke-width: 2;
 }
 .editor-tile-editor-svg-parts input:checked + svg {
-    stroke: hsl(225, 90%, 50%);
+    stroke: hsl(210, 90%, 50%);
 }
 /* Directional blocks have arrows */
 ol.editor-directional-block-tile-arrows {
