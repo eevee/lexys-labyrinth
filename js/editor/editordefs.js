@@ -284,7 +284,47 @@ export const PALETTE = [{
     ],
 }];
 
-// TODO loading this from json might actually be faster
+// Palette entries that aren't names of real tiles, but pre-configured ones.  The faux tile names
+// listed here should generally be returned from the real tile's pick_palette_entry()
+export const SPECIAL_PALETTE_ENTRIES = {
+    'thin_walls/south':     { name: 'thin_walls', edges: DIRECTIONS['south'].bit },
+    'frame_block/0':        { name: 'frame_block', direction: 'south', arrows: new Set },
+    'frame_block/1':        { name: 'frame_block', direction: 'north', arrows: new Set(['north']) },
+    'frame_block/2a':       { name: 'frame_block', direction: 'north', arrows: new Set(['north', 'east']) },
+    'frame_block/2o':       { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'south']) },
+    'frame_block/3':        { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south']) },
+    'frame_block/4':        { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south', 'west']) },
+    // FIXME need to handle entered_direction intelligently, but also allow setting it explicitly
+    'railroad/straight':    { name: 'railroad', tracks: 1 << 5, track_switch: null, entered_direction: 'north' },
+    'railroad/curve':       { name: 'railroad', tracks: 1 << 0, track_switch: null, entered_direction: 'north' },
+    'railroad/switch':      { name: 'railroad', tracks: 0, track_switch: 0, entered_direction: 'north' },
+    'logic_gate/not':       { name: 'logic_gate', direction: 'north', gate_type: 'not' },
+    'logic_gate/diode':     { name: 'logic_gate', direction: 'north', gate_type: 'diode' },
+    'logic_gate/and':       { name: 'logic_gate', direction: 'north', gate_type: 'and' },
+    'logic_gate/or':        { name: 'logic_gate', direction: 'north', gate_type: 'or' },
+    'logic_gate/xor':       { name: 'logic_gate', direction: 'north', gate_type: 'xor' },
+    'logic_gate/nand':      { name: 'logic_gate', direction: 'north', gate_type: 'nand' },
+    'logic_gate/latch-cw':  { name: 'logic_gate', direction: 'north', gate_type: 'latch-cw' },
+    'logic_gate/latch-ccw': { name: 'logic_gate', direction: 'north', gate_type: 'latch-ccw' },
+    'logic_gate/counter':   { name: 'logic_gate', direction: 'north', gate_type: 'counter', memory: 0 },
+    'circuit_block/xxx':    { name: 'circuit_block', direction: 'south', wire_directions: 0xf },
+    'sokoban_block/red':    { name: 'sokoban_block', color: 'red' },
+    'sokoban_button/red':   { name: 'sokoban_button', color: 'red' },
+    'sokoban_wall/red':     { name: 'sokoban_wall', color: 'red' },
+    'sokoban_block/blue':   { name: 'sokoban_block', color: 'blue' },
+    'sokoban_button/blue':  { name: 'sokoban_button', color: 'blue' },
+    'sokoban_wall/blue':    { name: 'sokoban_wall', color: 'blue' },
+    'sokoban_block/yellow': { name: 'sokoban_block', color: 'yellow' },
+    'sokoban_button/yellow':{ name: 'sokoban_button', color: 'yellow' },
+    'sokoban_wall/yellow':  { name: 'sokoban_wall', color: 'yellow' },
+    'sokoban_block/green':  { name: 'sokoban_block', color: 'green' },
+    'sokoban_button/green': { name: 'sokoban_button', color: 'green' },
+    'sokoban_wall/green':   { name: 'sokoban_wall', color: 'green' },
+    'one_way_walls/south':  { name: 'one_way_walls', edges: DIRECTIONS['south'].bit },
+};
+
+// Editor-specific tile properties.  Every tile has a help entry, but some complex tiles have extra
+// editor behavior as well
 export const TILE_DESCRIPTIONS = {
     // Basics
     player: {
@@ -296,6 +336,7 @@ export const TILE_DESCRIPTIONS = {
         name: "Cerise",
         cc2_name: "Melinda",
         desc: "The player, a gel rabbat who enjoys Lexy.  Walks on ice.  Stopped by dirt and gravel.  Reuses yellow keys.",
+        min_version: 2,
     },
     hint: {
         name: "Hint",
@@ -925,52 +966,29 @@ export const TILE_DESCRIPTIONS = {
     },
 };
 
-export const SPECIAL_PALETTE_ENTRIES = {
-    'thin_walls/south':     { name: 'thin_walls', edges: DIRECTIONS['south'].bit },
-    'frame_block/0':  { name: 'frame_block', direction: 'south', arrows: new Set },
-    'frame_block/1':  { name: 'frame_block', direction: 'north', arrows: new Set(['north']) },
-    'frame_block/2a': { name: 'frame_block', direction: 'north', arrows: new Set(['north', 'east']) },
-    'frame_block/2o': { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'south']) },
-    'frame_block/3':  { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south']) },
-    'frame_block/4':  { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south', 'west']) },
-    // FIXME need to handle entered_direction intelligently, but also allow setting it explicitly
-    'railroad/straight':    { name: 'railroad', tracks: 1 << 5, track_switch: null, entered_direction: 'north' },
-    'railroad/curve':       { name: 'railroad', tracks: 1 << 0, track_switch: null, entered_direction: 'north' },
-    'railroad/switch':      { name: 'railroad', tracks: 0, track_switch: 0, entered_direction: 'north' },
-    'logic_gate/not':       { name: 'logic_gate', direction: 'north', gate_type: 'not' },
-    'logic_gate/diode':     { name: 'logic_gate', direction: 'north', gate_type: 'diode' },
-    'logic_gate/and':       { name: 'logic_gate', direction: 'north', gate_type: 'and' },
-    'logic_gate/or':        { name: 'logic_gate', direction: 'north', gate_type: 'or' },
-    'logic_gate/xor':       { name: 'logic_gate', direction: 'north', gate_type: 'xor' },
-    'logic_gate/nand':      { name: 'logic_gate', direction: 'north', gate_type: 'nand' },
-    'logic_gate/latch-cw':  { name: 'logic_gate', direction: 'north', gate_type: 'latch-cw' },
-    'logic_gate/latch-ccw': { name: 'logic_gate', direction: 'north', gate_type: 'latch-ccw' },
-    'logic_gate/counter':   { name: 'logic_gate', direction: 'north', gate_type: 'counter', memory: 0 },
-    'circuit_block/xxx':    { name: 'circuit_block', direction: 'south', wire_directions: 0xf },
-    'sokoban_block/red':    { name: 'sokoban_block', color: 'red' },
-    'sokoban_button/red':   { name: 'sokoban_button', color: 'red' },
-    'sokoban_wall/red':     { name: 'sokoban_wall', color: 'red' },
-    'sokoban_block/blue':   { name: 'sokoban_block', color: 'blue' },
-    'sokoban_button/blue':  { name: 'sokoban_button', color: 'blue' },
-    'sokoban_wall/blue':    { name: 'sokoban_wall', color: 'blue' },
-    'sokoban_block/yellow': { name: 'sokoban_block', color: 'yellow' },
-    'sokoban_button/yellow':{ name: 'sokoban_button', color: 'yellow' },
-    'sokoban_wall/yellow':  { name: 'sokoban_wall', color: 'yellow' },
-    'sokoban_block/green':  { name: 'sokoban_block', color: 'green' },
-    'sokoban_button/green': { name: 'sokoban_button', color: 'green' },
-    'sokoban_wall/green':   { name: 'sokoban_wall', color: 'green' },
-    'one_way_walls/south':  { name: 'one_way_walls', edges: DIRECTIONS['south'].bit },
-};
-const _RAILROAD_ROTATED_LEFT = [3, 0, 1, 2, 5, 4];
-const _RAILROAD_ROTATED_RIGHT = [1, 2, 3, 0, 5, 4];
-// TODO merge this with the editor descriptions into one big dict of tile stuff only relevant to the editor
-export const SPECIAL_PALETTE_BEHAVIOR = {
+
+export function transform_direction_bitmask(bits, dirprop) {
+    let new_bits = 0;
+    for (let dirinfo of Object.values(DIRECTIONS)) {
+        if (bits & dirinfo.bit) {
+            new_bits |= DIRECTIONS[dirinfo[dirprop]].bit;
+        }
+    }
+    return new_bits;
+}
+
+// Editor-specific tile properties.
+// - pick_palette_entry: given a tile, return the palette key to select when it's eyedropped
+// - adjust_forward, adjust_backward: alterations that can be made with the adjust tool or ,/. keys,
+//   but that aren't real rotations (and thus aren't used for rotate/flip/etc)
+// - rotate_left, rotate_right, flip, mirror: transform a tile
+// - combine_draw, combine_erase: special handling for composite tiles, when drawing or erasing
+//   using a 'pristine' tile chosen from the palette
+// All the tile modification functions edit in-place with no undo support; that's up to the caller.
+export const SPECIAL_TILE_BEHAVIOR = {
     floor_letter: {
-        pick_palette_entry() {
-            return 'floor_letter';
-        },
         _arrows: ["⬆", "➡", "⬇", "⬅"],
-        rotate_left(tile) {
+        adjust_backward(tile) {
             // Rotate through arrows and ASCII separately
             let arrow_index = this._arrows.indexOf(tile.overlaid_glyph);
             if (arrow_index >= 0) {
@@ -985,7 +1003,7 @@ export const SPECIAL_PALETTE_BEHAVIOR = {
             }
             tile.overlaid_glyph = String.fromCharCode(cp);
         },
-        rotate_right(tile) {
+        adjust_forward(tile) {
             let arrow_index = this._arrows.indexOf(tile.overlaid_glyph);
             if (arrow_index >= 0) {
                 tile.overlaid_glyph = this._arrows[(arrow_index + 1) % 4];
@@ -999,22 +1017,23 @@ export const SPECIAL_PALETTE_BEHAVIOR = {
             }
             tile.overlaid_glyph = String.fromCharCode(cp);
         },
+        // TODO rotate arrows at least
     },
     thin_walls: {
         pick_palette_entry() {
             return 'thin_walls/south';
         },
         rotate_left(tile) {
-            if (tile.edges & 0x01) {
-                tile.edges |= 0x10;
-            }
-            tile.edges >>= 1;
+            tile.edges = transform_direction_bitmask(tile.edges, 'left');
         },
         rotate_right(tile) {
-            tile.edges <<= 1;
-            if (tile.edges & 0x10) {
-                tile.edges = (tile.edges & ~0x10) | 0x01;
-            }
+            tile.edges = transform_direction_bitmask(tile.edges, 'right');
+        },
+        mirror(tile) {
+            tile.edges = transform_direction_bitmask(tile.edges, 'mirrored');
+        },
+        flip(tile) {
+            tile.edges = transform_direction_bitmask(tile.edges, 'flipped');
         },
         combine_draw(palette_tile, existing_tile) {
             existing_tile.edges |= palette_tile.edges;
@@ -1040,20 +1059,28 @@ export const SPECIAL_PALETTE_BEHAVIOR = {
                 return `frame_block/${tile.arrows.size}`;
             }
         },
+        _transform(tile, dirprop) {
+            tile.direction = DIRECTIONS[tile.direction][dirprop];
+            tile.arrows = new Set(Array.from(tile.arrows, arrow => DIRECTIONS[arrow][dirprop]));
+        },
         rotate_left(tile) {
-            tile.direction = DIRECTIONS[tile.direction].left;
-            tile.arrows = new Set(Array.from(tile.arrows, arrow => DIRECTIONS[arrow].left));
+            this._transform(tile, 'left');
         },
         rotate_right(tile) {
-            tile.direction = DIRECTIONS[tile.direction].right;
-            tile.arrows = new Set(Array.from(tile.arrows, arrow => DIRECTIONS[arrow].right));
+            this._transform(tile, 'right');
+        },
+        mirror(tile) {
+            this._transform(tile, 'mirrored');
+        },
+        flip(tile) {
+            this._transform(tile, 'flipped');
         },
     },
     logic_gate: {
         pick_palette_entry(tile) {
             return `logic_gate/${tile.gate_type}`;
         },
-        rotate_left(tile) {
+        adjust_backward(tile) {
             if (tile.gate_type === 'counter') {
                 tile.memory = (tile.memory + 9) % 10;
             }
@@ -1061,13 +1088,50 @@ export const SPECIAL_PALETTE_BEHAVIOR = {
                 tile.direction = DIRECTIONS[tile.direction].left;
             }
         },
-        rotate_right(tile) {
+        adjust_forward(tile) {
             if (tile.gate_type === 'counter') {
                 tile.memory = (tile.memory + 1) % 10;
             }
             else {
                 tile.direction = DIRECTIONS[tile.direction].right;
             }
+        },
+        // Note that the counter gate can neither rotate nor flip
+        rotate_left(tile) {
+            if (tile.gate_type !== 'counter') {
+                tile.direction = DIRECTIONS[tile.direction].left;
+            }
+        },
+        rotate_right(tile) {
+            if (tile.gate_type !== 'counter') {
+                tile.direction = DIRECTIONS[tile.direction].right;
+            }
+        },
+        mirror(tile) {
+            if (tile.gate_type === 'counter')
+                return;
+
+            if (tile.gate_type === 'latch_cw') {
+                tile.gate_type = 'latch_ccw';
+            }
+            else if (tile.gate_type === 'latch_ccw') {
+                tile.gate_type = 'latch_cw';
+            }
+
+            tile.direction = DIRECTIONS[tile.direction].mirrored;
+        },
+        flip(tile) {
+            if (tile.gate_type === 'counter')
+                return;
+
+            if (tile.gate_type === 'latch_cw') {
+                tile.gate_type = 'latch_ccw';
+            }
+            else if (tile.gate_type === 'latch_ccw') {
+                tile.gate_type = 'latch_cw';
+            }
+
+            tile.direction = DIRECTIONS[tile.direction].flipped;
         },
     },
     railroad: {
@@ -1082,38 +1146,50 @@ export const SPECIAL_PALETTE_BEHAVIOR = {
             }
             return 'railroad/switch';
         },
-        rotate_left(tile) {
+        // track order: 0 NE, 1 SE, 2 SW, 3 NW, 4 EW, 5 NS
+        _tracks_left: [3, 0, 1, 2, 5, 4],
+        _tracks_right: [1, 2, 3, 0, 5, 4],
+        _tracks_mirror: [3, 2, 1, 0, 4, 5],
+        _tracks_flip: [1, 0, 3, 2, 4, 5],
+        _transform_tracks(tile, track_mapping) {
             let new_tracks = 0;
             for (let i = 0; i < 6; i++) {
                 if (tile.tracks & (1 << i)) {
-                    new_tracks |= 1 << _RAILROAD_ROTATED_LEFT[i];
+                    new_tracks |= 1 << track_mapping[i];
                 }
             }
             tile.tracks = new_tracks;
 
             if (tile.track_switch !== null) {
-                tile.track_switch = _RAILROAD_ROTATED_LEFT[tile.track_switch];
+                tile.track_switch = track_mapping[tile.track_switch];
             }
+        },
+        rotate_left(tile) {
+            this._transform_tracks(tile, this._tracks_left);
 
             if (tile.entered_direction) {
                 tile.entered_direction = DIRECTIONS[tile.entered_direction].left;
             }
         },
         rotate_right(tile) {
-            let new_tracks = 0;
-            for (let i = 0; i < 6; i++) {
-                if (tile.tracks & (1 << i)) {
-                    new_tracks |= 1 << _RAILROAD_ROTATED_RIGHT[i];
-                }
-            }
-            tile.tracks = new_tracks;
-
-            if (tile.track_switch !== null) {
-                tile.track_switch = _RAILROAD_ROTATED_RIGHT[tile.track_switch];
-            }
+            this._transform_tracks(tile, this._tracks_right);
 
             if (tile.entered_direction) {
                 tile.entered_direction = DIRECTIONS[tile.entered_direction].right;
+            }
+        },
+        mirror(tile) {
+            this._transform_tracks(tile, this._tracks_mirror);
+
+            if (tile.entered_direction) {
+                tile.entered_direction = DIRECTIONS[tile.entered_direction].mirrored;
+            }
+        },
+        flip(tile) {
+            this._transform_tracks(tile, this._tracks_flip);
+
+            if (tile.entered_direction) {
+                tile.entered_direction = DIRECTIONS[tile.entered_direction].flipped;
             }
         },
         combine_draw(palette_tile, existing_tile) {
@@ -1198,32 +1274,76 @@ export const SPECIAL_PALETTE_BEHAVIOR = {
         },
     },
 };
-SPECIAL_PALETTE_BEHAVIOR['one_way_walls'] = {
-    ...SPECIAL_PALETTE_BEHAVIOR['thin_walls'],
-    ...SPECIAL_PALETTE_BEHAVIOR['one_way_walls'],
+SPECIAL_TILE_BEHAVIOR['one_way_walls'] = {
+    ...SPECIAL_TILE_BEHAVIOR['thin_walls'],
+    ...SPECIAL_TILE_BEHAVIOR['one_way_walls'],
 };
 // Fill in some special behavior that boils down to rotating tiles which happen to be encoded as
 // different tile types
-for (let cycle of [
-    ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
-    ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
-    ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
-    ['terraformer_n', 'terraformer_e', 'terraformer_s', 'terraformer_w'],
-    ['turntable_cw', 'turntable_ccw'],
-]) {
-    for (let [i, name] of cycle.entries()) {
-        let left = cycle[(i - 1 + cycle.length) % cycle.length];
-        let right = cycle[(i + 1) % cycle.length];
-        SPECIAL_PALETTE_BEHAVIOR[name] = {
-            pick_palette_entry() {
-                return name;
-            },
-            rotate_left(tile) {
+function add_special_tile_cycle(rotation_order, mirror_mapping, flip_mapping) {
+    let names = new Set(rotation_order);
+
+    // Make the flip and mirror mappings symmetrical
+    for (let map of [mirror_mapping, flip_mapping]) {
+        for (let [key, value] of Object.entries(map)) {
+            names.add(key);
+            names.add(value);
+            if (! (value in map)) {
+                map[value] = key;
+            }
+        }
+    }
+
+    for (let name of names) {
+        let behavior = {};
+
+        let i = rotation_order.indexOf(name);
+        if (i >= 0) {
+            let left = rotation_order[(i - 1 + rotation_order.length) % rotation_order.length];
+            let right = rotation_order[(i + 1) % rotation_order.length];
+            behavior.rotate_left = function rotate_left(tile) {
                 tile.type = TILE_TYPES[left];
-            },
-            rotate_right(tile) {
+            };
+            behavior.rotate_right = function rotate_right(tile) {
                 tile.type = TILE_TYPES[right];
-            },
-        };
+            };
+        }
+
+        if (name in mirror_mapping) {
+            let mirror = mirror_mapping[name];
+            behavior.mirror = function mirror(tile) {
+                tile.type = TILE_TYPES[mirror];
+            };
+        }
+
+        if (name in flip_mapping) {
+            let flip = flip_mapping[name];
+            behavior.flip = function flip(tile) {
+                tile.type = TILE_TYPES[flip];
+            };
+        }
+
+        SPECIAL_TILE_BEHAVIOR[name] = behavior;
     }
 }
+
+add_special_tile_cycle(
+    ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
+    {force_floor_e: 'force_floor_w'},
+    {force_floor_n: 'force_floor_s'},
+);
+add_special_tile_cycle(
+    ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
+    {ice_nw: 'ice_ne', ice_sw: 'ice_se'},
+    {ice_nw: 'ice_sw', ice_ne: 'ice_se'},
+);
+add_special_tile_cycle(
+    ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
+    {swivel_nw: 'swivel_ne', swivel_sw: 'swivel_se'},
+    {swivel_nw: 'swivel_sw', swivel_ne: 'swivel_se'},
+);
+add_special_tile_cycle(
+    [],  // turntables don't rotate, but they do flip/mirror
+    {turntable_cw: 'turntable_ccw'},
+    {turntable_cw: 'turntable_ccw'},
+);

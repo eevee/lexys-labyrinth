@@ -1031,6 +1031,7 @@ const ADJUST_TOGGLES_CCW = {};
         ['flame_jet_off', 'flame_jet_on'],
         ['light_switch_off', 'light_switch_on'],
         ['stopwatch_bonus', 'stopwatch_penalty'],
+        ['turntable_cw', 'turntable_ccw'],
     ])
     {
         for (let [i, tile] of cycle.entries()) {

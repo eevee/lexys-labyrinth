@@ -11,7 +11,7 @@ import { mk, mk_svg, string_from_buffer_ascii, bytestring_to_buffer } from '../u
 import * as util from '../util.js';
 
 import * as dialogs from './dialogs.js';
-import { TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, PALETTE, SPECIAL_PALETTE_ENTRIES, SPECIAL_PALETTE_BEHAVIOR, TILE_DESCRIPTIONS } from './editordefs.js';
+import { TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, PALETTE, SPECIAL_PALETTE_ENTRIES, SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask } from './editordefs.js';
 import { SVGConnection, Selection } from './helpers.js';
 import * as mouseops from './mouseops.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
@@ -448,6 +448,33 @@ export class Editor extends PrimaryView {
         this.redo_button = _make_button("Redo", () => {
             this.redo();
         });
+        let edit_items = [
+            ["Rotate CCW", () => {
+                this.rotate_level_left();
+            }],
+            ["Rotate CW", () => {
+                this.rotate_level_right();
+            }],
+            ["Mirror", () => {
+                this.mirror_level();
+            }],
+            ["Flip", () => {
+                this.flip_level();
+            }],
+        ];
+        this.edit_menu = new MenuOverlay(
+            this.conductor,
+            edit_items,
+            item => item[0],
+            item => item[1](),
+        );
+        let edit_menu_button = _make_button("Edit ", ev => {
+            this.edit_menu.open(ev.currentTarget);
+        });
+        edit_menu_button.append(
+            mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
+                mk_svg('use', {href: `#svg-icon-menu-chevron`})),
+        );
         _make_button("Pack properties...", () => {
             new dialogs.EditorPackMetaOverlay(this.conductor, this.conductor.stored_game).open();
         });
@@ -1064,6 +1091,12 @@ export class Editor extends PrimaryView {
         this.svg_overlay.setAttribute('viewBox', `0 0 ${this.stored_level.size_x} ${this.stored_level.size_y}`);
     }
 
+    update_after_size_change() {
+        this.update_viewport_size();
+        this.update_cell_coordinates();
+        this.redraw_entire_level();
+    }
+
     // ------------------------------------------------------------------------------------------------
 
     set_canvas_zoom(zoom, origin_x = null, origin_y = null) {
@@ -1210,8 +1243,9 @@ export class Editor extends PrimaryView {
 
         // Select it in the palette, if possible
         let key = name;
-        if (SPECIAL_PALETTE_BEHAVIOR[name]) {
-            key = SPECIAL_PALETTE_BEHAVIOR[name].pick_palette_entry(tile);
+        let behavior = SPECIAL_TILE_BEHAVIOR[name];
+        if (behavior && behavior.pick_palette_entry) {
+            key = SPECIAL_TILE_BEHAVIOR[name].pick_palette_entry(tile);
         }
         this.palette_fg_selected_el = this.palette[key] ?? null;
         if (this.palette_fg_selected_el) {
@@ -1235,32 +1269,51 @@ export class Editor extends PrimaryView {
         this.redraw_background_tile();
     }
 
-    rotate_tile_left(tile) {
-        if (SPECIAL_PALETTE_BEHAVIOR[tile.type.name]) {
-            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].rotate_left(tile);
+    // Transform an individual tile in various ways.  No undo handling (as the tile may or may not
+    // even be part of the level).
+    _transform_tile(tile, adjust_method, transform_method, direction_property) {
+        let did_anything = true;
+
+        let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
+        if (adjust_method && behavior && behavior[adjust_method]) {
+            behavior[adjust_method](tile);
+        }
+        else if (behavior && behavior[transform_method]) {
+            behavior[transform_method](tile);
         }
         else if (TILE_TYPES[tile.type.name].is_actor) {
-            tile.direction = DIRECTIONS[tile.direction ?? 'south'].left;
+            tile.direction = DIRECTIONS[tile.direction ?? 'south'][direction_property];
         }
         else {
-            return false;
+            did_anything = false;
         }
 
-        return true;
+        if (tile.wire_directions) {
+            tile.wire_directions = transform_direction_bitmask(
+                tile.wire_directions, direction_property);
+            did_anything = true;
+        }
+        if (tile.wire_tunnel_directions) {
+            tile.wire_tunnel_directions = transform_direction_bitmask(
+                tile.wire_tunnel_directions, direction_property);
+            did_anything = true;
+        }
+
+        return did_anything;
     }
-
-    rotate_tile_right(tile) {
-        if (SPECIAL_PALETTE_BEHAVIOR[tile.type.name]) {
-            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].rotate_right(tile);
-        }
-        else if (TILE_TYPES[tile.type.name].is_actor) {
-            tile.direction = DIRECTIONS[tile.direction ?? 'south'].right;
-        }
-        else {
-            return false;
-        }
-
-        return true;
+    rotate_tile_left(tile, include_faux_adjustments = true) {
+        return this._transform_tile(
+            tile, include_faux_adjustments ? 'adjust_backward' : null, 'rotate_left', 'left');
+    }
+    rotate_tile_right(tile, include_faux_adjustments = true) {
+        return this._transform_tile(
+            tile, include_faux_adjustments ? 'adjust_forward' : null, 'rotate_right', 'right');
+    }
+    mirror_tile(tile) {
+        return this._transform_tile(tile, null, 'mirror', 'mirrored');
+    }
+    flip_tile(tile) {
+        return this._transform_tile(tile, null, 'flip', 'flipped');
     }
 
     rotate_palette_left() {
@@ -1371,12 +1424,12 @@ export class Editor extends PrimaryView {
         if (existing_tile && existing_tile.type === tile.type &&
             // FIXME this is hacky garbage
             tile === this.fg_tile && this.fg_tile_from_palette &&
-            SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
-            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw)
+            SPECIAL_TILE_BEHAVIOR[tile.type.name] &&
+            SPECIAL_TILE_BEHAVIOR[tile.type.name].combine_draw)
         {
             let old_tile = {...existing_tile};
             let new_tile = existing_tile;
-            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_draw(tile, new_tile);
+            SPECIAL_TILE_BEHAVIOR[tile.type.name].combine_draw(tile, new_tile);
             this._assign_tile(cell, layer, new_tile, old_tile);
             return;
         }
@@ -1418,12 +1471,12 @@ export class Editor extends PrimaryView {
         if (existing_tile && existing_tile.type === tile.type &&
             // FIXME this is hacky garbage
             tile === this.fg_tile && this.fg_tile_from_palette &&
-            SPECIAL_PALETTE_BEHAVIOR[tile.type.name] &&
-            SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase)
+            SPECIAL_TILE_BEHAVIOR[tile.type.name] &&
+            SPECIAL_TILE_BEHAVIOR[tile.type.name].combine_erase)
         {
             let old_tile = {...existing_tile};
             let new_tile = existing_tile;
-            let remove = SPECIAL_PALETTE_BEHAVIOR[tile.type.name].combine_erase(tile, new_tile);
+            let remove = SPECIAL_TILE_BEHAVIOR[tile.type.name].combine_erase(tile, new_tile);
             if (! remove) {
                 this._assign_tile(cell, tile.type.layer, new_tile, old_tile);
                 return;
@@ -1474,18 +1527,158 @@ export class Editor extends PrimaryView {
             this.stored_level.linear_cells = new_cells;
             this.stored_level.size_x = size_x;
             this.stored_level.size_y = size_y;
-            this.update_viewport_size();
-            this.update_cell_coordinates();
-            this.redraw_entire_level();
+            this.update_after_size_change();
         }, () => {
             this.stored_level.linear_cells = original_cells;
             this.stored_level.size_x = original_size_x;
             this.stored_level.size_y = original_size_y;
-            this.update_viewport_size();
-            this.update_cell_coordinates();
-            this.redraw_entire_level();
+            this.update_after_size_change();
         });
         this.commit_undo();
+    }
+
+    // Rearranges cells in the current selection or whole level, based on a few callbacks.
+    // DOES NOT commit.
+    // (These don't save undo entries for individual tiles, either, because they're expected to be
+    // completely reversible, and undo is done by performing the opposite transform rather than
+    // reloading a copy of a previous state.)
+    _rearrange_cells(swap_dimensions, downgrade_coords, upgrade_tile) {
+        let old_cells, old_w;
+        let w, h;
+        let new_cells = [];
+        if (this.selection.is_empty) {
+            // Do it to the whole level
+            w = this.stored_level.size_x;
+            h = this.stored_level.size_y;
+            old_w = w;
+            if (swap_dimensions) {
+                [w, h] = [h, w];
+                this.stored_level.size_x = w;
+                this.stored_level.size_y = h;
+            }
+            old_cells = this.stored_level.linear_cells;
+            this.stored_level.linear_cells = new_cells;
+        }
+        else {
+            // Do it to the selection
+            w = this.selection.rect.width;
+            h = this.selection.rect.height;
+            old_w = w;
+            if (swap_dimensions) {
+                [w, h] = [h, w];
+                this.selection._set_from_rect(new DOMRect(
+                    this.selection.rect.x, this.selection.rect.y, w, h));
+            }
+            old_cells = this.selection.floated_cells;
+            this.selection.floated_cells = new_cells;
+        }
+
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                let [old_x, old_y] = downgrade_coords(x, y, w, h);
+                let cell = old_cells[old_y * old_w + old_x];
+                for (let tile of cell) {
+                    if (tile) {
+                        upgrade_tile(tile);
+                    }
+                }
+                new_cells.push(cell);
+            }
+        }
+    }
+
+    rotate_level_right() {
+        this._do_transform(
+            true,
+            () => this._rotate_level_right(),
+            () => this._rotate_level_left(),
+        );
+    }
+    rotate_level_left() {
+        this._do_transform(
+            true,
+            () => this._rotate_level_left(),
+            () => this._rotate_level_right(),
+        );
+    }
+    rotate_level_180() {
+    }
+    mirror_level() {
+        this._do_transform(
+            false,
+            () => this._mirror_level(),
+            () => this._mirror_level(),
+        );
+    }
+    flip_level() {
+        this._do_transform(
+            false,
+            () => this._flip_level(),
+            () => this._flip_level(),
+        );
+    }
+    _do_transform(affects_size, redo, undo) {
+        // FIXME apply transform to connections if appropriate, somehow, ??  i don't even know how
+        // those interact with floating selection yet  :S
+        if (! this.selection.is_empty && ! this.selection.is_floating) {
+            this.selection.enfloat();
+        }
+        this._do(
+            () => {
+                redo();
+                this._post_transform_cleanup(affects_size);
+            },
+            () => {
+                undo();
+                this._post_transform_cleanup(affects_size);
+            },
+        );
+        this.commit_undo();
+    }
+    _post_transform_cleanup(affects_size) {
+        if (this.selection.is_empty) {
+            if (affects_size) {
+                this.update_after_size_change();
+            }
+            else {
+                this.redraw_entire_level();
+            }
+        }
+        else {
+            // FIXME what if it affects size?
+            this.selection.redraw();
+        }
+    }
+    // TODO mirror diagonally?
+
+    // Internal-use versions of the above.  These DO NOT create undo entries.
+    _rotate_level_left() {
+        this._rearrange_cells(
+            true,
+            (x, y, w, h) => [h - 1 - y, x],
+            tile => this.rotate_tile_left(tile, false),
+        );
+    }
+    _rotate_level_right() {
+        this._rearrange_cells(
+            true,
+            (x, y, w, h) => [y, w - 1 - x],
+            tile => this.rotate_tile_right(tile, false),
+        );
+    }
+    _mirror_level() {
+        this._rearrange_cells(
+            false,
+            (x, y, w, h) => [w - 1 - x, y],
+            tile => this.mirror_tile(tile),
+        );
+    }
+    _flip_level() {
+        this._rearrange_cells(
+            false,
+            (x, y, w, h) => [x, h - 1 - y],
+            tile => this.flip_tile(tile),
+        );
     }
 
     // Create a connection between two cells and update the UI accordingly.  If dest is null or

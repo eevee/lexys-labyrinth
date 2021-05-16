@@ -334,12 +334,27 @@ export class CanvasRenderer {
     // Used by the editor and map previews.  Draws a region of the level (probably a StoredLevel),
     // assuming nothing is moving.
     draw_static_region(x0, y0, x1, y1, destx = x0, desty = y0) {
-        this._adjust_viewport_if_dirty();
+        this.draw_static_generic({x0, y0, x1, y1, destx, desty});
+    }
 
-        let packet = new CanvasRendererDrawPacket(this, this.ctx, this.perception);
+    // Most generic possible form of drawing a static region; mainly useful if you want to use a
+    // different canvas or draw a custom block of cells
+    // TODO does this actually need any state at all?  could it just be, dare i ask, a function?
+    draw_static_generic({
+        x0, y0, x1, y1, destx = x0, desty = y0, cells = null, width = null,
+        ctx = this.ctx, perception = this.perception, show_facing = this.show_facing,
+    }) {
+        if (ctx === this.ctx) {
+            this._adjust_viewport_if_dirty();
+        }
+
+        width = width ?? this.level.size_x;
+        cells = cells ?? this.level.linear_cells;
+
+        let packet = new CanvasRendererDrawPacket(this, ctx, perception);
         for (let x = x0; x <= x1; x++) {
             for (let y = y0; y <= y1; y++) {
-                let cell = this.level.cell(x, y);
+                let cell = cells[y * width + x];
                 if (! cell)
                     continue;
 
@@ -350,11 +365,11 @@ export class CanvasRenderer {
 
                     // For actors (i.e., blocks), perception only applies if there's something
                     // of potential interest underneath
-                    if (this.perception !== 'normal' && tile.type.is_block && ! seen_anything_interesting) {
+                    if (perception !== 'normal' && tile.type.is_block && ! seen_anything_interesting) {
                         packet.perception = 'normal';
                     }
                     else {
-                        packet.perception = this.perception;
+                        packet.perception = perception;
                     }
 
                     if (tile.type.layer < LAYERS.actor && ! (

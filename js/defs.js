@@ -10,6 +10,8 @@ export const DIRECTIONS = {
         left: 'west',
         right: 'east',
         opposite: 'south',
+        mirrored: 'north',
+        flipped: 'south',
     },
     south: {
         movement: [0, 1],
@@ -20,6 +22,8 @@ export const DIRECTIONS = {
         left: 'east',
         right: 'west',
         opposite: 'north',
+        mirrored: 'south',
+        flipped: 'north',
     },
     west: {
         movement: [-1, 0],
@@ -30,6 +34,8 @@ export const DIRECTIONS = {
         left: 'south',
         right: 'north',
         opposite: 'east',
+        mirrored: 'east',
+        flipped: 'west',
     },
     east: {
         movement: [1, 0],
@@ -40,6 +46,8 @@ export const DIRECTIONS = {
         left: 'north',
         right: 'south',
         opposite: 'west',
+        mirrored: 'west',
+        flipped: 'east',
     },
 };
 // Should match the bit ordering above, and CC2's order

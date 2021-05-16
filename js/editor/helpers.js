@@ -72,6 +72,7 @@ export class Selection {
 
         this.floated_cells = null;
         this.floated_element = null;
+        this.floated_canvas = null;
     }
 
     get is_empty() {
@@ -117,6 +118,15 @@ export class Selection {
         this.element.setAttribute('y', this.rect.y);
         this.element.setAttribute('width', this.rect.width);
         this.element.setAttribute('height', this.rect.height);
+
+        if (this.floated_element) {
+            let tileset = this.editor.renderer.tileset;
+            this.floated_canvas.width = rect.width * tileset.size_x;
+            this.floated_canvas.height = rect.height * tileset.size_y;
+            let foreign_obj = this.floated_element.querySelector('foreignObject');
+            foreign_obj.setAttribute('width', this.floated_canvas.width);
+            foreign_obj.setAttribute('height', this.floated_canvas.height);
+        }
     }
 
     move_by(dx, dy) {
@@ -157,8 +167,8 @@ export class Selection {
             return;
 
         let stored_level = this.editor.stored_level;
-        for (let x = this.rect.left; x < this.rect.right; x++) {
-            for (let y = this.rect.top; y < this.rect.bottom; y++) {
+        for (let y = this.rect.top; y < this.rect.bottom; y++) {
+            for (let x = this.rect.left; x < this.rect.right; x++) {
                 let n = stored_level.coords_to_scalar(x, y);
                 yield [x, y, n];
             }
@@ -202,6 +212,7 @@ export class Selection {
         // it forever
         this.editor._do(
             () => {
+                this.floated_canvas = canvas;
                 this.floated_element = floated_element;
                 this.floated_cells = floated_cells;
                 this.svg_group.append(floated_element);
@@ -235,11 +246,13 @@ export class Selection {
         this.stamp_float();
 
         let element = this.floated_element;
+        let canvas = this.floated_canvas;
         let cells = this.floated_cells;
         this.editor._do(
             () => this._defloat(),
             () => {
                 this.floated_cells = cells;
+                this.floated_canvas = canvas;
                 this.floated_element = element;
                 this.svg_group.append(element);
             },
@@ -250,7 +263,25 @@ export class Selection {
     _defloat() {
         this.floated_element.remove();
         this.floated_element = null;
+        this.floated_canvas = null;
         this.floated_cells = null;
+    }
+
+    // Redraw the selection canvas from scratch
+    redraw() {
+        if (! this.floated_canvas)
+            return;
+
+        // FIXME uhoh, how do i actually do this?  we have no renderer of our own, we have a
+        // separate canvas, and all the renderer stuff expects to get ahold of a level.  i guess
+        // refactor it to draw a block of cells?
+        this.editor.renderer.draw_static_generic({
+            x0: 0, y0: 0,
+            x1: this.rect.width, y1: this.rect.height,
+            cells: this.floated_cells,
+            width: this.rect.width,
+            ctx: this.floated_canvas.getContext('2d'),
+        });
     }
 
     // TODO allow floating/dragging, ctrl-dragging to copy, anchoring...
