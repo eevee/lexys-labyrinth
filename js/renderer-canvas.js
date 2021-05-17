@@ -255,6 +255,13 @@ export class CanvasRenderer {
                 }
 
                 this.tileset.draw(actor, packet);
+
+                // If they killed the player, indicate as such.  The indicator has an arrow at the
+                // bottom; align that about 3/4 up the killer
+                if (actor.is_killer && '#killer-indicator' in this.tileset.layout) {
+                    packet.y -= Math.floor(th * 3/4) / th;
+                    this.tileset.draw_type('#killer-indicator', null, packet);
+                }
             }
         }
         packet.perception = this.perception;
@@ -376,6 +383,17 @@ export class CanvasRenderer {
                         tile.type.name === 'floor' && (tile.wire_directions | tile.wire_tunnel_directions) === 0))
                     {
                         seen_anything_interesting = true;
+                    }
+
+                    // Don't draw facing arrows atop blocks, unless they're on a cloner or trap
+                    // where it matters (it's distracting in large clumps and makes it hard to see
+                    // frame arrows)
+                    packet.show_facing = show_facing;
+                    if (show_facing && tile.type.is_block) {
+                        let terrain_name = cell[LAYERS.terrain].type.name;
+                        if (! (terrain_name === 'cloner' || terrain_name === 'trap')) {
+                            packet.show_facing = false;
+                        }
                     }
 
                     packet.x = destx + x - x0;
