@@ -19,6 +19,7 @@ body {
 
     --panel-bg-color: hsl(220, 10%, 15%);
     --button-bg-color: hsl(220, 10%, 25%);
+    --button-bg-shadow-color: #fff1;
     --button-bg-hover-color: hsl(220, 15%, 30%);
     --generic-bg-hover-on-white: hsl(220, 60%, 90%);
     --generic-bg-selected-on-white: hsl(220, 60%, 85%);
@@ -47,7 +48,8 @@ button,
     padding: 0.25em 0.5em;
     font-family: inherit;
     color: white;
-    background: var(--button-bg-color);
+    background-color: var(--button-bg-color);
+    background-image: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
     border: 1px solid hsl(220, 10%, 10%);
     box-shadow:
         inset 0 0 0 1px hsl(220, 10%, 33%),
@@ -58,7 +60,7 @@ button,
 }
 button:hover,
 .radio-faux-button-set > label:hover > input + span {
-    background: var(--button-bg-hover-color);
+    background-color: var(--button-bg-hover-color);
 }
 button:active,
 .radio-faux-button-set > label:active > input + span {
@@ -68,7 +70,7 @@ button:active,
 }
 button:disabled {
     color: #606060;
-    background: #202020;
+    background-color: #202020;
     box-shadow:
         inset 0 0 2px 1px hsl(220, 0%, 10%),
         0 1px 0 hsl(220, 10%, 10%);
@@ -812,13 +814,13 @@ pre.stack-trace {
     white-space: pre-wrap;
 }
 .played-pack-list > li > button:enabled {
-    background: hsl(220, 30%, 25%);
+    background-color: hsl(220, 30%, 25%);
     box-shadow:
         inset 0 0 0 1px hsl(220, 30%, 33%),
         0 1px 1px hsl(220, 10%, 10%);
 }
 .played-pack-list > li > button:enabled:hover {
-    background: hsl(220, 40%, 30%);
+    background-color: hsl(220, 40%, 30%);
 }
 .played-pack-list p {
     color: #c0c0c0;
