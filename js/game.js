@@ -269,7 +269,7 @@ export class Level extends LevelInterface {
     }
 
     get update_rate() {
-        if (this.compat.use_lynx_loop && this.compat.emulate_60fps) {
+        if (this.compat.emulate_60fps) {
             return 1;
         }
         else {
@@ -767,21 +767,16 @@ export class Level extends LevelInterface {
         this._do_init_phase();
         this._set_p1_input(p1_input);
 
-        if (this.compat.use_lynx_loop) {
-            if (this.compat.emulate_60fps) {
-                this._advance_tic_lynx60();
-            }
-            else {
-                this._advance_tic_lynx();
-            }
+        if (this.compat.emulate_60fps) {
+            this._advance_tic_lynx60();
         }
         else {
-            this._advance_tic_lexy();
+            this._advance_tic_lynx();
         }
     }
 
-    // Default loop: run at 20 tics per second, split things into some more loops
-    _advance_tic_lexy() {
+    // Lynx/Lexy loop: 20 tics per second
+    _advance_tic_lynx() {
         // Under CC2 rules, there are two wire updates at the very beginning of the game before the
         // player can actually move.  That means the first tic has five wire phases total.
         // FIXME this breaks item bestowal contraptions that immediately flip a force floor, since
@@ -792,64 +787,9 @@ export class Level extends LevelInterface {
         }
 
         this._do_decision_phase();
-
-        // Lexy's separate movement loop
-        for (let i = this.actors.length - 1; i >= 0; i--) {
-            let actor = this.actors[i];
-            if (! actor.cell)
-                continue;
-
-            this._do_actor_movement(actor, actor.decision);
-        }
-
-        // Advance everyone's cooldowns
-        // Note that we iterate in reverse order, DESPITE keeping dead actors around with null
-        // cells, to match the Lynx and CC2 behavior.  This is actually important in some cases;
-        // check out the start of CCLP3 #54, where the gliders will eat the blue key immediately if
-        // they act in forward order!  (More subtly, even the decision pass does things like
-        // advance the RNG, so for replay compatibility it needs to be in reverse order too.)
-        for (let i = this.actors.length - 1; i >= 0; i--) {
-            let actor = this.actors[i];
-            // Actors with no cell were destroyed
-            if (! actor.cell)
-                continue;
-
-            if (! actor.type.ttl) {
-                this._do_actor_cooldown(actor, 3);
-            }
-        }
-
-        // Mini extra pass: deal with teleporting separately.  Otherwise, actors may have been in
-        // the way of the teleporter but finished moving away during the above loop; this is
-        // particularly bad when it happens with a block you're pushing.  (CC2 doesn't need to do
-        // this because blocks you're pushing are always a frame ahead of you anyway.)
-        // This is also where we handle tiles with persistent standing behavior.
-        for (let i = this.actors.length - 1; i >= 0; i--) {
-            let actor = this.actors[i];
-            if (! actor.cell)
-                continue;
-            if (actor.type.ttl)
-                continue;
-
-            this._do_actor_idle(actor);
-        }
-
-        this._swap_players();
-        this._do_post_actor_phase();
+        this._do_action_phase(3);
 
         // Wire updates every frame, which means thrice per tic
-        this._do_wire_phase();
-        this._do_wire_phase();
-        this._do_wire_phase();
-
-        this._do_cleanup_phase();
-    }
-
-    // Lynx loop: everyone decides, then everyone moves/cools in a single pass
-    _advance_tic_lynx() {
-        this._do_decision_phase();
-        this._do_combined_action_phase(3);
-        this._do_post_actor_phase();
         this._do_wire_phase();
         this._do_wire_phase();
         this._do_wire_phase();
@@ -861,20 +801,17 @@ export class Level extends LevelInterface {
     // only be made every third frame
     _advance_tic_lynx60() {
         this._do_decision_phase(true);
-        this._do_combined_action_phase(1);
-        this._do_post_actor_phase();
+        this._do_action_phase(1);
         this._do_wire_phase();
 
         this.frame_offset = 1;
         this._do_decision_phase(true);
-        this._do_combined_action_phase(1);
-        this._do_post_actor_phase();
+        this._do_action_phase(1);
         this._do_wire_phase();
 
         this.frame_offset = 2;
         this._do_decision_phase();
-        this._do_combined_action_phase(1);
-        this._do_post_actor_phase();
+        this._do_action_phase(1);
         this._do_wire_phase();
 
         this.frame_offset = 0;
@@ -884,8 +821,8 @@ export class Level extends LevelInterface {
     // Attempt to advance by one FRAME at a time.  Primarily useful for running 60 FPS mode at,
     // well, 60 FPS.
     advance_frame(p1_input) {
-        if (this.compat.use_lynx_loop && this.compat.emulate_60fps) {
-            // Lynx 60, i.e. CC2
+        if (this.compat.emulate_60fps) {
+            // CC2
             if (this.frame_offset === 0) {
                 this._do_init_phase(p1_input);
             }
@@ -893,8 +830,7 @@ export class Level extends LevelInterface {
             let is_decision_frame = this.frame_offset === 2;
 
             this._do_decision_phase(! is_decision_frame);
-            this._do_combined_action_phase(1);
-            this._do_post_actor_phase();
+            this._do_action_phase(1);
             this._do_wire_phase();
 
             if (this.frame_offset === 2) {
@@ -902,7 +838,7 @@ export class Level extends LevelInterface {
             }
         }
         else {
-            // This is either Lexy mode or Lynx mode, and either way we run at 20 tps
+            // We're running at 20 tps, which means only one update on the first frame
             if (this.frame_offset === 0) {
                 this.advance_tic(p1_input);
             }
@@ -1019,7 +955,44 @@ export class Level extends LevelInterface {
         }
     }
 
-    // Lynx's combined action phase: each actor attempts to move, then cools down, in order
+    _do_action_phase(cooldown) {
+        if (this.compat.no_separate_idle_phase) {
+            this._do_combined_action_phase(cooldown);
+        }
+        else {
+            this._do_separated_action_phase(cooldown);
+        }
+
+        // Post-action stuff
+        this._swap_players();
+        this._do_post_actor_phase();
+    }
+
+    // Lynx + Lexy action phase: move and cool down in one loop, idle in another
+    _do_separated_action_phase(cooldown) {
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+            if (! actor.cell)
+                continue;
+
+            this._do_actor_movement(actor, actor.decision);
+            if (actor.type.ttl)
+                continue;
+
+            this._do_actor_cooldown(actor, cooldown);
+        }
+        for (let i = this.actors.length - 1; i >= 0; i--) {
+            let actor = this.actors[i];
+            if (! actor.cell)
+                continue;
+            if (actor.type.ttl)
+                continue;
+
+            this._do_actor_idle(actor);
+        }
+    }
+
+    // CC2 action phase: move, cool down, and idle all in one loop
     _do_combined_action_phase(cooldown) {
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
@@ -1033,8 +1006,6 @@ export class Level extends LevelInterface {
             this._do_actor_cooldown(actor, cooldown);
             this._do_actor_idle(actor);
         }
-
-        this._swap_players();
     }
 
     // Have an actor attempt to move
@@ -1953,7 +1924,7 @@ export class Level extends LevelInterface {
     _do_extra_cooldown(actor) {
         this._do_actor_cooldown(actor, this.update_rate);
         // Only Lexy has double-cooldown protection
-        if (! this.compat.use_lynx_loop) {
+        if (! this.compat.allow_double_cooldowns) {
             this._set_tile_prop(actor, 'last_extra_cooldown_tic', this.tic_counter);
         }
     }

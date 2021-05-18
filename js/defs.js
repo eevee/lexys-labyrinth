@@ -151,9 +151,13 @@ export const COMPAT_FLAGS = [
 
 // Core
 {
-    key: 'use_lynx_loop',
-    label: "Game uses the Lynx-style update loop",
-    rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
+    key: 'allow_double_cooldowns',
+    label: "Actors may cooldown twice in one tic",
+    rulesets: new Set(['steam', 'steam-strict', 'lynx']),
+}, {
+    key: 'no_separate_idle_phase',
+    label: "Actors teleport immediately after moving",
+    rulesets: new Set(['steam', 'steam-strict']),
 }, {
     key: 'player_moves_last',
     label: "Player always moves last",
