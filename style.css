@@ -715,7 +715,7 @@ pre.stack-trace {
     image-rendering: pixelated;
 }
 
-@media ((orientation: portrait) and (max-width: 800px)) or ((orientation: landscape) and (max-height: 600px)) {
+@media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
     body > header {
         padding: 1px;
     }
@@ -1312,7 +1312,7 @@ ol.packtest-summary > li {
         ;
     }
 }
-@media ((orientation: portrait) and (max-width: 800px)) or ((orientation: landscape) and (max-height: 600px)) {
+@media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
     #player-controls .-optional-label {
         display: none;
     }
@@ -1820,7 +1820,7 @@ body.--debug .player-overlay-message {
         display: none;
     }
 }
-@media ((orientation: portrait) and (max-width: 800px)) or ((orientation: landscape) and (max-height: 600px)) {
+@media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
     /* Overlay is a bit different on what I assume is a touchscreen */
     .player-overlay-message[data-reason='waiting'] > p {
         /* Hide the "Ready!" and controls, since there's a menu */
