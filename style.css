@@ -18,9 +18,9 @@ body {
     color: #ececec;
 
     --panel-bg-color: hsl(220, 10%, 15%);
-    --button-bg-color: hsl(220, 10%, 25%);
+    --button-bg-color: hsl(220, 20%, 25%);
     --button-bg-shadow-color: #fff1;
-    --button-bg-hover-color: hsl(220, 15%, 30%);
+    --button-bg-hover-color: hsl(220, 30%, 30%);
     --generic-bg-hover-on-white: hsl(220, 60%, 90%);
     --generic-bg-selected-on-white: hsl(220, 60%, 85%);
     --generic-border-selected-on-white: hsl(220, 60%, 75%);
@@ -50,10 +50,10 @@ button,
     color: white;
     background-color: var(--button-bg-color);
     background-image: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
-    border: 1px solid hsl(220, 10%, 10%);
+    border: 1px solid hsl(220, 10%, 7.5%);
     box-shadow:
-        inset 0 0 0 1px hsl(220, 10%, 33%),
-        0 1px 1px hsl(220, 10%, 10%);
+        inset 0 0 1px 1px #fff2,
+        0 1px 1px hsl(220, 10%, 7.5%);
     border-radius: 0.25em;
     text-transform: lowercase;
     cursor: pointer;
@@ -68,12 +68,15 @@ button:active,
     /* Need this for the editor's tool help things and i'm not questioning it */
     z-index: 1;
 }
+button:enabled.button-bright {
+    background-color: hsl(220, 50%, 25%);
+}
+button:enabled.button-bright:hover {
+    background-color: hsl(220, 70%, 30%);
+}
 button:disabled {
     color: #606060;
     background-color: #202020;
-    box-shadow:
-        inset 0 0 2px 1px hsl(220, 0%, 10%),
-        0 1px 0 hsl(220, 10%, 10%);
     cursor: auto;
 }
 button.button-big {
@@ -202,12 +205,13 @@ svg.svg-icon {
     border-top-right-radius: 0.25em;
     border-bottom-right-radius: 0.25em;
 }
+button.--pressed,
 .radio-faux-button-set > label > input:checked + span {
     background: hsl(220, 80%, 50%);
     box-shadow:
-        inset 0 0 1px 1px hsl(220, 50%, 40%),
-        inset 0 -0.125em 0.5em 0.25em hsl(220, 50%, 30%),
-        0 1px 1px hsl(220, 10%, 10%);
+        inset 0 1px 3px 1px hsl(220, 50%, 15%),
+        inset 0 0.25em 1em 0.5em hsl(220, 50%, 30%),
+        0 1px 1px hsl(220, 10%, 10%)
 }
 
 .button-row {
@@ -411,6 +415,84 @@ table.level-browser tbody tr:hover {
 table.level-browser tbody tr:nth-child(10n) td {
     border-bottom: 2px solid hsl(220, 20%, 80%);
 }
+@media (max-width: 600px) {
+    /* Unique media query: this is only necessary for VERY narrow screens */
+    /* In order to wrap the rows, turn the table markup into a stack of grids */
+    table.level-browser {
+        display: block;
+    }
+    table.level-browser tr {
+        display: grid;
+        grid:
+            "number star    name    name    forget"
+            "number .       clock   time    score"
+            / 3em 1em 1fr 1fr 1fr
+        ;
+    }
+    table.level-browser td,
+    table.level-browser th {
+        display: block;
+    }
+    table.level-browser thead .-title,
+    table.level-browser tfoot .-title {
+        /* "Level" and "Total" column headers are not useful and eat a lot of space */
+        display: none;
+    }
+    table.level-browser thead th:empty,
+    table.level-browser tfoot th:empty {
+        /* These are filler for table layout purposes */
+        display: none;
+    }
+    table.level-browser .-number {
+        grid-area: number;
+    }
+    table.level-browser .-title {
+        grid-area: name;
+    }
+    table.level-browser .-time {
+        grid-area: clock;
+    }
+    table.level-browser .-time + .-time {
+        grid-area: time;
+    }
+    table.level-browser .-score {
+        grid-area: score;
+    }
+    table.level-browser .-aid {
+        grid-area: star;
+        /* We overflow a bit because of our padding, so just leak into it */
+        justify-self: center;
+    }
+    table.level-browser .-button {
+        grid-area: forget;
+        justify-self: end;
+    }
+    /* Move borders off cells and onto rows */
+    table.level-browser thead tr th {
+        border: none;
+    }
+    table.level-browser tfoot tr th {
+        border: none;
+    }
+    table.level-browser tbody tr:nth-child(10n) td {
+        border: none;
+    }
+    table.level-browser thead tr {
+        border-bottom: 2px solid hsl(220, 20%, 60%);
+    }
+    table.level-browser tfoot tr {
+        border-top: 2px solid hsl(220, 20%, 60%);
+    }
+    table.level-browser tbody tr {
+        border-bottom: 1px solid #ddd;
+    }
+    table.level-browser tbody tr.--current {
+        border: none;
+    }
+    table.level-browser tbody tr:nth-child(10n) {
+        border-bottom: 2px solid hsl(220, 20%, 80%);
+    }
+}
 
 /* Compat dialog */
 .dialog-compat {
@@ -439,6 +521,46 @@ img.compat-icon,
     width: 32px;
     height: 32px;
     vertical-align: middle;
+}
+
+@media (max-width: 800px) {
+    /* Stack the formgrid, it doesn't fit very well as columns */
+    .dialog dl.formgrid {
+        display: block;
+    }
+    .dialog dl.formgrid > dt {
+        margin: 0.5em 0;
+        text-align: left;
+    }
+    .dialog dl.formgrid > dt:first-child {
+        margin-top: 0;
+    }
+    .dialog dl.formgrid > * + dt {
+        border-top: 1px solid #ccc;
+        padding-top: 0.5em;
+    }
+    .dialog dl.formgrid > * + dt:empty {
+        padding-top: 0;
+    }
+    .dialog dl.formgrid > dd {
+        margin: 0.5em 0;
+    }
+
+    .dialog-compat .radio-faux-button-set {
+        font-size: 0.83em;
+        flex-wrap: wrap;
+    }
+    .dialog-compat .radio-faux-button-set > * {
+        flex: 1 0 30%;
+    }
+    .dialog-compat .radio-faux-button-set .-button {
+        border-radius: 0;
+    }
+    ul.compat-flags img.compat-icon,
+    ul.compat-flags span.compat-icon-gap {
+        width: 16px;
+        height: 16px;
+    }
 }
 
 
@@ -481,6 +603,8 @@ label.option .option-label {
         max-width: 90%;
         max-height: 90%;
     }
+    .dialog-options {
+    }
 }
 
 
@@ -511,7 +635,6 @@ body > header > nav {
     gap: 0.5em;
 }
 body > header button {
-    font-size: 0.75em;
     white-space: nowrap;
 }
 body > header h1 a {
@@ -587,14 +710,18 @@ pre.stack-trace {
     order: 3;
     color: #606060;
 }
+#header-icon {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
 
-@media (max-width: 800px) {
+@media ((orientation: portrait) and (max-width: 800px)) or ((orientation: landscape) and (max-height: 600px)) {
     body > header {
-        padding: 0.125em 0.25em;
+        padding: 1px;
     }
     /* All these headings are way too big on phones */
     body > header h1 {
-        font-size: 1.25em;
+        font-size: 1.125em;
     }
     body > header h2 {
         font-size: 1.125em;
@@ -604,6 +731,12 @@ pre.stack-trace {
     }
     body > header p {
         /* "a game by eevee" takes up too much space :( */
+        display: none;
+    }
+
+    /* Hide the top/bottom nav while playing entirely */
+    body[data-mode=player] #header-pack,
+    body[data-mode=player] #header-level {
         display: none;
     }
 }
@@ -812,15 +945,6 @@ pre.stack-trace {
     text-align: left;
     /* this also forces the button to be 1 line of text high even for empty title */
     white-space: pre-wrap;
-}
-.played-pack-list > li > button:enabled {
-    background-color: hsl(220, 30%, 25%);
-    box-shadow:
-        inset 0 0 0 1px hsl(220, 30%, 33%),
-        0 1px 1px hsl(220, 10%, 10%);
-}
-.played-pack-list > li > button:enabled:hover {
-    background-color: hsl(220, 40%, 30%);
 }
 .played-pack-list p {
     color: #c0c0c0;
@@ -1128,9 +1252,6 @@ ol.packtest-summary > li {
     #player-actions button svg {
         font-size: 1em;
     }
-    #player-controls .-optional-label {
-        display: none;
-    }
     #player-controls button {
         padding: 0.25em 0.5em;
         line-height: 1.33;
@@ -1159,28 +1280,48 @@ ol.packtest-summary > li {
             "buttons"
             "game"
             "actions"
-            "music"
         ;
     }
     #player-controls,
     #player-actions {
+        /* Not much in these rows so make them a bit bigger for hittability */
+        font-size: 1.33em;
         justify-content: center;
     }
     #player-controls button,
     #player-actions button {
         flex: auto;
+        padding: 0.25em 0.5em;
+    }
+    #player-controls .control-restart {
+        /* This is a dedicated pause-menu button */
+        display: none;
     }
     #player .keyhint {
         /* Hide key hints; there's nowhere to put them and they take up surprisingly a lot of space */
         display: none;
     }
 }
-@media (max-width: 800px) {
+@media (orientation: landscape) and (max-height: 600px) {
+    /* On a small landscape screen, remove the music row (it matters!) */
+    #player-main {
+        grid:
+            "buttons    game    actions"
+            "buttons    game    actions"
+            / 1fr auto 1fr
+        ;
+    }
+}
+@media ((orientation: portrait) and (max-width: 800px)) or ((orientation: landscape) and (max-height: 600px)) {
+    #player-controls .-optional-label {
+        display: none;
+    }
     #splash-fullscreen {
         display: revert;
     }
     #player-music {
-        font-size: 0.875em;
+        /* TODO :( */
+        display: none;
     }
 }
 
@@ -1206,7 +1347,7 @@ ol.packtest-summary > li {
     row-gap: calc(var(--tile-height) * var(--scale) / 4);
 
     padding: calc(var(--tile-height) * var(--scale) / 4) calc(var(--tile-width) * var(--scale) / 4);
-    background: hsl(220, 10%, 20%);
+    background: hsl(220, 10%, 15%);
     box-shadow: 0 0.25em 1em black;
 }
 
@@ -1214,7 +1355,7 @@ ol.packtest-summary > li {
     grid-area: level;
 
     position: relative;
-    outline: 2px solid black;
+    outline: 1px solid hsl(220, 10%, 5%);
 }
 .level canvas {
     display: block;
@@ -1223,78 +1364,172 @@ ol.packtest-summary > li {
     --viewport-width: 9;
     --viewport-height: 9;
 }
-#player .overlay-message {
+
+.player-overlay-message {
     grid-area: level;
     place-self: stretch;
 
     position: relative;
     display: grid;
-    grid-template-rows: 2fr 6fr 2fr 1fr;
-    justify-content: stretch;
+    grid:
+        "pack"      calc(1.25em * 1.25 * 1)
+        "level"     calc(1.333em * 1.25 * 2)
+        "author"    calc(1em * 1.25 * 1)
+        "space"     1fr
+        "controls"  1.5em
+    ;
     align-items: center;
-    /* Prevent blowout; force using the canvas's height */
+    gap: 0.25em;
+    /* Prevent blowout; force using the canvas's size */
     height: 0;
     min-height: 100%;
+    width: 0;
+    min-width: 100%;
     box-sizing: border-box;
 
     z-index: 2;
     font-size: calc(0.5 * var(--tile-width) * var(--scale));
+    line-height: 1.25;
     background: #0009;
     color: white;
     text-align: center;
-    text-shadow: 0 2px 1px black;
-}
-#player .overlay-message > * {
-    padding: 0 5%;
+    text-shadow: 0 1px 1px black;
 }
 /* Allow clicking through the overlay in debug mode */
-body.--debug .overlay-message {
+body.--debug .player-overlay-message {
     pointer-events: none;
 }
-#player .overlay-message p {
-    margin: 0;
+.player-overlay-message > * {
+    padding: 0 0.25em;
 }
-#player .overlay-message .-top {
-    font-size: 1.5em;
+.player-overlay-message h1 {
+    /* Pack title, doesn't need to be too big */
+    grid-area: pack;
+    font-size: 1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: hsl(220, 25%, 60%);
 }
-#player .overlay-message .-middle {
+.player-overlay-message > h2 {
+    grid-area: level;
+    font-size: 2em;
 }
-#player .overlay-message .-bottom {
+.player-overlay-message[data-reason='waiting'] > h2 {
+    /* For 'waiting' this is a level name, so make it two lines of smaller text */
+    font-size: 1.333em;
 }
-#player .overlay-message .-keyhint {
-    align-self: end;
-    font-size: 0.5em;
+.player-overlay-message > h3 {
+    grid-area: author;
+    font-size: 1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: hsl(220, 10%, 90%);
+}
+.player-overlay-message > .scoreboard {
+    grid-row: author / space;
+}
+.player-overlay-message .-controls-hint {
+    grid-area: controls;
+    font-size: 0.75em;
     color: #c0c0c0;
 }
-#player .overlay-message[data-reason=""] {
+.player-overlay-message .mobile-pause-menu {
+    grid-area: space;
+}
+.mobile-pause-menu {
+    font-size: 1.25em;
+    display: none;  /* flex */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.33em;
+    width: 80%;
+    margin: auto;
+}
+.mobile-pause-menu button {
+    padding: 0.33em;
+}
+.mobile-pause-menu > p {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: stretch;
+    margin: 0;
+    gap: 0.33em;
+}
+.mobile-pause-menu > p > button {
+    flex: 1;
+    line-height: 1;
+}
+.mobile-pause-menu > p > button.-narrow {
+    flex: initial;
+}
+.mobile-pause-menu .-only-waiting,
+.mobile-pause-menu .-only-paused,
+.mobile-pause-menu .-only-failure,
+.mobile-pause-menu .-only-success,
+.mobile-pause-menu .-only-ended {
     display: none;
 }
-#player .overlay-message[data-reason=failure] {
-    box-shadow: inset 0 0 calc(4 * var(--tile-width)) var(--tile-width) black;
+.player-overlay-message[data-reason=waiting] .mobile-pause-menu .-only-waiting,
+.player-overlay-message[data-reason=paused] .mobile-pause-menu .-only-paused,
+.player-overlay-message[data-reason=failure] .mobile-pause-menu .-only-failure,
+.player-overlay-message[data-reason=success] .mobile-pause-menu .-only-success,
+.player-overlay-message[data-reason=ended] .mobile-pause-menu .-only-ended {
+    display: initial;
 }
-#player .overlay-message[data-reason=success] {
-    background: hsla(220, 50%, 25%, 0.5);
-    box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(220, 50%, 25%);
+.player-overlay-message[data-reason=paused] .mobile-pause-menu p.-only-paused {
+    display: flex;
 }
-#player .overlay-message[data-reason=ended] {
-    /* Shove the middle + bottom parts down so they don't overlay the busiest part of the ending image */
-    grid-template-rows: 8fr 4fr 2fr 0;
+.player-overlay-message[data-reason=""] {
+    display: none;
+}
+.player-overlay-message[data-reason=waiting] {
+    background: linear-gradient(to bottom, #000d, #0008 40%, #0008 60%, #000d);
+}
+.player-overlay-message[data-reason=failure] {
+    background: hsla(330, 20%, 10%, 0.5);
+    background: radial-gradient(#0004, hsla(330, 10%, 10%, 0.5) 40%, hsl(330, 20%, 10%));
+}
+.player-overlay-message[data-reason=success] {
+    background: radial-gradient(hsla(220, 60%, 5%, 0.75), 60%, hsla(220, 60%, 25%, 0.75));
+}
+.player-overlay-message[data-reason=ended] {
+    /* Rearrange this entirely, to fit the ending image in */
+    grid:
+        "congrats"  min-content
+        "."         0.5em
+        "menu"      1fr
+        "."         0.5em
+        "score"     min-content
+    ;
     overflow: hidden;
-    x-color: black;
     background: url(ending.png) no-repeat center center / cover;
     box-shadow: inset 0 0 calc(4 * var(--tile-width)) hsl(220, 50%, 25%);
-    x-text-shadow: 0 0 2px white, 0 2px 2px white;
 }
-#player .overlay-message[data-reason=ended] .-middle {
+.player-overlay-message[data-reason=ended] .mobile-pause-menu {
+    grid-area: menu;
+}
+.player-overlay-message[data-reason=ended] > .-congrats {
+    grid-area: congrats;
+    margin: 0;
+    padding: 0.25em;
     background: #0009;
 }
-#player .overlay-message[data-reason=ended] .-bottom {
-    font-size: 1.5em;
+.player-overlay-message[data-reason=ended] > .-score {
+    grid-area: score;
+    margin: 0;
+    padding: 0.25em;
     background: #0006;
+}
+.player-overlay-message[data-reason=ended] > .-score output {
+    font-size: 2em;
+    display: block;
 }
 @supports (mask-image: none) or (-webkit-mask-image: none) {
     /* Do this complicated rotating sunburst thing only if masks work */
-    #player .overlay-message[data-reason=ended]::before {
+    .player-overlay-message[data-reason=ended]::before {
         content: '';
         position: absolute;
         z-index: -1;
@@ -1317,35 +1552,68 @@ body.--debug .overlay-message {
         transform: rotate(1turn);
     }
 }
-dl.score-chart {
+.scoreboard {
     display: grid;
-    grid-auto-columns: 1fr 1fr;
-    grid-auto-rows: 1.33em;
-    margin: auto 10%;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+    grid-auto-rows: min-content;
+    align-items: center;
+    row-gap: 0.75em;
+    margin: auto 5%;
     font-weight: normal;
+    text-align: center;
 }
-dl.score-chart dt {
-    grid-column: 1;
-    text-align: left;
+.scoreboard .-subscore {
+    grid-column: span 2;
+    color: #f4f4f4;
 }
-dl.score-chart dd {
-    grid-column: 2;
+.scoreboard .-level-score {
+    grid-column: span 3;
+}
+.scoreboard .-improvement {
+    grid-column: span 3;
+}
+.scoreboard .-improvement.--same h4 {
+    color: hsl(240, 50%, 60%);
+}
+.scoreboard .-improvement.--same p {
+    color: hsl(240, 50%, 80%);
+}
+.scoreboard .-improvement.--worse h4 {
+    color: hsl(330, 50%, 60%);
+}
+.scoreboard .-improvement.--worse p {
+    color: hsl(330, 50%, 80%);
+}
+.scoreboard .-improvement.--better h4 {
+    color: hsl(210, 50%, 60%);
+}
+.scoreboard .-improvement.--better p {
+    color: hsl(210, 50%, 80%);
+}
+.scoreboard .-total-score {
+    grid-column: span 3;
+    color: hsl(45, 50%, 75%);
+}
+.scoreboard h4 {
+    font-size: 0.833em;
+    color: hsl(220, 10%, 80%);
+}
+.scoreboard .-total-score h4 {
+    color: hsl(30, 50%, 60%);
+}
+.scoreboard p {
     margin: 0;
-    text-align: right;
 }
-dl.score-chart .-component {
-    color: #d8d8d8;
-}
-dl.score-chart .-sum {
-    border-top: 1px solid white;
-}
-dl.score-chart .-total {
-    color: hsl(40, 75%, 80%);
-}
-dl.score-chart .-star {
-    position: absolute;
+.scoreboard .-total-score p {
+    font-size: 1.333em;
 }
 
+.player-level-number {
+    grid-area: number;
+    /* This is only for portrait, and mostly to fill space */
+    display: none;
+    line-height: 1;
+}
 .chips {
     grid-area: chips;
 }
@@ -1358,17 +1626,17 @@ dl.score-chart .-star {
 .chips,
 .time,
 .bonus {
-    font-size: calc(var(--tile-height) * var(--scale) / 3);
+    font-size: calc(var(--tile-height) * var(--scale) * 3/4);
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.25em;
 }
 .chips h3,
 .time h3,
 .bonus h3 {
     flex: 0;
     order: 2;
-    font-size: 1.5em;
+    font-size: 0.75em;
     line-height: 1;
     color: hsl(220, 20%, 80%);
 }
@@ -1376,7 +1644,6 @@ dl.score-chart .-star {
 .time output,
 .bonus output {
     flex: 1;
-    font-size: 2em;
     min-width: 2em;
     min-height: 1em;
     line-height: 1;
@@ -1408,28 +1675,25 @@ dl.score-chart .-star {
     }
 }
 .chips output.--done,
-.time output.--frozen {
+.time output.--frozen,
+.bonus output {
     color: hsl(220, 10%, 30%);
 }
-.bonus output {
+#player.--bonus-visible .bonus output {
     color: #e2c9ff;
-}
-#player .bonus {
-    visibility: hidden;
-    display: flex;
-}
-#player.--bonus-visible .bonus {
-    visibility: initial;
 }
 .player-rules {
     font-size: calc(var(--tile-height) * var(--scale) / 4);
     grid-area: rules;
     align-self: end;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
     color: hsl(220, 20%, 80%);
 }
 .player-rules p {
     display: none;
-    margin: 0.25em 0;
+    margin: 0;
 }
 #player.--hide-logic .player-rules #player-rule-logic-hidden {
     display: revert;
@@ -1516,17 +1780,25 @@ dl.score-chart .-star {
     #player-game-area {
         /* Rearrange the grid to be vertical */
         grid:
-            "level      level   level"
-            "inventory  rules   chips" calc((var(--tile-height) * var(--scale) * (2 - 1/6)) / 3)
-            "inventory  rules   time" calc((var(--tile-height) * var(--scale) * (2 - 1/6)) / 3)
-            "inventory  rules   bonus" calc((var(--tile-height) * var(--scale) * (2 - 1/6)) / 3)
-            / min-content min-content 1fr
+            "inventory   chips   chips   time" min-content
+            "inventory   rules   bonus   bonus" min-content
+            "level       level   level   level" min-content
+            / min-content 1fr 1fr 2fr
         ;
-        row-gap: calc(var(--tile-height) * var(--scale) / 6);
+    }
+    .player-level-number {
+        /* TODO this makes us too big on my phone, damn */
+        /*display: initial;*/
+    }
+    .chips,
+    .time,
+    .bonus {
+        /* These numbers need to be sliiightly smaller */
+        font-size: calc(var(--tile-height) * var(--scale) * 2/3);
     }
     #player .inventory {
-        /* stick me in the center right */
-        place-self: center end;
+        /* stick me in the center left */
+        place-self: center start;
     }
     #player-game-area > .player-hint-wrapper {
         /* Overlay hints on the inventory area */
@@ -1536,15 +1808,36 @@ dl.score-chart .-star {
         font-size: calc(var(--tile-height) * var(--scale) / 2.5);
     }
     #player-game-area > .player-hint-wrapper > .player-hint {
-        padding: 0.25em 0.33em;
+        padding: 0.33em 0.5em;
         line-height: 1.33;
     }
     .player-rules {
         align-self: center;
+        flex-direction: row;
     }
     .player-rules p span {
         /* There's only room for the icons, since there's no dedicated hint space */
         display: none;
+    }
+}
+@media ((orientation: portrait) and (max-width: 800px)) or ((orientation: landscape) and (max-height: 600px)) {
+    /* Overlay is a bit different on what I assume is a touchscreen */
+    .player-overlay-message[data-reason='waiting'] > p {
+        /* Hide the "Ready!" and controls, since there's a menu */
+        display: none;
+    }
+    .mobile-pause-menu {
+        display: flex;
+    }
+}
+@media (orientation: portrait) and (max-width: 800px) {
+    #player-game-area {
+        padding: 0;
+        background: none;
+        box-shadow: none;
+    }
+    .level {
+        outline: 1px solid black;
     }
 }
 

@@ -5,6 +5,7 @@
     <title>Lexy's Labyrinth</title>
     <link rel="stylesheet" type="text/css" href="style.css">
     <link rel="shortcut icon" type="image/png" href="icon.png">
+    <link rel="manifest" type="application/json" href="manifest.json">
     <script>
         "use strict";
         {
@@ -73,6 +74,12 @@
         <g id="svg-icon-menu-chevron">
             <path d="M2,4 l6,6 l6,-6 v3 l-6,6 l-6,-6 z"></path>
         </g>
+        <g id="svg-icon-prev">
+            <path d="M14,1 2,8 14,14 z">
+        </g>
+        <g id="svg-icon-next">
+            <path d="M2,1 14,8 2,14 z">
+        </g>
         <!-- Actions -->
         <g id="svg-icon-up">
             <path d="M0,12 l8,-8 l8,8 z"></path>
@@ -116,8 +123,8 @@
         <h1><a href="https://github.com/eevee/lexys-labyrinth">Lexy's Labyrinth</a></h1>
         <p>— an <a href="https://github.com/eevee/lexys-labyrinth">open source</a> game by <a href="https://eev.ee/">eevee</a></p>
         <nav>
+            <button id="main-compat" type="button">mode: <output>lexy</output></button>
             <button id="main-options" type="button">options</button>
-            <button id="main-compat" type="button">compat mode: <output>lexy</output></button>
         </nav>
     </header>
     <header id="header-pack">
@@ -133,11 +140,11 @@
         <h3 id="level-name">Level 1 — Key Pyramid</h3>
         <nav>
             <button id="main-prev-level" type="button">
-                <svg class="svg-icon" viewBox="0 0 16 16" title="previous"><path d="M14,1 2,8 14,14 z"></svg>
+                <svg class="svg-icon" viewBox="0 0 16 16" title="previous"><use href="#svg-icon-prev"></svg>
             </button>
             <button id="main-choose-level" type="button">Level select</button>
             <button id="main-next-level" type="button">
-                <svg class="svg-icon" viewBox="0 0 16 16" title="next"><path d="M2,1 14,8 2,14 z"></svg>
+                <svg class="svg-icon" viewBox="0 0 16 16" title="next"><use href="#svg-icon-next"></svg>
             </button>
         </nav>
     </header>
@@ -229,7 +236,7 @@
                     <svg class="svg-icon" viewBox="0 0 16 16"><path d="M1,8 7,2 7,14 z M9,8 15,2 15,14 z"></path></svg>
                     <span class="-optional-label">rewind</span> <span class="keyhint"><kbd>z</kbd></span></button>
                 <div class="radio-faux-button-set">
-                    <label><input class="control-turn-based" type="checkbox"> <span>Turn <br>based <br>mode</span></label>
+                    <label><input class="control-turn-based" type="checkbox"> <span>Step <br>mode</span></label>
                 </div>
             </div>
             <div id="player-actions">
@@ -245,15 +252,14 @@
             </div>
             <section id="player-game-area">
                 <div class="level"><!-- level canvas and any overlays go here --></div>
-                <div class="overlay-message">
-                    <h1 class="-top"></h1>
-                    <div class="-middle"></div>
-                    <p class="-bottom"></p>
-                    <p class="-keyhint"></p>
-                </div>
+                <div class="player-overlay-message"></div>
                 <div class="player-hint-wrapper">
                     <div class="player-hint"></div>
                     <svg class="player-hint-bg-icon svg-icon" viewBox="0 0 16 16"><use href="#svg-icon-hint"></use></svg>
+                </div>
+                <div class="player-level-number">
+                    Level
+                    <output></output>
                 </div>
                 <div class="chips">
                     <h3>
@@ -304,7 +310,7 @@
                 <div class="inventory"></div>
             </section>
             <div id="player-music">
-                🎵 <a id="player-music-title">title</a> by <a id="player-music-author">author</a>
+                🎵 <a id="player-music-title" target="_blank">title</a> by <a id="player-music-author" target="_blank">author</a>
                 <audio loop preload="auto">
             </div>
         </div>

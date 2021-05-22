@@ -8,7 +8,7 @@ import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
 import * as format_tws from './format-tws.js';
 import { Level } from './game.js';
-import { PrimaryView, DialogOverlay, ConfirmOverlay, flash_button, load_json_from_storage, save_json_to_storage } from './main-base.js';
+import { PrimaryView, DialogOverlay, ConfirmOverlay, flash_button, svg_icon, load_json_from_storage, save_json_to_storage } from './main-base.js';
 import { Editor } from './editor/main.js';
 import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
@@ -59,44 +59,44 @@ const OBITUARIES = {
     drowned: [
         "you tried out water cooling",
         "you fell into the c",
-        "water disaster",
+        "water disaster!",
         "you sank like a rock",
         "your stack overflowed",
     ],
     burned: [
         "your core temp got too high",
         "your plans went up in smoke",
-        "you got roasted",
+        "you held your feet to the fire",
         "you really blazed through that one",
         "you turned up the heat",
     ],
     slimed: [
-        "what an oozefest",
+        "you mutated",
         "quite a sticky situation",
-        "you got dunked in the gunk",
+        "you were garbage collected",
         "that'll leave a stain",
         "what a waste",
     ],
     exploded: [
-        //"
-        "looks like you're having a blast",
-        "you tripped over something of mine",
-        "you were blown to bits",
+        "you blew it",
+        "you're having a blast",
+        "you became 64 bits",
         "you will surely be mist",
+        "try not to trip",
     ],
     squished: [
-        "that block of ram was too much for you",
+        "you encountered a block of ram",
         "you became two-dimensional",
-        "you're a little flat, not too sharp",
+        "your hit box collided",
         "nice compression ratio",
-        //"
+        "you took a cube route",
     ],
     time: [
         "you tried to overclock",
         "you lost track of time",
         "your speedrun went badly",
-        "you're feeling quite alarmed",
-        //"
+        "you overslept",
+        "you got ticked off",
     ],
     electrocuted: [
         "a shocking revelation",
@@ -119,48 +119,48 @@ const OBITUARIES = {
         "you're having a ball",
         "you'll bounce back from this",
         "should've gone the other way",
-        //"
-        //"
+        "ping?  pong!",
+        //"",
     ],
     walker: [
         "you let it walk all over you",
         "step into, step over, step out",
-        "don't just wander around at random",
-        //"
-        //"
+        "you wandered around at random",
+        //"",
+        //"",
     ],
     fireball: [
         "you had a meltdown",
-        "you haven't been flamed like that since usenet",
-        //"
-        //"
-        //"
+        "watch your core temp",
+        "you got roasted",
+        "you lost the flamewar",
+        "goodness gracious",
     ],
     glider: [
         "your ship came in",
-        "don't worry, everything's fin now",
+        "everything turned out fin",
         "should've given it a wider berth",
         "watch out for that skipper",
-        //"
+        "don't harbor any resentment",
     ],
     tank_blue: [
-        "you didn't watch where they tread",
-        "please and tank blue",
+        "watch where you tread",
+        "well, tanks for trying",
         "should've reversed course",
-        "you strayed from the straight and narrow",
-        //"
+        "strayed from the straight and narrow",
+        "you charged in blindly",
     ],
     tank_yellow: [
-        "you let things get out of control",
-        "you need more direction in your life",
-        "your chances of surviving that were remote",
+        "things got out of control",
+        "you lost all direction",
+        "your chances of survival were remote",
         //"
         //"
     ],
     bug: [
         "you got ants in your pants",
-        "time for some debugging",
-        //"
+        "you need to debug",
+        "all the pest to you",
         //"
         //"
     ],
@@ -176,72 +176,72 @@ const OBITUARIES = {
         "you got a little nybble",
         "you're quite a mouthful",
         "you passed the taste test",
-        //"
+        "you ate it",
     ],
     teeth_timid: [
         "you got a killer byte",
-        //"
+        "you were nibbled to bits",
         "you got a tongue-lashing",
-        //"
-        //"
+        "how unvoretunate",
+        "you had an acci-dent",
     ],
     blob: [
+        "your luck ran out",
         "gooed job on that one",
-        "the rng manipulated you",
-        "goo another way next time",
-        //"
-        //"
+        "try gooing another way",
+        "what're the odds",
+        "ooze laughing now",
     ],
     doppelganger1: [
         "you were outfoxed",
-        "sometimes a copy beats the original",
-        "better reflect on what went wrong",
+        "you need some vixen up",
+        "take some time to reflect",
         "you've been duped",
-        //"
+        "stop hitting yourself",
     ],
     doppelganger2: [
         "your plans just didn't gel",
-        "bet that makes you hopping mad",
-        //"
-        //"
-        //"
+        "you got hopping mad",
+        "hare today, gone tomorrow",
+        "she left quite an impression",
+        "you were gänged up on",
     ],
     rover: [
-        "should've given it more roomba",
+        "try giving it more roomba",
         "exterminate.  exterminate.",
         "your space was invaded",
-        "red rover, red rover, this playthrough is over",
+        "the robots have taken over",
         "defeated by a confused frisbee",
     ],
     ghost: [
         "you were scared to death",
         "that wasn't very friendly",
         "now you're both ghosts",
-        //"
-        //"
+        "you were haunted down",
+        "what did you ex-specter",
     ],
     floor_mimic: [
         "you never saw that coming",
         "you were absolutely floored",
         "this seems fu-tile",
         "watch your step",
-        //"
+        "you put your foot in its mouth",
     ],
 
     // Misc
     dynamite_lit: [
         "you've got a short fuse",
         "you failed to put the pin back in",
-        //"
-        //"
-        //"
+        "it had a hair trigger",
+        "no take-backs",
+        "you ran the wrong way",
     ],
     rolling_ball: [
         "you were bowled over",
         "you found some head cannon",
         "strike one!",
         "down for the ten-count",
-        "watch out, pinhead",
+        "you really dropped the ball",
     ],
 };
 // Helper class used to let the game play sounds without knowing too much about the Player
@@ -426,8 +426,9 @@ class Player extends PrimaryView {
         this.play_speed = 1;
 
         this.level_el = this.root.querySelector('.level');
-        this.overlay_message_el = this.root.querySelector('.overlay-message');
+        this.overlay_message_el = this.root.querySelector('.player-overlay-message');
         this.hint_el = this.root.querySelector('.player-hint');
+        this.number_el = this.root.querySelector('.player-level-number output');
         this.chips_el = this.root.querySelector('.chips output');
         this.time_el = this.root.querySelector('.time output');
         this.bonus_el = this.root.querySelector('.bonus output');
@@ -490,6 +491,71 @@ class Player extends PrimaryView {
             this.current_keys_new.add('c');
             ev.target.blur();
         });
+
+        // Create the mobile pause menu, which consolidates buttons from around the desktop UI
+        // TODO i really need to, uh, consolidate this
+        let btn = (...args) => {
+            let onclick = args.pop();
+
+            let props = {};
+            let last = args[args.length - 1];
+            if (typeof last === 'object' && last.constructor === Object) {
+                props = args.pop();
+            }
+
+            let button = mk('button', props, ...args);
+            button.addEventListener('click', onclick);
+            return button;
+        };
+        this.mobile_pause_menu = mk('div.mobile-pause-menu',
+            // waiting
+            btn("Play", {'class': 'button-bright -only-waiting'}, () => {
+                this.set_state('playing');
+            }),
+            // paused
+            mk('p.-only-paused',
+                btn("Resume", {'class': 'button-bright'}, () => {
+                    this.set_state('playing');
+                }),
+                btn("Retry", () => {
+                    this.confirm_game_interruption("Abandon this attempt and try again?", () => {
+                        this.restart_level();
+                    });
+                }),
+            ),
+            // failure
+            btn("Retry", {'class': 'button-bright -only-failure -only-ended'}, () => {
+                this.restart_level();
+            }),
+            // success
+            btn("Onwards!", {'class': 'button-bright -only-success'}, () => {
+                this.conductor.maybe_change_level(this.conductor.level_index + 1);
+            }),
+            mk('p',
+                this.mobile_prev_button = btn(svg_icon('prev'), {'class': '-narrow'}, () => {
+                    this.confirm_game_interruption("Abandon this attempt and return to the previous level?", () => {
+                        this.conductor.maybe_change_level(this.conductor.level_index - 1);
+                    });
+                }),
+                btn("Level select", () => {
+                    // TODO this should really be in the level browser itself since you can check
+                    // scores without losing a game
+                    this.confirm_game_interruption("Abandon this attempt?", () => {
+                        this.open_level_browser();
+                    });
+                }),
+                this.mobile_next_button = btn(svg_icon('next'), {'class': '-narrow'}, () => {
+                    this.confirm_game_interruption("Abandon this attempt and proceed to the next level?", () => {
+                        this.conductor.maybe_change_level(this.conductor.level_index + 1);
+                    });
+                }),
+            ),
+            btn("Quit to pack list", () => {
+                this.confirm_game_interruption("Abandon this attempt and return to the pack list?", () => {
+                    this.conductor.switch_to_splash();
+                });
+            }),
+        );
 
         this.use_interpolation = true;
         // Default to the LL tileset for safety, but change when we load a level
@@ -605,15 +671,7 @@ class Player extends PrimaryView {
                 }
                 else if (this.state === 'stopped') {
                     if (this.level.state === 'success') {
-                        // Advance to the next level, if any
-                        if (this.conductor.level_index < this.conductor.stored_game.level_metadata.length - 1) {
-                            this.conductor.change_level(this.conductor.level_index + 1);
-                        }
-                        else {
-                            // TODO for CCLs, by default, this is also at level 144
-                            this.set_state('ended');
-                            this.update_ui();
-                        }
+                        this.proceed_to_next_level();
                     }
                     else {
                         // Restart
@@ -672,48 +730,28 @@ class Player extends PrimaryView {
         // Similarly, grab touch events and translate them to directions
         this.current_touches = {};  // ident => action
         this.touch_restart_delay = new util.DelayTimer;
-        let touch_target = this.root.querySelector('#player-game-area');  // FIXME should be .level but the message overlay blocks touching, whoops!
+        let touch_target = this.root.querySelector('#player-game-area .level');
         let collect_touches = ev => {
             ev.stopPropagation();
             ev.preventDefault();
             this.using_touch = true;
 
-            // If state is anything other than playing/waiting, probably switch to playing, similar
-            // to pressing spacebar
-            if (ev.type === 'touchstart') {
-                if (this.state === 'paused') {
-                    this.toggle_pause();
-                    return;
-                }
-                else if (this.state === 'stopped') {
-                    if (this.touch_restart_delay.active) {
-                        // If it's only been a very short time since the level ended, ignore taps
-                        // here, so you don't accidentally mash restart and lose the chance to undo
-                    }
-                    else if (this.level.state === 'success') {
-                        // Advance to the next level
-                        // TODO game ending?
-                        this.conductor.change_level(this.conductor.level_index + 1);
-                    }
-                    else {
-                        // Restart
-                        this.restart_level();
-                    }
-                    return;
-                }
-            }
-
-            // Figure out where these touches are, relative to the game area
+            // Figure out where these touches are, relative to the player
             // TODO allow starting a level without moving?
-            let rect = this.level_el.getBoundingClientRect();
+            // TODO if you don't move the touch, the player can pass it and will keep going in that
+            // direction?
+            let [px, py] = this.level.player.visual_position();
+            px += 0.5;
+            py += 0.5;
             for (let touch of ev.changedTouches) {
-                // Normalize touch coordinates to [-1, 1]
-                let rx = (touch.clientX - rect.left) / rect.width * 2 - 1;
-                let ry = (touch.clientY - rect.top) / rect.height * 2 - 1;
+                let [x, y] = this.renderer.point_to_real_cell_coords(touch.clientX, touch.clientY);
+                let dx = x - px;
+                let dy = y - py;
+                console.log(dx, dy);
                 // Divine a direction from the results
                 let action;
-                if (Math.abs(rx) > Math.abs(ry)) {
-                    if (rx < 0) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    if (dx < 0) {
                         action = 'left';
                     }
                     else {
@@ -721,7 +759,7 @@ class Player extends PrimaryView {
                     }
                 }
                 else {
-                    if (ry < 0) {
+                    if (dy < 0) {
                         action = 'up';
                     }
                     else {
@@ -745,9 +783,29 @@ class Player extends PrimaryView {
         };
         touch_target.addEventListener('touchend', dismiss_touches);
         touch_target.addEventListener('touchcancel', dismiss_touches);
+        // Also grab taps on the overlay, for the specific case that tapping on the end of level
+        // tally advances to the next level
+        this.overlay_message_el.addEventListener('touchstart', ev => {
+            if (this.state === 'stopped') {
+                if (this.touch_restart_delay.active) {
+                    // If it's only been a very short time since the level ended, ignore taps
+                    // here, so you don't accidentally mash restart and lose the chance to undo
+                }
+                else if (this.level.state === 'success') {
+                    // Advance to the next level
+                    this.proceed_to_next_level();
+                }
+                else {
+                    // Restart
+                    this.restart_level();
+                }
+                ev.stopPropagation();
+                ev.preventDefault();
+            }
+        });
 
         // When we lose focus, act as though every key was released, and pause the game
-        window.addEventListener('blur', ev => {
+        window.addEventListener('blur', () => {
             this.current_keys.clear();
             this.current_touches = {};
 
@@ -1253,9 +1311,13 @@ class Player extends PrimaryView {
         this.update_tileset();
         this.renderer.set_level(this.level);
         this.update_viewport_size();
+        this.number_el.textContent = stored_level.number;
         // TODO base this on a hash of the UA + some identifier for the pack + the level index.  StoredLevel doesn't know its own index atm...
         this.change_music(this.conductor.level_index % SOUNDTRACK.length);
         this._clear_state();
+
+        this.mobile_prev_button.disabled = ! (this.conductor.level_index - 1 >= 0);
+        this.mobile_next_button.disabled = ! (this.conductor.level_index + 1 < this.conductor.stored_game.level_metadata.length);
 
         this._update_replay_ui();
         if (this.debug.enabled) {
@@ -1298,6 +1360,7 @@ class Player extends PrimaryView {
         this.current_keyring = {};
         this.current_toolbelt = [];
         this.previous_hint_tile = null;
+        this.current_touches = {};
 
         this.chips_el.classList.remove('--done');
         this.time_el.classList.remove('--frozen');
@@ -1326,6 +1389,15 @@ class Player extends PrimaryView {
         this.update_ui();
         // Force a redraw, which won't happen on its own since the game isn't running
         this._redraw();
+    }
+
+    proceed_to_next_level() {
+        // Advance to the next level, if any
+        if (! this.conductor.maybe_change_level(this.conductor.level_index + 1)) {
+            // TODO for CCLs, by default, this is also at level 144
+            this.set_state('ended');
+            this.update_ui();
+        }
     }
 
     open_level_browser() {
@@ -1732,46 +1804,52 @@ class Player extends PrimaryView {
             this.current_keys_new.clear();
         }
 
+        // TODO wonder if some other update_ui stuff could move here
+        this.pause_button.classList.toggle('--pressed', this.state === 'paused');
+        this.rewind_button.classList.toggle('--pressed', this.state === 'rewinding');
+
         // Populate the overlay
-        let overlay_reason = '';
-        let overlay_top = '';
-        let overlay_middle = null;
-        let overlay_bottom = '';
-        let overlay_keyhint = '';
+        let overlay = this.overlay_message_el;
+        overlay.setAttribute('data-reason', this.state);
+        this.overlay_message_el.textContent = '';
         if (this.state === 'waiting') {
-            overlay_reason = 'waiting';
             let stored_level = this.level.stored_level;
-            overlay_top = `#${stored_level.number} ${stored_level.title}`;
-            overlay_middle = "Ready!";
-            if (stored_level.author) {
-                overlay_bottom = `by ${stored_level.author}`;
-            }
+            overlay.append(
+                mk('h1', this.conductor.stored_game.title),
+                mk('h2', `#${stored_level.number} ${stored_level.title}`),
+                mk('h3', stored_level.author ? `by ${stored_level.author}` : "\u200b"),
+                this.mobile_pause_menu,
+                mk('p.-controls-hint', "WASD/↑←↓→ to move · space to start without moving"),
+            );
         }
         else if (this.state === 'paused') {
-            overlay_reason = 'paused';
-            overlay_bottom = "/// paused ///";
+            overlay.append(mk('h2', "/// paused ///"));
             if (this.using_touch) {
-                overlay_keyhint = "tap to resume";
+                overlay.append(mk('p.-controls-hint', "tap to resume"));
             }
             else {
-                overlay_keyhint = "press P to resume";
+                overlay.append(mk('p.-controls-hint', "press space to resume"));
             }
+            overlay.append(this.mobile_pause_menu);
         }
         else if (this.state === 'stopped') {
             // Set a timer before tapping the overlay will restart/advance
             this.touch_restart_delay.set(2000);
 
             if (this.level.state === 'failure') {
-                overlay_reason = 'failure';
-                overlay_top = "whoops";
+                overlay.setAttribute('data-reason', 'failure');
                 let obits = OBITUARIES[this.level.fail_reason] ?? OBITUARIES['generic'];
-                overlay_bottom = random_choice(obits);
+                overlay.append(
+                    mk('h2', "whoops" + random_choice(["", "!", "?", "..."])),
+                    mk('h3', random_choice(obits)),
+                    this.mobile_pause_menu,
+                );
                 if (this.using_touch) {
                     // TODO touch gesture to rewind?
-                    overlay_keyhint = "tap to try again, or use undo/rewind above";
+                    overlay.append(mk('p.-controls-hint', "tap to try again, or use undo/rewind above"));
                 }
                 else {
-                    overlay_keyhint = "press space to try again, or Z to rewind";
+                    overlay.append(mk('p.-controls-hint', "press space to try again, or Z to rewind"));
                 }
             }
             else {
@@ -1831,7 +1909,7 @@ class Player extends PrimaryView {
                     this.conductor.save_savefile();
                 }
 
-                overlay_reason = 'success';
+                overlay.setAttribute('data-reason', 'success');
                 let base = level_number * 500;
                 let time = scorecard.time * 10;
                 // Pick a success message
@@ -1841,89 +1919,110 @@ class Player extends PrimaryView {
                     time_left_fraction = this.level.time_remaining / TICS_PER_SECOND / this.level.stored_level.time_limit;
                 }
 
+                let quip;
                 if (this.level.chips_remaining > 0) {
-                    overlay_top = random_choice([
+                    quip = random_choice([
                         "socket to em!", "go bug blaster!",
                     ]);
                 }
                 else if (this.level.time_remaining && this.level.time_remaining < 200) {
-                    overlay_top = random_choice([
+                    quip = random_choice([
                         "in the nick of time!", "cutting it close!",
                     ]);
                 }
                 else if (time_left_fraction !== null && time_left_fraction > 1) {
-                    overlay_top = random_choice([
+                    quip = random_choice([
                         "faster than light!", "impossible speed!", "pipelined!",
                     ]);
                 }
                 else if (time_left_fraction !== null && time_left_fraction > 0.75) {
-                    overlay_top = random_choice([
+                    quip = random_choice([
                         "lightning quick!", "nice speedrun!", "eagerly evaluated!",
                     ]);
                 }
                 else {
-                    overlay_top = random_choice([
+                    quip = random_choice([
                         "you did it!", "nice going!", "great job!", "good work!",
                         "onwards!", "tubular!", "yeehaw!", "hot damn!",
                         "alphanumeric!", "nice dynamic typing!",
                     ]);
                 }
+                overlay.append(mk('h2', quip));
+
+                let bonus = this.level.bonus_points;
+                let score_improvement = mk('div.-improvement');
+                let time_improvement = mk('div.-improvement');
+                if (! old_scorecard) {
+                    score_improvement.classList.add('--new');
+                    score_improvement.append(mk('h3', "first time!"));
+                    // leave time improvement empty since we already say it's first time once
+                }
+                else {
+                    let diff = scorecard.score - old_scorecard.score;
+                    let diffstr = Math.abs(diff).toLocaleString();
+                    if (diff > 0) {
+                        score_improvement.classList.add('--better');
+                        score_improvement.append(mk('h4', "new record!"), mk('p', `+ ${diffstr}`));
+                    }
+                    else if (diff === 0) {
+                        score_improvement.classList.add('--same');
+                        score_improvement.append(mk('h4', "tied your best!"), mk('p', `+ ${diffstr}`));
+                    }
+                    else {
+                        score_improvement.classList.add('--worse');
+                        score_improvement.append(mk('h4', "vs your best:"), mk('p', `− ${diffstr}`));
+                    }
+
+                    diff = scorecard.abstime - old_scorecard.abstime;
+                    diffstr = util.format_duration(Math.abs(diff) / TICS_PER_SECOND, 2);
+                    if (diff < 0) {
+                        time_improvement.classList.add('--better');
+                        time_improvement.append(mk('h4', "new record!"), mk('p', `− ${diffstr}`));
+                    }
+                    else if (diff === 0) {
+                        time_improvement.classList.add('--same');
+                        time_improvement.append(mk('h4', "tied your best!"), mk('p', `− ${diffstr}`));
+                    }
+                    else {
+                        time_improvement.classList.add('--worse');
+                        time_improvement.append(mk('h4', "vs your best:"), mk('p', `+ ${diffstr}`));
+                    }
+                }
+
+                overlay.append(mk('div.scoreboard',
+                    // base score + time bonus + score bonus
+                    mk('div.-subscore', mk('h4', "base score"), mk('p', base.toLocaleString())),
+                    mk('div.-subscore',
+                        mk('h4', "time bonus"),
+                        mk('p', time ? `+ ${time.toLocaleString()}` : "—")),
+                    mk('div.-subscore',
+                        mk('h4', "score bonus"),
+                        mk('p', bonus ? `+ ${bonus.toLocaleString()}` : "—")),
+                    // level score ... first time OR new record OR x short
+                    mk('div.-level-score',
+                        mk('h4', "level score"),
+                        mk('p', scorecard.score.toLocaleString(), scorecard.aid === 0 ? "★" : "")),
+                    score_improvement,
+
+                    mk('div.-level-score',
+                        mk('h4', "real time"),
+                        mk('p', util.format_duration(scorecard.abstime / TICS_PER_SECOND, 2))),
+                    time_improvement,
+
+                    // TODO show your level time, time improvement...?  not quite enough room...
+                    mk('div.-total-score',
+                        mk('h4', "total score"),
+                        mk('p', savefile.total_score.toLocaleString())),
+                    mk('div.-total-score',
+                        mk('h4', "total real time"),
+                        mk('p', util.format_duration(savefile.total_abstime / TICS_PER_SECOND, 2))),
+                ));
+
                 if (this.using_touch) {
-                    overlay_keyhint = "tap to move on";
+                    overlay.append(mk('p.-controls-hint', "tap to move on"));
                 }
                 else {
-                    overlay_keyhint = "press space to move on";
-                }
-
-                overlay_middle = mk('dl.score-chart',
-                    mk('dt.-component', "base score"),
-                    mk('dd.-component', base.toLocaleString()),
-                    mk('dt.-component', "time bonus"),
-                    mk('dd.-component', `+ ${time.toLocaleString()}`),
-                );
-                if (this.level.bonus_points) {
-                    overlay_middle.append(
-                        mk('dt.-component', "score bonus"),
-                        mk('dd.-component', `+ ${this.level.bonus_points.toLocaleString()}`),
-                    );
-                }
-
-                // TODO show your time, time improvement...?
-                let score_dd = mk('dd.-sum', scorecard.score.toLocaleString());
-                if (scorecard.aid === 0) {
-                    score_dd.append(mk('span.-star', "★"));
-                }
-                overlay_middle.append(mk('dt.-sum', "level score"), score_dd);
-
-                overlay_middle.append(
-                    mk('dt.-total', "total score"),
-                    mk('dd.-total', savefile.total_score.toLocaleString()),
-                );
-
-                if (old_scorecard && old_scorecard.score < scorecard.score) {
-                    overlay_middle.append(
-                        mk('dd.-total', `(+ ${(scorecard.score - old_scorecard.score).toLocaleString()})`),
-                    );
-                }
-                else {
-                    overlay_middle.append(mk('dd', ""));
-                }
-
-                overlay_middle.append(
-                    mk('dd', ""),
-                    mk('dt', "real time"),
-                    mk('dd', util.format_duration(scorecard.abstime / TICS_PER_SECOND, 2)),
-                    mk('dt.-total', "total time"),
-                    mk('dd.-total', util.format_duration(savefile.total_abstime / TICS_PER_SECOND, 2)),
-                );
-
-                if (old_scorecard && old_scorecard.abstime > scorecard.abstime) {
-                    overlay_middle.append(
-                        mk('dd.-total', `(− ${util.format_duration((old_scorecard.abstime - scorecard.abstime) / TICS_PER_SECOND, 2)})`),
-                    );
-                }
-                else {
-                    overlay_middle.append(mk('dd', ""));
+                    overlay.append(mk('p.-controls-hint', "press space to move on"));
                 }
             }
         }
@@ -1932,20 +2031,17 @@ class Player extends PrimaryView {
             // long and clunky?  final score is not interesting.  could show other stats, total
             // time, say something if you skipped levels...
             // TODO disable most of the ui here?  probably??
-            overlay_reason = 'ended';
-            overlay_middle = "Congratulations!  You solved a whole set of funny escape rooms.  But is that the best score you can manage...?";
             let savefile = this.conductor.current_pack_savefile;
-            overlay_bottom = `FINAL SCORE: ${savefile.total_score.toLocaleString()}`;
+            overlay.append(
+                mk('p.-score', "FINAL SCORE", mk('output', savefile.total_score.toLocaleString())),
+                this.mobile_pause_menu,
+                mk('p.-congrats', "Congratulations!  You beat some funny escape rooms.  Now improve your score!"),
+            );
             // TODO press spacebar to...  restart from level 1??  or what
         }
-        this.overlay_message_el.setAttribute('data-reason', overlay_reason);
-        this.overlay_message_el.querySelector('.-top').textContent = overlay_top;
-        this.overlay_message_el.querySelector('.-bottom').textContent = overlay_bottom;
-        this.overlay_message_el.querySelector('.-keyhint').textContent = overlay_keyhint;
-        let middle = this.overlay_message_el.querySelector('.-middle');
-        middle.textContent = '';
-        if (overlay_middle) {
-            middle.append(overlay_middle);
+        else {
+            // 'playing', or bogus
+            overlay.setAttribute('data-reason', '');
         }
 
         // Ask the renderer to apply a rewind effect only when rewinding, or when paused from
@@ -2041,6 +2137,7 @@ class Player extends PrimaryView {
         if (style['display'] === 'none')
             return;
 
+        let tolerable_fraction = 1;
         let is_portrait = window.matchMedia('(orientation: portrait)').matches;
         // The base size is the size of the canvas, i.e. the viewport size times the tile size --
         // but note that we have 2x4 extra tiles for the inventory depending on layout, plus half a
@@ -2061,8 +2158,16 @@ class Player extends PrimaryView {
         // between the player container and the game area
         let player = this.root.querySelector('#player-main');
         let game_area = this.root.querySelector('#player-game-area');
-        let avail_x = this.root.offsetWidth - (player.offsetWidth - game_area.offsetWidth);
-        let avail_y = this.root.offsetHeight - (player.offsetHeight - game_area.offsetHeight);
+        let avail_x = this.root.offsetWidth;
+        let avail_y = this.root.offsetHeight;
+        if (is_portrait) {
+            // Controls are only on top and bottom; anything to the sides is empty space
+            avail_y -= (player.offsetHeight - game_area.offsetHeight);
+        }
+        else {
+            // Other way around
+            avail_x -= (player.offsetWidth - game_area.offsetWidth);
+        }
         // ...minus the width of the debug panel, if visible
         if (this.debug.enabled) {
             avail_x -= this.root.querySelector('#player-debug').getBoundingClientRect().width;
@@ -2072,6 +2177,7 @@ class Player extends PrimaryView {
         avail_y -= Math.max(0, document.body.scrollHeight - document.body.clientHeight);
 
         let dpr = window.devicePixelRatio || 1.0;
+        dpr *= tolerable_fraction;
         // Divide to find the biggest scale that still fits.  Leave a LITTLE wiggle room for pixel
         // rounding and breathing (except on small screens, where being too small REALLY hurts), but
         // not too much since there's already a flex gap between the game and header/footer
@@ -2411,7 +2517,7 @@ class Splash extends PrimaryView {
 
     _create_pack_element(ident, packdef = null) {
         let title = packdef ? packdef.title : ident;
-        let button = mk('button.button-big', {type: 'button'}, title);
+        let button = mk('button.button-big.button-bright', {type: 'button'}, title);
         if (packdef) {
             button.addEventListener('click', ev => {
                 this.conductor.fetch_pack(packdef.path, packdef.title);
@@ -2959,26 +3065,6 @@ class OptionsOverlay extends DialogOverlay {
         );
     }
 
-    _add_options(root, options) {
-        let ul = mk('ul');
-        root.append(ul);
-        for (let optdef of options) {
-            let li = mk('li');
-            let label = mk('label.option');
-            label.append(mk('input', {type: 'checkbox', name: optdef.key}));
-            label.append(mk('span.option-label', optdef.label));
-            let help_icon = mk('img.-help', {src: 'icons/help.png'});
-            label.append(help_icon);
-            let help_text = mk('p.option-help', optdef.note);
-            li.append(label);
-            li.append(help_text);
-            ul.append(li);
-            help_icon.addEventListener('click', ev => {
-                help_text.classList.toggle('--visible');
-            });
-        }
-    }
-
     close() {
         // Ensure the player's music is set back how we left it
         this.conductor.player.update_music_playback_state();
@@ -3387,7 +3473,7 @@ class LevelBrowserOverlay extends DialogOverlay {
         this.set_title("choose a level");
         let thead = mk('thead', mk('tr',
             mk('th', ""),
-            mk('th', "Level"),
+            mk('th.-title', "Level"),
             mk('th.-time', mk('abbr', {
                 title: "Time left on the clock when you finished; doesn't exist for untimed levels",
             }, "Best clock")),
@@ -3414,6 +3500,7 @@ class LevelBrowserOverlay extends DialogOverlay {
                 }
 
                 // 0 means untimed level
+                // FIXME wait, not necessarily!  shouldn't untimed be null?
                 if (scorecard.time !== 0) {
                     time = String(scorecard.time);
                 }
@@ -3504,7 +3591,7 @@ class LevelBrowserOverlay extends DialogOverlay {
 
         table.append(mk('tfoot', mk('tr',
             mk('th'),
-            mk('th', "Total"),
+            mk('th.-title', "Total"),
             mk('th'),
             mk('th.-time', util.format_duration(total_abstime / TICS_PER_SECOND, 2)),
             mk('th.-score', total_score.toLocaleString()),
@@ -3834,6 +3921,14 @@ class Conductor {
         this.editor.load_game(stored_game);
 
         return this.change_level(level_index ?? (this.current_pack_savefile.current_level ?? 1) - 1);
+    }
+
+    // Attempt to change level, but silently return false if the given level number doesn't exist
+    maybe_change_level(level_index) {
+        if (level_index < 0 || level_index >= this.stored_game.level_metadata.length)
+            return false;
+
+        return this.change_level(level_index);
     }
 
     change_level(level_index) {

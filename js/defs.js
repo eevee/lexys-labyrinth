@@ -127,8 +127,8 @@ export const PICKUP_PRIORITIES = {
 
 export const COMPAT_RULESET_LABELS = {
     lexy: "Lexy",
-    steam: "Steam/CC2",
-    'steam-strict': "Steam/CC2 (strict)",
+    steam: "Steam",
+    'steam-strict': "Steam (strict)",
     lynx: "Lynx",
     ms: "Microsoft",
     custom: "Custom",

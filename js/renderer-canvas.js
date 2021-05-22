@@ -112,12 +112,30 @@ export class CanvasRenderer {
         return [x, y];
     }
 
+    point_to_cell_coords(client_x, client_y) {
+        let rect = this.canvas.getBoundingClientRect();
+        let scale_x = rect.width / this.canvas.width;
+        let scale_y = rect.height / this.canvas.height;
+        let x = Math.floor((client_x - rect.x) / scale_x / this.tileset.size_x + this.viewport_x);
+        let y = Math.floor((client_y - rect.y) / scale_y / this.tileset.size_y + this.viewport_y);
+        return [x, y];
+    }
+
     real_cell_coords_from_event(ev) {
         let rect = this.canvas.getBoundingClientRect();
         let scale_x = rect.width / this.canvas.width;
         let scale_y = rect.height / this.canvas.height;
         let x = (ev.clientX - rect.x) / scale_x / this.tileset.size_x + this.viewport_x;
         let y = (ev.clientY - rect.y) / scale_y / this.tileset.size_y + this.viewport_y;
+        return [x, y];
+    }
+
+    point_to_real_cell_coords(client_x, client_y) {
+        let rect = this.canvas.getBoundingClientRect();
+        let scale_x = rect.width / this.canvas.width;
+        let scale_y = rect.height / this.canvas.height;
+        let x = (client_x - rect.x) / scale_x / this.tileset.size_x + this.viewport_x;
+        let y = (client_y - rect.y) / scale_y / this.tileset.size_y + this.viewport_y;
         return [x, y];
     }
 

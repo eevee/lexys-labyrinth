@@ -1,4 +1,4 @@
-import { mk } from './util.js';
+import { mk, mk_svg } from './util.js';
 
 // Superclass for the main display modes: the player, the editor, and the splash screen
 export class PrimaryView {
@@ -283,6 +283,13 @@ export function flash_button(button) {
     window.setTimeout(() => {
         button.classList.remove('--button-glow');
     }, 500);
+}
+
+export function svg_icon(name) {
+    return mk_svg(
+        'svg.svg-icon',
+        {viewBox: '0 0 16 16'},
+        mk_svg('use', {href: `#svg-icon-${name}`}));
 }
 
 export function load_json_from_storage(key) {
