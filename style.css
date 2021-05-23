@@ -1715,7 +1715,7 @@ body.--debug .player-overlay-message {
     font-family: serif;
     color: hsl(220, 20%, 80%);
     background: url(#svg-icon-hint) hsl(220, 10%, 10%);
-    border: 3px double hsl(220, 10%, 20%);
+    border: 3px double hsl(220, 10%, 15%);
 }
 #player-game-area > .player-hint-wrapper > .player-hint-bg-icon {
     position: absolute;
