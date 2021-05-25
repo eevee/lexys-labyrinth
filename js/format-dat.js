@@ -391,6 +391,10 @@ function parse_level(bytes, number) {
             // Password, but not encoded
             // TODO ???
         }
+        else if (field_type === 0x09) {
+            // EXTENSION: Author, including trailing NUL
+            level.author = util.string_from_buffer_ascii(bytes, p, field_length - 1);
+        }
         else if (field_type === 0x0a) {
             // Initial actor order
             // TODO ??? should i...  trust this...
@@ -638,6 +642,10 @@ export function synthesize_level(stored_level) {
     // anything outside it (yyyyikes!), probably should sub with ? or something
     if (hint_text !== null) {
         add_block(7, util.bytestring_to_buffer(hint_text.substring(0, 127) + "\0"));
+    }
+    // EXTENSION: Author's name, if present
+    if (stored_level.author) {
+        add_block(9, util.bytestring_to_buffer(stored_level.author.substring(0, 255) + "\0"));
     }
     // Monster positions (dumb as hell and only used in MS mode)
     if (monster_coords.length > 0) {
