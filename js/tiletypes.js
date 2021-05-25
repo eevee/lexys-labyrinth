@@ -33,7 +33,7 @@ function _define_door(key) {
 }
 function _define_gate(key) {
     return {
-        layer: LAYERS.item,
+        layer: LAYERS.canopy,
         // Doors can be opened by ice blocks, but not dirt blocks or monsters
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         blocks(me, level, other) {
@@ -2738,7 +2738,8 @@ const TILE_TYPES = {
         ...COMMON_TOOL,
         on_depart(me, level, other) {
             if (other.type.is_real_player && ! me.cell.get_item_mod()) {
-                level._set_tile_prop(me, 'timer', 85);  // FIXME??  wiki just says about 4.3 seconds what
+                // FIXME wiki just says about 4.3 seconds; more likely this is exactly 255 frames
+                level._set_tile_prop(me, 'timer', 85);
                 level.transmute_tile(me, 'dynamite_lit');
                 // Actors are expected to have this, so populate it
                 level._set_tile_prop(me, 'movement_cooldown', 0);
