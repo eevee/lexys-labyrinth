@@ -50,11 +50,15 @@ export class CanvasRenderer {
             this.viewport_size_x = 9;
             this.viewport_size_y = 9;
         }
-        this.canvas = mk('canvas', {width: tileset.size_x * this.viewport_size_x, height: tileset.size_y * this.viewport_size_y});
-        this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
-        this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
-        this.canvas.style.setProperty('--tile-width', `${tileset.size_x}px`);
-        this.canvas.style.setProperty('--tile-height', `${tileset.size_y}px`);
+        this.canvas = this.constructor.make_canvas(
+            tileset.size_x * this.viewport_size_x,
+            tileset.size_y * this.viewport_size_y);
+        if (this.canvas.style) {
+            this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
+            this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
+            this.canvas.style.setProperty('--tile-width', `${tileset.size_x}px`);
+            this.canvas.style.setProperty('--tile-height', `${tileset.size_y}px`);
+        }
         this.ctx = this.canvas.getContext('2d');
         this.viewport_x = 0;
         this.viewport_y = 0;
@@ -68,6 +72,11 @@ export class CanvasRenderer {
         this.update_rate = 3;
         this.use_cc2_anim_speed = false;
         this.active_player = null;
+    }
+
+    // This is here so command-line Node stuff can swap it out for the canvas package
+    static make_canvas(w, h) {
+        return mk('canvas', {width: w, height: h});
     }
 
     set_level(level) {
@@ -154,12 +163,14 @@ export class CanvasRenderer {
             return;
 
         this.viewport_dirty = false;
-        this.canvas.setAttribute('width', this.tileset.size_x * this.viewport_size_x);
-        this.canvas.setAttribute('height', this.tileset.size_y * this.viewport_size_y);
-        this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
-        this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
-        this.canvas.style.setProperty('--tile-width', `${this.tileset.size_x}px`);
-        this.canvas.style.setProperty('--tile-height', `${this.tileset.size_y}px`);
+        this.canvas.width = this.tileset.size_x * this.viewport_size_x;
+        this.canvas.height = this.tileset.size_y * this.viewport_size_y;
+        if (this.canvas.style) {
+            this.canvas.style.setProperty('--viewport-width', this.viewport_size_x);
+            this.canvas.style.setProperty('--viewport-height', this.viewport_size_y);
+            this.canvas.style.setProperty('--tile-width', `${this.tileset.size_x}px`);
+            this.canvas.style.setProperty('--tile-height', `${this.tileset.size_y}px`);
+        }
     }
 
     draw(update_progress = 0) {
@@ -277,7 +288,6 @@ export class CanvasRenderer {
                 // If they killed the player, indicate as such.  The indicator has an arrow at the
                 // bottom; align that about 3/4 up the killer
                 if (actor.is_killer && '#killer-indicator' in this.tileset.layout) {
-                    packet.y -= Math.floor(th * 3/4) / th;
                     this.tileset.draw_type('#killer-indicator', null, packet);
                 }
             }
@@ -426,7 +436,7 @@ export class CanvasRenderer {
     // or something, or maybe make this a tileset method
     draw_single_tile_type(name, tile = null, canvas = null, x = 0, y = 0) {
         if (! canvas) {
-            canvas = mk('canvas', {width: this.tileset.size_x, height: this.tileset.size_y});
+            canvas = this.constructor.make_canvas(this.tileset.size_x, this.tileset.size_y);
         }
         let ctx = canvas.getContext('2d');
 

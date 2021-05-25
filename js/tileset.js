@@ -512,6 +512,8 @@ export const CC2_TILESET_LAYOUT = {
         __special__: 'animated',
         duration: 20,
         cc2_duration: 16,
+        // Nice little touch: green teleporters aren't animated in sync
+        positionally_hashed: true,
         all: [[4, 19], [5, 19], [6, 19], [7, 19]],
     },
     teleport_yellow: {
@@ -1016,10 +1018,10 @@ export const LL_TILESET_LAYOUT = {
     '#supported-versions': new Set(['cc1', 'cc2', 'll']),
     '#wire-width': 1/16,
     '#editor-arrows': {
-        north: [6, 1],
-        east: [6.5, 1],
-        south: [6, 1.5],
-        west: [6.5, 1.5],
+        north: [25, 31],
+        east: [25.5, 31],
+        south: [25, 31.5],
+        west: [25.5, 31.5],
     },
 
     // ------------------------------------------------------------------------------------------------
@@ -1113,24 +1115,29 @@ export const LL_TILESET_LAYOUT = {
     },
     no_player1_sign: [10, 2],
     no_player2_sign: [10, 3],
-    '#active-player-background': [11, 2],
-    // TODO dopps can push but i don't think they have any other visuals
-    doppelganger1: {
-        __special__: 'overlay',
-        base: [11, 3],
-        overlay: 'player',
-    },
-    doppelganger2: {
-        __special__: 'overlay',
-        base: [11, 3],
-        overlay: 'player2',
-    },
+    socket: [11, 2],
     exit: {
         __special__: 'animated',
         duration: 16,
         all: [[12, 2], [13, 2], [14, 2], [15, 2]],
     },
-    socket: [12, 3],
+    '#active-player-background': {
+        __special__: 'animated',
+        duration: 120,
+        all: [[12, 3], [13, 3]],
+    },
+    // TODO dopps can push but i don't think they have any other visuals
+    doppelganger1: {
+        __special__: 'overlay',
+        base: [14, 3],
+        overlay: 'player',
+    },
+    doppelganger2: {
+        __special__: 'overlay',
+        base: [14, 3],
+        overlay: 'player2',
+    },
+    '#killer-indicator': [15, 3],
 
     floor_custom_green: [0, 4],
     floor_custom_pink: [1, 4],
@@ -1148,7 +1155,7 @@ export const LL_TILESET_LAYOUT = {
         open: [1, 7],
     },
     cracked_floor: [2, 6],
-    
+
     thin_walls: {
         __special__: 'thin_walls',
         thin_walls_ns: [8, 4],
@@ -1415,6 +1422,8 @@ export const LL_TILESET_LAYOUT = {
         __special__: 'animated',
         duration: 20,
         cc2_duration: 16,
+        // Nice little touch: green teleporters aren't animated in sync
+        positionally_hashed: true,
         all: [[4, 23], [5, 23], [6, 23], [7, 23]],
     },
     teleport_blue_exit: {
