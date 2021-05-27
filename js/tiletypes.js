@@ -1387,6 +1387,20 @@ const TILE_TYPES = {
         populate_defaults(me) {
             me.color = 'red';
         },
+        on_ready(me, level) {
+            if (me.cell.get_actor()) {
+                // Already held down, make sure the level knows
+                level.sokoban_buttons_unpressed[me.color] -= 1;
+                if (level.sokoban_buttons_unpressed[me.color] === 0) {
+                    for (let cell of level.linear_cells) {
+                        let terrain = cell.get_terrain();
+                        if (terrain.type.name === 'sokoban_wall' && terrain.color === me.color) {
+                            terrain.type = TILE_TYPES['sokoban_floor'];
+                        }
+                    }
+                }
+            }
+        },
         on_arrive(me, level, other) {
             if (other.type.name === 'sokoban_block' && me.color !== other.color)
                 return;
