@@ -2181,7 +2181,7 @@ class Player extends PrimaryView {
         // Divide to find the biggest scale that still fits.  Leave a LITTLE wiggle room for pixel
         // rounding and breathing (except on small screens, where being too small REALLY hurts), but
         // not too much since there's already a flex gap between the game and header/footer
-        let maxfrac = is_portrait ? 1 : 0.99;
+        let maxfrac = is_portrait ? 1 : 0.95;
         let scale = Math.floor(maxfrac * dpr * Math.min(avail_x / base_x, avail_y / base_y));
         if (scale <= 1) {
             scale = 1;
