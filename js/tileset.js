@@ -2168,6 +2168,12 @@ export class Tileset {
                 // Rounding smooths out float error (assuming the framerate never exceeds 1000)
                 let chunk_size = 1 / duration;
                 let segment = Math.floor(Math.round(start_time * 1000) / 1000 % chunk_size);
+                // It's possible for the segment to be negative here in very obscure cases (notably,
+                // if an actor in Lynx mode starts out on an open trap, it'll be artificially
+                // accelerated and will appear to have started animating before the first tic)
+                if (segment < 0) {
+                    segment += chunk_size;
+                }
                 p = (p + segment) * duration;
             }
             else if (duration > 1) {
