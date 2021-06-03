@@ -1,13 +1,14 @@
+import { readFile, stat } from 'fs/promises';
+import { performance } from 'perf_hooks';
+import { argv, exit, stderr, stdout } from 'process';
+
 import { compat_flags_for_ruleset } from '../defs.js';
 import { Level } from '../game.js';
 import * as format_c2g from '../format-c2g.js';
 import * as format_dat from '../format-dat.js';
 import * as format_tws from '../format-tws.js';
 import * as util from '../util.js';
-
-import { argv, exit, stderr, stdout } from 'process';
-import { opendir, readFile, stat } from 'fs/promises';
-import { performance } from 'perf_hooks';
+import { LocalDirectorySource } from './lib.js';
 
 // TODO arguments:
 // - custom pack to test, possibly its solutions, possibly its ruleset (or default to steam-strict/lynx)
@@ -17,39 +18,6 @@ import { performance } from 'perf_hooks';
 // - support for xfails somehow?
 // TODO use this for a test suite
 
-export class LocalDirectorySource extends util.FileSource {
-    constructor(root) {
-        super();
-        this.root = root;
-        this.files = {};
-        this._loaded_promise = this._scan_dir('/');
-    }
-
-    async _scan_dir(path) {
-        let dir = await opendir(this.root + path);
-        for await (let dirent of dir) {
-            if (dirent.isDirectory()) {
-                await this._scan_dir(path + dirent.name + '/');
-            }
-            else {
-                let filepath = path + dirent.name;
-                this.files[filepath.toLowerCase()] = filepath;
-                if (this.files.size > 2000)
-                    throw `way, way too many files in local directory source ${this.root}`;
-            }
-        }
-    }
-
-    async get(path) {
-        let realpath = this.files[path.toLowerCase()];
-        if (realpath) {
-            return (await readFile(this.root + realpath)).buffer;
-        }
-        else {
-            throw new Error(`No such file: ${path}`);
-        }
-    }
-}
 
 function pad(s, n) {
     return s.substring(0, n).padEnd(n, " ");
@@ -330,7 +298,7 @@ may be run with different compat modes.
                   don't support built-in replays, this must be a TWS file
   -l            level range to play back; either 'all' or a string like '1-4,10'
   -f            force the next argument to be interpreted as a file path, if for
-                    some perverse reason you have a level file named '-c'
+                  some perverse reason you have a level file named '-c'
   -h, --help    ignore other arguments and show this message
 
 Supports the same filetypes as Lexy's Labyrinth: DAT/CCL, C2M, or a directory

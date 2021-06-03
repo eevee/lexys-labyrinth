@@ -560,7 +560,7 @@ const TILE_TYPES = {
             // FIXME it's possible to have a switch but no tracks...
             me.track_switch = null;  // null, or 0-5 indicating the active switched track
             // If there's already an actor on us, it's treated as though it entered the tile moving
-            // in this direction, which is given in the save file and defaults to zero i.e. north
+            // in this direction
             me.entered_direction = 'north';
         },
         // TODO feel like "ignores" was the wrong idea and there should just be some magic flags for

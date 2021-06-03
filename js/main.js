@@ -12,7 +12,7 @@ import { PrimaryView, DialogOverlay, ConfirmOverlay, flash_button, svg_icon, loa
 import { Editor } from './editor/main.js';
 import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
-import { Tileset, TILESET_LAYOUTS } from './tileset.js';
+import { Tileset, TILESET_LAYOUTS, parse_tile_world_large_tileset, infer_tileset_from_image } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, mk_svg } from './util.js';
 import * as util from './util.js';
@@ -747,7 +747,6 @@ class Player extends PrimaryView {
                 let [x, y] = this.renderer.point_to_real_cell_coords(touch.clientX, touch.clientY);
                 let dx = x - px;
                 let dy = y - py;
-                console.log(dx, dy);
                 // Divine a direction from the results
                 let action;
                 if (Math.abs(dx) > Math.abs(dy)) {
@@ -1216,7 +1215,7 @@ class Player extends PrimaryView {
             }
             tooltip.inventory.textContent = inv.join(', ');
         });
-        this.renderer.canvas.addEventListener('mouseout', ev => {
+        this.renderer.canvas.addEventListener('mouseout', () => {
             if (this.debug.actor_tooltip) {
                 this.debug.actor_tooltip.element.classList.remove('--visible');
             }
@@ -1268,6 +1267,7 @@ class Player extends PrimaryView {
 
         if (this.level) {
             this.update_tileset();
+            this.adjust_scale();  // in case tile size changed
             this._redraw();
         }
     }
@@ -2771,7 +2771,7 @@ class OptionsOverlay extends DialogOverlay {
                 // FIXME again, wait, or what?
                 img.src = newdef.src;
                 newdef.tileset = new Tileset(
-                    img, TILESET_LAYOUTS[newdef.layout] ?? 'lexy',
+                    img, TILESET_LAYOUTS[newdef.layout ?? 'lexy'],
                     newdef.tile_width, newdef.tile_height);
             }
             this.available_tilesets[ident] = newdef;
@@ -2797,11 +2797,14 @@ class OptionsOverlay extends DialogOverlay {
                 }
             }
             select.value = conductor.options.tilesets[slot.ident] ?? 'lexy';
-            select.addEventListener('change', ev => {
+            if (! conductor._loaded_tilesets[select.value]) {
+                select.value = 'lexy';
+            }
+            select.addEventListener('change', () => {
                 this.update_selected_tileset(slot.ident);
             });
 
-            let el = mk('dd.option-tileset', select);
+            let el = mk('dd.option-tileset', select, " ");
             this.tileset_els[slot.ident] = el;
             this.update_selected_tileset(slot.ident);
 
@@ -2811,19 +2814,13 @@ class OptionsOverlay extends DialogOverlay {
             );
         }
         this.custom_tileset_counter = 1;
-        dl.append(
-            mk('dd',
-                "You can also load a custom tileset, which will be saved in browser storage.",
-                mk('br'),
-                "Supports the Tile World static layout and the Steam layout.",
-                mk('br'),
-                "(Steam tilesets can be found in ", mk('code', "data/bmp"), " within the game's local files).",
-                mk('br'),
-                mk('input', {type: 'file', name: 'custom-tileset'}),
-                mk('div.option-load-tileset',
-                ),
-            ),
-        );
+        dl.append(mk('dd',
+            mk('p', "You can also load a custom tileset, which will be saved in browser storage."),
+            mk('p', "MSCC, Tile World, and Steam layouts are all supported."),
+            mk('p', "(Steam tilesets can be found in ", mk('code', "data/bmp"), " within the game's local files)."),
+            mk('p', mk('input', {type: 'file', name: 'custom-tileset'})),
+            mk('div.option-load-tileset'),
+        ));
 
         // Load current values
         this.root.elements['music-volume'].value = this.conductor.options.music_volume ?? 1.0;
@@ -2836,7 +2833,7 @@ class OptionsOverlay extends DialogOverlay {
             this._load_custom_tileset(ev.target.files[0]);
         });
 
-        this.add_button("save", ev => {
+        this.add_button("save", () => {
             let options = this.conductor.options;
             options.music_volume = parseFloat(this.root.elements['music-volume'].value);
             options.music_enabled = this.root.elements['music-enabled'].checked;
@@ -2904,7 +2901,7 @@ class OptionsOverlay extends DialogOverlay {
 
             this.close();
         });
-        this.add_button("forget it", ev => {
+        this.add_button("forget it", () => {
             // Restore the player's music volume just in case
             if (this.original_music_volume !== undefined) {
                 this.conductor.player.music_audio_el.volume = this.original_music_volume;
@@ -2950,101 +2947,57 @@ class OptionsOverlay extends DialogOverlay {
         // ratio, hopefully.  Note that the LL layout is currently in progress so we can't
         // really detect that, but there can't really be alternatives to it either
         let result_el = this.root.querySelector('.option-load-tileset');
-        let layout;
-        // Note: Animated Tile World has a 1px gap between rows to indicate where animations
-        // start and also a single extra 1px column on the left, which I super don't support :(
-        for (let try_layout of Object.values(TILESET_LAYOUTS)) {
-            let [w, h] = try_layout['#dimensions'];
-            // XXX this assumes square tiles, but i have written mountains of code that doesn't!
-            if (img.naturalWidth * h === img.naturalHeight * w) {
-                layout = try_layout;
-                break;
-            }
+        let tileset;
+        try {
+            tileset = infer_tileset_from_image(img, (w, h) => mk('canvas', {width: w, height: h}));
         }
-        if (! layout) {
+        catch (e) {
+            console.error(e);
             result_el.textContent = '';
-            result_el.append("This doesn't look like a tileset layout I understand, sorry!");
+            result_el.append(mk('p', "This doesn't look like a tileset layout I understand, sorry!"));
             return;
         }
 
-        // Load into a canvas and erase the background, if any
-        let canvas = mk('canvas', {width: img.naturalWidth, height: img.naturalHeight});
-        let ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        this._erase_background(canvas, ctx, layout);
-
-        let [w, h] = layout['#dimensions'];
-        let tw = Math.floor(img.naturalWidth / w);
-        let th = Math.floor(img.naturalHeight / h);
-        let tileset = new Tileset(canvas, layout, tw, th);
         let renderer = new CanvasRenderer(tileset, 1);
         result_el.textContent = '';
+        let buttons = mk('p');
         result_el.append(
-            `This looks like a ${layout['#name']} tileset with ${tw}×${th} tiles.`,
-            mk('br'),
-            renderer.draw_single_tile_type('player'),
-            renderer.draw_single_tile_type('chip'),
-            renderer.draw_single_tile_type('exit'),
-            mk('br'),
+            mk('p', `This looks like a ${tileset.layout['#name']} tileset with ${tileset.size_x}×${tileset.size_y} tiles.`),
+            mk('p',
+                renderer.draw_single_tile_type('player'),
+                renderer.draw_single_tile_type('chip'),
+                renderer.draw_single_tile_type('exit'),
+            ),
+            buttons,
         );
 
         let tileset_ident = `new-custom-${this.custom_tileset_counter}`;
         let tileset_name = `New custom ${this.custom_tileset_counter}`;
         this.custom_tileset_counter += 1;
         for (let slot of TILESET_SLOTS) {
-            if (! layout['#supported-versions'].has(slot.ident))
+            if (! tileset.layout['#supported-versions'].has(slot.ident))
                 continue;
 
             let dd = this.tileset_els[slot.ident];
             let select = dd.querySelector('select');
             select.append(mk('option', {value: tileset_ident}, tileset_name));
 
-            let button = util.mk_button(`Use for ${slot.name}`, ev => {
+            let button = util.mk_button(`Use for ${slot.name}`, () => {
                 select.value = tileset_ident;
                 this.update_selected_tileset(slot.ident);
             });
-            result_el.append(button);
+            buttons.append(button);
         }
 
         this.available_tilesets[tileset_ident] = {
             ident: tileset_ident,
             name: tileset_name,
-            canvas: canvas,
+            canvas: tileset.image,
             tileset: tileset,
-            layout: layout['#ident'],
-            tile_width: tw,
-            tile_height: th,
+            layout: tileset.layout['#ident'],
+            tile_width: tileset.size_x,
+            tile_height: tileset.size_y,
         };
-    }
-
-    _erase_background(canvas, ctx, layout) {
-        let trans = layout['#transparent-color'];
-        if (! trans)
-            return;
-
-        let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let px = image_data.data;
-        if (trans.length === 2) {
-            // Read the background color from a pixel
-            let i = trans[0] + trans[1] * canvas.width;
-            if (px[i + 3] === 0) {
-                // Background is already transparent!
-                return;
-            }
-            trans = [px[i], px[i + 1], px[i + 2], px[i + 3]];
-        }
-
-        for (let i = 0; i < canvas.width * canvas.height * 4; i += 4) {
-            if (px[i] === trans[0] && px[i + 1] === trans[1] &&
-                px[i + 2] === trans[2] && px[i + 3] === trans[3])
-            {
-                px[i] = 0;
-                px[i + 1] = 0;
-                px[i + 2] = 0;
-                px[i + 3] = 0;
-            }
-        }
-        ctx.putImageData(image_data, 0, 0);
     }
 
     update_selected_tileset(slot_ident) {
@@ -3671,49 +3624,12 @@ class Conductor {
         }
         this.set_compat(this._compat_ruleset, this.compat);
 
-        this._loaded_tilesets = {};  // tileset ident => tileset
-        this.tilesets = {};  // slot (game type) => tileset
-        for (let slot of TILESET_SLOTS) {
-            let tileset_ident = this.options.tilesets[slot.ident] ?? 'lexy';
-            let tilesetdef;
-            if (BUILTIN_TILESETS[tileset_ident]) {
-                tilesetdef = BUILTIN_TILESETS[tileset_ident];
-            }
-            else {
-                tilesetdef = load_json_from_storage(CUSTOM_TILESET_PREFIX + tileset_ident);
-                if (! tilesetdef) {
-                    tileset_ident = 'lexy';
-                    tilesetdef = BUILTIN_TILESETS['lexy'];
-                }
-            }
-
-            if (this._loaded_tilesets[tileset_ident]) {
-                this.tilesets[slot.ident] = this._loaded_tilesets[tileset_ident];
-                continue;
-            }
-
-            let layout = TILESET_LAYOUTS[tilesetdef.layout] ?? 'lexy';
-            let img = new Image;
-            img.src = tilesetdef.src;
-            // FIXME wait on the img to decode (well i can't in a constructor), or what?
-            let tileset = new Tileset(img, layout, tilesetdef.tile_width, tilesetdef.tile_height);
-            this.tilesets[slot.ident] = tileset;
-            this._loaded_tilesets[tileset_ident] = tileset;
-        }
-
-        this.splash = new Splash(this);
-        this.editor = new Editor(this);
-        this.player = new Player(this);
-        this.reload_all_options();
-
-        this.loaded_in_editor = false;
-        this.loaded_in_player = false;
 
         // Bind the header buttons
-        document.querySelector('#main-options').addEventListener('click', ev => {
+        document.querySelector('#main-options').addEventListener('click', () => {
             new OptionsOverlay(this).open();
         });
-        document.querySelector('#main-compat').addEventListener('click', ev => {
+        document.querySelector('#main-compat').addEventListener('click', () => {
             new CompatOverlay(this).open();
         });
         document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[this._compat_ruleset ?? 'custom'];
@@ -3787,6 +3703,77 @@ class Conductor {
                 ).open();
             }
         });
+    }
+
+    // Finish loading; must call me!
+    async load() {
+        this._loaded_tilesets = {};  // tileset ident => tileset
+        this.tilesets = {};  // slot (game type) => tileset
+        let tileset_promises = [];
+        for (let slot of TILESET_SLOTS) {
+            let tileset_ident = this.options.tilesets[slot.ident] ?? 'lexy';
+            let tilesetdef;
+            if (BUILTIN_TILESETS[tileset_ident]) {
+                tilesetdef = BUILTIN_TILESETS[tileset_ident];
+            }
+            else {
+                tilesetdef = load_json_from_storage(CUSTOM_TILESET_PREFIX + tileset_ident);
+                if (! tilesetdef) {
+                    tileset_ident = 'lexy';
+                    tilesetdef = BUILTIN_TILESETS['lexy'];
+                }
+            }
+
+            if (this._loaded_tilesets[tileset_ident]) {
+                this.tilesets[slot.ident] = this._loaded_tilesets[tileset_ident];
+                continue;
+            }
+
+            let layout = TILESET_LAYOUTS[tilesetdef.layout];
+            let img = new Image;
+            // FIXME make a promise out of the image, don't finish loading until it's done; note
+            // that the editor relies on having a tileset available immediately, ugh
+            let promise = util.promise_event(img, 'load', 'error').then(() => {
+                let tileset;
+                if (tilesetdef.layout === 'tw-animated') {
+                    // This layout is dynamic so we need to reparse it
+                    let canvas = mk('canvas', {width: img.naturalWidth, height: img.naturalHeight});
+                    canvas.getContext('2d').drawImage(img, 0, 0);
+                    try {
+                        tileset = parse_tile_world_large_tileset(canvas);
+                    }
+                    catch (err) {
+                        // Don't break the whole app on a broken stored tileset; instead leave it
+                        // empty and default to Lexy in a moment
+                        console.error(err);
+                        return;
+                    }
+                }
+                else {
+                    tileset = new Tileset(img, layout, tilesetdef.tile_width, tilesetdef.tile_height);
+                }
+                this.tilesets[slot.ident] = tileset;
+                this._loaded_tilesets[tileset_ident] = tileset;
+            });
+            img.src = tilesetdef.src;
+            tileset_promises.push(promise);
+        }
+
+        await Promise.all(tileset_promises);
+        // Replace any missing tilesets with the default
+        for (let slot of TILESET_SLOTS) {
+            if (slot.ident !== 'll' && ! (slot.ident in this.tilesets)) {
+                this.tilesets[slot.ident] = this.tilesets['ll'];
+            }
+        }
+
+        this.splash = new Splash(this);
+        this.editor = new Editor(this);
+        this.player = new Player(this);
+        this.reload_all_options();
+
+        this.loaded_in_editor = false;
+        this.loaded_in_player = false;
 
         this.update_nav_buttons();
         document.querySelector('#loading').setAttribute('hidden', '');
@@ -4118,17 +4105,13 @@ async function main() {
     let query = new URLSearchParams(location.search);
 
     let conductor = new Conductor();
+    await conductor.load();
     window._conductor = conductor;
 
     // Allow putting us in debug mode automatically if we're in development
     if (local && query.has('debug')) {
         conductor.player._start_in_debug_mode = true;
     }
-
-    // Cheap hack to make sure the tileset(s) have loaded before we go any further
-    // FIXME this can wait until we switch, it's not needed for the splash screen!  but it's here
-    // for the moment because of ?level, do a better fix
-    await Promise.all(Object.values(conductor.tilesets).map(tileset => tileset.image.decode()));
 
     // Pick a level (set)
     // TODO error handling  :(

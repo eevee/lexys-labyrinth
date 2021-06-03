@@ -371,8 +371,8 @@ export const CC2_TILESET_LAYOUT = {
     walker: {
         __special__: 'double-size-monster',
         base: [0, 13],
-        vertical: [[1, 13], [2, 13], [3, 13], [4, 13], [5, 13], [6, 13], [7, 13]],
-        horizontal: [[8, 13], [10, 13], [12, 13], [14, 13], [8, 14], [10, 14], [12, 14]],
+        vertical: [null, [1, 13], [2, 13], [3, 13], [4, 13], [5, 13], [6, 13], [7, 13]],
+        horizontal: [null, [8, 13], [10, 13], [12, 13], [14, 13], [8, 14], [10, 14], [12, 14]],
     },
     helmet: [0, 14],
     stopwatch_toggle: [14, 14],
@@ -381,8 +381,8 @@ export const CC2_TILESET_LAYOUT = {
     blob: {
         __special__: 'double-size-monster',
         base: [0, 15],
-        vertical: [[1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15]],
-        horizontal: [[8, 15], [10, 15], [12, 15], [14, 15], [8, 16], [10, 16], [12, 16]],
+        vertical: [null, [1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15]],
+        horizontal: [null, [8, 15], [10, 15], [12, 15], [14, 15], [8, 16], [10, 16], [12, 16]],
     },
     // (cc2 editor copy/paste outline)
     floor_mimic: {
@@ -830,6 +830,7 @@ export const CC2_TILESET_LAYOUT = {
     ..._omit_custom_lexy_vfx,
 };
 
+// (This is really the MSCC layout, but often truncated in such a way that only TW can use it)
 export const TILE_WORLD_TILESET_LAYOUT = {
     '#ident': 'tw-static',
     '#name': "Tile World (static)",
@@ -876,9 +877,13 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     ice_ne: [1, 11],
     ice_se: [1, 12],
     ice_sw: [1, 13],
-    // FIXME this stuff needs like reveal and whatnot
-    fake_wall: [1, 14],
-    fake_floor: [1, 15],
+    fake_floor: {
+        __special__: 'perception',
+        modes: new Set(['palette', 'editor', 'xray']),
+        hidden: [1, 15],
+        revealed: [1, 14],
+    },
+    fake_wall: [1, 15],
 
     // TODO overlay buffer?? [2, 0]
     thief_tools: [2, 1],
@@ -1003,6 +1008,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
         },
         skating: 'normal',
         forced: 'normal',
+        drowned: [3, 3],
         burned: [3, 4],  // TODO TW's lynx mode doesn't use this!  it uses the generic failed
         exploded: [3, 6],
         failed: [3, 7],
@@ -2012,7 +2018,15 @@ export const LL_TILESET_LAYOUT = {
 };
 
 export const TILESET_LAYOUTS = {
+    // MS layout, either abbreviated or full
     'tw-static': TILE_WORLD_TILESET_LAYOUT,
+    // "Large" (and dynamic, so not actually defined here) TW layout
+    'tw-animated': {
+        '#ident': 'tw-animated',
+        '#name': "Tile World (animated)",
+        '#supported-versions': new Set(['cc1']),
+        ..._omit_custom_lexy_vfx,
+    },
     cc2: CC2_TILESET_LAYOUT,
     lexy: LL_TILESET_LAYOUT,
 };
@@ -2188,7 +2202,13 @@ export class Tileset {
             n = drawspec.idle_frame_index ?? 0;
         }
 
-        packet.blit(...frames[n]);
+        if (drawspec.triple) {
+            // Lynx-style big splashes and explosions
+            packet.blit(...frames[n], 0, 0, 3, 3, -1, -1);
+        }
+        else {
+            packet.blit(...frames[n]);
+        }
     }
 
     // Simple overlaying used for green/purple toggle tiles and doppelgangers.  Draw the base (a
@@ -2371,20 +2391,22 @@ export class Tileset {
     _draw_thin_walls_cc1(drawspec, name, tile, packet) {
         let edges = tile ? tile.edges : 0x0f;
 
-        // This is kinda best-effort since the tiles are opaque and not designed to combine
-        if (edges === (DIRECTIONS['south'].bit | DIRECTIONS['east'].bit)) {
+        // This is kinda best-effort since the tiles are not designed to combine
+        if ((edges & DIRECTIONS['south'].bit) && (edges & DIRECTIONS['east'].bit)) {
             packet.blit(...drawspec.southeast);
-        }
-        else if (edges & DIRECTIONS['north'].bit) {
-            packet.blit(...drawspec.north);
-        }
-        else if (edges & DIRECTIONS['east'].bit) {
-            packet.blit(...drawspec.east);
         }
         else if (edges & DIRECTIONS['south'].bit) {
             packet.blit(...drawspec.south);
         }
-        else {
+        else if (edges & DIRECTIONS['east'].bit) {
+            packet.blit(...drawspec.east);
+        }
+
+        if (edges & DIRECTIONS['north'].bit) {
+            packet.blit(...drawspec.north);
+        }
+
+        if (edges & DIRECTIONS['west'].bit) {
             packet.blit(...drawspec.west);
         }
     }
@@ -2441,50 +2463,67 @@ export class Tileset {
     }
 
     _draw_double_size_monster(drawspec, name, tile, packet) {
-        // CC2's tileset has double-size art for blobs and walkers that spans the tile they're
+        // CC2 and Lynx have double-size art for blobs and walkers that spans the tile they're
         // moving from AND the tile they're moving into.
-        // First, of course, this only happens if they're moving at all.
-        if (! tile || ! tile.movement_speed) {
+        // CC2 also has an individual 1×1 static tile, used in all four directions.
+        if ((! tile || ! tile.movement_speed) && drawspec.base) {
             this.draw_drawspec(drawspec.base, name, tile, packet);
             return;
         }
 
-        // They only support horizontal and vertical moves, not all four directions.  The other two
-        // directions are simply the animations played in reverse.
-        let axis_cels;
+        // CC2 only supports horizontal and vertical moves, not all four directions.  The other two
+        // directions are the animations played in reverse.  TW's large layout supports all four.
+        let direction = (tile ? tile.direction : null) ?? 'south';
+        let axis_cels = drawspec[direction];
         let w = 1, h = 1, x = 0, y = 0, sx = 0, sy = 0, reverse = false;
-        if (tile.direction === 'north') {
-            axis_cels = drawspec.vertical;
-            reverse = true;
+        if (direction === 'north') {
+            if (! axis_cels) {
+                axis_cels = drawspec.vertical;
+                reverse = true;
+            }
             h = 2;
             sy = 1;
         }
-        else if (tile.direction === 'south') {
-            axis_cels = drawspec.vertical;
+        else if (direction === 'south') {
+            if (! axis_cels) {
+                axis_cels = drawspec.vertical;
+            }
             h = 2;
             y = -1;
             sy = -1;
         }
-        else if (tile.direction === 'west') {
-            axis_cels = drawspec.horizontal;
-            reverse = true;
+        else if (direction === 'west') {
+            if (! axis_cels) {
+                axis_cels = drawspec.horizontal;
+                reverse = true;
+            }
             w = 2;
             sx = 1;
         }
-        else if (tile.direction === 'east') {
-            axis_cels = drawspec.horizontal;
+        else if (direction === 'east') {
+            if (! axis_cels) {
+                axis_cels = drawspec.horizontal;
+            }
             w = 2;
             x = -1;
             sx = -1;
         }
 
-        let p = tile.movement_progress(packet.update_progress, packet.update_rate);
-        let index = Math.floor(p * (axis_cels.length + 1));
-        if (index === 0 || index > axis_cels.length) {
+        let index;
+        if (tile && tile.movement_speed) {
+            let p = tile.movement_progress(packet.update_progress, packet.update_rate);
+            index = Math.floor(p * axis_cels.length);
+        }
+        else {
+            index = drawspec.idle_frame_index ?? 0;
+        }
+        let cel = reverse ? axis_cels[axis_cels.length - index + 1] : axis_cels[index];
+
+        if (cel === null) {
+            // null means use the 1x1 "base" tile instead
             packet.blit_aligned(...drawspec.base, 0, 0, 1, 1, sx, sy);
         }
         else {
-            let cel = reverse ? axis_cels[axis_cels.length - index] : axis_cels[index - 1];
             packet.blit_aligned(...cel, 0, 0, w, h, x, y);
         }
     }
@@ -2689,4 +2728,433 @@ export class Tileset {
             return [x0, y0, x1, y1];
         }
     }
+}
+
+
+const TILE_WORLD_LARGE_TILE_ORDER = [
+    'floor',
+    'force_floor_n', 'force_floor_w', 'force_floor_s', 'force_floor_e', 'force_floor_all',
+    'ice', 'ice_se', 'ice_sw', 'ice_ne', 'ice_nw',
+    'gravel', 'dirt', 'water', 'fire', 'bomb', 'trap', 'thief_tools', 'hint',
+    'button_blue', 'button_green', 'button_red', 'button_brown',
+    'teleport_blue', 'wall',
+    '#thin_walls/north', '#thin_walls/west', '#thin_walls/south', '#thin_walls/east', '#thin_walls/southeast',
+    'fake_wall', 'green_floor', 'green_wall', 'popwall', 'cloner',
+    'door_red', 'door_blue', 'door_yellow', 'door_green',
+    'socket', 'exit', 'chip',
+    'key_red', 'key_blue', 'key_yellow', 'key_green',
+    'cleats', 'suction_boots', 'fire_boots', 'flippers',
+    // Bogus tiles
+    'bogus_exit_1', 'bogus_exit_2',
+    'bogus_player_burned_fire', 'bogus_player_burned', 'bogus_player_win', 'bogus_player_drowned',
+    'player1_swimming_n', 'player1_swimming_w', 'player1_swimming_s', 'player1_swimming_e',
+    // Actors
+    '#player1-moving', '#player1-pushing', 'dirt_block',
+    'tank_blue', 'ball', 'glider', 'fireball', 'bug', 'paramecium', 'teeth', 'blob', 'walker',
+    // Animations, which can be 3×3
+    'splash', 'explosion', 'disintegrate',
+];
+export function parse_tile_world_large_tileset(canvas) {
+    let ctx = canvas.getContext('2d');
+    let tw = null;
+    let layout = {
+        ...TILESET_LAYOUTS['tw-animated'],
+        player: {
+            __special__: 'visual-state',
+            normal: 'moving',
+            blocked: 'pushing',
+            moving: {},
+            pushing: {},
+            swimming: 'moving',
+            // TODO in tile world, skating and forced both just slide the static sprite
+            skating: 'moving',
+            forced: 'moving',
+            exited: 'normal',
+            // FIXME really these should play to completion, like lynx...
+            drowned: null,
+            // slimed: n/a
+            burned: null,
+            exploded: null,
+            failed: null,
+            // fell: n/a
+        },
+        thin_walls: {
+            __special__: 'thin_walls_cc1',
+        },
+    };
+    let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let px = image_data.data;  // 🙄
+
+    let uses_alpha;
+    let is_transparent;
+    if (px[7] === 0) {
+        uses_alpha = true;
+        // FIXME does tile world actually support this?  and handle it like this?  probably find out
+        is_transparent = i => {
+            return px[i + 3] === 0;
+        };
+    }
+    else {
+        uses_alpha = false;
+        let r = px[4];
+        let g = px[5];
+        let b = px[6];
+        is_transparent = i => {
+            return px[i] === r && px[i + 1] === g && px[i + 2] === b;
+        };
+    }
+
+    // Scan out the rows first so we know them ahead of time
+    let th = null;
+    let prev_y = null;
+    let row_heights = {};  // first row => height in tiles
+    for (let y = 0; y < canvas.height; y++) {
+        let i = y * canvas.width * 4;
+        if (is_transparent(i))
+            continue;
+
+        if (prev_y !== null) {
+            let row_height = y - prev_y - 1;  // fencepost
+            if (th === null) {
+                th = row_height;
+                if (th < 4)
+                    throw new Error(`Bad tile height ${th}, this may not be a TW large tileset`);
+            }
+            if (row_height % th !== 0) {
+                console.warn("Tile height seems to be", th, "but row between", prev_y, "and", y,
+                    "is not an integral multiple");
+            }
+            row_heights[prev_y] = row_height / th;
+        }
+        prev_y = y;
+    }
+
+    let i = 0;
+    let t = 0;
+    for (let y = 0; y < canvas.height; y++) {
+        let is_divider_row = false;
+        let prev_x = null;
+        for (let x = 0; x < canvas.width; x++) {
+            let trans = is_transparent(i);
+            if (trans && ! uses_alpha) {
+                px[i] = px[i + 1] = px[i + 2] = px[i + 3] = 0;
+            }
+            i += 4;
+
+            if (x === 0) {
+                is_divider_row = ! trans;
+                prev_x = x;
+                continue;
+            }
+            if (! (is_divider_row && ! trans))
+                continue;
+            if (t >= TILE_WORLD_LARGE_TILE_ORDER.length)
+                continue;
+
+            // This is an opaque pixel in a divider row, which marks the end of a tile
+            if (tw === null) {
+                tw = x - prev_x;
+                if (tw < 4)
+                    throw new Error(`Bad tile width ${tw}, this may not be a TW large tileset`);
+            }
+
+            let name = TILE_WORLD_LARGE_TILE_ORDER[t];
+            let spec;
+            let num_columns = (x - prev_x) / tw;
+            let num_rows = row_heights[y];
+            if (num_rows === 0 || num_columns === 0)
+                throw new Error(`Bad row/column count (${num_rows}, ${num_columns}) at ${x}, ${y}`);
+            let x0 = (prev_x + 1) / tw;
+            let y0 = (y + 1) / th;
+            if (num_rows === 1 && num_columns === 1) {
+                spec = [x0, y0];
+            }
+            else if (59 <= t && t <= 71) {
+                // Actors have special layouts, one of several options
+                if (num_rows === 1 && num_columns === 2) {
+                    // NS, EW
+                    spec = {
+                        north: [x0, y0],
+                        south: [x0, y0],
+                        east: [x0 + 1, y0],
+                        west: [x0 + 1, y0],
+                    };
+                }
+                else if (num_rows === 1 && num_columns === 4) {
+                    // N, W, S, E
+                    spec = {
+                        north: [x0, y0],
+                        west: [x0 + 1, y0],
+                        south: [x0 + 2, y0],
+                        east: [x0 + 3, y0],
+                    };
+                }
+                else if (num_rows === 2 && num_columns === 1) {
+                    // NS; EW
+                    spec = {
+                        north: [x0, y0],
+                        south: [x0, y0],
+                        east: [x0, y0 + 1],
+                        west: [x0, y0 + 1],
+                    };
+                }
+                else if (num_rows === 2 && num_columns === 2) {
+                    // N, W; S, E
+                    spec = {
+                        north: [x0, y0],
+                        west: [x0 + 1, y0],
+                        south: [x0, y0 + 1],
+                        east: [x0 + 1, y0 + 1],
+                    };
+                }
+                else if (num_rows === 2 && num_columns === 8) {
+                    // N N N N, W W W W; S S S S, E E E E
+                    spec = {
+                        __special__: 'animated',
+                        // FIXME when global?
+                        global: false,
+                        duration: 1,
+                        idle_frame_index: 1,
+                        north: [[x0, y0], [x0 + 1, y0], [x0 + 2, y0], [x0 + 3, y0]],
+                        west: [[x0 + 4, y0], [x0 + 5, y0], [x0 + 6, y0], [x0 + 7, y0]],
+                        south: [[x0, y0 + 1], [x0 + 1, y0 + 1], [x0 + 2, y0 + 1], [x0 + 3, y0 + 1]],
+                        east: [[x0 + 4, y0 + 1], [x0 + 5, y0 + 1], [x0 + 6, y0 + 1], [x0 + 7, y0 + 1]],
+                    };
+                }
+                else if (num_rows === 2 && num_columns === 16) {
+                    // Double-tile arranged as:
+                    // NNNN SSSS WWWWWWWW
+                    // NNNN SSSS EEEEEEEE
+                    spec = {
+                        __special__: 'double-size-monster',
+                        idle_frame_index: 3,
+                        north: [[x0, y0], [x0 + 1, y0], [x0 + 2, y0], [x0 + 3, y0]],
+                        south: [[x0 + 4, y0], [x0 + 5, y0], [x0 + 6, y0], [x0 + 7, y0]],
+                        west: [[x0 + 8, y0], [x0 + 10, y0], [x0 + 12, y0], [x0 + 14, y0]],
+                        east: [[x0 + 8, y0 + 1], [x0 + 10, y0 + 1], [x0 + 12, y0 + 1], [x0 + 14, y0 + 1]],
+                    };
+                }
+                else {
+                    throw new Error(`Invalid layout for ${name}: ${num_columns} tiles wide by ${num_rows} tiles tall`);
+                }
+            }
+            else if (t >= 72) {
+                // One of the explosion animations; should be a single row, must be 6 or 12 frames,
+                // BUT is allowed to be triple size
+                spec = {
+                    __special__: 'animated',
+                    global: false,
+                    duration: 1,
+                    all: [],
+                };
+                for (let f = 0; f < num_columns; f += num_rows) {
+                    spec['all'].push([x0 + f, y0]);
+                }
+
+                if (num_rows === 3) {
+                    spec.triple = true;
+                }
+            }
+            else {
+                // Everyone else is a static tile, automatically animated
+                // TODO enforce only one row
+                spec = {
+                    __special__: 'animated',
+                    duration: 3 * num_columns,  // one tic per frame
+                    all: [],
+                };
+                for (let f = 0; f < num_columns; f++) {
+                    spec['all'].push([x0 + f, y0]);
+                }
+            }
+
+            // Handle some special specs
+            if (name === '#player1-moving') {
+                layout['player']['moving'] = spec;
+            }
+            else if (name === '#player1-pushing') {
+                layout['player']['pushing'] = spec;
+            }
+            else if (name.startsWith('#thin_walls/')) {
+                let direction = name.match(/\/(\w+)$/)[1];
+                layout['thin_walls'][direction] = spec;
+
+                // Erase the floor
+                for (let f = 0; f < num_columns; f += 1) {
+                    erase_thin_wall_floor(
+                        image_data, prev_x + 1 + f * tw, y + 1,
+                        layout['floor'][0] * tw, layout['floor'][1] * th,
+                        tw, th);
+                }
+            }
+            else {
+                layout[name] = spec;
+
+                if (name === 'floor') {
+                    layout['wall_appearing'] = spec;
+                    layout['wall_invisible'] = spec;
+                }
+                else if (name === 'wall') {
+                    layout['wall_invisible_revealed'] = spec;
+                }
+                else if (name === 'fake_wall') {
+                    layout['fake_floor'] = spec;
+                }
+                else if (name === 'splash' || name === 'explosion') {
+                    let n = Math.floor(0.25 * spec['all'].length);
+                    let cel = spec['all'][n];
+                    if (spec.triple) {
+                        cel = [cel[0] + 1, cel[1] + 1];
+                    }
+                    // TODO remove these sometime
+                    if (name === 'splash') {
+                        layout['player']['drowned'] = cel;
+                    }
+                    else if (name === 'explosion') {
+                        layout['player']['burned'] = cel;
+                        layout['player']['exploded'] = cel;
+                        layout['player']['failed'] = cel;
+                    }
+                }
+            }
+
+            prev_x = x;
+            t += 1;
+        }
+    }
+    ctx.putImageData(image_data, 0, 0);
+
+    return new Tileset(canvas, layout, tw, th);
+}
+
+// MSCC repeats all the actor columns three times: once for an actor on top of normal floor (which
+// we don't use because we expect everything transparent), once for the actor on a solid background,
+// and once for a mask used to cut it out.  Combine (3) with (2) and write it atop (1).
+function apply_mscc_mask(canvas) {
+    let ctx = canvas.getContext('2d');
+    let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let px = image_data.data;
+    let tw = canvas.width / 13;
+    let dest_x0 = tw * 4;
+    let src_x0 = tw * 7;
+    let mask_x0 = tw * 10;
+    for (let y = 0; y < canvas.height; y++) {
+        let dest_i = (y * canvas.width + dest_x0) * 4;
+        let src_i = (y * canvas.width + src_x0) * 4;
+        let mask_i = (y * canvas.width + mask_x0) * 4;
+        for (let dx = 0; dx < tw * 3; dx++) {
+            px[dest_i + 0] = px[src_i + 0];
+            px[dest_i + 1] = px[src_i + 1];
+            px[dest_i + 2] = px[src_i + 2];
+            px[dest_i + 3] = px[mask_i];
+
+            dest_i += 4;
+            src_i += 4;
+            mask_i += 4;
+        }
+    }
+
+    // Resizing the canvas clears it, so do that first
+    canvas.width = canvas.height / 16 * 7;
+    ctx.putImageData(image_data, 0, 0);
+}
+
+// CC1 considered thin walls to be a floor tile, but CC2 makes them a transparent overlay.  LL is
+// designed to work like CC2, so to make a CC1 tileset work, try erasing the floor out from under a
+// thin wall.  This is extremely best-effort; it won't work very well if the wall has a shadow or
+// happens to share some pixels with the floor below.
+function erase_thin_wall_floor(image_data, wall_x0, wall_y0, floor_x0, floor_y0, tile_width, tile_height) {
+    let px = image_data.data;
+    for (let dy = 0; dy < tile_height; dy++) {
+        let wall_i = ((wall_y0 + dy) * image_data.width + wall_x0) * 4;
+        let floor_i = ((floor_y0 + dy) * image_data.width + floor_x0) * 4;
+        for (let dx = 0; dx < tile_width; dx++) {
+            if (px[wall_i + 3] > 0 && px[wall_i] === px[floor_i] &&
+                px[wall_i + 1] === px[floor_i + 1] && px[wall_i + 2] === px[floor_i + 2])
+            {
+                px[wall_i + 3] = 0;
+            }
+            wall_i += 4;
+            floor_i += 4;
+        }
+    }
+}
+function erase_mscc_thin_wall_floors(image_data, layout, tw, th) {
+    let floor_spec = layout['floor'];
+    let floor_x = floor_spec[0] * tw;
+    let floor_y = floor_spec[1] * th;
+    for (let direction of ['north', 'south', 'east', 'west', 'southeast']) {
+        let spec = layout['thin_walls'][direction];
+        erase_thin_wall_floor(image_data, spec[0] * tw, spec[1] * th, floor_x, floor_y, tw, th);
+    }
+}
+
+function erase_tileset_background(image_data, layout) {
+    let trans = layout['#transparent-color'];
+    if (! trans)
+        return;
+
+    let px = image_data.data;
+    if (trans.length === 2) {
+        // Read the background color from a pixel
+        let i = trans[0] + trans[1] * image_data.width;
+        if (px[i + 3] === 0) {
+            // Background is already transparent!
+            return;
+        }
+        trans = [px[i], px[i + 1], px[i + 2], px[i + 3]];
+    }
+
+    for (let i = 0; i < image_data.width * image_data.height * 4; i += 4) {
+        if (px[i] === trans[0] && px[i + 1] === trans[1] &&
+            px[i + 2] === trans[2] && px[i + 3] === trans[3])
+        {
+            px[i] = 0;
+            px[i + 1] = 0;
+            px[i + 2] = 0;
+            px[i + 3] = 0;
+        }
+    }
+
+    return true;
+}
+
+export function infer_tileset_from_image(img, make_canvas) {
+    // 99% of the time, we'll need a canvas anyway, so might as well create it now
+    let canvas = make_canvas(img.naturalWidth, img.naturalHeight);
+    let ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    // Determine the layout from the image dimensions.  Try the usual suspects first
+    let aspect_ratio = img.naturalWidth / img.naturalHeight;
+    // Special case: the "full" MS layout, which MSCC uses internally; it's the same layout as TW's
+    // abbreviated one, but it needs its "mask" columns converted to a regular alpha channel
+    if (aspect_ratio === 13/16) {
+        apply_mscc_mask(canvas);
+        aspect_ratio = 7/16;
+    }
+
+    for (let layout of Object.values(TILESET_LAYOUTS)) {
+        if (! ('#dimensions' in layout))
+            continue;
+        let [w, h] = layout['#dimensions'];
+        // XXX this assumes square tiles, but i have written mountains of code that doesn't!
+        if (w / h === aspect_ratio) {
+            let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let did_anything = erase_tileset_background(image_data.data, layout);
+            let tw = Math.floor(canvas.width / w);
+            let th = Math.floor(canvas.height / h);
+            if (layout['#ident'] === 'tw-static') {
+                did_anything = true;
+                erase_mscc_thin_wall_floors(image_data, layout, tw, th);
+            }
+            if (did_anything) {
+                ctx.putImageData(image_data, 0, 0);
+            }
+            return new Tileset(canvas, layout, tw, th);
+        }
+    }
+
+    // Anything else could be Tile World's "large" layout, which has no fixed dimensions
+    return parse_tile_world_large_tileset(canvas);
 }
