@@ -3141,7 +3141,7 @@ export function infer_tileset_from_image(img, make_canvas) {
         // XXX this assumes square tiles, but i have written mountains of code that doesn't!
         if (w / h === aspect_ratio) {
             let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            let did_anything = erase_tileset_background(image_data.data, layout);
+            let did_anything = erase_tileset_background(image_data, layout);
             let tw = Math.floor(canvas.width / w);
             let th = Math.floor(canvas.height / h);
             if (layout['#ident'] === 'tw-static') {
