@@ -1377,6 +1377,9 @@ const TILE_TYPES = {
         populate_defaults(me) {
             me.color = 'red';
         },
+        on_clone(me, original) {
+            me.color = original.color;
+        },
         visual_state(me) {
             return me.color ?? 'red';
         },
