@@ -2637,7 +2637,7 @@ export class Level extends LevelInterface {
             return;
         }
 
-		//only used for glass block atm
+        //only used for glass block atm
         if (actor.type.on_death) {
             actor.type.on_death(actor, this);
         }
@@ -2805,11 +2805,11 @@ export class Level extends LevelInterface {
             // to destroy it
             return;
         }
-		
-		//only used for electrified floor atm
-		if (tile.type.on_death && !tile.type.is_actor) {
-			tile.type.on_death(tile, this);
-		}
+        
+        //only used for electrified floor atm
+        if (tile.type.on_death && !tile.type.is_actor) {
+            tile.type.on_death(tile, this);
+        }
 
         let old_type = tile.type;
         let new_type = TILE_TYPES[name];
