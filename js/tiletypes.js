@@ -2952,7 +2952,7 @@ const TILE_TYPES = {
             {
                 if (level.ankh_tile) {
                     level.transmute_tile(level.ankh_tile, 'floor');
-                    level.spawn_animation(level.ankh_tile, 'puff');
+                    level.spawn_animation(level.ankh_tile.cell, 'puff');
                 }
                 let old_tile = level.ankh_tile;
                 level.ankh_tile = terrain;
