@@ -1978,6 +1978,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
         on_begin(me, level) {
+			level._set_tile_prop(me, 'is_active', false);
             level._set_tile_prop(me, 'wire_directions', 15);
             level.recalculate_circuitry_next_wire_phase = true;
         },
