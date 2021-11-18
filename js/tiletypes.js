@@ -1226,10 +1226,10 @@ const TILE_TYPES = {
                 return null;
             }
         },
-        on_bumped(me, level, other) {
+        on_bumped(me, level, other, direction) {
             if (other.type.name === 'boulder') {
                 level._set_tile_prop(me, 'rolling', true);
-                level._set_tile_prop(me, 'direction', other.direction);
+                level._set_tile_prop(me, 'direction', direction);
                 level._set_tile_prop(other, 'rolling', false);
             }
         },

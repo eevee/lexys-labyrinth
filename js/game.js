@@ -1618,7 +1618,7 @@ export class Level extends LevelInterface {
             let original_name = tile.type.name;
             // TODO check ignores here?
             if (tile.type.on_bumped) {
-                tile.type.on_bumped(tile, this, actor);
+                tile.type.on_bumped(tile, this, actor, direction);
             }
 
             // Death happens here: if a monster or block even thinks about moving into a player, or
