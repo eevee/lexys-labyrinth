@@ -1881,7 +1881,7 @@ export class Level extends LevelInterface {
         // Whether we're sliding is determined entirely by whether we most recently moved onto a
         // sliding tile that we don't ignore.  This could /almost/ be computed on the fly, except
         // that an actor that starts on e.g. ice or a teleporter is not considered sliding.
-        this._set_tile_prop(actor, 'is_sliding', terrain.type.slide_mode && ! actor.ignores(terrain.type.name));
+        this._set_tile_prop(actor, 'is_sliding', terrain.type.slide_mode && !actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name));
 
         // Do Lexy-style hooking here: only attempt to pull things just after we've actually moved
         // successfully, which means the hook can never stop us from moving and hook slapping is not
@@ -1969,9 +1969,7 @@ export class Level extends LevelInterface {
                 continue;
             if (actor.ignores(tile.type.name))
                 continue;
-            if (actor.slide_ignores(tile.type.name))
-                continue;
-
+            
             if (tile.type.on_approach) {
                 tile.type.on_approach(tile, this, actor);
             }
@@ -2036,7 +2034,8 @@ export class Level extends LevelInterface {
                     continue;
                 }
             }
-            else if (tile.type.on_arrive) {
+            else if (tile.type.on_arrive && !actor.slide_ignores(tile.type.name)) {
+                // Kind of weird putting slide_ignores here, except that all sliding happens on on_arrive, and tiles that make you slide in on_arrive don't do anything else, so for now it works
                 tile.type.on_arrive(tile, this, actor);
             }
 
