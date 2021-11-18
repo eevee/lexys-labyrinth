@@ -1278,7 +1278,7 @@ const TILE_TYPES = {
             return other.cell.get_item() !== null && me.encased_item !== null;
         },
         on_death(me, level) {
-            //needs to be called by transmute_tile to ttl and by lit_dynamite before remove_tile
+            //needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile
             if (me.encased_item !== null) {
                 level._place_dropped_item(me.encased_item, me.cell ?? me.previous_cell, me);
                 level._set_tile_prop(me, 'encased_item', null);
@@ -1995,7 +1995,7 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'is_active', false);
         },
         on_death(me, level) {
-            // FIXME i probably broke this lol
+            //needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile
             //need to remove our wires since they're an implementation detail
             level._set_tile_prop(me, 'wire_directions', 0);
             level.recalculate_circuitry_next_wire_phase = true;
