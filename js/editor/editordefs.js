@@ -894,7 +894,7 @@ export const TILE_DESCRIPTIONS = {
     },
     gate_red: {
         name: "Red gate",
-        desc: "Requires a red key.  Unlike doors, may be placed on top of other terrain.",
+        desc: "Requires a red key.  Unlike doors, may be placed on top of other terrain, and any actor with the key may unlock it.",
     },
     sand: {
         name: "Sand",

@@ -34,8 +34,7 @@ function _define_door(key) {
 function _define_gate(key) {
     return {
         layer: LAYERS.canopy,
-        // Doors can be opened by ice blocks, but not dirt blocks or monsters
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
+        // Unlike doors, anything with the key (or a ghost) can step on them
         blocks(me, level, other) {
             if (other.type.name === 'ghost')
                 return false;
