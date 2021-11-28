@@ -3005,8 +3005,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.real_player,
         can_reveal_walls: true,
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
-        slide_ignores: new Set(['cracked_ice']),
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice', 'cracked_floor']),
         pushes: {
             dirt_block: true,
             ice_block: true,
@@ -3060,8 +3059,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.player,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
-        slide_ignores: new Set(['cracked_ice']),
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice', 'cracked_floor']),
         pushes: {
             dirt_block: true,
             ice_block: true,

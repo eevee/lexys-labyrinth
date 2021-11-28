@@ -922,11 +922,11 @@ export const TILE_DESCRIPTIONS = {
     },
     cracked_floor: {
         name: "Cracked floor",
-        desc: "Turns into a hole when something steps off of it (except ghosts).",
+        desc: "Turns into a hole when something steps off of it (except ghosts and Cerise).",
     },
     cracked_ice: {
         name: "Cracked ice",
-        desc: "Turns into water when something steps off of it (except ghosts).",
+        desc: "Turns into water when something steps off of it (except ghosts and Cerise).",
     },
     score_5x: {
         name: "×5 bonus",
