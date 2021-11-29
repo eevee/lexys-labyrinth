@@ -34,8 +34,7 @@ function _define_door(key) {
 function _define_gate(key) {
     return {
         layer: LAYERS.canopy,
-        // Doors can be opened by ice blocks, but not dirt blocks or monsters
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
+        // Unlike doors, anything with the key (or a ghost) can step on them
         blocks(me, level, other) {
             if (other.type.name === 'ghost')
                 return false;
@@ -1226,10 +1225,10 @@ const TILE_TYPES = {
                 return null;
             }
         },
-        on_bumped(me, level, other) {
+        on_bumped(me, level, other, direction) {
             if (other.type.name === 'boulder') {
                 level._set_tile_prop(me, 'rolling', true);
-                level._set_tile_prop(me, 'direction', other.direction);
+                level._set_tile_prop(me, 'direction', direction);
                 level._set_tile_prop(other, 'rolling', false);
             }
         },
@@ -1278,7 +1277,7 @@ const TILE_TYPES = {
             return other.cell.get_item() !== null && me.encased_item !== null;
         },
         on_death(me, level) {
-            //needs to be called by transmute_tile to ttl and by lit_dynamite before remove_tile
+            //needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile
             if (me.encased_item !== null) {
                 level._place_dropped_item(me.encased_item, me.cell ?? me.previous_cell, me);
                 level._set_tile_prop(me, 'encased_item', null);
@@ -1978,6 +1977,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
         on_begin(me, level) {
+            level._set_tile_prop(me, 'is_active', false);
             level._set_tile_prop(me, 'wire_directions', 15);
             level.recalculate_circuitry_next_wire_phase = true;
         },
@@ -1994,7 +1994,7 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'is_active', false);
         },
         on_death(me, level) {
-            // FIXME i probably broke this lol
+            //needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile
             //need to remove our wires since they're an implementation detail
             level._set_tile_prop(me, 'wire_directions', 0);
             level.recalculate_circuitry_next_wire_phase = true;
@@ -2952,7 +2952,7 @@ const TILE_TYPES = {
             {
                 if (level.ankh_tile) {
                     level.transmute_tile(level.ankh_tile, 'floor');
-                    level.spawn_animation(level.ankh_tile, 'puff');
+                    level.spawn_animation(level.ankh_tile.cell, 'puff');
                 }
                 let old_tile = level.ankh_tile;
                 level.ankh_tile = terrain;
@@ -3005,7 +3005,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.real_player,
         can_reveal_walls: true,
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']),
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice', 'cracked_floor']),
         pushes: {
             dirt_block: true,
             ice_block: true,
@@ -3059,7 +3059,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.player,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice']),
+        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice', 'cracked_floor']),
         pushes: {
             dirt_block: true,
             ice_block: true,

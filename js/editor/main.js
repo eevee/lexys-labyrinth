@@ -1438,7 +1438,7 @@ export class Editor extends PrimaryView {
         // Special case: preserve wires when replacing one wired tile with another
         if (new_tile.type.contains_wire &&
             // FIXME this is hacky garbage
-            tile === this.fg_tile && this.fg_tile_from_palette)
+            tile === this.fg_tile && this.fg_tile_from_palette && existing_tile !== undefined)
         {
             if (existing_tile.type.contains_wire) {
                 new_tile.wire_directions = existing_tile.wire_directions;

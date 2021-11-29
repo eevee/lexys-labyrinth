@@ -894,7 +894,7 @@ export const TILE_DESCRIPTIONS = {
     },
     gate_red: {
         name: "Red gate",
-        desc: "Requires a red key.  Unlike doors, may be placed on top of other terrain.",
+        desc: "Requires a red key.  Unlike doors, may be placed on top of other terrain, and any actor with the key may unlock it.",
     },
     sand: {
         name: "Sand",
@@ -922,11 +922,11 @@ export const TILE_DESCRIPTIONS = {
     },
     cracked_floor: {
         name: "Cracked floor",
-        desc: "Turns into a hole when something steps off of it (except ghosts).",
+        desc: "Turns into a hole when something steps off of it (except ghosts and Cerise).",
     },
     cracked_ice: {
         name: "Cracked ice",
-        desc: "Turns into water when something steps off of it (except ghosts).",
+        desc: "Turns into water when something steps off of it (except ghosts and Cerise).",
     },
     score_5x: {
         name: "×5 bonus",
