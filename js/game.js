@@ -1421,40 +1421,28 @@ export class Level extends LevelInterface {
                 actor.decision = dir1;
             }
             else {
-                // We have two directions.  If one of them is our current facing, we prefer that
-                // one, UNLESS it's blocked AND the other isn't.
+                // Resolve two directions.
                 // Note that if this is an override, then the forced direction is still used to
                 // interpret our input!
+                // FIXME lynx only checks horizontal?
+                let open1 = try_direction(dir1, push_mode);
+                let open2 = try_direction(dir2, push_mode);
                 let current_direction = forced_move ?? actor.direction;
-                if (dir1 === current_direction || dir2 === current_direction) {
-                    let other_direction = dir1 === current_direction ? dir2 : dir1;
-                    let curr_open = try_direction(current_direction, push_mode);
-                    let other_open = try_direction(other_direction, push_mode);
-                    if (! curr_open && other_open) {
-                        actor.decision = other_direction;
-                        open = true;
-                    }
-                    else {
-                        actor.decision = current_direction;
-                        open = curr_open;
-                    }
+                if (open1 && open2 && (dir1 === current_direction || dir2 === current_direction)) {
+                    // Both directions are open, but one of them is the way we're already moving, so
+                    // stick with that
+                    actor.decision = current_direction;
+                    open = true;
+                }
+                else if (open1 !== open2) {
+                    // Only one direction is open, so use it.
+                    actor.decision = open1 ? dir1 : dir2;
+                    open = true;
                 }
                 else {
-                    // Neither direction is the way we're moving, so try both and prefer horizontal
-                    // FIXME i'm told cc2 prefers orthogonal actually, but need to check on that
-                    // FIXME lynx only checks horizontal, what about cc2?  it must check both
-                    // because of the behavior where pushing into a corner always pushes horizontal
-                    let open1 = try_direction(dir1, push_mode);
-                    let open2 = try_direction(dir2, push_mode);
-                    if (open1 && ! open2) {
-                        actor.decision = dir1;
-                        open = true;
-                    }
-                    else if (! open1 && open2) {
-                        actor.decision = dir2;
-                        open = true;
-                    }
-                    else if (dir1 === 'east' || dir1 === 'west') {
+                    // If we got here, both directions are equally (in)accessible, and we have no
+                    // reason to prefer one over the other, so prefer the horizontal.
+                    if (dir1 === 'east' || dir1 === 'west') {
                         actor.decision = dir1;
                         open = open1;
                     }
