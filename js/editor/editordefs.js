@@ -976,6 +976,10 @@ export const TILE_DESCRIPTIONS = {
         name: "Sokoban wall",
         desc: "Acts like wall.  Turns to floor while all sokoban buttons of the same color are pressed.",
     },
+    one_way_walls: {
+        name: "One-way wall",
+        desc: "Similar to a thin wall, but can be passed through one side only.",
+    }
 };
 
 
