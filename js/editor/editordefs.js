@@ -515,7 +515,7 @@ export const TILE_DESCRIPTIONS = {
         name: "Ice corner",
         desc: "Acts like ice, but turns anything sliding on it around the corner.  Edges act like thin walls.",
     },
-    force_floor_n: {
+    force_floor_s: {
         name: "Force floor",
         desc: "Slides anything on it in the indicated direction, unless it has suction boots.  Players may attempt to step off, but not on their first slide.  No effect on ghosts.",
     },
@@ -896,6 +896,18 @@ export const TILE_DESCRIPTIONS = {
         name: "Red gate",
         desc: "Requires a red key.  Unlike doors, may be placed on top of other terrain, and any actor with the key may unlock it.",
     },
+    gate_blue: {
+        name: "Blue gate",
+        desc: "Requires a blue key.  Unlike doors, may be placed on top of other terrain, and any actor with the key may unlock it.",
+    },
+    gate_yellow: {
+        name: "Yellow gate",
+        desc: "Requires a yellow key.  Unlike doors, may be placed on top of other terrain, and any actor with the key may unlock it.",
+    },
+    gate_green: {
+        name: "Green gate",
+        desc: "Requires a green key.  Unlike doors, may be placed on top of other terrain, and any actor with the key may unlock it.",
+    },
     sand: {
         name: "Sand",
         desc: "Anything walking on it moves at half speed.  Stops all blocks.",
@@ -964,6 +976,10 @@ export const TILE_DESCRIPTIONS = {
         name: "Sokoban wall",
         desc: "Acts like wall.  Turns to floor while all sokoban buttons of the same color are pressed.",
     },
+    one_way_walls: {
+        name: "One-way wall",
+        desc: "Similar to a thin wall, but can be passed through one side only.",
+    }
 };
 
 
