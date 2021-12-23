@@ -296,8 +296,8 @@ export const COMPAT_FLAGS = [
     label: "Bonking while sliding doesn't apply instantly",
     rulesets: new Set(['lynx', 'ms']),
 }, {
-    key: 'fire_allows_monsters',
-    label: "Fire doesn't block monsters",
+    key: 'fire_allows_most_monsters',
+    label: "Fire doesn't block monsters, except bugs and walkers",
     rulesets: new Set(['ms']),
 },
 ];

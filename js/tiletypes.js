@@ -781,7 +781,9 @@ const TILE_TYPES = {
             if (other.type.collision_mask & (COLLISION.fireball | COLLISION.yellow_tank | COLLISION.ghost))
                 return false;
             if (other.type.collision_mask & COLLISION.monster_any) {
-                return ! level.compat.fire_allows_monsters;
+                if (level.compat.fire_allows_most_monsters && other.type.name !== 'bug' && other.type.name !== 'walker')
+                    return false;
+                return true;
             }
             return false;
         },
