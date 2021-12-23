@@ -2482,7 +2482,6 @@ export class Tileset {
                 reverse = true;
             }
             h = 2;
-            sy = 1;
         }
         else if (direction === 'south') {
             if (! axis_cels) {
@@ -2498,7 +2497,6 @@ export class Tileset {
                 reverse = true;
             }
             w = 2;
-            sx = 1;
         }
         else if (direction === 'east') {
             if (! axis_cels) {
@@ -2517,7 +2515,7 @@ export class Tileset {
         else {
             index = drawspec.idle_frame_index ?? 0;
         }
-        let cel = reverse ? axis_cels[axis_cels.length - index + 1] : axis_cels[index];
+        let cel = reverse ? axis_cels[axis_cels.length - index - 1] : axis_cels[index];
 
         if (cel === null) {
             // null means use the 1x1 "base" tile instead
