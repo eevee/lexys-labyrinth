@@ -974,7 +974,7 @@ class Player extends PrimaryView {
         // Auto-delete captions once their animations end
         this.captions_el.addEventListener('animationend', ev => {
             if (ev.target !== this.captions_el) {
-                this.target.remove();
+                ev.target.remove();
             }
         });
 
