@@ -2003,7 +2003,7 @@ const TILE_TYPES = {
             level.recalculate_circuitry_next_wire_phase = true;
         },
         visual_state(me) {
-            return me && me.is_active === false ? 'inactive' : 'active';
+            return me && me.is_active ? 'active' : 'inactive';
         },
     },
 
