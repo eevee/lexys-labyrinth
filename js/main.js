@@ -267,15 +267,27 @@ class SFXPlayer {
         // designed to emulate my homegrown formula as closely as possible, since I did a lot of
         // fiddling to come up with that and I like how it came out.
         let listener = this.ctx.listener;
-        listener.positionX.value = 0;
-        listener.positionY.value = 0;
-        listener.positionZ.value = -8;
-        listener.forwardX.value = 0;
-        listener.forwardY.value = 0;
-        listener.forwardZ.value = 1;
-        listener.upX.value = 0;
-        listener.upY.value = -1;
-        listener.upZ.value = 0;
+        if ('positionX' in listener) {
+            listener.positionX.value = 0;
+            listener.positionY.value = 0;
+            listener.positionZ.value = -8;
+        }
+        else {
+            // Old way, only one Firefox supports atm  ú_ù
+            listener.setPosition(0, 0, -8);
+        }
+        if ('forwardX' in listener) {
+            listener.forwardX.value = 0;
+            listener.forwardY.value = 0;
+            listener.forwardZ.value = 1;
+            listener.upX.value = 0;
+            listener.upY.value = -1;
+            listener.upZ.value = 0;
+        }
+        else {
+            // Same as above
+            listener.setOrientation(0, 0, 1, 0, -1, 0);
+        }
 
         this.player_x = null;
         this.player_y = null;
@@ -448,8 +460,13 @@ class SFXPlayer {
         this.player_x = x;
         this.player_y = y;
         let listener = this.ctx.listener;
-        listener.positionX.value = x;
-        listener.positionY.value = y;
+        if ('positionX' in listener) {
+            listener.positionX.value = x;
+            listener.positionY.value = y;
+        }
+        else {
+            listener.setPosition(x, y, -8);
+        }
     }
 
     play_once(name, cell = null) {
