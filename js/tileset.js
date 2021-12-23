@@ -1236,7 +1236,14 @@ export const LL_TILESET_LAYOUT = {
         },
         base: 'water',
     },
-    ice: [12, 8],
+    ice: {
+        __special__: 'animated',
+        duration: 60 * 15,
+        positionally_hashed: true,
+        all: new Array(252).fill([12, 8]).concat([
+            [8, 9], [9, 9], [10, 9], [11, 9],
+        ]),
+    },
     cracked_ice: [12, 9],
     ice_se: [13, 8],
     ice_sw: [14, 8],
