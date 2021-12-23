@@ -246,8 +246,7 @@ export const COMPAT_FLAGS = [
     label: "Pulling blocks with the hook happens at decision time",
     rulesets: new Set(['steam', 'steam-strict']),
 }, {
-    // FIXME this is kind of annoying, there are some collision rules too
-    key: 'tanks_teeth_push_ice_blocks',
+    key: 'use_pgchip_ice_blocks',
     label: "Ice blocks emulate pgchip rules",
     rulesets: new Set(['ms']),
 }, {

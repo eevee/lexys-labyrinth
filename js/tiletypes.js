@@ -166,7 +166,7 @@ function button_visual_state(me) {
         }
     }
     return 'released';
-};
+}
 
 // Logic for chasing after the player (or running away); shared by both teeth and mimics
 function pursue_player(me, level) {
@@ -211,6 +211,15 @@ function pursue_player(me, level) {
         // Vertical first
         return [preferred_vertical, preferred_horizontal].filter(x => x);
     }
+}
+
+// Ugh.  Check for can_reveal_walls, but special-casing it for the pgchip ice blocks, where the
+// static property is different.  This sux!!
+function can_actually_reveal_walls(tile, level) {
+    if (level.compat.use_pgchip_ice_blocks && tile.type.name == 'ice_block')
+        return false;
+
+    return tile.type.can_reveal_walls;
 }
 
 // Chunks of properties that are shared among bunches of tiles
@@ -311,7 +320,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
         on_bumped(me, level, other) {
-            if (other.type.can_reveal_walls) {
+            if (can_actually_reveal_walls(other, level)) {
                 level.spawn_animation(me.cell, 'wall_invisible_revealed');
             }
         },
@@ -320,7 +329,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
         on_bumped(me, level, other) {
-            if (other.type.can_reveal_walls) {
+            if (can_actually_reveal_walls(other, level)) {
                 level.transmute_tile(me, 'wall');
             }
         },
@@ -406,7 +415,7 @@ const TILE_TYPES = {
             }
         },
         on_bumped(me, level, other) {
-            if (other.type.can_reveal_walls) {
+            if (can_actually_reveal_walls(other, level)) {
                 level.transmute_tile(me, 'wall');
             }
         },
@@ -422,7 +431,7 @@ const TILE_TYPES = {
             }
         },
         on_bumped(me, level, other) {
-            if (other.type.can_reveal_walls && ! level.compat.blue_floors_vanish_on_arrive) {
+            if (can_actually_reveal_walls(other, level) && ! level.compat.blue_floors_vanish_on_arrive) {
                 this.reveal(me, level, other);
             }
         },
@@ -1141,6 +1150,13 @@ const TILE_TYPES = {
     ice_block: {
         layer: LAYERS.actor,
         collision_mask: COLLISION.block_cc2,
+        blocked_by(me, level, other) {
+            // pgchip's ice blocks followed dirt block collision rules, except for being able to go
+            // on dirt
+            if (level.compat.use_pgchip_ice_blocks && other.type.name !== 'dirt' &&
+                (other.type.blocks_collision & COLLISION.block_cc1))
+                return true;
+        },
         blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.never,
         is_actor: true,
@@ -1158,7 +1174,7 @@ const TILE_TYPES = {
         on_after_bumped(me, level, other) {
             // Fireballs melt ice blocks on regular floor FIXME and water!
             // XXX what if i'm in motion?
-            if (other.type.name === 'fireball') {
+            if (other.type.name === 'fireball' && ! level.compat.use_pgchip_ice_blocks) {
                 let terrain = me.cell.get_terrain();
                 if (terrain.type.name === 'floor') {
                     level.transmute_tile(me, 'splash');

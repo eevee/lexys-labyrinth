@@ -1631,7 +1631,7 @@ export class Level extends LevelInterface {
                 return false;
 
             if (actor.can_push(tile, direction, this) || (
-                this.compat.tanks_teeth_push_ice_blocks && tile.type.name === 'ice_block' &&
+                this.compat.use_pgchip_ice_blocks && tile.type.name === 'ice_block' &&
                 (actor.type.name === 'teeth' || actor.type.name === 'teeth_timid' || actor.type.name === 'tank_blue')
             )) {
                 // Collect pushables for later, so we don't inadvertently push through a wall
