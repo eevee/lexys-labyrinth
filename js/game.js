@@ -2556,18 +2556,18 @@ export class Level extends LevelInterface {
         tile[key] = val;
     }
 
-    collect_chip() {
+    collect_chip(actor) {
         if (this.chips_remaining > 0) {
             if (this.chips_remaining > 1) {
-                this.sfx.play_once('get-chip');
+                this.sfx.play_once('get-chip', actor.cell);
             }
             else {
-                this.sfx.play_once('get-chip-last');
+                this.sfx.play_once('get-chip-last', actor.cell);
             }
-            this.chips_remaining--;
+            this.chips_remaining -= 1;
         }
         else {
-            this.sfx.play_once('get-chip-extra');
+            this.sfx.play_once('get-chip-extra', actor.cell);
         }
     }
 

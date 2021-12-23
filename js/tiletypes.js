@@ -1340,7 +1340,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
-            level.collect_chip();
+            level.collect_chip(me);
             return true;
         },
         // Not affected by gray buttons
@@ -3105,7 +3105,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
-            level.collect_chip();
+            level.collect_chip(me);
             return true;
         },
     },
@@ -3115,7 +3115,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
-            level.collect_chip();
+            level.collect_chip(me);
             return true;
         },
     },

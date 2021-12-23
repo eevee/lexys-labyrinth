@@ -270,11 +270,11 @@ class SFXPlayer {
         if ('positionX' in listener) {
             listener.positionX.value = 0;
             listener.positionY.value = 0;
-            listener.positionZ.value = -8;
+            listener.positionZ.value = -7;
         }
         else {
             // Old way, only one Firefox supports atm  ú_ù
-            listener.setPosition(0, 0, -8);
+            listener.setPosition(0, 0, -7);
         }
         if ('forwardX' in listener) {
             listener.forwardX.value = 0;
@@ -465,7 +465,7 @@ class SFXPlayer {
             listener.positionY.value = y;
         }
         else {
-            listener.setPosition(x, y, -8);
+            listener.setPosition(x, y, -7);
         }
     }
 
