@@ -246,16 +246,36 @@ const OBITUARIES = {
 };
 // Helper class used to let the game play sounds without knowing too much about the Player
 class SFXPlayer {
-    constructor() {
+    constructor(place_caption_cb) {
+        this.place_caption_cb = place_caption_cb;
+
         this.ctx = new (window.AudioContext || window.webkitAudioContext);  // come the fuck on, safari
         this.volume = 1.0;
         this.enabled = true;
+        // 0 disabled; 1 adjust gain only; 2 full spatial panning
+        this.spatial_mode = 2;
 
         // This automatically reduces volume when a lot of sound effects are playing at once
         this.compressor_node = this.ctx.createDynamicsCompressor();
         this.compressor_node.threshold.value = -40;
         this.compressor_node.ratio.value = 16;
         this.compressor_node.connect(this.ctx.destination);
+
+        // Set up spatial sound.  Units are cells.  The listener is aligned with the center of the
+        // viewport (NOT the player), and moved out some distance to put it where the player is.
+        // The twiddles here (distance from screen, and ref distance + rolloff in play_once()) were
+        // designed to emulate my homegrown formula as closely as possible, since I did a lot of
+        // fiddling to come up with that and I like how it came out.
+        let listener = this.ctx.listener;
+        listener.positionX.value = 0;
+        listener.positionY.value = 0;
+        listener.positionZ.value = -8;
+        listener.forwardX.value = 0;
+        listener.forwardY.value = 0;
+        listener.forwardZ.value = 1;
+        listener.upX.value = 0;
+        listener.upY.value = -1;
+        listener.upZ.value = 0;
 
         this.player_x = null;
         this.player_y = null;
@@ -348,6 +368,63 @@ class SFXPlayer {
             'revive': 'sfx/revive.ogg',
         };
 
+        this.sound_captions = {
+            blocked: 'mmf!',
+            bomb: 'BOOM',
+            'button-press': 'beep',
+            'button-release': 'boop',
+            door: 'ka-chik',
+            // these are only triggered by the active player
+            drop: null,
+            'fake-floor': null,
+            'get-bonus': null,
+            'get-bonus2': null,
+            // these are active player only, but give some audio feedback
+            'get-chip': 'bwink',
+            'get-chip-extra': 'bwonk',
+            'get-chip-last': 'bwenk',
+            // key and tool play no matter who picks it up (though this is not the case in cc2, so
+            // arguably wrong; if i ever change that, consider dropping the caption?)
+            'get-key': 'bwip',
+            // bonus+penalty can only be collected by player, but toggle can be done by doppelganger
+            'get-stopwatch-bonus': null,
+            'get-stopwatch-penalty': null,
+            'get-stopwatch-toggle': 'bee-beep',
+            'get-tool': 'bwoop',
+            // active player only
+            popwall: null,
+            push: null,
+            // can happen offscreen!
+            socket: 'ka-chunk',
+            splash: 'splash',
+            'splash-slime': 'sploosh',
+            // all steps are active player only
+            'slide-force': null,
+            'slide-ice': null,
+            'step-fire': null,
+            'step-force': null,
+            'step-floor': null,
+            'step-gravel': null,
+            'step-ice': null,
+            'step-popdown': null,
+            'step-water': null,
+            teleport: 'fwoosh',
+            // active player only, but useful audio cue
+            thief: 'dududuh',
+            'thief-bribe': 'ch-ching',
+            transmogrify: 'vwoo-wip',
+
+            // "Bummer" is pretty classic imo
+            lose: 'Bummer.',
+            tick: '...tick...',
+            timeup: null,
+            // can happen offscreen
+            exit: '(exited)',
+            // flavor, not really useful
+            win: null,
+            'revive': null,
+        };
+
         for (let [name, path] of Object.entries(this.sound_sources)) {
             this.init_sound(name, path);
         }
@@ -362,9 +439,17 @@ class SFXPlayer {
         };
     }
 
-    set_player_position(cell) {
-        this.player_x = cell.x;
-        this.player_y = cell.y;
+    set_listener_position(x, y) {
+        // Note that the given position is the center of a cell, but we play sounds from the top
+        // left corners, so just shave off half a cell here.
+        x -= 0.5;
+        y -= 0.5;
+
+        this.player_x = x;
+        this.player_y = y;
+        let listener = this.ctx.listener;
+        listener.positionX.value = x;
+        listener.positionY.value = y;
     }
 
     play_once(name, cell = null) {
@@ -384,22 +469,52 @@ class SFXPlayer {
         node.buffer = data.audiobuf;
 
         let volume = this.volume;
-        if (cell && this.player_x !== null) {
-            // Reduce the volume for further-away sounds
-            let dx = cell.x - this.player_x;
-            let dy = cell.y - this.player_y;
-            let dist = Math.sqrt(dx*dx + dy*dy);
-            // x/(x + a) is a common and delightful way to get an easy asymptote and output between
-            // 0 and 1.  This arbitrary factor of 2 seems to work nicely in practice, falling off
-            // quickly so you don't get drowned in button spam, but still leaving buttons audible
-            // even at the far reaches of a 100×100 level.  (Maybe because gain is exponential?)
-            volume *= 1 - dist / (dist + 2);
-        }
         let gain = this.ctx.createGain();
         gain.gain.value = volume;
         node.connect(gain);
-        gain.connect(this.compressor_node);
+
+        if (cell && this.player_x !== null && this.spatial_mode > 0) {
+            if (this.spatial_mode === 1) {
+                // Reduce the volume for further-away sounds
+                let dx = cell.x - this.player_x;
+                let dy = cell.y - this.player_y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                // x/(x + a) is a common and delightful way to get an easy asymptote and output between
+                // 0 and 1.  This arbitrary factor of 2 seems to work nicely in practice, falling off
+                // quickly so you don't get drowned in button spam, but still leaving buttons audible
+                // even at the far reaches of a 100×100 level.  (Maybe because gain is exponential?)
+                volume *= 1 - dist / (dist + 2);
+                gain.gain.value = volume;
+                gain.connect(this.compressor_node);
+            }
+            else if (this.spatial_mode === 2) {
+                let panner = new PannerNode(this.ctx, {
+                    panningModel: 'HRTF',
+                    distanceModel: 'inverse',
+                    refDistance: 8,
+                    maxDistance: 10000,
+                    rolloffFactor: 4,
+                    positionX: cell.x,
+                    positionY: cell.y,
+                    positionZ: 0,
+                    orientationX: 0,
+                    orientationY: 0,
+                    orientationZ: -1,
+                });
+                gain.connect(panner);
+                panner.connect(this.compressor_node);
+            }
+        }
+        else {
+            gain.connect(this.compressor_node);
+        }
+
         node.start(this.ctx.currentTime);
+
+        let caption = this.sound_captions[name];
+        if (caption) {
+            this.place_caption_cb(cell, caption);
+        }
     }
 }
 class Player extends PrimaryView {
@@ -424,9 +539,11 @@ class Player extends PrimaryView {
 
         this.scale = 1;
         this.play_speed = 1;
+        this.show_captions = false;
 
         this.level_el = this.root.querySelector('.level');
         this.overlay_message_el = this.root.querySelector('.player-overlay-message');
+        this.captions_el = this.root.querySelector('.player-overlay-captions');
         this.hint_el = this.root.querySelector('.player-hint');
         this.number_el = this.root.querySelector('.player-level-number output');
         this.chips_el = this.root.querySelector('.chips output');
@@ -837,9 +954,16 @@ class Player extends PrimaryView {
             this.adjust_scale();
         });
 
+        // Auto-delete captions once their animations end
+        this.captions_el.addEventListener('animationend', ev => {
+            if (ev.target !== this.captions_el) {
+                this.target.remove();
+            }
+        });
+
         // TODO yet another thing that should be in setup, but can't be because load_level is called
         // first
-        this.sfx_player = new SFXPlayer;
+        this.sfx_player = new SFXPlayer(this.place_caption.bind(this));
     }
 
     setup() {
@@ -1255,6 +1379,10 @@ class Player extends PrimaryView {
         if (this.state !== 'waiting') {
             this.restart_level();
         }
+
+        // Also nuke all captions, especially since otherwise their animations will restart when
+        // switching back
+        this.captions_el.textContent = '';
     }
 
     reload_options(options) {
@@ -1263,6 +1391,14 @@ class Player extends PrimaryView {
         this.music_enabled = options.music_enabled ?? true;
         this.sfx_player.volume = options.sound_volume ?? 1.0;
         this.sfx_player.enabled = options.sound_enabled ?? true;
+        if ([0, 1, 2].indexOf(options.spatial_mode) < 0) {
+            options.spatial_mode = 2;
+        }
+        this.sfx_player.spatial_mode = options.spatial_mode;
+        this.show_captions = options.show_captions ?? false;
+        if (! this.show_captions) {
+            this.captions_el.textContent = '';
+        }
         this.renderer.use_cc2_anim_speed = options.use_cc2_anim_speed ?? false;
 
         if (this.level) {
@@ -1640,6 +1776,16 @@ class Player extends PrimaryView {
         }
         // Never try to draw past the next actual update
         this.renderer.draw(Math.min(0.999, update_progress));
+
+        // Update the SFX listener position, since it's inherently tied to the camera position,
+        // which only the renderer actually knows
+        this.sfx_player.set_listener_position(
+            this.renderer.viewport_x + this.renderer.viewport_size_x / 2,
+            this.renderer.viewport_y + this.renderer.viewport_size_y / 2,
+        );
+
+        // And move existing captions to match
+        this.update_caption_positions();
     }
 
     render_inventory_tile(name) {
@@ -2127,6 +2273,57 @@ class Player extends PrimaryView {
         else if (this.state === 'stopped') {
             this.music_audio_el.pause();
         }
+    }
+
+    place_caption(cell, text) {
+        if (! this.show_captions)
+            return;
+
+        let span = mk('span.-caption', {}, text);
+        if (cell) {
+            // The given coordinates are the upper left of the cell the sound is coming from; shift
+            // to the center
+            span.setAttribute('data-x', cell.x + 0.5);
+            span.setAttribute('data-y', cell.y + 0.5);
+        }
+        else {
+            // This is a global sound; slap it in the center
+            // TODO well...  we'll see how good an idea this is I guess
+            span.setAttribute('data-x', this.renderer.viewport_x + this.renderer.viewport_size_x / 2);
+            span.setAttribute('data-y', this.renderer.viewport_y + this.renderer.viewport_size_y / 2);
+        }
+        this._update_caption_position(span);
+        this.captions_el.append(span);
+    }
+
+    update_caption_positions() {
+        if (! this.show_captions)
+            return;
+
+        // There's an event handler on the container to delete these as soon as they finish
+        // animating, but I've had such event handlers be flaky before, so as an emergency measure:
+        // if the caption container gets full, nuke it
+        if (this.captions_el.childNodes.length > 100) {
+            this.captions_el.textContent = '';
+        }
+
+        for (let caption of this.captions_el.childNodes) {
+            this._update_caption_position(caption);
+        }
+    }
+
+    _update_caption_position(caption) {
+        let cx = parseFloat(caption.getAttribute('data-x'));
+        let cy = parseFloat(caption.getAttribute('data-y'));
+        // Move them relative to the viewport
+        let relx = cx - this.renderer.viewport_x;
+        let rely = cy - this.renderer.viewport_y;
+        // Cap them to not go past the edge of the viewport
+        relx = Math.max(0, Math.min(this.renderer.viewport_size_x, relx));
+        rely = Math.max(0, Math.min(this.renderer.viewport_size_y, rely));
+        // And some CSS calc() turns this into a useful position
+        caption.style.setProperty('--x-offset', relx);
+        caption.style.setProperty('--y-offset', rely);
     }
 
     // Auto-size the game canvas to fit the screen, if possible
@@ -2708,7 +2905,7 @@ class OptionsOverlay extends DialogOverlay {
         let dl = mk('dl.formgrid');
         this.main.append(dl);
 
-        // Volume options
+        // Simple options
         dl.append(
             mk('dt', "Music volume"),
             mk('dd.option-volume',
@@ -2720,6 +2917,16 @@ class OptionsOverlay extends DialogOverlay {
                 mk('label', mk('input', {name: 'sound-enabled', type: 'checkbox'}), " Enabled"),
                 mk('input', {name: 'sound-volume', type: 'range', min: 0, max: 1, step: 0.05}),
             ),
+            mk('dt', "Spatial mode"),
+            mk('dd',
+                mk('select', {name: 'spatial-mode'},
+                    mk('option', {value: '2'}, "Stereo — Full stereo panning"),
+                    mk('option', {value: '1'}, "Mono — Change volume with distance"),
+                    mk('option', {value: '0'}, "Off — Play sounds at full volume"),
+                ),
+            ),
+            mk('dt'),
+            mk('dd', mk('label', mk('input', {name: 'show-captions', type: 'checkbox'}), " Enable captions")),
             mk('dt'),
             mk('dd', mk('label', mk('input', {name: 'use-cc2-anim-speed', type: 'checkbox'}), " Use CC2 animation speed")),
         );
@@ -2827,6 +3034,8 @@ class OptionsOverlay extends DialogOverlay {
         this.root.elements['music-enabled'].checked = this.conductor.options.music_enabled ?? true;
         this.root.elements['sound-volume'].value = this.conductor.options.sound_volume ?? 1.0;
         this.root.elements['sound-enabled'].checked = this.conductor.options.sound_enabled ?? true;
+        this.root.elements['spatial-mode'].value = this.conductor.options.spatial_mode ?? 2;
+        this.root.elements['show-captions'].checked = this.conductor.options.show_captions ?? false;
         this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
 
         this.root.elements['custom-tileset'].addEventListener('change', ev => {
@@ -2839,6 +3048,8 @@ class OptionsOverlay extends DialogOverlay {
             options.music_enabled = this.root.elements['music-enabled'].checked;
             options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
             options.sound_enabled = this.root.elements['sound-enabled'].checked;
+            options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
+            options.show_captions = this.root.elements['show-captions'].checked;
             options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
 
             // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data
@@ -3221,7 +3432,6 @@ class PackTestDialog extends DialogOverlay {
     async run(handle) {
         let pack = this.conductor.stored_game;
         let dummy_sfx = {
-            set_player_position() {},
             play() {},
             play_once() {},
         };

@@ -57,7 +57,6 @@ const ANSI_RESET = "\x1b[39m";
 
 async function test_pack(pack, ruleset, level_filter = null) {
     let dummy_sfx = {
-        set_player_position() {},
         play() {},
         play_once() {},
     };

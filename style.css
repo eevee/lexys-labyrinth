@@ -33,6 +33,7 @@ main[hidden] {
 input[type=radio],
 input[type=checkbox],
 input[type=range] {
+    font-size: inherit;
     margin: 0.125em;
     vertical-align: middle;
 }
@@ -99,6 +100,9 @@ button.--image {
 }
 button.--image img {
     display: block;
+}
+select {
+    font-size: inherit;
 }
 h1, h2, h3, h4, h5, h6 {
     font-weight: normal;
@@ -1606,6 +1610,51 @@ body.--debug .player-overlay-message {
 }
 .scoreboard .-total-score p {
     font-size: 1.333em;
+}
+
+/* Transparent container for displaying captions for captions */
+.player-overlay-captions {
+    grid-area: level;
+    place-self: stretch;
+    position: relative;
+    /* above the message layer */
+    z-index: 3;
+
+    font-size: calc(0.75em * var(--scale));
+    pointer-events: none;
+}
+.player-overlay-captions > span.-caption {
+    position: absolute;
+    left: calc(var(--x-offset) * var(--tile-width) * var(--scale));
+    top: calc(var(--y-offset) * var(--tile-height) * var(--scale));
+    animation: 1s ease-in 1 forwards caption-fade;
+
+    font-weight: bold;
+    color: white;
+    /* Lol this sucks, please save me Tab */
+    /* TODO use an svg element for these instead?  would also avoid overflow issues */
+    text-shadow:
+        -1px -1px black,
+         1px -1px black,
+        -1px  2px black,
+         1px  2px black,
+         /* one more to fix lowercase k! */
+         1px  0   black;
+
+    white-space: nowrap;
+    /* Anchor these to their absolute centers */
+    transform: translate(-50%, -50%);
+}
+@keyframes caption-fade {
+    0% {
+        opacity: 1;
+    }
+    75% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
 }
 
 .player-level-number {

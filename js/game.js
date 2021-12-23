@@ -887,7 +887,6 @@ export class Level extends LevelInterface {
             }
         }
 
-        this.sfx.set_player_position(this.player.cell);
         this.pending_green_toggle = false;
     }
 
@@ -1078,7 +1077,7 @@ export class Level extends LevelInterface {
                 // This is only used for checking when to play the mmf sound, doesn't need undoing;
                 // it's cleared when we make a successful move or a null decision
                 actor.last_blocked_direction = actor.direction;
-                this.sfx.play_once('blocked');
+                this.sfx.play_once('blocked', actor.cell);
             }
             this._set_tile_prop(actor, 'is_blocked', true);
         }
