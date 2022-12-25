@@ -874,11 +874,25 @@ class Player extends PrimaryView {
             // TODO allow starting a level without moving?
             // TODO if you don't move the touch, the player can pass it and will keep going in that
             // direction?
-            let [px, py] = this.level.player.visual_position();
-            px += 0.5;
-            py += 0.5;
+
+            let [px, py] = (()=>{
+                if (this.renderer.directional_touch_type === 0){
+                    let [px, py] = this.level.player.visual_position(); 
+                    px += 0.5;
+                    py += 0.5;
+                    return [px, py];
+                }else if (this.renderer.directional_touch_type === 1){
+                    return [touch_target.offsetLeft + touch_target.offsetWidth / 2, touch_target.offsetTop + touch_target.offsetHeight / 2];
+                }
+            })();
             for (let touch of ev.changedTouches) {
-                let [x, y] = this.renderer.point_to_real_cell_coords(touch.clientX, touch.clientY);
+                let [x, y] = (()=>{
+                    if (this.renderer.directional_touch_type === 0){
+                        return this.renderer.point_to_real_cell_coords(touch.clientX, touch.clientY);
+                    }else if (this.renderer.directional_touch_type === 1){
+                        return [touch.clientX, touch.clientY];
+                    }
+                })();
                 let dx = x - px;
                 let dy = y - py;
                 // Divine a direction from the results
@@ -1417,6 +1431,8 @@ class Player extends PrimaryView {
             this.captions_el.textContent = '';
         }
         this.renderer.use_cc2_anim_speed = options.use_cc2_anim_speed ?? false;
+
+        this.renderer.directional_touch_type = options.directional_touch_type ?? 0;
 
         if (this.level) {
             this.update_tileset();
@@ -2946,7 +2962,13 @@ class OptionsOverlay extends DialogOverlay {
             mk('dd', mk('label', mk('input', {name: 'show-captions', type: 'checkbox'}), " Enable captions")),
             mk('dt'),
             mk('dd', mk('label', mk('input', {name: 'use-cc2-anim-speed', type: 'checkbox'}), " Use CC2 animation speed")),
-        );
+            mk('dt', "Directional touch type (for mobile)"),
+            mk('dd',
+                mk('select', {name: 'dir-touch-type'},
+                    mk('option', {value: '0'}, "Relative to player"),
+                    mk('option', {value: '1'}, "Relative to viewport")
+                ),
+            ),        );
         // Update volume live, if the player is active and was playing when this dialog was opened
         // (note that it won't auto-pause until open())
         let player = this.conductor.player;
@@ -3054,6 +3076,7 @@ class OptionsOverlay extends DialogOverlay {
         this.root.elements['spatial-mode'].value = this.conductor.options.spatial_mode ?? 2;
         this.root.elements['show-captions'].checked = this.conductor.options.show_captions ?? false;
         this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
+        this.root.elements['dir-touch-type'].checked = this.conductor.options.directional_touch_type ?? 0;
 
         this.root.elements['custom-tileset'].addEventListener('change', ev => {
             this._load_custom_tileset(ev.target.files[0]);
@@ -3068,6 +3091,7 @@ class OptionsOverlay extends DialogOverlay {
             options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
             options.show_captions = this.root.elements['show-captions'].checked;
             options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
+            options.directional_touch_type = parseInt(this.root.elements['dir-touch-type'].value, 10);
 
             // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data
             // URIs, and /delete/ any custom ones we're not using any more, both of which require
