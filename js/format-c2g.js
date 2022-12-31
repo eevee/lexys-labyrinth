@@ -926,6 +926,22 @@ const TILE_ENCODING = {
         modifier: modifier_color,
         is_extension: true,
     },
+    0xf4: {
+        name: 'one_way_walls',
+        has_next: true,
+        is_extension: true,
+        extra_args: [
+            {
+                size: 1,
+                decode(tile, mask) {
+                    tile.edges = mask;
+                },
+                encode(tile) {
+                    return tile.edges;
+                },
+            },
+        ],
+    },
 };
 const REVERSE_TILE_ENCODING = {};
 for (let [tile_byte, spec] of Object.entries(TILE_ENCODING)) {
@@ -2156,7 +2172,7 @@ const MAX_SIMULTANEOUS_REQUESTS = 5;
 
         _fetch_map(path, n);
     };
-    
+
     // FIXME and right off the bat we have an Issue: this is a text format so i want a string, not
     // an arraybuffer!
     let contents = util.string_from_buffer_ascii(buf);
