@@ -916,9 +916,16 @@ class Player extends PrimaryView {
         };
         touch_target.addEventListener('touchend', dismiss_touches);
         touch_target.addEventListener('touchcancel', dismiss_touches);
-        // Also grab taps on the overlay, for the specific case that tapping on the end of level
-        // tally advances to the next level
+        // Also grab taps on the overlay, for the specific cases that tapping on the end of level
+        // tally advances to the next level, and tapping on a non-phone dismisses the overlay
         this.overlay_message_el.addEventListener('touchstart', ev => {
+            if (this.state === 'waiting' || this.state === 'paused') {
+                if (getComputedStyle(this.mobile_pause_menu).display === 'none') {
+                    this.set_state('playing');
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                }
+            }
             if (this.state === 'stopped') {
                 if (this.touch_restart_delay.active) {
                     // If it's only been a very short time since the level ended, ignore taps
@@ -1982,8 +1989,13 @@ class Player extends PrimaryView {
                 mk('h2', `#${stored_level.number} ${stored_level.title}`),
                 mk('h3', stored_level.author ? `by ${stored_level.author}` : "\u200b"),
                 this.mobile_pause_menu,
-                mk('p.-controls-hint', "WASD/↑←↓→ to move · space to start without moving"),
             );
+            if (this.using_touch) {
+                overlay.append(mk('p.-controls-hint', "tap to start"));
+            }
+            else {
+                overlay.append(mk('p.-controls-hint', "WASD/↑←↓→ to move · space to start without moving"));
+            }
         }
         else if (this.state === 'paused') {
             overlay.append(mk('h2', "/// paused ///"));
