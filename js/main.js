@@ -863,8 +863,17 @@ class Player extends PrimaryView {
         });
         // Similarly, grab touch events and translate them to directions
         this.current_touches = {};  // ident => action
+        this.touch_history = {} // ident => {x, y} representing start of touch
         this.touch_restart_delay = new util.DelayTimer;
         let touch_target = this.root.querySelector('#player-game-area .level');
+        let start_touches = ev => {
+            ev.stopPropagation();
+            ev.preventDefault();
+            this.using_touch = true;
+            for (let touch of ev.changedTouches) {
+                this.touch_history[touch.identifier] = {x: touch.clientX, y: touch.clientY};
+            }
+        }
         let collect_touches = ev => {
             ev.stopPropagation();
             ev.preventDefault();
@@ -874,11 +883,10 @@ class Player extends PrimaryView {
             // TODO allow starting a level without moving?
             // TODO if you don't move the touch, the player can pass it and will keep going in that
             // direction?
-            let [px, py] = this.level.player.visual_position();
-            px += 0.5;
-            py += 0.5;
             for (let touch of ev.changedTouches) {
+                let start = this.touch_history[touch.identifier]
                 let [x, y] = this.renderer.point_to_real_cell_coords(touch.clientX, touch.clientY);
+                let [px, py] = this.renderer.point_to_real_cell_coords(start.x, start.y);
                 let dx = x - px;
                 let dy = y - py;
                 // Divine a direction from the results
@@ -907,11 +915,12 @@ class Player extends PrimaryView {
                 this.set_state('playing');
             }
         };
-        touch_target.addEventListener('touchstart', collect_touches);
+        touch_target.addEventListener('touchstart', start_touches);
         touch_target.addEventListener('touchmove', collect_touches);
         let dismiss_touches = ev => {
             for (let touch of ev.changedTouches) {
                 delete this.current_touches[touch.identifier];
+                delete this.touch_history[touch.identifier];
             }
         };
         touch_target.addEventListener('touchend', dismiss_touches);
