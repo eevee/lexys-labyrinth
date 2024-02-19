@@ -509,7 +509,7 @@ export class Editor extends PrimaryView {
                 let safe_title = (stored_pack.title || "untitled").replace(/[""]/g, "'").replace(/[\x00-\x1f]+/g, "_");
                 lines.push(`game "${safe_title}"`);
                 for (let [key, value] of Object.entries(stored_pack.metadata)) {
-                    lines.push(`; meta ${key}: ${value}`)
+                    lines.push(`; meta ${key}: ${value}`);
                 }
 
                 let files = {};
