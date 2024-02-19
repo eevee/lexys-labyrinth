@@ -508,6 +508,9 @@ export class Editor extends PrimaryView {
                 let lines = [];
                 let safe_title = (stored_pack.title || "untitled").replace(/[""]/g, "'").replace(/[\x00-\x1f]+/g, "_");
                 lines.push(`game "${safe_title}"`);
+                for (let [key, value] of Object.entries(stored_pack.metadata)) {
+                    lines.push(`; meta ${key}: ${value}`);
+                }
 
                 let files = {};
                 let count = stored_pack.level_metadata.length;
@@ -741,6 +744,7 @@ export class Editor extends PrimaryView {
         let pack_key = stored_pack.editor_metadata.key;
         this.stash.packs[pack_key] = {
             title: stored_pack.title,
+            metadata: stored_pack.metadata,
             level_count: stored_pack.level_metadata.length,
             last_modified: Date.now(),
         };
@@ -824,6 +828,7 @@ export class Editor extends PrimaryView {
         });
         // TODO should this also be in the pack's stash...?
         stored_pack.title = this.stash.packs[pack_key].title;
+        stored_pack.metadata = this.stash.packs[pack_key].metadata ?? {};
         stored_pack.editor_metadata = {
             key: pack_key,
         };
