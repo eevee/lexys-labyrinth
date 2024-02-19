@@ -508,14 +508,8 @@ export class Editor extends PrimaryView {
                 let lines = [];
                 let safe_title = (stored_pack.title || "untitled").replace(/[""]/g, "'").replace(/[\x00-\x1f]+/g, "_");
                 lines.push(`game "${safe_title}"`);
-                if (stored_pack.metadata.by) {
-                    lines.push(`; meta by: ${stored_pack.metadata.by}`);
-                }
-                if (stored_pack.metadata.description) {
-                    lines.push(`; meta description: ${stored_pack.metadata.description}`);
-                }
-                if (stored_pack.metadata.difficulty) {
-                    lines.push(`; meta difficulty: ${stored_pack.metadata.difficulty}`);
+                for (let [key, value] of Object.entries(stored_pack.metadata)) {
+                    lines.push(`; meta ${key}: ${value}`)
                 }
 
                 let files = {};
