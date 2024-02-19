@@ -2113,6 +2113,18 @@ class Parser {
     }
 }
 
+
+function parse_pack_metadata(string) {
+    let metadata = {};
+    for (let match of string.matchAll(/; meta (.+?): (.+)/g)) {
+        metadata[match[1]] = match[2];
+    }
+    if (metadata.difficulty) {
+        metadata.difficulty = parseFloat(metadata.difficulty);
+    }
+    return metadata;
+}
+
 // C2G is a Chip's Challenge 2 format that describes the structure of a level set, which is helpful
 // since CC2 levels are all stored in separate files
 // XXX observations i have made about this hell format:
@@ -2176,6 +2188,7 @@ const MAX_SIMULTANEOUS_REQUESTS = 5;
     // FIXME and right off the bat we have an Issue: this is a text format so i want a string, not
     // an arraybuffer!
     let contents = util.string_from_buffer_ascii(buf);
+    game.metadata = parse_pack_metadata(contents);
     parser = new Parser(contents);
     let statements = [];
     let level_number = 1;
