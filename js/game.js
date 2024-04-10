@@ -60,6 +60,7 @@ export class Tile {
             return false;
 
         if (level.compat.monsters_ignore_keys && this.type.is_key)
+            // MS: Monsters are never blocked by keys
             return false;
 
         if (this.type.blocks_collision & other.type.collision_mask)
@@ -666,21 +667,18 @@ export class Level extends LevelInterface {
         this.wired_outputs = Array.from(wired_outputs);
         this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
 
-        if (!first_time) {
-            //update wireables
-             for (var i = 0; i < this.width; ++i)
-            {
-                for (var j = 0; j < this.height; ++j)
-                {
+        if (! first_time) {
+            // Update wireables
+            for (let i = 0; i < this.width; i++) {
+                for (let j = 0; j < this.height; j++) {
                     let terrain = this.cell(i, j).get_terrain();
-                    if (terrain.is_wired !== undefined)
-                    {
+                    if (terrain.is_wired !== undefined) {
                         terrain.type.on_begin(terrain, this);
                     }
                 }
             }
 
-            if (!undoing) {
+            if (! undoing) {
                 this._push_pending_undo(() => this.undid_past_recalculate_circuitry = true);
             }
         }
@@ -779,6 +777,7 @@ export class Level extends LevelInterface {
     _advance_tic_lynx() {
         // Under CC2 rules, there are two wire updates at the very beginning of the game before the
         // player can actually move.  That means the first tic has five wire phases total.
+        // TODO or i could just, uh, do two wire updates /first/
         // FIXME this breaks item bestowal contraptions that immediately flip a force floor, since
         // the critters on the force floors don't get a bonk before this happens
         if (this.tic_counter === 0) {
@@ -1630,6 +1629,7 @@ export class Level extends LevelInterface {
             // a player thinks about moving into a monster, the player dies.  A player standing on a
             // wall is only saved by the wall being checked first.  This is also why standing on an
             // item won't save you: actors are checked before items!
+            // TODO merge this with player_protected_by_items?  seems like they don't make sense independently
             if (layer === LAYERS.actor &&
                 // Lynx: Touching a monster at decision time doesn't kill you, and pushing doesn't
                 // happen at decision time thanks to no_early_push
@@ -1866,12 +1866,16 @@ export class Level extends LevelInterface {
         // FIXME this feels clunky
         let goal_cell = this.get_neighboring_cell(actor.cell, direction);
         let terrain = goal_cell.get_terrain();
-        if (terrain && terrain.type.speed_factor && ! actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)) {
+        let ignore = actor.ignores(terrain.type.name) || actor.slide_ignores(terrain.type.name);
+        if (terrain.type.speed_factor && ! ignore) {
             speed /= terrain.type.speed_factor;
         }
-        //speed boots speed us up UNLESS we're entering a terrain with a speed factor and an unignored slide mode (so e.g. we gain 2x on teleports, ice + ice skates, force floors + suction boots, sand and dash floors, but we don't gain 2x sliding on ice or force floors unless it's the turn we're leaving them)
-        if (actor.has_item('speed_boots')
-        && !(terrain.type.speed_factor && terrain.type.slide_mode && !actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name)))
+        // Speed boots speed us up, UNLESS we're entering a terrain with a speed factor and an
+        // unignored slide mode -- so e.g. we gain 2x on teleports, ice + ice skates, force floors +
+        // suction boots, sand and dash floors, but we don't gain 2x sliding on ice or force floors
+        // unless it's the turn we're leaving them
+        if (actor.has_item('speed_boots') && (
+                ! terrain.type.speed_factor || ! terrain.type.slide_mode || ignore))
         {
             speed /= 2;
         }
@@ -1886,7 +1890,7 @@ export class Level extends LevelInterface {
         // Whether we're sliding is determined entirely by whether we most recently moved onto a
         // sliding tile that we don't ignore.  This could /almost/ be computed on the fly, except
         // that an actor that starts on e.g. ice or a teleporter is not considered sliding.
-        this._set_tile_prop(actor, 'is_sliding', terrain.type.slide_mode && !actor.ignores(terrain.type.name) && !actor.slide_ignores(terrain.type.name));
+        this._set_tile_prop(actor, 'is_sliding', terrain.type.slide_mode && ! ignore);
 
         // Do Lexy-style hooking here: only attempt to pull things just after we've actually moved
         // successfully, which means the hook can never stop us from moving and hook slapping is not
@@ -1974,7 +1978,7 @@ export class Level extends LevelInterface {
                 continue;
             if (actor.ignores(tile.type.name))
                 continue;
-            
+
             if (tile.type.on_approach) {
                 tile.type.on_approach(tile, this, actor);
             }
@@ -2027,6 +2031,7 @@ export class Level extends LevelInterface {
                     tile.type.item_priority >= actor.type.item_pickup_priority ||
                     (mod && mod.type.item_modifier === 'pickup'));
                 if (this.compat.monsters_ignore_keys && tile.type.is_key && actor.type.is_monster) {
+                    // MS: Monsters never try to pick up keys
                     try_pickup = false;
                 }
                 if (try_pickup && this.attempt_take(actor, tile)) {
@@ -2414,7 +2419,7 @@ export class Level extends LevelInterface {
         }
     }
 
-    //same as above, but accepts multiple tiles
+    // Same as above, but accepts multiple tiles
     *iter_tiles_in_reading_order_multiple(start_cell, names, reverse = false) {
         let i = this.coords_to_scalar(start_cell.x, start_cell.y);
         let index = TILE_TYPES[names[0]].layer;
@@ -2432,6 +2437,7 @@ export class Level extends LevelInterface {
 
             let cell = this.linear_cells[i];
             let tile = cell[index];
+            // FIXME probably uh do a lookup here
             if (tile && names.indexOf(tile.type.name) >= 0) {
                 yield tile;
             }
@@ -2651,7 +2657,7 @@ export class Level extends LevelInterface {
             return;
         }
 
-        //only used for glass block atm
+        // Only used for glass block atm
         if (actor.type.on_death) {
             actor.type.on_death(actor, this);
         }
@@ -2819,8 +2825,8 @@ export class Level extends LevelInterface {
             // to destroy it
             return;
         }
-        
-        //only used for electrified floor atm
+
+        // Only used for electrified floor atm
         if (tile.type.on_death && !tile.type.is_actor) {
             tile.type.on_death(tile, this);
         }
