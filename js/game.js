@@ -691,7 +691,7 @@ export class Level extends LevelInterface {
         // not in an un-overrideable slide
         if (this.player.movement_cooldown > 0)
             return false;
-        if (! this.player.pending_slide)
+        if (! this.player.is_pending_slide)
             return true;
         if (! this.player.can_override_slide)
             return false;
@@ -1043,7 +1043,6 @@ export class Level extends LevelInterface {
                 (terrain.type.slide_mode === 'force' && ! actor.ignores(terrain.type.name))))
             {
                 // Turn the actor around so ice corners bonk correctly
-                // XXX this is jank as hell
                 if (terrain.type.slide_mode === 'ice') {
                     this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
                 }
@@ -1051,15 +1050,17 @@ export class Level extends LevelInterface {
                 // function, as a bonking monster will notice the item now and take it.
                 this.step_on_cell(actor, actor.cell);
 
-                if (! this.compat.bonking_isnt_instant) {
-                    // Note that ghosts bonk even on ice corners, which they can otherwise pass through!
-                    let forced_move = this.get_forced_move(actor, terrain);
-                    if (actor.type.name === 'ghost') {
-                        forced_move = actor.direction;
-                    }
-                    // If we got a new direction, try moving again
-                    if (forced_move && direction !== forced_move) {
-                        success = this.attempt_step(actor, forced_move);
+                // If we changed direction, try moving again.
+                // (This is why ghosts bonk even on ice corners, which they can pass through)
+                if (actor.direction !== direction &&
+                    // CC1: Wait until next tic to start moving again
+                    // XXX seems reasonable, do i want that as default behavior?  when does it come up?
+                    ! this.compat.bonking_isnt_instant)
+                {
+                    success = this.attempt_step(actor, actor.direction);
+                    if (success) {
+                        // This only exists for decisions, so we need to clear it now
+                        this._set_tile_prop(actor, 'is_pending_slide', false);
                     }
                 }
             }
@@ -1238,6 +1239,25 @@ export class Level extends LevelInterface {
             }
             this.pending_green_toggle = false;
         }
+
+        // On the very first tic, check for any actors standing on force floors, and set their slide
+        // directions.  Done here because they do NOT move yet, even if unblocked!
+        // TODO this feels oddly artificial.  is this supposed to happen during idle, maybe?
+        // FIXME check compat flag for lynx
+        if (this.tic_counter === 0 && this.frame_offset === 0) {
+            for (let i = this.actors.length - 1; i >= 0; i--) {
+                let actor = this.actors[i];
+
+                let terrain = actor.cell.get_terrain();
+                if (terrain && terrain.type.slide_mode === 'force') {
+                    let forced_move = this.get_forced_move(actor, terrain);
+                    if (forced_move) {
+                        this._set_tile_prop(actor, 'is_pending_slide', true)
+                        this.set_actor_direction(actor, forced_move);
+                    }
+                }
+            }
+        }
     }
 
     _do_cleanup_phase() {
@@ -1367,9 +1387,8 @@ export class Level extends LevelInterface {
         //   succeed, even if overriding in the same direction we're already moving, that does count
         //   as an override.
         let terrain = actor.cell.get_terrain();
-        let forced_move = this.get_forced_move(actor, terrain);
-        let may_move = ! forced_only && (
-            ! forced_move || (actor.can_override_slide && terrain.type.allow_player_override));
+        let may_move = ! forced_only && (! actor.is_pending_slide || (
+                actor.can_override_slide && terrain.type.allow_player_override));
         let [dir1, dir2] = this._extract_player_directions(input);
 
         // Check for special player actions, which can only happen at decision time.  Dropping can
@@ -1397,9 +1416,9 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (forced_move && ! (may_move && dir1)) {
+        if (actor.is_pending_slide && ! (may_move && dir1)) {
             // This is a forced move and we're not overriding it, so we're done
-            actor.decision = forced_move;
+            actor.decision = actor.direction;
 
             if (terrain.type.slide_mode === 'force') {
                 this._set_tile_prop(actor, 'can_override_slide', true);
@@ -1426,11 +1445,10 @@ export class Level extends LevelInterface {
                 // FIXME lynx only checks horizontal?
                 let open1 = try_direction(dir1, push_mode);
                 let open2 = try_direction(dir2, push_mode);
-                let current_direction = forced_move ?? actor.direction;
-                if (open1 && open2 && (dir1 === current_direction || dir2 === current_direction)) {
+                if (open1 && open2 && (dir1 === actor.direction || dir2 === actor.direction)) {
                     // Both directions are open, but one of them is the way we're already moving, so
                     // stick with that
-                    actor.decision = current_direction;
+                    actor.decision = actor.direction;
                     open = true;
                 }
                 else if (open1 !== open2) {
@@ -1455,9 +1473,10 @@ export class Level extends LevelInterface {
             // If we're overriding a force floor but the direction we're moving in is blocked, we
             // keep our override power (but only under the CC2 behavior of instant bonking).
             // Notably, this happens even if we do end up able to move!
-            if (forced_move && terrain.type.slide_mode === 'force' && ! open &&
+            if (actor.is_pending_slide && terrain.type.slide_mode === 'force' && ! open &&
                 ! this.compat.bonking_isnt_instant)
             {
+                actor.decision = actor.direction;
                 this._set_tile_prop(actor, 'can_override_slide', true);
             }
             else {
@@ -1487,10 +1506,9 @@ export class Level extends LevelInterface {
 
         let direction_preference;
         let terrain = actor.cell.get_terrain();
-        let forced_move = this.get_forced_move(actor, terrain);
-        if (forced_move) {
+        if (actor.is_pending_slide) {
             // Actors can't make voluntary moves while sliding; they just, ah, slide.
-            actor.decision = forced_move;
+            actor.decision = actor.direction;
             return;
         }
         else if (actor.type.name === 'ghost' && terrain.type.slide_mode === 'ice') {
@@ -2022,7 +2040,9 @@ export class Level extends LevelInterface {
                 }
             }
             else if (tile.type.on_arrive && !actor.slide_ignores(tile.type.name)) {
-                // Kind of weird putting slide_ignores here, except that all sliding happens on on_arrive, and tiles that make you slide in on_arrive don't do anything else, so for now it works
+                // Kind of weird putting slide_ignores here, except that all sliding happens on
+                // on_arrive, and tiles that make you slide in on_arrive don't do anything else, so
+                // for now it works
                 tile.type.on_arrive(tile, this, actor);
             }
 
@@ -2031,6 +2051,14 @@ export class Level extends LevelInterface {
                 // drawn between moves.  It also simplifies checks elsewhere, so that's nice
                 this._set_tile_prop(actor, 'is_pending_slide', true);
             }
+        }
+
+        // FIXME ingratiate this with the rest of this stuff i think
+        // FIXME figure out what the hell that comment means
+        let forced_move = this.get_forced_move(actor);
+        if (forced_move) {
+            this._set_tile_prop(actor, 'is_pending_slide', true)
+            this.set_actor_direction(actor, forced_move);
         }
     }
 
