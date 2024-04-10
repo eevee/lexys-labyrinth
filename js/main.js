@@ -2432,13 +2432,6 @@ const BUILTIN_LEVEL_PACKS = [{
     desc: "Designed like a direct replacement for Chip's Challenge 1, with introductory levels for new players and a gentle difficulty curve.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1',
 }, {
-    path: 'levels/CCLP4.ccl',
-    preview: 'levels/previews/cclp4.png',
-    ident: 'cclp4',
-    title: "Chip's Challenge Level Pack 4",
-    desc: "Moderately difficult, but not unfair.",
-    url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_4',
-}, {
     path: 'levels/CCLXP2.ccl',
     preview: 'levels/previews/cclxp2.png',
     ident: 'cclxp2',
@@ -2452,6 +2445,20 @@ const BUILTIN_LEVEL_PACKS = [{
     title: "Chip's Challenge Level Pack 3",
     desc: "A tough challenge, by and for veteran players.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_3',
+}, {
+    path: 'levels/CCLP4.ccl',
+    preview: 'levels/previews/cclp4.png',
+    ident: 'cclp4',
+    title: "Chip's Challenge Level Pack 4",
+    desc: "Moderately difficult, but not unfair.",
+    url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_4',
+}, {
+    path: 'levels/CCLP5.ccl',
+    preview: 'levels/previews/cclp5.png',
+    ident: 'cclp5',
+    title: "Chip's Challenge Level Pack 5",
+    desc: "The latest and greatest.",
+    url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_5',
 /*
  * TODO: this is tricky.  it's a massive hodgepodge of levels mostly made by individual people...
 }, {
