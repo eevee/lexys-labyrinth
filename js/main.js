@@ -3297,6 +3297,7 @@ class CompatOverlay extends DialogOverlay {
         });
         this.main.append(button_set);
 
+        // TODO include the section dividers, somehow
         let list = mk('ul.compat-flags');
         for (let compat of COMPAT_FLAGS) {
             let label = mk('label',
@@ -3317,7 +3318,24 @@ class CompatOverlay extends DialogOverlay {
             list.append(mk('li', label));
         }
         list.addEventListener('change', ev => {
-            this.root.elements['__ruleset__'].value = 'custom';
+            // If the current set of flags exactly matches one of the presets, highlight that button
+            let selected_ruleset = 'custom';
+            for (let ruleset of COMPAT_RULESET_ORDER) {
+                let ok = true;
+                for (let compat of COMPAT_FLAGS) {
+                    if (this.root.elements[compat.key].checked !== compat.rulesets.has(ruleset)) {
+                        ok = false;
+                        break;
+                    }
+                }
+
+                if (ok) {
+                    selected_ruleset = ruleset;
+                    break;
+                }
+            }
+
+            this.root.elements['__ruleset__'].value = selected_ruleset;
             ev.target.closest('li').classList.toggle('-checked', ev.target.checked);
         });
         this.main.append(list);
