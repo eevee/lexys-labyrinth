@@ -56,7 +56,6 @@ function _define_force_floor(direction, opposite_type) {
         layer: LAYERS.terrain,
         slide_mode: 'force',
         speed_factor: 2,
-        slide_automatically: true,
         allow_player_override: true,
         on_arrive(me, level, other) {
             if (level.compat.force_floors_on_arrive) {
@@ -978,7 +977,6 @@ const TILE_TYPES = {
     force_floor_all: {
         layer: LAYERS.terrain,
         slide_mode: 'force',
-        slide_automatically: true,
         speed_factor: 2,
         allow_player_override: true,
         blocks(me, level, other) {

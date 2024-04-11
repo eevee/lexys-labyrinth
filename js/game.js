@@ -2016,13 +2016,6 @@ export class Level extends LevelInterface {
                 // XXX that is jank as hell what are you talking about
                 tile.type.on_arrive(tile, this, actor);
             }
-
-            if (tile.type.slide_automatically) {
-                // This keeps a player on force floor consistently using their sliding pose, even if
-                // drawn between moves.  It also simplifies checks elsewhere, so that's nice
-                // FIXME if i'm right about how this works then this may not be necessary?
-                this._set_tile_prop(actor, 'is_pending_slide', true);
-            }
         }
     }
 
