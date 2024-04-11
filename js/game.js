@@ -1630,89 +1630,92 @@ export class Level extends LevelInterface {
             }
         }
 
-        // If we got this far, all that's left is to deal with pushables
-        if (pushable_tiles.length > 0) {
-            // This ends recursive push attempts, which can happen with a row of ice clogged by ice
-            // blocks that are trying to slide
-            actor._trying_to_push = true;
-            try {
-                for (let tile of pushable_tiles) {
-                    if (tile._trying_to_push)
+        // If we got this far, all that's left is to deal with pushables, if any
+        if (pushable_tiles.length === 0) {
+            return ! still_blocked;
+        }
+
+        // This flag (and the try/finally to ensure it's immediately cleared) detects recursive push
+        // attempts, which can happen with a row of ice clogged by stuck sliding ice blocks
+        actor._trying_to_push = true;
+        try {
+            for (let tile of pushable_tiles) {
+                if (tile._trying_to_push)
+                    return false;
+                if (push_mode === 'bump' || push_mode === 'slap') {
+                    if (tile.movement_cooldown > 0)
                         return false;
-                    if (push_mode === 'bump' || push_mode === 'slap') {
-                        if (tile.movement_cooldown > 0)
-                            return false;
 
-                        let redirected_direction = tile.cell.redirect_exit(tile, direction);
-                        if (! this.check_movement(tile, tile.cell, redirected_direction, push_mode))
-                            return false;
+                    let redirected_direction = tile.cell.redirect_exit(tile, direction);
+                    if (! this.check_movement(tile, tile.cell, redirected_direction, push_mode))
+                        return false;
 
-                        if (push_mode === 'slap') {
-                            if (actor === this.player) {
-                                this._set_tile_prop(actor, 'is_pushing', true);
-                                this.sfx.play_once('push');
-                            }
-                            // FIXME we get here for monsters in lynx mode!  check this is actually
-                            // possible
-                            tile.decision = direction;
-                        }
-                    }
-                    else if (push_mode === 'push') {
+                    if (push_mode === 'slap') {
                         if (actor === this.player) {
                             this._set_tile_prop(actor, 'is_pushing', true);
+                            this.sfx.play_once('push');
                         }
+                        // FIXME we get here for monsters in lynx mode!  check this is actually
+                        // possible
+                        tile.decision = direction;
+                    }
+                }
+                else if (push_mode === 'push') {
+                    if (actor === this.player) {
+                        this._set_tile_prop(actor, 'is_pushing', true);
+                    }
 
-                        let tile_is_stuck_sliding = (tile.is_sliding && ! tile.is_pulled && (
-                            tile.movement_cooldown > 0 || tile.cell.get_terrain().type.slide_mode === 'force'));
+                    let tile_is_stuck_sliding = (tile.is_sliding && ! tile.is_pulled && (
+                        tile.movement_cooldown > 0 || tile.cell.get_terrain().type.slide_mode === 'force'));
 
-                        if (this.compat.no_directly_pushing_sliding_blocks && tile_is_stuck_sliding) {
-                            // CC2: Can't directly push a sliding block, even one on a force floor
-                            // that's stuck on a wall (and thus not moving).  Such a push ALWAYS
-                            // becomes a pending push, so it won't happen until next tic, and we
-                            // remain blocked
+                    if (this.compat.no_directly_pushing_sliding_blocks && tile_is_stuck_sliding) {
+                        // CC2: Can't directly push a sliding block, even one on a force floor
+                        // that's stuck on a wall (and thus not moving).  Such a push ALWAYS becomes
+                        // a pending push, so it won't happen until next tic, and we remain blocked
+                        this._set_tile_prop(tile, 'pending_push', direction);
+                        // If the block already had its decision phase this turn, override it
+                        tile.decision = direction;
+                        return false;
+                    }
+
+                    // Lexy/Lynx(?) behavior: try to push the block first, then resort to pending if
+                    // the push fails
+                    if (this.attempt_out_of_turn_step(tile, direction)) {
+                        if (actor === this.player) {
+                            this.sfx.play_once('push');
+                        }
+                    }
+                    else {
+                        if (! this.compat.no_directly_pushing_sliding_blocks && tile_is_stuck_sliding) {
+                            // If the push failed and the obstacle is in the middle of a slide,
+                            // remember this as the next move it'll make
                             this._set_tile_prop(tile, 'pending_push', direction);
-                            // If the block already had its decision phase this turn, override it
                             tile.decision = direction;
-                            return false;
                         }
-
-                        // Lexy/Lynx(?) behavior: try to push the block first, then resort to
-                        // pending if the push fails
-                        if (this.attempt_out_of_turn_step(tile, direction)) {
-                            if (actor === this.player) {
-                                this.sfx.play_once('push');
-                            }
-                        }
-                        else {
-                            if (! this.compat.no_directly_pushing_sliding_blocks && tile_is_stuck_sliding) {
-                                // If the push failed and the obstacle is in the middle of a slide,
-                                // remember this as the next move it'll make
-                                this._set_tile_prop(tile, 'pending_push', direction);
-                                tile.decision = direction;
-                            }
-                            return false;
-                        }
+                        return false;
                     }
                 }
             }
-            finally {
-                delete actor._trying_to_push;
-            }
+        }
+        finally {
+            delete actor._trying_to_push;
+        }
 
-            // In push mode, check one last time for being blocked, in case we e.g. pushed a block
-            // off of a recessed wall.
-            // This is the check that prevents spring mining, the phenomenon where (a) actor pushes
-            // a block off of a recessed wall or lilypad, (b) the wall/lilypad becomes blocking as a
-            // result, (c) the actor moves into the cell anyway.  In most cases this is prevented on
-            // accident, because pushes happen at decision time during the collision check, and then
-            // the actual movement happens later with a second collision check.
-            // Note that there is one exception: CC2 does seem to have spring mining prevention when
-            // pushing a row of ice blocks, so we keep the check if we're a block.  See BLOX replay;
-            // without this, ice blocks spring mine around 61.9s.
-            if ((! this.compat.emulate_spring_mining || actor.type.is_block) &&
-                push_mode === 'push' &&
-                cell.some(tile => tile && tile.blocks(actor, direction, this)))
-                return false;
+        // In push mode, check one last time for being blocked, in case we e.g. pushed a block off
+        // of a recessed wall.
+        // This is the check that prevents spring mining, the phenomenon where (a) actor pushes a
+        // block off of a recessed wall or lilypad, (b) the wall/lilypad becomes blocking as a
+        // result, (c) the actor moves into the cell anyway.  In most cases this is prevented on
+        // accident, because pushes happen at decision time during the collision check, and then the
+        // actual movement happens later with a second collision check.
+        // Note that there is one exception: CC2 does seem to have spring mining prevention when
+        // pushing a row of ice blocks, so we keep the check if we're a block ourselves.  See BLOX
+        // replay; without this, ice blocks spring mine around 61.9s.
+        if ((! this.compat.emulate_spring_mining || actor.type.is_block) &&
+            push_mode === 'push' &&
+            cell.some(tile => tile && tile.blocks(actor, direction, this)))
+        {
+            return false;
         }
 
         return ! still_blocked;
