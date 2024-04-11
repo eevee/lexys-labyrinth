@@ -2030,8 +2030,9 @@ export class Level extends LevelInterface {
             // XXX this does seem to be correct by CC2 rules, but it's very weird -- this will
             // usually happen anyway during the actor's idle phase.  it also requires random force
             // floors to have a clumsy check that you aren't already about to slide
+            // TODO maybe don't do this for lynx?  i don't really grok the implications
             if (tile.type.on_stand && !actor.slide_ignores(tile.type.name)) {
-                tile.type.on_stand(tile, this, actor);
+                tile.type.on_stand(tile, this, actor, true);
             }
         }
     }
