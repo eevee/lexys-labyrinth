@@ -2814,8 +2814,7 @@ export class Level extends LevelInterface {
             });
         }
         else {
-            tile.type = new_type;
-            this._push_pending_undo(() => tile.type = old_type);
+            this._set_tile_prop(tile, 'type', new_type);
         }
 
         // For transmuting into an animation, set up the timer immediately
