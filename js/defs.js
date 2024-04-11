@@ -200,10 +200,6 @@ export const COMPAT_FLAGS = [
     label: "Players can't override backwards on a force floor",
     rulesets: new Set(['lynx']),
 }, {
-    key: 'force_floors_on_arrive',
-    label: "Force floors trigger on arrival",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
     key: 'traps_like_lynx',
     label: "Traps eject faster, and even when already open",
     rulesets: new Set(['lynx']),

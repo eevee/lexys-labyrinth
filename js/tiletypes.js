@@ -57,16 +57,10 @@ function _define_force_floor(direction, opposite_type) {
         slide_mode: 'force',
         speed_factor: 2,
         allow_player_override: true,
-        on_arrive(me, level, other) {
-            if (level.compat.force_floors_on_arrive) {
-                // Lynx: Force floors activate when stepped on, not when stood on
-                level.schedule_actor_slide(other, direction);
-            }
-        },
+        // Used by Lynx to prevent backwards overriding
+        force_floor_direction: direction,
         on_stand(me, level, other) {
-            if (! level.compat.force_floors_on_arrive) {
-                level.schedule_actor_slide(other, direction);
-            }
+            level.schedule_actor_slide(other, direction);
         },
         activate(me, level) {
             level.transmute_tile(me, opposite_type);
@@ -982,12 +976,6 @@ const TILE_TYPES = {
         blocks(me, level, other) {
             return (level.compat.rff_blocks_monsters &&
                 (other.type.collision_mask & COLLISION.monster_typical));
-        },
-        on_arrive(me, level, other) {
-            if (level.compat.force_floors_on_arrive) {
-                // Lynx: Force floors activate when stepped on, not when stood on
-                level.schedule_actor_slide(other, level.get_force_floor_direction());
-            }
         },
         on_stand(me, level, other) {
             if (! other.is_pending_slide && ! level.compat.force_floors_on_arrive) {
