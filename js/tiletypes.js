@@ -2712,7 +2712,8 @@ const TILE_TYPES = {
     // TODO note: ms allows blocks to pass over tools
     cleats: {
         ...COMMON_TOOL,
-        item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', ]),
+        item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
+        // XXX this is literally the only definition of slide_ignores
         item_slide_ignores: new Set(['cracked_ice']),
     },
     suction_boots: {
