@@ -855,9 +855,7 @@ export class Level extends LevelInterface {
 
     _do_init_phase() {
         // At the beginning of the very first tic, some tiles want to do initialization that's not
-        // appropriate to do before the game begins.  (For example, bombs blow up anything that
-        // starts on them in CC2, but we don't want to do that before the game has run at all.  We
-        // DEFINITELY don't want to blow the PLAYER up before the game starts!)
+        // appropriate to do before the game begins
         if (! this.done_on_begin) {
             // Run backwards, to match actor order
             for (let i = this.linear_cells.length - 1; i >= 0; i--) {
@@ -1145,6 +1143,12 @@ export class Level extends LevelInterface {
             let terrain = actor.cell.get_terrain();
             if (terrain.type.on_stand && ! actor.ignores(terrain.type.name)) {
                 terrain.type.on_stand(terrain, this, actor);
+            }
+            // You might think a loop would be good here but this is unbelievably faster and the
+            // only tile with an on_stand is the bomb anyway
+            let item = actor.cell.get_item();
+            if (item && item.type.on_stand && ! actor.ignores(item.type.name)) {
+                item.type.on_stand(item, this, actor);
             }
         }
         // Lynx gives everything in an open trap an extra cooldown, which makes things walk into

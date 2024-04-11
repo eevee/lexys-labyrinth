@@ -215,13 +215,13 @@ export const COMPAT_FLAGS = [
 
 // Items
 {
-    key: 'no_immediate_detonate_bombs',
-    label: "Mines under non-player actors don't explode at level start",
+    key: 'bombs_detonate_on_arrive',
+    label: "Mines detonate only when stepped on",
     rulesets: new Set(['lynx', 'ms']),
 }, {
-    key: 'detonate_bombs_under_players',
-    label: "Mines under players explode at level start",
-    rulesets: new Set(['steam', 'steam-strict']),
+    key: 'bombs_immediately_detonate_under_players',
+    label: "Mines under players detonate at level start",
+    rulesets: new Set(['steam-strict']),
 }, {
     key: 'cloned_bowling_balls_can_be_lost',
     label: "Bowling balls on cloners are destroyed when fired at point blank",

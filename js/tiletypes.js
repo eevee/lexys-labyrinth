@@ -1002,19 +1002,23 @@ const TILE_TYPES = {
     },
     bomb: {
         layer: LAYERS.item,
-        on_begin(me, level) {
-            if (level.compat.no_immediate_detonate_bombs)
-                return;
-
-            // In CC2, actors on a bomb (but not a green one) are immediately blown up
-            let actor = me.cell.get_actor();
-            if (actor && ! actor.ignores(this.name)) {
-                if (actor.type.is_real_player && ! level.compat.detonate_bombs_under_players)
-                    return;
-                this.on_arrive(me, level, actor);
+        on_arrive(me, level, other) {
+            if (level.compat.bombs_detonate_on_arrive) {
+                me.type._detonate(me, level, other);
             }
         },
-        on_arrive(me, level, other) {
+        on_stand(me, level, other) {
+            // Lynx: Bombs detonate on arrival, not on idle
+            // Steam: Bombs detonate when stood on, even if a player starts the level on one.  This
+            // is useless in CC2 design and breaks some CC1 levels, so it's off by default
+            if (! level.compat.bombs_detonate_on_arrive &&
+                ! (level.compat.bombs_immediately_detonate_under_players &&
+                    level.tic_counter === 0 && other.type.is_real_player))
+            {
+                me.type._detonate(me, level, other);
+            }
+        },
+        _detonate(me, level, other) {
             level.remove_tile(me);
             level.kill_actor(other, me, 'explosion', 'bomb', 'exploded');
         },
@@ -1328,6 +1332,7 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         is_required_chip: true,
         on_arrive(me, level, other) {
+            // Unlike regular bombs, these only seem to respond to being stepped on, not stood on
             level.remove_tile(me);
             level.kill_actor(other, me, 'explosion', 'bomb', 'exploded');
         },
