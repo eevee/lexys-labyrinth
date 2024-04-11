@@ -1238,25 +1238,6 @@ export class Level extends LevelInterface {
             }
             this.pending_green_toggle = false;
         }
-
-        // On the very first tic, check for any actors standing on force floors, and set their slide
-        // directions.  Done here because they do NOT move yet, even if unblocked!
-        // TODO this feels oddly artificial.  is this supposed to happen during idle, maybe?
-        // FIXME check compat flag for lynx
-        if (this.tic_counter === 0 && this.frame_offset === 0) {
-            for (let i = this.actors.length - 1; i >= 0; i--) {
-                let actor = this.actors[i];
-
-                let terrain = actor.cell.get_terrain();
-                if (terrain && terrain.type.slide_mode === 'force') {
-                    let forced_move = this.get_forced_move(actor, terrain);
-                    if (forced_move) {
-                        this._set_tile_prop(actor, 'is_pending_slide', true)
-                        this.set_actor_direction(actor, forced_move);
-                    }
-                }
-            }
-        }
     }
 
     _do_cleanup_phase() {
@@ -1336,22 +1317,6 @@ export class Level extends LevelInterface {
             }
         }
         return [dir1, dir2];
-    }
-
-    get_forced_move(actor, terrain = null) {
-        if (! terrain) {
-            terrain = actor.cell.get_terrain();
-        }
-        if (! terrain.type.slide_mode)
-            return null;
-        if (! terrain.type.get_slide_direction)
-            return null;
-        if (! (actor.is_pending_slide || terrain.type.slide_automatically))
-            return null;
-        if (actor.ignores(terrain.type.name))
-            return null;
-
-        return terrain.type.get_slide_direction(terrain, this, actor);
     }
 
     make_player_decision(actor, input, forced_only = false) {
@@ -2048,22 +2013,22 @@ export class Level extends LevelInterface {
                 // Kind of weird putting slide_ignores here, except that all sliding happens on
                 // on_arrive, and tiles that make you slide in on_arrive don't do anything else, so
                 // for now it works
+                // XXX that is jank as hell what are you talking about
                 tile.type.on_arrive(tile, this, actor);
+            }
+
+            if (tile.type.on_stand && !actor.slide_ignores(tile.type.name)) {
+                // XXX according to notcc, cc2 also has actors "stand" on tiles immediately upon
+                // arrival, even though they'll do it anyway on their idle phase
+                tile.type.on_stand(tile, this, actor);
             }
 
             if (tile.type.slide_automatically) {
                 // This keeps a player on force floor consistently using their sliding pose, even if
                 // drawn between moves.  It also simplifies checks elsewhere, so that's nice
+                // FIXME if i'm right about how this works then this may not be necessary?
                 this._set_tile_prop(actor, 'is_pending_slide', true);
             }
-        }
-
-        // FIXME ingratiate this with the rest of this stuff i think
-        // FIXME figure out what the hell that comment means
-        let forced_move = this.get_forced_move(actor);
-        if (forced_move) {
-            this._set_tile_prop(actor, 'is_pending_slide', true)
-            this.set_actor_direction(actor, forced_move);
         }
     }
 
@@ -3030,5 +2995,12 @@ export class Level extends LevelInterface {
     // Change an actor's direction
     set_actor_direction(actor, direction) {
         this._set_tile_prop(actor, 'direction', direction);
+    }
+
+    schedule_actor_slide(actor, direction = null) {
+        if (direction) {
+            this.set_actor_direction(actor, direction);
+        }
+        this._set_tile_prop(actor, 'is_pending_slide', true);
     }
 }

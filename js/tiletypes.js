@@ -58,14 +58,17 @@ function _define_force_floor(direction, opposite_type) {
         speed_factor: 2,
         slide_automatically: true,
         allow_player_override: true,
-        get_slide_direction(me, level, other) {
+        on_stand(me, level, other) {
+            level.schedule_actor_slide(other, direction);
+            // FIXME i think it's really that in lynx these push on arrival; try that and see if
+            // it's better
+            /*
             if (level.compat.force_floors_inert_on_first_tic && level.tic_counter === 0) {
                 // Lynx: Force floors don't push on the first tic
                 return null;
             }
-            return direction;
+            */
         },
-        force_floor_direction: direction,
         activate(me, level) {
             level.transmute_tile(me, opposite_type);
         },
@@ -744,15 +747,15 @@ const TILE_TYPES = {
         contains_wire: true,
         wire_propagation_mode: 'all',
         slide_mode: 'turntable',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
         on_arrive(me, level, other) {
             level._set_tile_prop(other, 'is_pending_slide', true);
             level.set_actor_direction(other, DIRECTIONS[other.direction].right);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'right');
             }
+        },
+        on_stand(me, level, other) {
+            level.schedule_actor_slide(other);
         },
         activate(me, level) {
             level.transmute_tile(me, 'turntable_ccw');
@@ -765,15 +768,15 @@ const TILE_TYPES = {
         contains_wire: true,
         wire_propagation_mode: 'all',
         slide_mode: 'turntable',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
         on_arrive(me, level, other) {
             level._set_tile_prop(other, 'is_pending_slide', true);
             level.set_actor_direction(other, DIRECTIONS[other.direction].left);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'left');
             }
+        },
+        on_stand(me, level, other) {
+            level.schedule_actor_slide(other);
         },
         activate(me, level) {
             level.transmute_tile(me, 'turntable_cw');
@@ -886,12 +889,9 @@ const TILE_TYPES = {
     cracked_ice: {
         layer: LAYERS.terrain,
         slide_mode: 'ice',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
         speed_factor: 2,
         on_arrive(me, level, other) {
-            level._set_tile_prop(other, 'is_pending_slide', true);
+            level.schedule_actor_slide(other);
         },
         on_depart(me, level, other) {
             level.transmute_tile(me, 'water');
@@ -902,84 +902,73 @@ const TILE_TYPES = {
     ice: {
         layer: LAYERS.terrain,
         slide_mode: 'ice',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
         speed_factor: 2,
         on_arrive(me, level, other) {
-            level._set_tile_prop(other, 'is_pending_slide', true);
+            level.schedule_actor_slide(other);
         },
     },
     ice_sw: {
         layer: LAYERS.terrain,
         thin_walls: new Set(['south', 'west']),
         slide_mode: 'ice',
-        get_slide_direction(me, level, other) {
-            return {
+        speed_factor: 2,
+        blocks_leaving: blocks_leaving_thin_walls,
+        on_arrive(me, level, other) {
+            let direction = {
                 north: 'north',
                 south: 'east',
                 east: 'east',
                 west: 'north',
             }[other.direction];
-        },
-        speed_factor: 2,
-        blocks_leaving: blocks_leaving_thin_walls,
-        on_arrive(me, level, other) {
-            level._set_tile_prop(other, 'is_pending_slide', true);
+            level.schedule_actor_slide(other, direction);
         },
     },
     ice_nw: {
         layer: LAYERS.terrain,
         thin_walls: new Set(['north', 'west']),
         slide_mode: 'ice',
-        get_slide_direction(me, level, other) {
-            return {
+        speed_factor: 2,
+        blocks_leaving: blocks_leaving_thin_walls,
+        on_arrive(me, level, other) {
+            let direction = {
                 north: 'east',
                 south: 'south',
                 east: 'east',
                 west: 'south',
             }[other.direction];
-        },
-        speed_factor: 2,
-        blocks_leaving: blocks_leaving_thin_walls,
-        on_arrive(me, level, other) {
-            level._set_tile_prop(other, 'is_pending_slide', true);
+            level.schedule_actor_slide(other, direction);
         },
     },
     ice_ne: {
         layer: LAYERS.terrain,
         thin_walls: new Set(['north', 'east']),
         slide_mode: 'ice',
-        get_slide_direction(me, level, other) {
-            return {
+        speed_factor: 2,
+        blocks_leaving: blocks_leaving_thin_walls,
+        on_arrive(me, level, other) {
+            let direction = {
                 north: 'west',
                 south: 'south',
                 east: 'south',
                 west: 'west',
             }[other.direction];
-        },
-        speed_factor: 2,
-        blocks_leaving: blocks_leaving_thin_walls,
-        on_arrive(me, level, other) {
-            level._set_tile_prop(other, 'is_pending_slide', true);
+            level.schedule_actor_slide(other, direction);
         },
     },
     ice_se: {
         layer: LAYERS.terrain,
         thin_walls: new Set(['south', 'east']),
         slide_mode: 'ice',
-        get_slide_direction(me, level, other) {
-            return {
+        speed_factor: 2,
+        blocks_leaving: blocks_leaving_thin_walls,
+        on_arrive(me, level, other) {
+            let direction = {
                 north: 'north',
                 south: 'west',
                 east: 'north',
                 west: 'west',
             }[other.direction];
-        },
-        speed_factor: 2,
-        blocks_leaving: blocks_leaving_thin_walls,
-        on_arrive(me, level, other) {
-            level._set_tile_prop(other, 'is_pending_slide', true);
+            level.schedule_actor_slide(other, direction);
         },
     },
     force_floor_n: _define_force_floor('north', 'force_floor_s'),
@@ -992,16 +981,25 @@ const TILE_TYPES = {
         slide_automatically: true,
         speed_factor: 2,
         allow_player_override: true,
-        get_slide_direction(me, level, _other) {
+        blocks(me, level, other) {
+            return (level.compat.rff_blocks_monsters &&
+                (other.type.collision_mask & COLLISION.monster_typical));
+        },
+        on_stand(me, level, other) {
+            // XXX this check is necessary because of step_on_cell and then the idle phase causing
+            // us to be called twice.  who is correct??  is the step_on_cell call supposed to be
+            // there?
+            if (! other.is_pending_slide) {
+                level.schedule_actor_slide(other, level.get_force_floor_direction());
+            }
+            // FIXME i think it's really that in lynx these push on arrival; try that and see if
+            // it's better
+            /*
             if (level.compat.force_floors_inert_on_first_tic && level.tic_counter === 0) {
                 // Lynx: Force floors don't push on the first tic
                 return null;
             }
-            return level.get_force_floor_direction();
-        },
-        blocks(me, level, other) {
-            return (level.compat.rff_blocks_monsters &&
-                (other.type.collision_mask & COLLISION.monster_typical));
+            */
         },
     },
     slime: {
@@ -1726,9 +1724,6 @@ const TILE_TYPES = {
     teleport_blue: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
         contains_wire: true,
         wire_propagation_mode: 'all',
         *teleport_dest_order(me, level, other) {
@@ -1816,9 +1811,6 @@ const TILE_TYPES = {
     teleport_red: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
         contains_wire: true,
         wire_propagation_mode: 'none',
         allow_player_override: true,
@@ -1873,9 +1865,6 @@ const TILE_TYPES = {
     teleport_green: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
         *teleport_dest_order(me, level, other) {
             // The CC2 green teleporter scheme is:
             // 1. Use the PRNG to pick another green teleporter
@@ -1947,9 +1936,6 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         item_priority: PICKUP_PRIORITIES.always,
         slide_mode: 'teleport',
-        get_slide_direction(me, level, other) {
-            return other.direction;
-        },
         allow_player_override: true,
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;
