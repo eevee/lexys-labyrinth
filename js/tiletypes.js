@@ -58,16 +58,16 @@ function _define_force_floor(direction, opposite_type) {
         speed_factor: 2,
         slide_automatically: true,
         allow_player_override: true,
-        on_stand(me, level, other) {
-            level.schedule_actor_slide(other, direction);
-            // FIXME i think it's really that in lynx these push on arrival; try that and see if
-            // it's better
-            /*
-            if (level.compat.force_floors_inert_on_first_tic && level.tic_counter === 0) {
-                // Lynx: Force floors don't push on the first tic
-                return null;
+        on_arrive(me, level, other) {
+            if (level.compat.force_floors_on_arrive) {
+                // Lynx: Force floors activate when stepped on, not when stood on
+                level.schedule_actor_slide(other, direction);
             }
-            */
+        },
+        on_stand(me, level, other) {
+            if (! level.compat.force_floors_on_arrive) {
+                level.schedule_actor_slide(other, direction);
+            }
         },
         activate(me, level) {
             level.transmute_tile(me, opposite_type);
@@ -985,21 +985,16 @@ const TILE_TYPES = {
             return (level.compat.rff_blocks_monsters &&
                 (other.type.collision_mask & COLLISION.monster_typical));
         },
-        on_stand(me, level, other) {
-            // XXX this check is necessary because of step_on_cell and then the idle phase causing
-            // us to be called twice.  who is correct??  is the step_on_cell call supposed to be
-            // there?
-            if (! other.is_pending_slide) {
+        on_arrive(me, level, other) {
+            if (level.compat.force_floors_on_arrive) {
+                // Lynx: Force floors activate when stepped on, not when stood on
                 level.schedule_actor_slide(other, level.get_force_floor_direction());
             }
-            // FIXME i think it's really that in lynx these push on arrival; try that and see if
-            // it's better
-            /*
-            if (level.compat.force_floors_inert_on_first_tic && level.tic_counter === 0) {
-                // Lynx: Force floors don't push on the first tic
-                return null;
+        },
+        on_stand(me, level, other) {
+            if (! level.compat.force_floors_on_arrive) {
+                level.schedule_actor_slide(other, level.get_force_floor_direction());
             }
-            */
         },
     },
     slime: {

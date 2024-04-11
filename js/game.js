@@ -2017,12 +2017,6 @@ export class Level extends LevelInterface {
                 tile.type.on_arrive(tile, this, actor);
             }
 
-            if (tile.type.on_stand && !actor.slide_ignores(tile.type.name)) {
-                // XXX according to notcc, cc2 also has actors "stand" on tiles immediately upon
-                // arrival, even though they'll do it anyway on their idle phase
-                tile.type.on_stand(tile, this, actor);
-            }
-
             if (tile.type.slide_automatically) {
                 // This keeps a player on force floor consistently using their sliding pose, even if
                 // drawn between moves.  It also simplifies checks elsewhere, so that's nice

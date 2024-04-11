@@ -160,7 +160,7 @@ export const COMPAT_FLAGS = [
     rulesets: new Set(['steam', 'steam-strict']),
 }, {
     key: 'player_moves_last',
-    label: "Player always moves last",
+    label: "Players always move last",
     rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'player_protected_by_items',
@@ -197,11 +197,11 @@ export const COMPAT_FLAGS = [
     rulesets: new Set(['ms']),
 }, {
     key: 'no_backwards_override',
-    label: "Player can't override backwards on a force floor",
+    label: "Players can't override backwards on a force floor",
     rulesets: new Set(['lynx']),
 }, {
-    key: 'force_floors_inert_on_first_tic',
-    label: "Force floors don't trigger on the first tic",
+    key: 'force_floors_on_arrive',
+    label: "Force floors trigger on arrival",
     rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'traps_like_lynx',
@@ -239,7 +239,8 @@ export const COMPAT_FLAGS = [
 // Blocks
 {
     key: 'no_early_push',
-    label: "Pushing blocks happens at move time",
+    label: "Pushing blocks happens at move time (block slapping is disabled)",
+    // XXX wait but the DEFAULT behavior allows block slapping, which lynx has, so why is lynx listed here?
     rulesets: new Set(['lynx', 'ms']),
 }, {
     key: 'use_legacy_hooking',
@@ -272,7 +273,7 @@ export const COMPAT_FLAGS = [
     // TODO what does ms do when a tank is on ice or a ff?  wiki's description is wacky
     // TODO yellow tanks seem to have memory too??
     key: 'tanks_always_obey_button',
-    label: "Blue tanks always obey blue buttons",
+    label: "Blue tanks on cloners obey blue buttons",
     rulesets: new Set(['steam-strict']),
 }, {
     key: 'tanks_ignore_button_while_moving',
