@@ -33,7 +33,7 @@ export class Tile {
 
     // Gives the effective position of an actor in motion, given smooth scrolling
     visual_position(update_progress = 0, update_rate = 0) {
-        if (! this.previous_cell || this.movement_speed === null) {
+        if (! this.previous_cell || this.movement_speed === null || this.moves_instantly) {
             return [this.cell.x, this.cell.y];
         }
 
@@ -414,6 +414,9 @@ export class Level extends LevelInterface {
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);
+                        if (this.compat.actors_move_instantly) {
+                            tile.moves_instantly = true;
+                        }
                     }
                     cell._add(tile);
 
@@ -564,7 +567,7 @@ export class Level extends LevelInterface {
             // but it can't anyway because Tile.wire_directions = 0; need some
             // other way to identify a tile as wired, or at least an actor
             if (actor && actor.wire_directions &&
-                (actor.movement_cooldown === 0 || this.compat.tiles_react_instantly))
+                (actor.movement_cooldown === 0 || this.compat.actors_move_instantly))
             {
                 wire_directions = actor.wire_directions;
             }
@@ -1128,7 +1131,7 @@ export class Level extends LevelInterface {
                 }
             }
 
-            if (! this.compat.tiles_react_instantly) {
+            if (! this.compat.actors_move_instantly) {
                 this.step_on_cell(actor, actor.cell);
             }
             // Note that we don't erase the movement bookkeeping until next decision phase, because
@@ -1971,7 +1974,7 @@ export class Level extends LevelInterface {
             this.add_tile(actor, goal_cell);
         }
 
-        if (this.compat.tiles_react_instantly) {
+        if (this.compat.actors_move_instantly) {
             this.step_on_cell(actor, actor.cell);
         }
     }
@@ -2198,6 +2201,9 @@ export class Level extends LevelInterface {
                 }
                 if (tile.cell) {
                     this.add_actor(tile);
+                    if (this.compat.actors_move_instantly) {
+                        tile.moves_instantly = true;
+                    }
                 }
                 this.add_tile(dropping_actor, cell);
             }

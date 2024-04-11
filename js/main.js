@@ -1750,7 +1750,6 @@ class Player extends PrimaryView {
         else {
             // Figure out how far we are between the last game update and the next one, so the
             // renderer can interpolate appropriately.
-            let now = performance.now();
             let elapsed = (performance.now() - this.last_advance) / 1000;
             let speed = this.play_speed;
             if (this.state === 'rewinding') {

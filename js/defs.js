@@ -183,15 +183,14 @@ export const COMPAT_FLAGS = [
     key: 'force_lynx_animation_lengths',
     label: "Animations use Lynx duration",
     rulesets: new Set(['lynx']),
+}, {
+    key: 'actors_move_instantly',
+    label: "Movement happens instantly",
+    rulesets: new Set(['ms']),
 },
 
 // Tiles
 {
-    // XXX this is goofy
-    key: 'tiles_react_instantly',
-    label: "Tiles react when approached",
-    rulesets: new Set(['ms']),
-}, {
     key: 'rff_actually_random',
     label: "Random force floors are actually random",
     rulesets: new Set(['ms']),
