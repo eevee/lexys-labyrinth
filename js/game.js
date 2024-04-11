@@ -446,7 +446,6 @@ export class Level extends LevelInterface {
         this.player2_move = null;
 
         // Connect buttons and teleporters
-        let num_cells = this.width * this.height;
         for (let connectable of connectables) {
             this.connect_button(connectable);
         }
@@ -856,6 +855,8 @@ export class Level extends LevelInterface {
     _do_init_phase() {
         // At the beginning of the very first tic, some tiles want to do initialization that's not
         // appropriate to do before the game begins
+        // FIXME this was originally added for bomb, which no longer uses it, so, god i would like
+        // to get rid of this
         if (! this.done_on_begin) {
             // Run backwards, to match actor order
             for (let i = this.linear_cells.length - 1; i >= 0; i--) {

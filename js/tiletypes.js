@@ -1025,9 +1025,9 @@ const TILE_TYPES = {
     },
     hole: {
         layer: LAYERS.terrain,
-        on_begin(me, level) {
-            var one_north = level.cell(me.cell.x, me.cell.y - 1);
-            if (one_north === null || one_north.get_terrain().type.name != 'hole') {
+        on_ready(me, level) {
+            let one_north = level.cell(me.cell.x, me.cell.y - 1);
+            if (one_north === null || one_north.get_terrain().type.name !== 'hole') {
                 level._set_tile_prop(me, 'visual_state', 'north');
             }
             else {
@@ -1051,10 +1051,10 @@ const TILE_TYPES = {
 
             level.transmute_tile(me, 'hole');
             // Update hole visual state (note that me.type is hole now)
-            me.type.on_begin(me, level);
-            var one_south = level.cell(me.cell.x, me.cell.y + 1);
+            me.type.on_ready(me, level);
+            let one_south = level.cell(me.cell.x, me.cell.y + 1);
             if (one_south && one_south.get_terrain().type.name === 'hole') {
-                me.type.on_begin(one_south.get_terrain(), level);
+                me.type.on_ready(one_south.get_terrain(), level);
             }
         },
     },
@@ -1535,7 +1535,8 @@ const TILE_TYPES = {
     },
     trap: {
         layer: LAYERS.terrain,
-        on_begin(me, level) {
+        on_ready(me, level) {
+            // This may run before or after any pressed buttons, but, that's fine
             if (me.presses === undefined) {
                 level._set_tile_prop(me, 'presses', 0);
             }
