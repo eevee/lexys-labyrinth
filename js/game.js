@@ -180,6 +180,7 @@ Object.assign(Tile.prototype, {
     is_sliding: false,
     is_pending_slide: false,
     can_override_slide: false,
+    pending_push: null,
 });
 
 
@@ -947,9 +948,12 @@ export class Level extends LevelInterface {
             }
 
             // This only persists until the next decision
-            if (actor.is_pending_slide) {
-                this._set_tile_prop(actor, 'is_pending_slide', false);
-            }
+            this._set_tile_prop(actor, 'is_pending_slide', false);
+            // Note that pending_push is only cleared when we actually move, both to prevent being
+            // pushed a second time when we're already in mid-push, and to avoid a pending push
+            // leaking over into the tic /after/ this one when it's made between our own decision
+            // and movement phases.  (That can happen with the hook, which pulls both during the
+            // holder's decision phase and then again when they move.)
         }
     }
 
@@ -1015,14 +1019,6 @@ export class Level extends LevelInterface {
         if (! direction)
             return true;
 
-        // Clear this here since we use it to prevent pushing a block that's already been pushed.
-        // Also avoids a perverse CC2 ordering issue: a player with a hook sets this on a block at
-        // decision time; the block makes its decision (based on this); but then the player acts and
-        // sets this /again/ so it carries over and the block tries to move an extra time next turn.
-        if (actor.pending_push) {
-            this._set_tile_prop(actor, 'pending_push', null);
-        }
-
         // Actor is allowed to move, so do so
         let success = this.attempt_step(actor, direction);
 
@@ -1057,17 +1053,13 @@ export class Level extends LevelInterface {
                     ! this.compat.bonking_isnt_instant)
                 {
                     success = this.attempt_step(actor, actor.direction);
-                    if (success) {
-                        // This only exists for decisions, so we need to clear it now
-                        this._set_tile_prop(actor, 'is_pending_slide', false);
-                    }
                 }
             }
             else if (terrain.type.name === 'teleport_red' && ! terrain.is_active) {
                 // Curious special-case red teleporter behavior: if you pass through a wired but
                 // inactive one, you keep sliding indefinitely.  Players can override out of it, but
                 // other actors are just stuck.  So, set this again.
-                this._set_tile_prop(actor, 'is_pending_slide', true);
+                this.schedule_actor_slide(actor);
             }
         }
 
@@ -1802,6 +1794,9 @@ export class Level extends LevelInterface {
         if (actor.movement_cooldown > 0)
             return false;
 
+        // Once we try to move, this expires
+        this._set_tile_prop(actor, 'pending_push', null);
+
         let redirected_direction = actor.cell.redirect_exit(actor, direction);
         if (direction !== redirected_direction) {
             // Some tiles (ahem, frame blocks) rotate when their attempted direction is redirected
@@ -1844,6 +1839,9 @@ export class Level extends LevelInterface {
         {
             speed /= 2;
         }
+
+        // Once we successfully start a move (even out of turn), this flag becomes obsolete
+        this._set_tile_prop(actor, 'is_pending_slide', false);
 
         let orig_cell = actor.cell;
         this._set_tile_prop(actor, 'previous_cell', orig_cell);
@@ -2069,9 +2067,9 @@ export class Level extends LevelInterface {
             }
         }
 
-        // Teleport slides happen when coming out of a teleporter, but not other times, so need to
-        // be noted explicitly
-        this._set_tile_prop(actor, 'is_pending_slide', true);
+        // Teleport slides happen when coming out of a teleporter, but not other times when standing
+        // on a teleporter, so they need to be performed explicitly here
+        this.schedule_actor_slide(actor);
         // Real players might be able to immediately override the resulting slide
         if (actor.type.is_real_player && teleporter.type.allow_player_override) {
             this._set_tile_prop(actor, 'can_override_slide', true);
