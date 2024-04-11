@@ -990,7 +990,7 @@ const TILE_TYPES = {
             }
         },
         on_stand(me, level, other) {
-            if (! level.compat.force_floors_on_arrive) {
+            if (! other.is_pending_slide && ! level.compat.force_floors_on_arrive) {
                 level.schedule_actor_slide(other, level.get_force_floor_direction());
             }
         },
