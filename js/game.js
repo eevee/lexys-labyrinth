@@ -1661,31 +1661,35 @@ export class Level extends LevelInterface {
                         if (actor === this.player) {
                             this._set_tile_prop(actor, 'is_pushing', true);
                         }
-                        // We can't directly push a sliding block, even one on a force floor that's
-                        // stuck on a wall.  Instead, it becomes a pending move for the block, which
-                        // will use this as a decision next time it's allowed to move
-                        // FIXME this is clumsy and creates behavior dependent on actor order.  my
-                        // original implementation only did this if the push /failed/; is that worth
-                        // a compat option?  also, how does any of this work under lynx rules?
-                        if (tile.is_sliding && ! tile.is_pulled && (tile.movement_cooldown > 0 ||
-                            tile.cell.get_terrain().type.slide_mode === 'force'))
-                        {
+
+                        let tile_is_stuck_sliding = (tile.is_sliding && ! tile.is_pulled && (
+                            tile.movement_cooldown > 0 || tile.cell.get_terrain().type.slide_mode === 'force'));
+
+                        if (this.compat.no_directly_pushing_sliding_blocks && tile_is_stuck_sliding) {
+                            // CC2: Can't directly push a sliding block, even one on a force floor
+                            // that's stuck on a wall (and thus not moving).  Such a push ALWAYS
+                            // becomes a pending push, so it won't happen until next tic, and we
+                            // remain blocked
                             this._set_tile_prop(tile, 'pending_push', direction);
-                            // FIXME if the block has already made a decision then this is necessary
-                            // to override it.  but i don't like it; (a) it might cause blocks to
-                            // get stuck against walls on force floors, because the code to fix that
-                            // is at decision time; (b) it's done for pulling too and just feels
-                            // hacky?
+                            // If the block already had its decision phase this turn, override it
                             tile.decision = direction;
                             return false;
                         }
 
+                        // Lexy/Lynx(?) behavior: try to push the block first, then resort to
+                        // pending if the push fails
                         if (this.attempt_out_of_turn_step(tile, direction)) {
                             if (actor === this.player) {
                                 this.sfx.play_once('push');
                             }
                         }
                         else {
+                            if (! this.compat.no_directly_pushing_sliding_blocks && tile_is_stuck_sliding) {
+                                // If the push failed and the obstacle is in the middle of a slide,
+                                // remember this as the next move it'll make
+                                this._set_tile_prop(tile, 'pending_push', direction);
+                                tile.decision = direction;
+                            }
                             return false;
                         }
                     }

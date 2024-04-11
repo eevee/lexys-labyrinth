@@ -243,6 +243,10 @@ export const COMPAT_FLAGS = [
     label: "Pulling blocks with the hook happens at decision time",
     rulesets: new Set(['steam', 'steam-strict']),
 }, {
+    key: 'no_directly_pushing_sliding_blocks',
+    label: "Don't directly push sliding blocks",
+    rulesets: new Set(['steam', 'steam-strict']),
+}, {
     key: 'use_pgchip_ice_blocks',
     label: "Ice blocks emulate pgchip rules",
     rulesets: new Set(['ms']),
