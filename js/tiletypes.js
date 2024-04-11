@@ -2761,10 +2761,7 @@ const TILE_TYPES = {
                 // Dynamite that lands on a force floor is moved by it, and dynamite that lands on a
                 // button holds it down
                 // TODO is there anything this should NOT activate?
-                let terrain = me.cell.get_terrain();
-                if (terrain && terrain.type.on_arrive && ! me.ignores(terrain.type.name)) {
-                    terrain.type.on_arrive(terrain, level, me);
-                }
+                level.step_on_cell(me, me.cell);
             }
         },
     },
