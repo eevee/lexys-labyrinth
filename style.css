@@ -1608,14 +1608,14 @@ body.--debug .player-overlay-message {
 }
 .scoreboard .-total-score {
     grid-column: span 3;
-    color: hsl(45, 50%, 75%);
+    color: hsl(45, 100%, 75%);
 }
 .scoreboard h4 {
     font-size: 0.75em;
     color: hsl(220, 10%, 60%);
 }
 .scoreboard .-total-score h4 {
-    color: hsl(30, 100%, 60%);
+    color: hsl(30, 50%, 60%);
 }
 .scoreboard p {
     margin: 0;
