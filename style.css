@@ -1268,16 +1268,8 @@ ol.packtest-summary > li {
         padding: 0.25em 0.5em;
         line-height: 1.33;
     }
-    /* Hackily remove the <br>s in "turn based mode" */
-    #player-controls .radio-faux-button-set br {
-        display: none;
-    }
     #player-actions {
         justify-content: end;
-    }
-    #player-actions button svg {
-        display: inline-block;
-        margin: 0.125em;
     }
     #player button .keyhint {
         top: -2em;
@@ -1312,6 +1304,10 @@ ol.packtest-summary > li {
     #player .keyhint {
         /* Hide key hints; there's nowhere to put them and they take up surprisingly a lot of space */
         display: none;
+    }
+    #player-controls .radio-faux-button-set span {
+        /* "step mode" is real big */
+        font-size: 0.75em;
     }
 }
 @media (orientation: landscape) and (max-height: 600px) {
@@ -1384,10 +1380,11 @@ ol.packtest-summary > li {
     position: relative;
     display: grid;
     grid:
-        "pack"      calc(1.25em * 1.25 * 1)
+        "pack"      calc(1em * 1.25 * 1)
         "level"     calc(1.333em * 1.25 * 2)
         "author"    calc(1em * 1.25 * 1)
         "space"     1fr
+        "score"     1.5em
         "controls"  1.5em
     ;
     align-items: center;
@@ -1417,11 +1414,11 @@ body.--debug .player-overlay-message {
 .player-overlay-message h1 {
     /* Pack title, doesn't need to be too big */
     grid-area: pack;
-    font-size: 1em;
+    font-size: 0.833em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: hsl(220, 25%, 60%);
+    color: hsl(220, 25%, 75%);
 }
 .player-overlay-message > h2 {
     grid-area: level;
@@ -1439,8 +1436,12 @@ body.--debug .player-overlay-message {
     text-overflow: ellipsis;
     color: hsl(220, 10%, 90%);
 }
+.player-overlay-message > .-best-score {
+    grid-area: score;
+    align-self: flex-end;
+}
 .player-overlay-message > .scoreboard {
-    grid-row: author / space;
+    grid-row: author / score;
 }
 .player-overlay-message .-controls-hint {
     grid-area: controls;
@@ -1573,6 +1574,9 @@ body.--debug .player-overlay-message {
     margin: auto 5%;
     font-weight: normal;
     text-align: center;
+    /* this is a lot of stuff crammed into a small space, so prefer having more space between rows
+     * and less space between labels+values (which makes them more clearly related anyway) */
+    line-height: 1.1;
 }
 .scoreboard .-subscore {
     grid-column: span 2;
@@ -1607,11 +1611,11 @@ body.--debug .player-overlay-message {
     color: hsl(45, 50%, 75%);
 }
 .scoreboard h4 {
-    font-size: 0.833em;
-    color: hsl(220, 10%, 80%);
+    font-size: 0.75em;
+    color: hsl(220, 10%, 60%);
 }
 .scoreboard .-total-score h4 {
-    color: hsl(30, 50%, 60%);
+    color: hsl(30, 100%, 60%);
 }
 .scoreboard p {
     margin: 0;

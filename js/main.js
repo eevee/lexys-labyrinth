@@ -2020,12 +2020,24 @@ class Player extends PrimaryView {
         this.overlay_message_el.textContent = '';
         if (this.state === 'waiting') {
             let stored_level = this.level.stored_level;
+
+            let best_score = "";
+            let savefile = this.conductor.current_pack_savefile;
+            let scorecard = savefile.scorecards[stored_level.number - 1];
+            if (scorecard) {
+                best_score = `best score: ${scorecard.score.toLocaleString()}`;
+                if (scorecard.aid === 0) {
+                    best_score += "★";
+                }
+            }
+
             overlay.append(
                 mk('h1', this.conductor.stored_game.title),
                 mk('h2', `#${stored_level.number} ${stored_level.title}`),
                 mk('h3', stored_level.author ? `by ${stored_level.author}` : "\u200b"),
                 this.mobile_pause_menu,
-                mk('p.-controls-hint', "WASD/↑←↓→ to move · space to start without moving"),
+                mk('div.-best-score', best_score),
+                mk('p.-controls-hint', "WASD/↑←↓→ to move · space to idle"),
             );
         }
         else if (this.state === 'paused') {
@@ -3749,7 +3761,7 @@ class LevelBrowserOverlay extends DialogOverlay {
             if (scorecard) {
                 score = scorecard.score.toLocaleString();
                 if (scorecard.aid === 0) {
-                    aid = '★';
+                    aid = "★";
                 }
 
                 // 0 means untimed level
