@@ -344,8 +344,8 @@ const TILE_TYPES = {
             }
         },
         on_depart(me, level, other) {
-            // Inexplicable CC2 quirk: nothing happens if there's dynamite on us
-            // TODO compat?  this makes no sense to me
+            // CC2 quirk: nothing happens if there's still an actor on us (i.e. dynamite)
+            // FIXME does this imply on_depart isn't called at all if we walk off dynamite?
             if (me.cell.has('dynamite_lit'))
                 return;
 
@@ -866,8 +866,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.ghost | COLLISION.fireball,
         on_depart(me, level, other) {
-            // Inexplicable CC2 quirk: nothing happens if there's dynamite on us
-            // TODO compat?  this makes no sense to me
+            // CC2 quirk: nothing happens if there's still an actor on us (i.e. dynamite)
             if (me.cell.has('dynamite_lit'))
                 return;
 
@@ -2851,13 +2850,15 @@ const TILE_TYPES = {
                         }
                     }
 
-                    if (removed_anything || actor) {
-                        if (actor) {
-                            level.kill_actor(actor, me, 'explosion');
-                        }
-                        else {
-                            level.spawn_animation(cell, cell.get_actor() ? 'explosion_nb' : 'explosion');
-                        }
+                    if (actor) {
+                        level.kill_actor(actor, me, 'explosion');
+                    }
+                    else if (removed_anything && ! cell.get_actor()) {
+                        level.spawn_animation(cell, 'explosion');
+                    }
+                    else {
+                        // Extension: Show the entire blast radius every time
+                        level.spawn_animation(cell, 'explosion_nb');
                     }
                 }
             }
