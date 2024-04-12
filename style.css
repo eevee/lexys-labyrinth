@@ -19,6 +19,7 @@ body {
 
     --panel-bg-color: hsl(220, 10%, 15%);
     --button-bg-color: hsl(220, 20%, 25%);
+    --button-bg-gradient: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
     --button-bg-shadow-color: #fff1;
     --button-bg-hover-color: hsl(220, 30%, 30%);
     --generic-bg-hover-on-white: hsl(220, 60%, 90%);
@@ -50,7 +51,7 @@ button,
     font-family: inherit;
     color: white;
     background-color: var(--button-bg-color);
-    background-image: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
+    background-image: var(--button-bg-gradient);
     border: 1px solid hsl(220, 10%, 7.5%);
     box-shadow:
         inset 0 0 1px 1px #fff2,
@@ -1237,6 +1238,13 @@ ol.packtest-summary > li {
 }
 #player button:disabled .keyhint {
     display: none;
+}
+#player-controls button:enabled.control-restart {
+    /* Special shenanigans for holding R to restart */
+    --restart-progress: 0;
+    background-image: var(--button-bg-gradient), conic-gradient(
+        hsl(345, 60%, 40%) 0deg calc(var(--restart-progress) * 360deg),
+        transparent calc(var(--restart-progress) * 360deg) 360deg)
 }
 @media (orientation: portrait) {
     /* On a portrait screen, put the controls on top */

@@ -21,6 +21,7 @@ const PAGE_TITLE = "Lexy's Labyrinth";
 // This prefix is LLDEMO in base64, used to be somewhat confident that a string is a valid demo
 // (it's 6 characters so it becomes exactly 8 base64 chars with no leftovers to entangle)
 const REPLAY_PREFIX = "TExERU1P";
+const RESTART_KEY_DELAY = 1.0;
 
 function format_replay_duration(t) {
     return `${t} tics (${util.format_duration(t / TICS_PER_SECOND)})`;
@@ -715,7 +716,6 @@ class Player extends PrimaryView {
             this.inventory_el.append(img);
         }
 
-        let last_key;
         this.pending_player_move = null;
         this.next_player_move = null;
         this.player_used_move = false;
@@ -747,6 +747,11 @@ class Player extends PrimaryView {
 
             if (ev.key === 'p' || ev.key === 'Pause') {
                 this.toggle_pause();
+                return;
+            }
+
+            if (ev.key === 'r') {
+                this.start_restarting();
                 return;
             }
 
@@ -849,10 +854,16 @@ class Player extends PrimaryView {
             if (! this.active)
                 return;
 
+            if (ev.key === 'r') {
+                this.stop_restarting();
+                return;
+            }
+
             if (ev.key === 'z') {
                 if (this.state === 'rewinding') {
                     this.set_state('playing');
                 }
+                return;
             }
 
             if (this.key_mapping[ev.key]) {
@@ -939,23 +950,13 @@ class Player extends PrimaryView {
 
         // When we lose focus, act as though every key was released, and pause the game
         window.addEventListener('blur', () => {
-            this.current_keys.clear();
-            this.current_touches = {};
-
-            if (this.state === 'playing' || this.state === 'rewinding') {
-                this.autopause();
-            }
+            this.enter_background();
         });
         // Same when the window becomes hidden (especially important on phones, where this covers
         // turning the screen off!)
         document.addEventListener('visibilitychange', ev => {
             if (document.visibilityState === 'hidden') {
-                this.current_keys.clear();
-                this.current_touches = {};
-
-                if (this.state === 'playing' || this.state === 'rewinding') {
-                    this.autopause();
-                }
+                this.enter_background();
             }
         });
 
@@ -1400,6 +1401,17 @@ class Player extends PrimaryView {
         // Also nuke all captions, especially since otherwise their animations will restart when
         // switching back
         this.captions_el.textContent = '';
+    }
+
+    // Called when we lose focus; assume all keys are released, since we can't be sure any more
+    enter_background() {
+        this.stop_restarting();
+        this.current_keys.clear();
+        this.current_touches = {};
+
+        if (this.state === 'playing' || this.state === 'rewinding') {
+            this.autopause();
+        }
     }
 
     reload_options(options) {
@@ -1946,6 +1958,38 @@ class Player extends PrimaryView {
         this.set_state('paused');
     }
 
+    start_restarting() {
+        this.stop_restarting();
+
+        if (! (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding'))
+            return;
+
+        let t0 = performance.now();
+        let update = () => {
+            let t = performance.now();
+            let p = (t - t0) / 1000 / RESTART_KEY_DELAY;
+            this.restart_button.style.setProperty('--restart-progress', p);
+
+            if (p < 1) {
+                this._restart_handle = requestAnimationFrame(update);
+            }
+            else {
+                this.restart_level();
+                this.stop_restarting();
+                this._restart_handle = null;
+            }
+        };
+        update();
+    }
+
+    stop_restarting() {
+        if (this._restart_handle) {
+            cancelAnimationFrame(this._restart_handle);
+            this._restart_handle = null;
+        }
+        this.restart_button.style.setProperty('--restart-progress', 0);
+    }
+
     // waiting: haven't yet pressed a key so the timer isn't going
     // playing: playing normally
     // paused: um, paused
@@ -2217,8 +2261,13 @@ class Player extends PrimaryView {
 
         this.update_music_playback_state();
 
-        // The advance and redraw methods run in a loop, but they cancel
-        // themselves if the game isn't running, so restart them here
+        // Restarting makes no sense if we're not playing
+        if (this.state === 'waiting' || this.state === 'stopped' || this.state === 'ended') {
+            this.stop_restarting();
+        }
+
+        // The advance and redraw methods run in a loop, but they cancel themselves if the game
+        // isn't running, so restart them here
         if (this.state === 'playing' || this.state === 'rewinding') {
             if (! this._advance_handle) {
                 this.advance();
