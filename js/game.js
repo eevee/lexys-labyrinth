@@ -668,7 +668,7 @@ export class Level extends LevelInterface {
             }
         }
         this.wired_outputs = Array.from(wired_outputs);
-        this.wired_outputs.sort((a, b) => this.coords_to_scalar(a.cell.x, a.cell.y) - this.coords_to_scalar(b.cell.x, b.cell.y));
+        this.wired_outputs.sort((a, b) => this.coords_to_scalar(b.cell.x, b.cell.y) - this.coords_to_scalar(a.cell.x, a.cell.y));
 
         if (! first_time) {
             // Update wireables
