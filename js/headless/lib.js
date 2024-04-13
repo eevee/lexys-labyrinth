@@ -1,15 +1,17 @@
 import { opendir, readFile } from 'fs/promises';
 
-import canvas from 'canvas';
+//import canvas from 'canvas';
 
-import CanvasRenderer from '../renderer-canvas.js';
+//import CanvasRenderer from '../renderer-canvas.js';
 import * as util from '../util.js';
 
+/*
 export class NodeCanvasRenderer extends CanvasRenderer {
     static make_canvas(w, h) {
         return canvas.createCanvas(w, h);
     }
 }
+*/
 
 export class LocalDirectorySource extends util.FileSource {
     constructor(root) {

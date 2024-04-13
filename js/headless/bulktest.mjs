@@ -1,6 +1,7 @@
 import { readFile, stat } from 'fs/promises';
 import { performance } from 'perf_hooks';
 import { argv, exit, stderr, stdout } from 'process';
+import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
 
 import { compat_flags_for_ruleset } from '../defs.js';
 import { Level } from '../game.js';
@@ -54,197 +55,155 @@ const RESULT_TYPES = {
     },
 };
 const ANSI_RESET = "\x1b[39m";
+function ansi_cursor_move(dx, dy) {
+    if (dx > 0) {
+        stdout.write(`\x1b[${dx}C`);
+    }
+    else if (dx < 0) {
+        stdout.write(`\x1b[${-dx}D`);
+    }
 
-async function test_pack(pack, ruleset, level_filter = null) {
-    let dummy_sfx = {
-        play() {},
-        play_once() {},
-    };
-    let compat = compat_flags_for_ruleset(ruleset);
+    if (dy > 0) {
+        stdout.write(`\x1b[${dy}B`);
+    }
+    else if (dy < 0) {
+        stdout.write(`\x1b[${-dy}A`);
+    }
+}
 
-    // TODO factor out the common parts maybe?
-    stdout.write(pad(`${pack.title} (${ruleset})`, 20) + " ");
-    let num_levels = pack.level_metadata.length;
-    let num_passed = 0;
-    let num_missing = 0;
-    let total_tics = 0;
-    let t0 = performance.now();
-    let last_pause = t0;
-    let failures = [];
-    for (let i = 0; i < num_levels; i++) {
-        let stored_level, level;
-        let level_start_time = performance.now();
-        let record_result = (token, short_status, include_canvas, comment) => {
-            let result_stuff = RESULT_TYPES[token];
-            stdout.write(result_stuff.color + result_stuff.symbol);
-            if (token === 'failure' || token === 'short' || token === 'error') {
-                failures.push({
-                    token,
-                    short_status,
-                    comment,
-                    level,
-                    stored_level,
-                    index: i,
-                    fail_reason: level ? level.fail_reason : null,
-                    time_elapsed: performance.now() - level_start_time,
-                    time_expected: stored_level ? stored_level.replay.duration / 20 : null,
-                    title: stored_level ? stored_level.title : "[error]",
-                    time_simulated: level ? level.tic_counter / 20 : null,
+const dummy_sfx = {
+    play() {},
+    play_once() {},
+};
+
+function test_level(stored_level, compat) {
+    let level;
+    let level_start_time = performance.now();
+    let make_result = (type, short_status, include_canvas) => {
+        //let result_stuff = RESULT_TYPES[type];
+        // XXX stdout.write(result_stuff.color + result_stuff.symbol);
+        return {
+            type,
+            short_status,
+            fail_reason: level ? level.fail_reason : null,
+            time_elapsed: performance.now() - level_start_time,
+            time_simulated: level ? level.tic_counter / 20 : null,
+            tics_simulated: level ? level.tic_counter : null,
+        };
+
+        // FIXME allegedly it's possible to get a canvas working in node...
+        /*
+        if (include_canvas && level) {
+            try {
+                let tileset = this.conductor.choose_tileset_for_level(level.stored_level);
+                this.renderer.set_tileset(tileset);
+                let canvas = mk('canvas', {
+                    width: Math.min(this.renderer.canvas.width, level.size_x * tileset.size_x),
+                    height: Math.min(this.renderer.canvas.height, level.size_y * tileset.size_y),
                 });
+                this.renderer.set_level(level);
+                this.renderer.set_active_player(level.player);
+                this.renderer.draw();
+                canvas.getContext('2d').drawImage(
+                    this.renderer.canvas, 0, 0,
+                    this.renderer.canvas.width, this.renderer.canvas.height);
+                tbody.append(mk('tr', mk('td.-full', {colspan: 5}, canvas)));
             }
-            if (level) {
-                /*
-                    mk('td.-clock', util.format_duration(level.tic_counter / TICS_PER_SECOND)),
-                    mk('td.-delta', util.format_duration((level.tic_counter - stored_level.replay.duration) / TICS_PER_SECOND, 2)),
-                    mk('td.-speed', ((level.tic_counter / TICS_PER_SECOND) / (performance.now() - level_start_time) * 1000).toFixed(2) + '×'),
-                */
+            catch (e) {
+                console.error(e);
+                tbody.append(mk('tr', mk('td.-full', {colspan: 5},
+                    `Internal error while trying to capture screenshot: ${e}`)));
+            }
+        }
+        */
+    };
+
+    let replay = stored_level.replay;
+    level = new Level(stored_level, compat);
+    level.sfx = dummy_sfx;
+    level.undo_enabled = false; // slight performance boost
+    replay.configure_level(level);
+
+    while (true) {
+        let input = replay.get(level.tic_counter);
+        level.advance_tic(input);
+
+        if (level.state === 'success') {
+            if (level.tic_counter < replay.duration - 10) {
+                // Early exit is dubious (e.g. this happened sometimes before multiple
+                // players were implemented correctly)
+                return make_result('early', "Won early", true);
             }
             else {
+                return make_result('success', "Won");
             }
+        }
+        else if (level.state === 'failure') {
+            return make_result('failure', "Lost", true);
+        }
+        else if (level.tic_counter >= replay.duration + 220) {
+            // This threshold of 11 seconds was scientifically calculated by noticing that
+            // the TWS of Southpole runs 11 seconds past its last input
+            return make_result('short', "Out of input", true);
+        }
 
-            // FIXME allegedly it's possible to get a canvas working in node...
+        if (level.tic_counter % 20 === 1) {
+            // XXX
             /*
-            if (include_canvas && level) {
-                try {
-                    let tileset = this.conductor.choose_tileset_for_level(level.stored_level);
-                    this.renderer.set_tileset(tileset);
-                    let canvas = mk('canvas', {
-                        width: Math.min(this.renderer.canvas.width, level.size_x * tileset.size_x),
-                        height: Math.min(this.renderer.canvas.height, level.size_y * tileset.size_y),
-                    });
-                    this.renderer.set_level(level);
-                    this.renderer.set_active_player(level.player);
-                    this.renderer.draw();
-                    canvas.getContext('2d').drawImage(
-                        this.renderer.canvas, 0, 0,
-                        this.renderer.canvas.width, this.renderer.canvas.height);
-                    tbody.append(mk('tr', mk('td.-full', {colspan: 5}, canvas)));
-                }
-                catch (e) {
-                    console.error(e);
-                    tbody.append(mk('tr', mk('td.-full', {colspan: 5},
-                        `Internal error while trying to capture screenshot: ${e}`)));
-                }
+            if (handle.cancel) {
+                return make_result('interrupted', "Interrupted");
+                this.current_status.textContent = `Interrupted on level ${i + 1}/${num_levels}; ${num_passed} passed`;
+                return;
             }
             */
 
-            if (level) {
-                total_tics += level.tic_counter;
+            // Don't run for more than 100ms at a time, to avoid janking the browser...
+            // TOO much.  I mean, we still want it to reflow the stuff we've added, but
+            // we also want to be pretty aggressive so this finishes quickly
+            // XXX unnecessary headless
+            /*
+            let now = performance.now();
+            if (now - last_pause > 100) {
+                await util.sleep(4);
+                last_pause = now;
             }
-        };
-
-        if (level_filter && ! level_filter.has(i + 1)) {
-            record_result('skipped', "Skipped");
-            continue;
+            */
         }
+    }
+}
 
+// Stuff that's related to testing a level, but is not actually testing a level
+function test_level_wrapper(pack, level_index, level_filter, compat) {
+    let result;
+    let stored_level;
+    if (level_filter && ! level_filter.has(level_index + 1)) {
+        result = { type: 'skipped', short_status: "Skipped" };
+    }
+    else {
         try {
-            stored_level = pack.load_level(i);
+            stored_level = pack.load_level(level_index);
             if (! stored_level.has_replay) {
-                record_result('no-replay', "No replay");
-                num_missing += 1;
-                continue;
+                result = { type: 'no-replay', short_status: "No replay" };
             }
-
-            // TODO? this.current_status.textContent = `Testing level ${i + 1}/${num_levels} ${stored_level.title}...`;
-
-            let replay = stored_level.replay;
-            level = new Level(stored_level, compat);
-            level.sfx = dummy_sfx;
-            level.undo_enabled = false; // slight performance boost
-            replay.configure_level(level);
-
-            while (true) {
-                let input = replay.get(level.tic_counter);
-                level.advance_tic(input);
-
-                if (level.state === 'success') {
-                    if (level.tic_counter < replay.duration - 10) {
-                        // Early exit is dubious (e.g. this happened sometimes before multiple
-                        // players were implemented correctly)
-                        record_result('early', "Won early", true);
-                    }
-                    else {
-                        record_result('success', "Won");
-                    }
-                    num_passed += 1;
-                    break;
-                }
-                else if (level.state === 'failure') {
-                    record_result('failure', "Lost", true);
-                    break;
-                }
-                else if (level.tic_counter >= replay.duration + 220) {
-                    // This threshold of 11 seconds was scientifically calculated by noticing that
-                    // the TWS of Southpole runs 11 seconds past its last input
-                    record_result('short', "Out of input", true);
-                    break;
-                }
-
-                if (level.tic_counter % 20 === 1) {
-                    // XXX
-                    /*
-                    if (handle.cancel) {
-                        record_result('interrupted', "Interrupted");
-                        this.current_status.textContent = `Interrupted on level ${i + 1}/${num_levels}; ${num_passed} passed`;
-                        return;
-                    }
-                    */
-
-                    // Don't run for more than 100ms at a time, to avoid janking the browser...
-                    // TOO much.  I mean, we still want it to reflow the stuff we've added, but
-                    // we also want to be pretty aggressive so this finishes quickly
-                    // XXX unnecessary headless
-                    /*
-                    let now = performance.now();
-                    if (now - last_pause > 100) {
-                        await util.sleep(4);
-                        last_pause = now;
-                    }
-                    */
-                }
+            else {
+                result = test_level(stored_level, compat);
             }
         }
         catch (e) {
-            console.error(e);
-            // FIXME this does not seem to work
-            record_result(
-                'error', "Error", true,
-                `Replay failed due to internal error (see console for traceback): ${e}`);
+            //console.error(e);
+            result = {
+                type: 'error',
+                short_status: "Error",
+                time_simulated: null,
+                tics_simulated: null,
+                exception: e,
+            };
         }
     }
-
-    let total_real_elapsed = (performance.now() - t0) / 1000;
-
-    stdout.write(`${ANSI_RESET} ${num_passed}/${num_levels - num_missing}\n`);
-    for (let failure of failures) {
-        let short_status = failure.short_status;
-        if (failure.token === 'failure') {
-            short_status += ": ";
-            short_status += failure.fail_reason;
-        }
-
-        let parts = [
-            String(failure.index + 1).padStart(5),
-            pad(failure.title.replace(/[\r\n]+/, " "), 32),
-            RESULT_TYPES[failure.token].color + pad(short_status, 20) + ANSI_RESET,
-        ];
-        if (failure.time_simulated !== null) {
-            parts.push("ran for" + util.format_duration(failure.time_simulated).padStart(6, " "));
-        }
-        if (failure.token === 'failure') {
-            parts.push("  with" + util.format_duration(failure.time_expected - failure.time_simulated).padStart(6, " ") + " still to go");
-        }
-        stdout.write(parts.join(" ") + "\n");
-    }
-
-    return {
-        num_passed,
-        num_missing,
-        num_failed: num_levels - num_passed - num_missing,
-        time_elapsed: total_real_elapsed,
-        time_simulated: total_tics / 20,
-    };
+    result.level_index = level_index;
+    result.time_expected = stored_level && stored_level.has_replay ? stored_level.replay.duration / 20 : null;
+    result.title = stored_level ? stored_level.title : "[load error]";
+    return result;
 }
 
 async function _scan_source(source) {
@@ -280,6 +239,202 @@ async function _scan_source(source) {
         }
     }
     // TODO else...?  complain we couldn't find anything?  list what we did find??  idk
+}
+
+async function load_pack(testdef) {
+    let pack;
+    if ((await stat(testdef.pack_path)).isDirectory()) {
+        let source = new LocalDirectorySource(testdef.pack_path);
+        pack = await _scan_source(source);
+    }
+    else {
+        let pack_data = await readFile(testdef.pack_path);
+        if (testdef.pack_path.match(/[.]zip$/)) {
+            let source = new util.ZipFileSource(pack_data.buffer);
+            pack = await _scan_source(source);
+        }
+        else {
+            pack = format_dat.parse_game(pack_data.buffer);
+
+            let solutions_data = await readFile(testdef.solutions_path);
+            let solutions = format_tws.parse_solutions(solutions_data.buffer);
+            pack.level_replays = solutions.levels;
+        }
+    }
+
+    if (! pack.title) {
+        let match = testdef.pack_path.match(/(?:^|\/)([^/.]+)(?:\..*)?\/?$/);
+        if (match) {
+            pack.title = match[1];
+        }
+        else {
+            pack.title = testdef.pack_path;
+        }
+    }
+
+    return pack;
+}
+
+async function main_worker(testdef) {
+    // We have to load the pack separately in every thread
+    let pack = await load_pack(testdef);
+    let ruleset = testdef.ruleset;
+    let level_filter = testdef.level_filter;
+    let compat = compat_flags_for_ruleset(ruleset);
+
+    let t = performance.now();
+    parentPort.on('message', level_index => {
+        //console.log("idled for", (performance.now() - t) / 1000);
+        parentPort.postMessage(test_level_wrapper(pack, level_index, level_filter, compat));
+        t = performance.now();
+    });
+}
+
+// the simplest pool in the world
+async function* run_in_thread_pool(num_workers, worker_data, items) {
+    let next_index = 0;
+    let workers = [];
+    let result_available_resolve;
+    let result_available = new Promise(resolve => {
+        result_available_resolve = resolve;
+    });
+    for (let i = 0; i < num_workers; i++) {
+        let worker = new Worker(new URL(import.meta.url), {
+            workerData: worker_data,
+        });
+
+        let waiting_on_index = null;
+        let process_next = () => {
+            if (next_index < items.length) {
+                let item = items[next_index];
+                next_index += 1;
+                worker.postMessage(item);
+            }
+        };
+        worker.on('message', result => {
+            result_available_resolve(result);
+            process_next();
+        });
+        process_next();
+
+        workers.push(worker);
+    }
+
+    try {
+        for (let i = 0; i < items.length; i++) {
+            let result = await result_available;
+            result_available = new Promise(resolve => {
+                result_available_resolve = resolve;
+            });
+
+            yield result;
+        }
+    }
+    finally {
+        for (let worker of workers) {
+            worker.terminate();
+        }
+    }
+}
+
+
+async function test_pack(testdef) {
+    let pack = await load_pack(testdef);
+    let ruleset = testdef.ruleset;
+    let level_filter = testdef.level_filter;
+    let compat = compat_flags_for_ruleset(ruleset);
+
+    let num_levels = pack.level_metadata.length;
+    let columns = stdout.columns || 80;
+    // 20 for title, 1 for space, the dots, 1 for space, 9 for succeeded/total, 1 for padding
+    let title_width = 20;
+    let dots_per_row = columns - title_width - 1 - 1 - 9 - 1;
+    // TODO factor out the common parts maybe?
+    stdout.write(pad(`${pack.title} (${ruleset})`, title_width) + " ");
+    let d = num_levels;
+    let num_dot_lines = 1;
+    while (d > 0) {
+        let n = Math.min(d, dots_per_row);
+        stdout.write("\x1b[90m");
+        stdout.write("?".repeat(n));
+        d -= n;
+        if (d > 0) {
+            stdout.write("\n");
+            stdout.write(" ".repeat(title_width + 1));
+            num_dot_lines += 1;
+        }
+    }
+    ansi_cursor_move(0, -(num_dot_lines - 1));
+    stdout.write(`\x1b[${title_width + 2}G`);
+
+    let num_passed = 0;
+    let num_missing = 0;
+    let total_tics = 0;
+    let t0 = performance.now();
+    let last_pause = t0;
+    let failures = [];
+    let promises = [];
+    let indices = [...Array(num_levels).keys()];
+    for await (let result of run_in_thread_pool(4, testdef, indices)) {
+        //let result = test_level_wrapper(pack, i, level_filter, compat);
+        let result_stuff = RESULT_TYPES[result.type];
+        let col = result.level_index % dots_per_row;
+        let row = Math.floor(result.level_index / dots_per_row);
+        ansi_cursor_move(col, row);
+        stdout.write(result_stuff.color + result_stuff.symbol);
+        ansi_cursor_move(-(col + 1), -row);
+
+        if (result.tics_simulated) {
+            total_tics += result.tics_simulated;
+        }
+
+        if (result.type === 'no-replay') {
+            num_missing += 1;
+        }
+        else if (result.type === 'success' || result.type === 'early') {
+            num_passed += 1;
+        }
+        else {
+            failures.push(result);
+        }
+    }
+
+    let total_real_elapsed = (performance.now() - t0) / 1000;
+
+    ansi_cursor_move(dots_per_row + 1, 0);
+    stdout.write(`${ANSI_RESET} ${num_passed}/${num_levels - num_missing}`);
+    ansi_cursor_move(0, num_dot_lines - 1);
+    stdout.write("\n");
+    failures.sort((a, b) => a.level_index - b.level_index);
+    for (let failure of failures) {
+        let short_status = failure.short_status;
+        if (failure.type === 'failure') {
+            short_status += ": ";
+            short_status += failure.fail_reason;
+        }
+
+        let parts = [
+            String(failure.level_index + 1).padStart(5),
+            pad(failure.title.replace(/[\r\n]+/, " "), 32),
+            RESULT_TYPES[failure.type].color + pad(short_status, 20) + ANSI_RESET,
+        ];
+        if (failure.time_simulated !== null) {
+            parts.push("ran for" + util.format_duration(failure.time_simulated).padStart(6, " "));
+        }
+        if (failure.type === 'failure') {
+            parts.push("  with" + util.format_duration(failure.time_expected - failure.time_simulated).padStart(6, " ") + " still to go");
+        }
+        stdout.write(parts.join(" ") + "\n");
+    }
+
+    return {
+        num_passed,
+        num_missing,
+        num_failed: num_levels - num_passed - num_missing,
+        // FIXME should maybe count the thread time if we care about actual game speedup
+        time_elapsed: total_real_elapsed,
+        time_simulated: total_tics / 20,
+    };
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -396,37 +551,7 @@ async function main() {
         time_simulated: 0,
     };
     for (let testdef of tests) {
-        let pack;
-        if ((await stat(testdef.pack_path)).isDirectory()) {
-            let source = new LocalDirectorySource(testdef.pack_path);
-            pack = await _scan_source(source);
-        }
-        else {
-            let pack_data = await readFile(testdef.pack_path);
-            if (testdef.pack_path.match(/[.]zip$/)) {
-                let source = new util.ZipFileSource(pack_data.buffer);
-                pack = await _scan_source(source);
-            }
-            else {
-                pack = format_dat.parse_game(pack_data.buffer);
-
-                let solutions_data = await readFile(testdef.solutions_path);
-                let solutions = format_tws.parse_solutions(solutions_data.buffer);
-                pack.level_replays = solutions.levels;
-            }
-        }
-
-        if (! pack.title) {
-            let match = testdef.pack_path.match(/(?:^|\/)([^/.]+)(?:\..*)?\/?$/);
-            if (match) {
-                pack.title = match[1];
-            }
-            else {
-                pack.title = testdef.pack_path;
-            }
-        }
-
-        let result = await test_pack(pack, testdef.ruleset, testdef.level_filter);
+        let result = await test_pack(testdef);
         for (let key of Object.keys(overall)) {
             overall[key] += result[key];
         }
@@ -438,4 +563,10 @@ async function main() {
     stdout.write(`Simulated ${util.format_duration(overall.time_simulated)} of game time in ${util.format_duration(overall.time_elapsed)}, speed of ${(overall.time_simulated / overall.time_elapsed).toFixed(1)}×\n`);
 
 }
-main();
+
+if (isMainThread) {
+    main();
+}
+else {
+    main_worker(workerData);
+}
