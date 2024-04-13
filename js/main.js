@@ -751,7 +751,9 @@ class Player extends PrimaryView {
             }
 
             if (ev.key === 'r') {
-                this.start_restarting();
+                if (! this._restart_handle) {
+                    this.start_restarting();
+                }
                 return;
             }
 
@@ -4010,6 +4012,7 @@ class Conductor {
                         // FIXME this breaks if you do it from the editor bc update_tileset hasn't
                         // been called yet bc that happens in load_level which is deferred...  but
                         // then why does it work from splash??
+                        // FIXME it doesn't work from splash lmao
                         this.player.setup_debug();
                     },
                 ).open();
