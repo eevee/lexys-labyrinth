@@ -236,6 +236,15 @@ const COMMON_TOOL = {
     blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
     item_priority: PICKUP_PRIORITIES.normal,
 };
+const COMMON_PUSHES = {
+    dirt_block: true,
+    ice_block: true,
+    frame_block: true,
+    circuit_block: true,
+    boulder: true,
+    glass_block: true,
+    sokoban_block: true,
+};
 
 const TILE_TYPES = {
     // Floors and walls
@@ -1147,11 +1156,9 @@ const TILE_TYPES = {
         can_reverse_on_railroad: true,
         movement_speed: 4,
         pushes: {
-            ice_block: true,
-            frame_block: true,
-            boulder: true,
-            glass_block: true,
-            sokoban_block: true,
+            // Ice blocks specifically cannot push dirt blocks
+            ...COMMON_PUSHES,
+            dirt_block: false,
         },
         on_after_bumped(me, level, other) {
             // Fireballs melt ice blocks on regular floor FIXME and water!
@@ -1179,14 +1186,7 @@ const TILE_TYPES = {
         allows_push(me, direction) {
             return me.arrows && me.arrows.has(direction);
         },
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
-            boulder: true,
-            glass_block: true,
-            sokoban_block: true,
-        },
+        pushes: COMMON_PUSHES,
         on_clone(me, original) {
             me.arrows = new Set(original.arrows);
         },
@@ -1208,10 +1208,11 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         can_reveal_walls: true,
+        // Boulders don't directly push each other; instead on_bumped will propagate the momentum
+        // XXX can they not push other kinds of blocks?
         pushes: {
             ice_block: true,
             frame_block: true,
-            //boulders don't push each other; instead on_bumped will chain through them
         },
         ignores: new Set(['fire', 'flame_jet_on', 'electrified_floor']),
         can_reverse_on_railroad: true,
@@ -1249,7 +1250,9 @@ const TILE_TYPES = {
         can_reverse_on_railroad: true,
         movement_speed: 4,
         try_pickup_item(me, level) {
-            //suck up any item that ever CAN be picked up off of the floor and put it in our encased_item slot (not an inventory since e.g. a glass block with red key can't unlock red doors)
+            // Suck up any item that could be picked up off of the floor, and put it in our
+            // encased_item slot (which is, somewhat confusingly, distinct from our inventory -- we
+            // cannot actually make use of our encased item)
             if (me.encased_item === null) {
                 let item = me.cell.get_item();
                 let mod = me.cell.get_item_mod();
@@ -2513,15 +2516,7 @@ const TILE_TYPES = {
     tank_yellow: {
         ...COMMON_MONSTER,
         collision_mask: COLLISION.yellow_tank,
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
-            circuit_block: true,
-            boulder: true,
-            glass_block: true,
-            sokoban_block: true,
-        },
+        pushes: COMMON_PUSHES,
         decide_movement(me, level) {
             if (me.pending_decision) {
                 let decision = me.pending_decision;
@@ -2639,16 +2634,7 @@ const TILE_TYPES = {
         can_reveal_walls: true,
         movement_speed: 8,
         movement_parity: 2,
-        // FIXME basically everyone has this same set of objects listed?
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
-            circuit_block: true,
-            boulder: true,
-            glass_block: true,
-            sokoban_block: true,
-        },
+        pushes: COMMON_PUSHES,
         on_ready(me, level) {
             me.current_emulatee = 0;
             me.attempted_moves = 0;
@@ -2974,15 +2960,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.real_player,
         can_reveal_walls: true,
         movement_speed: 4,
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
-            circuit_block: true,
-            boulder: true,
-            glass_block: true,
-            sokoban_block: true,
-        },
+        pushes: COMMON_PUSHES,
         infinite_items: {
             key_green: true,
         },
@@ -2999,15 +2977,7 @@ const TILE_TYPES = {
         can_reveal_walls: true,
         movement_speed: 4,
         ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice', 'cracked_floor']),
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
-            circuit_block: true,
-            boulder: true,
-            glass_block: true,
-            sokoban_block: true,
-        },
+        pushes: COMMON_PUSHES,
         infinite_items: {
             key_yellow: true,
         },
@@ -3024,15 +2994,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.player,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
-            circuit_block: true,
-            boulder: true,
-            glass_block: true,
-            sokoban_block: true,
-        },
+        pushes: COMMON_PUSHES,
         infinite_items: {
             key_green: true,
         },
@@ -3053,15 +3015,7 @@ const TILE_TYPES = {
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
         ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice', 'cracked_floor']),
-        pushes: {
-            dirt_block: true,
-            ice_block: true,
-            frame_block: true,
-            circuit_block: true,
-            boulder: true,
-            glass_block: true,
-            sokoban_block: true,
-        },
+        pushes: COMMON_PUSHES,
         infinite_items: {
             key_yellow: true,
         },
