@@ -10,28 +10,23 @@ import { TILES_WITH_PROPS } from './tile-overlays.js';
 
 const MOUSE_BUTTON_MASKS = [1, 4, 2];  // MouseEvent.button/buttons are ordered differently
 export class MouseOperation {
-    constructor(editor, client_x, client_y, physical_button) {
+    constructor(editor, physical_button) {
         this.editor = editor;
         this.is_held = false;
         this.physical_button = physical_button;
         this.alt_mode = physical_button !== 0;
         this.ctrl = false;
         this.shift = false;
-        //this._update_modifiers(ev);  // FIXME how do i get this initially??
-
-        let [frac_cell_x, frac_cell_y] = this.editor.renderer.real_cell_coords_from_event({clientX: client_x, clientY: client_y});
-        let cell_x = Math.floor(frac_cell_x);
-        let cell_y = Math.floor(frac_cell_y);
 
         // Client coordinates of the previous mouse event
-        this.prev_client_x = client_x;
-        this.prev_client_y = client_y;
+        this.prev_client_x = null;
+        this.prev_client_y = null;
         // Cell coordinates
-        this.prev_cell_x = cell_x;
-        this.prev_cell_y = cell_y;
+        this.prev_cell_x = null;
+        this.prev_cell_y = null;
         // Fractional cell coordinates
-        this.prev_frac_cell_x = frac_cell_x;
-        this.prev_frac_cell_y = frac_cell_y;
+        this.prev_frac_cell_x = null;
+        this.prev_frac_cell_y = null;
 
         // Same as above, but for the most recent click (so drag ops know where they started)
         this.click_client_x = null;
@@ -40,10 +35,6 @@ export class MouseOperation {
         this.click_cell_y = null;
         this.click_frac_cell_x = null;
         this.click_frac_cell_y = null;
-
-        // Start out with a hover effect
-        // FIXME no good, subclass hasn't finished setting itself up yet
-        //this.do_move({clientX: client_x, clientY: client_y});
     }
 
     cell(x, y) {
@@ -207,6 +198,8 @@ export class PanOperation extends MouseOperation {
     }
 }
 
+// FIXME handle moving the mouse while the button is down; should continuously eyedrop
+// (seems like that /should/ work...)
 export class EyedropOperation extends MouseOperation {
     constructor(...args) {
         super(...args);
@@ -296,10 +289,13 @@ export class PencilOperation extends MouseOperation {
     handle_press(x, y) {
         this.draw_in_cell(x, y);
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, _cell_x, _cell_y) {
+    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
         for (let [x, y] of this.iter_touched_cells(frac_cell_x, frac_cell_y)) {
             this.draw_in_cell(x, y);
         }
+
+        // Also update the preview tile position
+        this.handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y);
     }
 
     draw_in_cell(x, y) {
@@ -346,6 +342,8 @@ export class PencilOperation extends MouseOperation {
 // toggled)
 // - right-click to pick, same logic as pencil (which needs improving)
 // - ctrl-click to erase
+// - wait, no.  ctrl to like, fill the terrain layer regardless of the current tile's layer?  atm
+// you can't flood with an item usefully, it just fills the whole level
 // - reset the preview after a fill?  is that ever necessary?
 export class FillOperation extends MouseOperation {
     constructor(...args) {

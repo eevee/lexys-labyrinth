@@ -210,6 +210,7 @@ export class Editor extends PrimaryView {
 
         // Level canvas and mouse handling
         this.mouse_coords = null;
+        this.mouse_ops = [null, new mouseops.PanOperation(this, 1), null];  // left, middle, right
         this.mouse_op = null;
         this.viewport_el.addEventListener('mousedown', ev => {
             this.mouse_coords = [ev.clientX, ev.clientY];
@@ -223,36 +224,10 @@ export class Editor extends PrimaryView {
                 button = 0;
             }
 
-            let op_type = null;
-            if (button === 0) {
-                // Left button: activate tool
-                op_type = TOOLS[this.current_tool].op1;
+            this.set_mouse_button(button);
+            if (this.mouse_op) {
+                this.mouse_op.do_press(ev);
             }
-            else if (button === 1) {
-                // Middle button: always pan
-                op_type = mouseops.PanOperation;
-                // TODO how should this impact the hover?
-            }
-            else if (button === 2) {
-                // Right button: activate tool's alt mode
-                op_type = TOOLS[this.current_tool].op2;
-            }
-
-            if (! op_type)
-                return;
-
-            if (this.mouse_op && this.mouse_op instanceof op_type &&
-                this.mouse_op.physical_button === button)
-            {
-                // Don't replace with the same operation!
-            }
-            else {
-                if (this.mouse_op) {
-                    this.mouse_op.do_destroy();
-                }
-                this.mouse_op = new op_type(this, ev.clientX, ev.clientY, ev.button, button);
-            }
-            this.mouse_op.do_press(ev);
 
             ev.preventDefault();
             ev.stopPropagation();
@@ -284,9 +259,9 @@ export class Editor extends PrimaryView {
                 this.statusbar_cursor.textContent = `—`;
             }
 
-            if (! this.mouse_op)
-                return;
-            this.mouse_op.do_move(ev);
+            if (this.mouse_op) {
+                this.mouse_op.do_move(ev);
+            }
         });
         this.actual_viewport_el.addEventListener('mouseleave', () => {
             if (this.mouse_op) {
@@ -302,10 +277,7 @@ export class Editor extends PrimaryView {
             ev.preventDefault();
 
             this.mouse_op.do_commit();
-            // If this was an op for a different button, switch back to the primary
-            if (this.mouse_op.physical_button !== 0) {
-                this.init_default_mouse_op();
-            }
+            this.set_mouse_button(0);
         });
         // Disable context menu, which interferes with right-click tools
         this.viewport_el.addEventListener('contextmenu', ev => {
@@ -1167,17 +1139,31 @@ export class Editor extends PrimaryView {
         }
         this.current_tool = tool;
         this.tool_button_els[this.current_tool].classList.add('-selected');
-        this.init_default_mouse_op();
+
+        // Left button: activate tool
+        this._init_mouse_op(0, this.current_tool && TOOLS[this.current_tool].op1);
+        // Right button: activate tool's alt mode
+        this._init_mouse_op(2, this.current_tool && TOOLS[this.current_tool].op2);
+
+        this.set_mouse_button(0);
+    }
+    _init_mouse_op(button, op_type) {
+        if (this.mouse_ops[button] && op_type && this.mouse_ops[button] instanceof op_type)
+            // Don't recreate the same type of mouse operation
+            return;
+
+        if (this.mouse_ops[button]) {
+            this.mouse_ops[button].do_destroy();
+            this.mouse_ops[button] = null;
+        }
+
+        if (op_type) {
+            this.mouse_ops[button] = new op_type(this, button);
+        }
     }
 
-    init_default_mouse_op() {
-        if (this.mouse_op) {
-            this.mouse_op.do_destroy();
-            this.mouse_op = null;
-        }
-        if (this.current_tool && TOOLS[this.current_tool].op1) {
-            this.mouse_op = new TOOLS[this.current_tool].op1(this, ...(this.mouse_coords ?? [0, 0]), 0);  // FIXME?
-        }
+    set_mouse_button(button) {
+        this.mouse_op = this.mouse_ops[button];
     }
 
     show_palette_tooltip(key) {
@@ -1330,8 +1316,10 @@ export class Editor extends PrimaryView {
         ctx.clearRect(0, 0, this.fg_tile_el.width, this.fg_tile_el.height);
         this.renderer.draw_single_tile_type(
             this.fg_tile.type.name, this.fg_tile, this.fg_tile_el);
-        if (this.mouse_op) {
-            this.mouse_op.handle_tile_updated();
+        for (let mouse_op of this.mouse_ops) {
+            if (mouse_op) {
+                mouse_op.handle_tile_updated();
+            }
         }
     }
 
@@ -1340,8 +1328,10 @@ export class Editor extends PrimaryView {
         ctx.clearRect(0, 0, this.bg_tile_el.width, this.bg_tile_el.height);
         this.renderer.draw_single_tile_type(
             this.bg_tile.type.name, this.bg_tile, this.bg_tile_el);
-        if (this.mouse_op) {
-            this.mouse_op.handle_tile_updated(true);
+        for (let mouse_op of this.mouse_ops) {
+            if (mouse_op) {
+                mouse_op.handle_tile_updated(true);
+            }
         }
     }
 
