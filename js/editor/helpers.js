@@ -33,8 +33,9 @@ export class SVGConnection {
 
 
 export class PendingRectangularSelection {
-    constructor(owner) {
+    constructor(owner, mode) {
         this.owner = owner;
+        this.mode = mode ?? 'new';  // new, add, subtract
         this.element = mk_svg('rect.overlay-pending-selection');
         this.size_text = mk_svg('text.overlay-edit-tip');
         this.owner.svg_group.append(this.element, this.size_text);
@@ -54,7 +55,16 @@ export class PendingRectangularSelection {
     }
 
     commit() {
-        this.owner.add_rect(this.rect);
+        if (this.mode === 'new') {
+            this.owner.clear();
+            this.owner.add_rect(this.rect);
+        }
+        else if (this.mode === 'add') {
+            this.owner.add_rect(this.rect);
+        }
+        else if (this.mode === 'subtract') {
+            this.owner.subtract_rect(this.rect);
+        }
         this.element.remove();
         this.size_text.remove();
     }
@@ -116,8 +126,8 @@ export class Selection {
         return this.cells.has(this.editor.stored_level.coords_to_scalar(x, y));
     }
 
-    create_pending() {
-        return new PendingRectangularSelection(this);
+    create_pending(mode) {
+        return new PendingRectangularSelection(this, mode);
     }
 
     add_rect(rect) {
@@ -154,17 +164,35 @@ export class Selection {
                 Math.max(this.bbox.bottom, rect.bottom) - this.bbox.y);
         }
 
-        // XXX wait what the hell is this doing here?  why would we set_from_rect while floating, vs
-        // stamping it first?
-        if (this.floated_element) {
-            console.log("what the hell is this doing here");
-            let tileset = this.editor.renderer.tileset;
-            this.floated_canvas.width = this.bbox.width * tileset.size_x;
-            this.floated_canvas.height = this.bbox.height * tileset.size_y;
-            let foreign_obj = this.floated_element.querySelector('foreignObject');
-            foreign_obj.setAttribute('width', this.floated_canvas.width);
-            foreign_obj.setAttribute('height', this.floated_canvas.height);
+        this._update_outline();
+    }
+
+    subtract_rect(rect) {
+        let old_cells = this.cells;
+        this.cells = new Set(this.cells);
+
+        this.editor._do(
+            () => this._subtract_rect(rect),
+            () => {
+                this._set_from_set(old_cells);
+            },
+            false,
+        );
+    }
+
+    _subtract_rect(rect) {
+        if (this.is_empty)
+            // Nothing to do
+            return;
+
+        let stored_level = this.editor.stored_level;
+        for (let y = rect.top; y < rect.bottom; y++) {
+            for (let x = rect.left; x < rect.right; x++) {
+                this.cells.delete(stored_level.coords_to_scalar(x, y));
+            }
         }
+
+        // TODO shrink bbox?  i guess i only have to check along the edges that the rect intersects?
 
         this._update_outline();
     }

@@ -2244,6 +2244,7 @@ svg.level-editor-overlay path.overlay-selection-background {
 svg.level-editor-overlay path.overlay-selection {
     stroke: hsla(var(--selected-hue), 10%, 10%, 0.75);
     fill: hsla(var(--selected-hue), 50%, 75%, 0.375);
+    fill-rule: evenodd;
     stroke-width: calc(0.125px / var(--scale));
     stroke-dasharray: calc(0.125px / var(--scale)), calc(0.125px / var(--scale));
     animation: marching-ants 0.5s linear infinite;

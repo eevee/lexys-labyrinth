@@ -525,13 +525,21 @@ export class FillOperation extends MouseOperation {
 
 // TODO also, delete
 // FIXME i broke transforms
-// FIXME need to subtract from selection too
+// FIXME don't show the overlay text until has_moved
+// FIXME hide the god damn cursor
 export class SelectOperation extends MouseOperation {
     handle_press() {
         if (this.shift) {
-            // Extend selection
-            this.mode = 'extend';
-            this.pending_selection = this.editor.selection.create_pending();
+            this.mode = 'select';
+            if (this.ctrl) {
+                // Subtract from selection (the normal way is ctrl, but ctrl-shift works even to
+                // start dragging inside an existing selection)
+                this.pending_selection = this.editor.selection.create_pending('subtract');
+            }
+            else {
+                // Extend selection
+                this.pending_selection = this.editor.selection.create_pending('add');
+            }
             this.update_pending_selection();
         }
         else if (! this.editor.selection.is_empty &&
@@ -542,9 +550,15 @@ export class SelectOperation extends MouseOperation {
             this.make_copy = this.ctrl;
         }
         else {
-            // Create new selection
-            this.mode = 'create';
-            this.pending_selection = this.editor.selection.create_pending();
+            this.mode = 'select';
+            if (this.ctrl) {
+                // Subtract from selection (must initiate click outside selection, or it'll float)
+                this.pending_selection = this.editor.selection.create_pending('subtract');
+            }
+            else {
+                // Create new selection
+                this.pending_selection = this.editor.selection.create_pending('new');
+            }
             this.update_pending_selection();
         }
         this.has_moved = false;
@@ -598,9 +612,6 @@ export class SelectOperation extends MouseOperation {
                 // commit it before doing anything else
                 this.editor.selection.commit_floating();
 
-                if (this.mode === 'create') {
-                    this.editor.selection.clear();
-                }
                 this.pending_selection.commit();
             }
             else {

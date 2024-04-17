@@ -41,7 +41,7 @@ export const TOOLS = {
     select_box: {
         icon: 'icons/tool-select-box.png',
         name: "Box select",
-        desc: "Select and manipulate rectangles.\n\n[mouse1] Select rectangle\n[shift] [mouse1] Add to selection\n\n[mouse1] Move selection\n[ctrl] [mouse1] Clone selection",
+        desc: "Select and manipulate rectangles.\n\n[mouse1] Select rectangle\n[shift] [mouse1] Add to selection\n[ctrl] [mouse1] Remove from selection\n\n[mouse1] Move selection\n[ctrl] [mouse1] Clone selection",
         affects_selection: true,
         op1: mouseops.SelectOperation,
         shortcut: 'm',
