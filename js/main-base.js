@@ -234,8 +234,11 @@ export class DialogOverlay extends Overlay {
         this.header.append(mk('h1', {}, title));
     }
 
-    add_button(label, onclick) {
+    add_button(label, onclick, is_default) {
         let button = mk('button', {type: 'button'}, label);
+        if (is_default) {
+            button.classList.add('button-bright');
+        }
         button.addEventListener('click', onclick);
         this.footer.append(button);
         return button;
@@ -252,9 +255,9 @@ export class AlertOverlay extends DialogOverlay {
         super(conductor);
         this.set_title(title);
         this.main.append(mk('p', {}, message));
-        this.add_button("a'ight", ev => {
+        this.add_button("a'ight", () => {
             this.close();
-        });
+        }, true);
     }
 }
 
@@ -267,7 +270,7 @@ export class ConfirmOverlay extends DialogOverlay {
         this.add_button("yep", ev => {
             this.close();
             what();
-        });
+        }, true);
         this.add_button("nope", ev => {
             this.close();
         });

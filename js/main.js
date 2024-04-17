@@ -2965,7 +2965,7 @@ class LevelErrorOverlay extends DialogOverlay {
         );
         this.add_button("welp, you get what you pay for", ev => {
             this.close();
-        });
+        }, true);
     }
 }
 
@@ -3197,7 +3197,7 @@ class OptionsOverlay extends DialogOverlay {
             this.conductor.reload_all_options();
 
             this.close();
-        });
+        }, true);
         this.add_button("forget it", () => {
             // Restore the player's music volume just in case
             if (this.original_music_volume !== undefined) {
@@ -3412,7 +3412,7 @@ class CompatOverlay extends DialogOverlay {
             this.save();
             this.remember();
             this.close();
-        });
+        }, true);
         this.add_button("save for this session only", () => {
             this.save();
             this.close();
@@ -3528,7 +3528,7 @@ class PackTestDialog extends DialogOverlay {
 
         this.add_button("close", () => {
             this.close();
-        });
+        }, true);
 
         this.renderer = new CanvasRenderer(this.conductor.tilesets['ll'], 16);
     }
@@ -3868,7 +3868,7 @@ class LevelBrowserOverlay extends DialogOverlay {
 
         this.add_button("nevermind", ev => {
             this.close();
-        });
+        }, true);
     }
 
     open() {
