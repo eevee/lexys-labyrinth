@@ -1693,6 +1693,16 @@ const TILE_TYPES = {
             skeleton_key: 'bribe',
             stopwatch_bonus: 'stopwatch_penalty',
             stopwatch_penalty: 'stopwatch_bonus',
+            green_chip: 'green_bomb',
+            green_bomb: 'green_chip',
+            chip: 'bomb',
+            bomb: 'chip',
+
+            // TODO
+            // boulder: 'log',
+            // log: 'boulder',
+            // ankh: 'phantom_ring',
+            // phantom_ring: 'ankh',
         },
         _blob_mogrifications: ['glider', 'paramecium', 'fireball', 'bug', 'walker', 'ball', 'teeth', 'tank_blue', 'teeth_timid'],
         on_begin(me, level) {
