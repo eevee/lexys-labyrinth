@@ -6,7 +6,7 @@ function activate_me(me, level) {
     me.type.activate(me, level);
 }
 
-function blocks_leaving_thin_walls(me, actor, direction) {
+function blocks_leaving_thin_walls(me, level, actor, direction) {
     return me.type.thin_walls.has(direction) && actor.type.name !== 'ghost';
 }
 
@@ -384,7 +384,7 @@ const TILE_TYPES = {
                 return false;
             return (me.edges & DIRECTIONS[direction].opposite_bit) !== 0;
         },
-        blocks_leaving(me, actor, direction) {
+        blocks_leaving(me, level, actor, direction) {
             if (actor.type.name === 'ghost')
                 return false;
             return (me.edges & DIRECTIONS[direction].bit) !== 0;
@@ -397,7 +397,7 @@ const TILE_TYPES = {
     // stop something from leaving
     one_way_walls: {
         layer: LAYERS.thin_wall,
-        blocks_leaving(me, actor, direction) {
+        blocks_leaving(me, level, actor, direction) {
             if (actor.type.name === 'ghost')
                 return false;
             return (me.edges & DIRECTIONS[direction].bit) !== 0;
@@ -625,7 +625,7 @@ const TILE_TYPES = {
             return me.type._is_affected(me, other) &&
                 ! me.type.has_opening(me, DIRECTIONS[direction].opposite);
         },
-        blocks_leaving(me, other, direction) {
+        blocks_leaving(me, level, other, direction) {
             // FIXME needs the same logic as redirect_exit, so that an illegal entrance can't leave
             // at all
             return me.type._is_affected(me, other) && ! me.type.has_opening(me, direction);
@@ -729,6 +729,30 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         speed_factor: 0.5,
+    },
+    grass: {
+        layer: LAYERS.terrain,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
+        blocks(me, level, other) {
+            // These guys with big wheels can't do grass
+            return (
+                other.type.name === 'tank_blue' || other.type.name === 'tank_yellow' ||
+                other.type.name === 'rover');
+        },
+        blocks_leaving(me, level, other, direction) {
+            // Both kinds of bugs prefer to stay in the grass
+            if (other.type.name === 'bug' || other.type.name === 'paramecium') {
+                let neighbor = level.get_neighboring_cell(me.cell, direction);
+                if (neighbor && neighbor.get_terrain().type.name !== 'grass')
+                    return true;
+            }
+        },
+        on_arrive(me, level, other) {
+            if (other.type.name === 'fireball') {
+                level.transmute_tile(me, 'fire');
+                level.spawn_animation(me.cell, 'puff');
+            }
+        },
     },
     dash_floor: {
         layer: LAYERS.terrain,

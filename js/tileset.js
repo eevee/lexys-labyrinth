@@ -1161,6 +1161,7 @@ export const LL_TILESET_LAYOUT = {
         open: [1, 7],
     },
     cracked_floor: [2, 6],
+    grass: [2, 7],
 
     thin_walls: {
         __special__: 'thin_walls',

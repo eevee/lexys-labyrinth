@@ -894,6 +894,10 @@ const TILE_ENCODING = {
         name: 'sand',
         is_extension: true,
     },
+    0xe8: {
+        name: 'grass',
+        is_extension: true,
+    },
     0xed: {
         name: 'ankh',
         has_next: true,
