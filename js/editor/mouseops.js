@@ -119,6 +119,8 @@ export class MouseOperation {
         this.hide();
     }
 
+    // XXX uhhh seems weird to control a shared resource like this????
+    // XXX also it's visible initially until you move the mouse over the canvas lol
     show() {
         if (! this.is_hover_visible) {
             this.is_hover_visible = true;

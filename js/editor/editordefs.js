@@ -234,6 +234,7 @@ export const PALETTE = [{
         'logic_gate/latch-cw',
         'logic_gate/latch-ccw',
         'logic_gate/counter',
+
         'button_pink',
         'button_black',
         'light_switch_off',
@@ -245,41 +246,47 @@ export const PALETTE = [{
 }, {
     title: "Experimental",
     tiles: [
-        'circuit_block/xxx',
-        'gift_bow',
-        'skeleton_key',
+        'sokoban_block/red',
+        'sokoban_block/blue',
+        'sokoban_block/green',
+        'sokoban_block/yellow',
+        'sokoban_button/red',
+        'sokoban_button/blue',
+        'sokoban_button/green',
+        'sokoban_button/yellow',
+
+        'sokoban_wall/red',
+        'sokoban_wall/blue',
+        'sokoban_wall/green',
+        'sokoban_wall/yellow',
         'gate_red',
         'gate_blue',
         'gate_yellow',
         'gate_green',
-        'sand',
+
+        'one_way_walls/south',
         'dash_floor',
         'spikes',
+        'sand',
+        'grass',
         'cracked_ice',
-        'hole',
         'cracked_floor',
+        'hole',
+
         'turntable_cw',
         'turntable_ccw',
         'teleport_blue_exit',
         'electrified_floor',
-        'ankh',
-        'score_5x',
-        'boulder',
+        'circuit_block/xxx',
         'glass_block',
         'logic_gate/diode',
-        'sokoban_block/red',
-        'sokoban_button/red',
-        'sokoban_wall/red',
-        'sokoban_block/blue',
-        'sokoban_button/blue',
-        'sokoban_wall/blue',
-        'sokoban_block/green',
-        'sokoban_button/green',
-        'sokoban_wall/green',
-        'sokoban_block/yellow',
-        'sokoban_button/yellow',
-        'sokoban_wall/yellow',
-        'one_way_walls/south',
+        'boulder',
+
+        'gift_bow',
+        'skeleton_key',
+        'ankh',
+        'score_5x',
+        'raft',
     ],
 }];
 
@@ -705,15 +712,15 @@ export const TILE_DESCRIPTIONS = {
     // Mechanisms
     dirt_block: {
         name: "Dirt block",
-        desc: "Can be pushed, but only one at a time.  Resists fire.  Turns to dirt in water.",
+        desc: "A single-push block (i.e., cannot push other blocks ahead of it).  Fireproof.  Turns to dirt in water.",
     },
     ice_block: {
         name: "Ice block",
-        desc: "Can be pushed.  Pushes any ice block or frame block ahead of it.  Turns to water in fire.  Turns to ice in water.",
+        desc: "A multi-push block (i.e., can push other blocks ahead of it).  Cannot push dirt blocks directly.  Turns to water in fire.  Turns to ice in water.",
     },
     frame_block: {
         name: "Frame block",
-        desc: "Can be pushed, but only in the directions given by the arrows.  Pushes any other kind of block ahead of it.  Can be moved in other directions by ice, force floors, etc.  Rotates when moved along a curved railroad track.",
+        desc: "A multi-push block.  Can only be pushed in the directions given by the arrows.  Can be moved in other directions by ice, force floors, etc.  Rotates when moved along a curved railroad track.",
     },
     green_floor: {
         name: "Toggle floor",
@@ -817,10 +824,6 @@ export const TILE_DESCRIPTIONS = {
         name: "NOT gate",
         desc: "Emits power only when not receiving power.",
     },
-    'logic_gate/diode': {
-        name: "Diode",
-        desc: "Emits power only when receiving power. (Effectively, this delays power by one frame.)",
-    },
     'logic_gate/and': {
         name: "AND gate",
         desc: "Emits power while both inputs are receiving power.",
@@ -879,17 +882,17 @@ export const TILE_DESCRIPTIONS = {
     },
 
     // Experimental
-    circuit_block: {
-        name: "Circuit block",
-        desc: "May contain wires, which will connect to any adjacent wires and conduct power as normal. When pushed into water, turns into floor with the same wires.",
+    sokoban_block: {
+        name: "Sokoban block",
+        desc: "A single-push block.  Can't pass over colored floor of a different color.  Has no effect on sokoban buttons of a different color.  Turns to colored floor in water.",
     },
-    gift_bow: {
-        name: "Gift bow",
-        desc: "When placed atop an item, anything may step on the item and will pick it up, even if it normally could not do so.  When placed alone, has no effect, but an item may be dropped beneath it.",
+    sokoban_button: {
+        name: "Sokoban button",
+        desc: "Changes sokoban walls of the same color to floor, but only while all buttons of the same color are held.  Not affected by sokoban blocks of a different color.",
     },
-    skeleton_key: {
-        name: "Skeleton key",
-        desc: "Counts as a tool, not a key.  Opens any color lock if the owner lacks a matching key.",
+    sokoban_wall: {
+        name: "Sokoban wall",
+        desc: "Acts like wall.  Turns to floor while all sokoban buttons of the same color are pressed.",
     },
     gate_red: {
         name: "Red gate",
@@ -907,78 +910,131 @@ export const TILE_DESCRIPTIONS = {
         name: "Green gate",
         desc: "Requires a green key.  Unlike doors, may be placed on top of other terrain, and any actor with the key may unlock it.",
     },
+
+    one_way_walls: {
+        name: "One-way wall",
+        desc: "Similar to a thin wall, but can be passed through one side only.",
+    },
+    dash_floor: {
+        name: "Dash floor",
+        desc: "Anything walking on it moves at double speed.  Stacks with speed boots.",
+    },
+    spikes: {
+        name: "Spikes",
+        desc: "Stops players (and doppelgangers) unless they have hiking boots.  Everything else can pass.",
+    },
     sand: {
         name: "Sand",
         desc: "Anything walking on it moves at half speed.  Stops all blocks.",
     },
-    ankh: {
-        name: "Ankh",
-        desc: "When dropped on empty floor by a player, inscribes a sacred symbol which will save a player's life once.",
-    },
-    turntable_cw: {
-        name: "Turntable (clockwise)",
-        desc: "Rotates anything entering this tile clockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
-    },
-    turntable_ccw: {
-        name: "Turntable (counterclockwise)",
-        desc: "Rotates anything entering this tile counterclockwise. Frame blocks are rotated too. If connected to wire, only functions while receiving power.",
-    },
-    electrified_floor: {
-        name: "Electrified floor",
-        desc: "Conducts power (like a 4-way wire). While powered, destroys anything not wearing lightning boots (except dirt blocks).",
-    },
-    hole: {
-        name: "Hole",
-        desc: "A bottomless pit. Destroys everything (except ghosts).",
-    },
-    cracked_floor: {
-        name: "Cracked floor",
-        desc: "Turns into a hole when something steps off of it (except ghosts and Cerise).",
+    grass: {
+        name: "Grass",
+        desc: "Stops all blocks, tanks, and rovers.  Turns to fire when a fireball touches it.",
     },
     cracked_ice: {
         name: "Cracked ice",
         desc: "Turns into water when something steps off of it (except ghosts and Cerise).",
     },
-    score_5x: {
-        name: "×5 bonus",
-        desc: "Quintuples the player's current bonus points.  Can be collected by doppelgangers, rovers, and bowling balls, but will not grant bonus points.",
+    cracked_floor: {
+        name: "Cracked floor",
+        desc: "Turns into a hole when something steps off of it (except ghosts and Cerise).",
     },
-    spikes: {
-        name: "Spikes",
-        desc: "Stops players (and doppelgangers) unless they have hiking boots. Everything else can pass.",
+    hole: {
+        name: "Hole",
+        desc: "A bottomless pit.  Destroys everything (except ghosts).",
     },
-    boulder: {
-        name: "Boulder",
-        desc: "Similar to a dirt block, but rolls when pushed. Boulders transfer momentum to each other. Has ice block/frame block collision. Turns into gravel in water. Spreads slime.",
+
+    turntable_cw: {
+        name: "Turntable (clockwise)",
+        desc: "Rotates anything entering this tile clockwise.  Frame blocks rotate as if on tracks.  If connected to wire, only functions while receiving power.",
     },
-    dash_floor: {
-        name: "Dash floor",
-        desc: "Anything walking on it moves at double speed. Stacks with speed shoes!",
+    turntable_ccw: {
+        name: "Turntable (counterclockwise)",
+        desc: "Rotates anything entering this tile counterclockwise.  Frame blocks rotate as if on tracks.  If connected to wire, only functions while receiving power.",
     },
     teleport_blue_exit: {
         name: "Blue teleporter exit",
         desc: "A blue teleporter for all intents and purposes except it can only be exited, not entered.",
     },
+    electrified_floor: {
+        name: "Electrified floor",
+        desc: "Conducts power (like a 4-way wire).  While powered, destroys anything not wearing lightning boots (except dirt blocks).",
+    },
+    circuit_block: {
+        name: "Circuit block",
+        desc: "A single-push block.  May contain wires, which will connect to any adjacent wires and conduct power as normal, replacing anything on the floor below.  When pushed into water, turns into floor with the same wires.",
+    },
     glass_block: {
         name: "Glass block",
-        desc: "Similar to a dirt block, but stores the first item it moves over, dropping it when destroyed and cloning it in a cloning machine. Has ice block/frame block collision. Turns into floor in water. Doesn't have dirt block immunities.",
+        desc: "A single-push block.  Can pick up one item it moves over, which may then be cloned via a clone machine.  Drops the item when destroyed.  Turns to floor in water.",
     },
-    sokoban_block: {
-        name: "Sokoban block",
-        desc: "Similar to a dirt block.  Turns to colored floor in water.  Can't pass over colored floor of a different color.  Has no effect on sokoban buttons of a different color.",
+    'logic_gate/diode': {
+        name: "Diode",
+        desc: "Only transmits power in one direction.",
     },
-    sokoban_button: {
-        name: "Sokoban button",
-        desc: "Changes sokoban walls of the same color to floor, but only while all buttons of the same color are held.  Not affected by sokoban blocks of a different color.",
+    boulder: {
+        name: "Boulder",
+        desc: "Rolls when pushed.  Transfers momentum to another boulder it hits.  Fireproof.  Turns into gravel in water.  Spreads slime.",
     },
-    sokoban_wall: {
-        name: "Sokoban wall",
-        desc: "Acts like wall.  Turns to floor while all sokoban buttons of the same color are pressed.",
+
+    gift_bow: {
+        name: "Gift bow",
+        desc: "When placed atop an item, anything may step on the item and will pick it up, even if it normally could not do so.  When placed alone, has no effect, but an item may be dropped beneath it.",
     },
-    one_way_walls: {
-        name: "One-way wall",
-        desc: "Similar to a thin wall, but can be passed through one side only.",
-    }
+    skeleton_key: {
+        name: "Skeleton key",
+        desc: "Counts as a tool, not a key.  Opens any lock when the owner lacks a matching key, but only once.",
+    },
+    ankh: {
+        name: "Ankh",
+        desc: "When dropped on empty floor by a player, inscribes a sacred symbol which will resurrect a player on that tile, then vanish.  Only one symbol may exist at a time, and only the player may step on the symbol.",
+    },
+    score_5x: {
+        name: "×5 bonus",
+        desc: "Quintuples the player's current bonus points.  Can be collected by doppelgangers, rovers, and bowling balls, but will not grant bonus points.",
+    },
+    raft: {
+        name: "Raft",
+        desc: "A vehicle for crossing water safely.  Follows its passenger until they reach land.  Can be pushed around (like a single-push block) while swimming.",
+    },
+    // TODO aspirational
+    iceberg: {
+        name: "Iceberg",
+        desc: "Behaves like ice when stepped on.  Can be pushed around (like a multi-push block) while swimming.",
+    },
+    cart: {
+        name: "Cart",
+        desc: "A vehicle for moving in both directions on tracks.  Automatically pushes and pulls any number of adjacent carts.",
+    },
+    // XXX extremely aspirational lmao
+    laser: {
+        name: "Laser",
+        desc: "Fires a powerful beam in a straight line, which destroys anything that touches it.",
+    },
+    prism_main: {
+        name: "Prism",
+        desc: "A multi-push block.  Reflects any laser hitting it.  Turns to ice in water.",
+    },
+    crystal: {
+        name: "Crystal",
+        desc: "Emits power while struck by a laser.",
+    },
+    fan: {
+        name: "Fan",
+        desc: "Blows strong wind in a straight line, pushing anything in its path.  Only active while powered.",
+    },
+    toll: {
+        name: "Toll",
+        desc: "When placed atop an item, that item becomes a toll required to pass.  One of the item will be taken away every time an actor passes.  When placed alone, has no effect, but an item may be dropped beneath it.",
+    },
+    phantom_ring: {
+        name: "Phantom ring",
+        desc: "Allows its wearer to walk through all varieties of solid walls, but mysteriously vanishes once they exit into normal space.",
+    },
+    log: {
+        name: "Log",
+        desc: "May be rolled in one direction, in which case it acts like a boulder.  May be stood up in the other direction, in which case it stands up on end and acts like a single-push block.  Turns to grass in water.",
+    },
 };
 
 
