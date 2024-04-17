@@ -524,7 +524,8 @@ export class FillOperation extends MouseOperation {
 
 
 // TODO also, delete
-// TODO also, better marching ants, hard to see on gravel
+// FIXME i broke transforms
+// FIXME need to subtract from selection too
 export class SelectOperation extends MouseOperation {
     handle_press() {
         if (this.shift) {

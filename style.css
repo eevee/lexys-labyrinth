@@ -2317,6 +2317,28 @@ svg.level-editor-overlay text.overlay-edit-tip {
     border-bottom: 1px solid currentColor;
     color: white;
 }
+.editor-big-tooltip kbd {
+    font-size: 0.75em;
+    display: inline-block;
+    margin-right: 0.25rem;
+    padding: 1px 2px;
+    border: 1px solid #d8d8d8;
+    border-bottom-width: 2px;
+    border-radius: 2px;
+    line-height: 1;
+    vertical-align: 0.25em;
+    background: #d8d8d8;
+    box-shadow: 0 2px #999;
+    color: hsl(var(--main-hue), 10%, 20%);
+    letter-spacing: -1px;
+    text-transform: lowercase;
+}
+.editor-big-tooltip svg {
+    width: 1.5em;
+    height: 1.5em;
+    margin: 0 -0.25em;  /* these are mouse buttons; shave off some of the extra space */
+    vertical-align: -0.375em;
+}
 #editor .controls {
     /* TODO with the hint area gone i don't think this needs to be a grid?  could just flex */
     grid-area: controls;
@@ -2359,6 +2381,10 @@ svg.level-editor-overlay text.overlay-edit-tip {
 .icon-button-set {
     display: flex;
     flex-wrap: wrap;
+    padding: 2px;
+    border-radius: 4px;
+    background: hsl(var(--selected-hue), 10%, 10%);
+    border: 1px solid hsl(var(--selected-hue), 10%, 20%);
 }
 .icon-button-set button {
     width: auto;
@@ -2366,13 +2392,13 @@ svg.level-editor-overlay text.overlay-edit-tip {
     padding: 0;
     margin: 0;
     line-height: 1;
-    background: url(icons/tool-bg-unselected.png) no-repeat;
+    background: none;
     border: none;
-    border-radius: 0;
+    border-radius: 2px;
     box-shadow: none;
 }
 .icon-button-set button.-selected {
-    background-image: url(icons/tool-bg-selected.png);
+    background: hsl(var(--selected-hue), 90%, 70%);
 }
 .icon-button-set button img {
     display: block;

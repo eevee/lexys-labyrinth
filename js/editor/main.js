@@ -134,8 +134,7 @@ export class Editor extends PrimaryView {
         this.statusbar_cursor = mk('div.-mouse', "—");
         statusbar.append(
             mk('div.-zoom',
-                mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
-                    mk_svg('use', {href: `#svg-icon-zoom`})),
+                this.svg_icon('svg-icon-zoom'),
                 this.statusbar_zoom_input,
                 this.statusbar_zoom,
             ),
@@ -400,6 +399,7 @@ export class Editor extends PrimaryView {
                 }
                 header_text += ` (${shortcut})`;
             }
+            let tooltip = mk('div.-help.editor-big-tooltip', mk('h3', header_text));
             let button = mk(
                 'button', {
                     type: 'button',
@@ -409,8 +409,23 @@ export class Editor extends PrimaryView {
                     src: tooldef.icon,
                     alt: tooldef.name,
                 }),
-                mk('div.-help.editor-big-tooltip', mk('h3', header_text), tooldef.desc),
+                tooltip,
             );
+
+            // Replace the [key] elements in the tooltip
+            for (let [_, literal, key] of tooldef.desc.matchAll(/(.*?)(?:\[(.+?)\]|$)/gs)) {
+                tooltip.append(literal);
+                if (key === 'mouse1') {
+                    tooltip.append(this.svg_icon('svg-icon-mouse1'));
+                }
+                else if (key === 'mouse2') {
+                    tooltip.append(this.svg_icon('svg-icon-mouse2'));
+                }
+                else if (key) {
+                    tooltip.append(mk('kbd', key));
+                }
+            }
+
             this.tool_button_els[toolname] = button;
             toolbox.append(button);
         }
@@ -462,10 +477,7 @@ export class Editor extends PrimaryView {
         let edit_menu_button = _make_button("Edit ", ev => {
             this.edit_menu.open(ev.currentTarget);
         });
-        edit_menu_button.append(
-            mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
-                mk_svg('use', {href: `#svg-icon-menu-chevron`})),
-        );
+        edit_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
         _make_button("Pack properties...", () => {
             new dialogs.EditorPackMetaOverlay(this.conductor, this.conductor.stored_game).open();
         });
@@ -563,10 +575,7 @@ export class Editor extends PrimaryView {
         let export_menu_button = _make_button("Export ", ev => {
             this.export_menu.open(ev.currentTarget);
         });
-        export_menu_button.append(
-            mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
-                mk_svg('use', {href: `#svg-icon-menu-chevron`})),
-        );
+        export_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
         //_make_button("Toggle green objects");
 
         // Tile palette
@@ -1853,6 +1862,11 @@ export class Editor extends PrimaryView {
 
     // ------------------------------------------------------------------------------------------------
     // Misc UI stuff
+
+    svg_icon(id) {
+        return mk_svg('svg.svg-icon', {viewBox: '0 0 16 16'},
+            mk_svg('use', {href: `#${id}`}));
+    }
 
     open_tile_prop_overlay(tile, cell, rect) {
         this.cancel_mouse_drag();

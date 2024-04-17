@@ -115,6 +115,19 @@
             <path d="M1,6 a5,5 0 1,1 10,0 a5,5 0 1,1 -10,0 m2,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"></path>
             <path d="M14,12 l-2,2 -4,-4 2,-2 4,4"></path>
         </g>
+        <g id="svg-icon-mouse1">
+            <path d="
+                M9,2 a3,3 0 0,1 3,3 v5 a4,4 0 0,1 -8,0 v-5 a3,3 0 0,1 3,-3 z
+                M9,3 v5 h-4 v-3 a2,2 0 0,1 2,-2 h1 z
+            "></path>
+                <!--M9,3 a2,2 0 0,0 -2,2 v3 h3 z-->
+        </g>
+        <g id="svg-icon-mouse2">
+            <path d="
+                M9,2 a3,3 0 0,1 3,3 v5 a4,4 0 0,1 -8,0 v-5 a3,3 0 0,1 3,-3 z
+                M7,3 h2 a2,2 0 0,1 2,2 v3 h-4 v-5 z
+            "></path>
+        </g>
     </defs>
     </svg>
     <header id="header-main">
@@ -203,8 +216,8 @@
             <div class="button-row">
                 <input id="splash-upload-file" type="file" accept=".dat,.ccl,.c2m,.ccs,.zip" multiple>
                 <input id="splash-upload-dir" type="file" webkitdirectory>
-                <button type="button" id="splash-upload-file-button" class="button-big">Load files</button>
-                <button type="button" id="splash-upload-dir-button" class="button-big">Load directory</button>
+                <button type="button" id="splash-upload-file-button" class="button-big button-bright">Load files</button>
+                <button type="button" id="splash-upload-dir-button" class="button-big button-bright">Load directory</button>
             </div>
             <ul class="played-pack-list" id="splash-other-pack-list">
                 <!-- populated by js -->
@@ -214,8 +227,8 @@
         <section id="splash-your-levels">
             <h2>Create</h2>
             <div class="button-row">
-                <button type="button" id="splash-create-pack" class="button-big">New pack</button>
-                <button type="button" id="splash-create-level" class="button-big">New scratch level<br>(won't be saved!)</button>
+                <button type="button" id="splash-create-pack" class="button-big button-bright">New pack</button>
+                <button type="button" id="splash-create-level" class="button-big button-bright">New scratch level<br>(won't be saved!)</button>
             </div>
         </section>
     </main>

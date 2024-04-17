@@ -7,7 +7,7 @@ export const TOOLS = {
     pencil: {
         icon: 'icons/tool-pencil.png',
         name: "Pencil",
-        desc: "Place, erase, and select tiles.\nLeft click: draw\nCtrl: erase\nShift: replace all layers\nRight click: pick foreground tile\nCtrl-right click: pick background tile",
+        desc: "Place, erase, and select tiles.\n\n[mouse1] Draw\n[ctrl] [mouse1] Erase\n[shift] [mouse1] Draw, replacing everything\n\n[mouse2] Pick foreground tile\n[ctrl] [mouse2] Pick background tile",
         uses_palette: true,
         op1: mouseops.PencilOperation,
         op2: mouseops.EyedropOperation,
@@ -32,7 +32,7 @@ export const TOOLS = {
     fill: {
         icon: 'icons/tool-fill.png',
         name: "Fill",
-        desc: "Flood-fill an area with tiles",
+        desc: "Flood-fill an area with tiles.",
         uses_palette: true,
         op1: mouseops.FillOperation,
         op2: mouseops.EyedropOperation,
@@ -41,7 +41,7 @@ export const TOOLS = {
     select_box: {
         icon: 'icons/tool-select-box.png',
         name: "Box select",
-        desc: "Select and manipulate rectangles.",
+        desc: "Select and manipulate rectangles.\n\n[mouse1] Select rectangle\n[shift] [mouse1] Add to selection\n\n[mouse1] Move selection\n[ctrl] [mouse1] Clone selection",
         affects_selection: true,
         op1: mouseops.SelectOperation,
         shortcut: 'm',
@@ -55,14 +55,14 @@ export const TOOLS = {
     tracks: {
         icon: 'icons/tool-tracks.png',
         name: "Tracks",
-        desc: "Draw tracks following the cursor.\nLeft click: Lay tracks\nCtrl-click: Erase tracks\nRight click: Toggle track switch",
+        desc: "Draw tracks following the cursor.\n\n[mouse1] Lay tracks\n[ctrl] [mouse1] Erase tracks\n[mouse2] Toggle track switch",
         op1: mouseops.TrackOperation,
         op2: mouseops.TrackOperation,
     },
     adjust: {
         icon: 'icons/tool-adjust.png',
         name: "Adjust",
-        desc: "Edit existing tiles.\nLeft click: rotate actor or toggle terrain\nRight click: rotate or toggle in reverse\nShift: always target terrain\nCtrl-click: edit properties of complex tiles\n(wires, railroads, hints, etc.)",
+        desc: "Edit existing tiles.\n\n[mouse1] Rotate actor / toggle terrain\n[mouse2] Rotate/toggle in the other direction\n[shift] Affect terrain\n\n[ctrl] [mouse1] Edit properties of complex tiles\n(wires, railroads, hints, etc.)",
         op1: mouseops.AdjustOperation,
         op2: mouseops.AdjustOperation,
         shortcut: 'a',
@@ -78,7 +78,7 @@ export const TOOLS = {
         // shift-drag: create a new connection (arbitrary cells)
         // right drag: move a connection endpoint
         // ctrl-right drag: move the other endpoint (if a cell is both source and dest)
-        desc: "Set up CC1-style clone and trap connections.\n(WIP)\nNOTE: Not supported in CC2!\nRight click: auto link using Lynx rules",
+        desc: "Set up CC1-style clone and trap connections.\n(WIP)\nNOTE: Not supported in the real CC2!\n\n[mouse2] Auto link using Lynx/CC2 rules",
         //desc: "Set up CC1-style clone and trap connections.\nNOTE: Not supported in CC2!\nLeft drag: link button with valid target\nCtrl-click: erase link\nRight click: auto link using Lynx rules",
         op1: mouseops.ConnectOperation,
         op2: mouseops.ConnectOperation,
@@ -86,15 +86,14 @@ export const TOOLS = {
     wire: {
         icon: 'icons/tool-wire.png',
         name: "Wire",
-        desc: "Edit CC2 wiring.\nLeft click: draw wires\nCtrl-click: erase wires\nRight click: toggle tunnels (floor only)",
+        desc: "Edit CC2 wiring.\n\n[mouse1] Draw wire\n[ctrl] [mouse1] Erase wire\n\n[mouse2] Toggle tunnels (floor only)",
         op1: mouseops.WireOperation,
         op2: mouseops.WireOperation,
     },
     camera: {
         icon: 'icons/tool-camera.png',
         name: "Camera",
-        desc: "Draw and edit custom camera regions",
-        help: "Draw and edit camera regions.\n(LL only.  When the player is within a camera region,\nthe camera stays locked inside it.)\nLeft click: create or edit a region\nRight click: erase a region",
+        desc: "Draw and edit camera regions.\n(LL only.  When the player is within a camera region,\nthe camera stays locked inside it.)\n\n[mouse1] Create or edit a region\n[mouse2] Delete a region",
         op1: mouseops.CameraOperation,
         op2: mouseops.CameraEraseOperation,
     },
