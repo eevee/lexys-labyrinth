@@ -2258,9 +2258,9 @@ export class Tileset {
             // Draw the base tile
             packet.blit(drawspec.base[0], drawspec.base[1]);
 
-            let mode = tile.wire_propagation_mode || TILE_TYPES[name].wire_propagation_mode;
-            let is_crossed = (
-                tile.wire_directions === 0x0f && drawspec.wired_cross && mode === 'cross');
+            let mode = tile.wire_propagation_mode ?? TILE_TYPES[name].wire_propagation_mode;
+            let is_crossed = drawspec.wired_cross && (
+                mode === 'cross' || (mode === 'autocross' && tile.wire_directions === 0x0f));
             if (is_crossed && tile.powered_edges && tile.powered_edges !== 0x0f) {
                 // For crossed wires with different power, order matters; horizontal is on top
                 // TODO note that this enforces the CC2 wire order

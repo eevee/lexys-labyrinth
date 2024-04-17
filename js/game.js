@@ -2445,9 +2445,12 @@ export class Level extends LevelInterface {
             if (! wired)
                 continue;
 
-            if (wired.type.wire_propagation_mode === 'none' && ! wired.type.is_power_source)
+            if ((wired.wire_propagation_mode ?? wired.type.wire_propagation_mode) === 'none' &&
+                ! wired.type.is_power_source)
+            {
                 // Being next to e.g. a red teleporter doesn't count (but pink button is ok)
                 continue;
+            }
 
             if ((wired.wire_directions & dirinfo.opposite_bit) &&
                 ! (wired.wire_tunnel_directions & dirinfo.opposite_bit))

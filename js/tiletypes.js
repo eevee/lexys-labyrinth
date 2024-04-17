@@ -251,7 +251,7 @@ const TILE_TYPES = {
     floor: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        wire_propagation_mode: 'cross',
+        wire_propagation_mode: 'autocross',
         on_approach(me, level, other) {
             if (other.type.name === 'blob' || other.type.name === 'boulder') {
                 // Blobs spread slime onto floor
@@ -474,7 +474,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all,
         contains_wire: true,
-        wire_propagation_mode: 'cross',
+        wire_propagation_mode: 'autocross',
     },
     canopy: {
         layer: LAYERS.canopy,
@@ -2408,13 +2408,14 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         contains_wire: true,
-        wire_propagation_mode: 'cross',
+        wire_propagation_mode: 'autocross',
         can_reverse_on_railroad: true,
         movement_speed: 4,
         on_clone(me, original) {
             me.wire_directions = original.wire_directions;
         },
         on_starting_move(me, level) {
+            level._set_tile_prop(me, 'powered_edges', 0);
             level.recalculate_circuitry_next_wire_phase = true;
         },
         on_finishing_move(me, level) {

@@ -1,4 +1,4 @@
-import { DIRECTIONS, DIRECTION_ORDER } from './defs.js';
+import { DIRECTIONS } from './defs.js';
 
 export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_dead_end) {
     let is_first = true;
@@ -15,45 +15,45 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
             let seen_edges = seen_cells.get(cell) ?? 0;
             if (seen_edges & edgeinfo.bit)
                 continue;
-                
+
+            let tile = terrain;
             let actor = cell.get_actor();
-            let wire_directions = terrain.wire_directions;
-            if ((actor?.wire_directions ?? null !== null) && (actor.movement_cooldown === 0 || level.compat.tiles_react_instantly))
+            if (actor && actor.type.contains_wire && (
+                actor.movement_cooldown === 0 || level.compat.tiles_react_instantly))
             {
-                wire_directions = actor.wire_directions;
+                tile = actor;
             }
 
             // The wire comes in from this edge towards the center; see how it connects within this
             // cell, then check for any neighbors
             let connections = edgeinfo.bit;
-            if (! is_first && ((wire_directions ?? 0) & edgeinfo.bit) === 0) {
+            let mode = tile.wire_propagation_mode ?? tile.type.wire_propagation_mode;
+            if (! is_first && ((tile.wire_directions ?? 0) & edgeinfo.bit) === 0) {
                 // There's not actually a wire here (but not if this is our starting cell, in which
                 // case we trust the caller)
                 if (on_dead_end) {
-                    on_dead_end(terrain.cell, edge);
+                    on_dead_end(cell, edge);
                 }
                 continue;
             }
-            else if (terrain.type.wire_propagation_mode === 'none') {
+            else if (mode === 'none') {
                 // The wires in this tile never connect to each other
             }
-            else if (terrain.type.wire_propagation_mode === 'cross' ||
-                (wire_directions === 0x0f && terrain.type.wire_propagation_mode !== 'all'))
-            {
+            else if (mode === 'cross' || (mode === 'autocross' && tile.wire_directions === 0x0f)) {
                 // This is a cross pattern, so only opposite edges connect
-                if (wire_directions & edgeinfo.opposite_bit) {
+                if (tile.wire_directions & edgeinfo.opposite_bit) {
                     connections |= edgeinfo.opposite_bit;
                 }
             }
             else {
                 // Everything connects
-                connections |= wire_directions;
+                connections |= tile.wire_directions;
             }
 
             seen_cells.set(cell, seen_edges | connections);
 
             if (on_wire) {
-                on_wire(terrain, connections);
+                on_wire(tile, connections);
             }
 
             for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
@@ -67,6 +67,8 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
                 let neighbor;
                 if ((terrain.wire_tunnel_directions ?? 0) & dirinfo.bit) {
                     // Search in this direction for a matching tunnel
+                    // Note that while actors (the fuckin circuit block) can be wired, tunnels ONLY
+                    // appear on terrain, and are NOT affected by actors on top
                     neighbor = find_matching_wire_tunnel(level, cell.x, cell.y, direction);
                 }
                 else {
