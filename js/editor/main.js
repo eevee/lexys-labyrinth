@@ -455,17 +455,26 @@ export class Editor extends PrimaryView {
             this.redo();
         });
         let edit_items = [
-            ["Rotate CCW", () => {
+            ["Rotate left", () => {
                 this.rotate_level_left();
             }],
-            ["Rotate CW", () => {
+            ["Rotate right", () => {
                 this.rotate_level_right();
             }],
-            ["Mirror", () => {
+            ["Rotate 180°", () => {
+                this.rotate_level_right();
+            }],
+            ["Mirror horizontally", () => {
                 this.mirror_level();
             }],
-            ["Flip", () => {
+            ["Flip vertically", () => {
                 this.flip_level();
+            }],
+            ["Pivot around main diagonal", () => {
+                this.pivot_level_main();
+            }],
+            ["Pivot around anti diagonal", () => {
+                this.pivot_level_anti();
             }],
         ];
         this.edit_menu = new MenuOverlay(
@@ -1324,11 +1333,28 @@ export class Editor extends PrimaryView {
         return this._transform_tile(
             tile, include_faux_adjustments ? 'adjust_forward' : null, 'rotate_right', 'right');
     }
+    rotate_tile_180(tile) {
+        let changed = this.rotate_tile_right(tile);
+        changed ||= this.rotate_tile_right(tile);
+        return changed;
+    }
     mirror_tile(tile) {
         return this._transform_tile(tile, null, 'mirror', 'mirrored');
     }
     flip_tile(tile) {
         return this._transform_tile(tile, null, 'flip', 'flipped');
+    }
+    pivot_tile_main(tile) {
+        // A flip along the main diagonal is equivalent to a right turn, then a horizontal mirror
+        let changed = this.rotate_tile_right(tile);
+        changed ||= this.mirror_tile(tile);
+        return changed;
+    }
+    pivot_tile_anti(tile) {
+        // A flip along the anti-diagonal is equivalent to a left turn, then a horizontal mirror
+        let changed = this.rotate_tile_left(tile);
+        changed ||= this.mirror_tile(tile);
+        return changed;
     }
 
     rotate_palette_left() {
@@ -1561,50 +1587,43 @@ export class Editor extends PrimaryView {
     // (These don't save undo entries for individual tiles, either, because they're expected to be
     // completely reversible, and undo is done by performing the opposite transform rather than
     // reloading a copy of a previous state.)
-    _rearrange_cells(swap_dimensions, downgrade_coords, upgrade_tile) {
-        let old_cells, old_w;
-        let w, h;
+    _rearrange_cells(swap_dimensions, convert_coords, upgrade_tile) {
         let new_cells = [];
-        if (this.selection.is_empty) {
-            // Do it to the whole level
-            w = this.stored_level.size_x;
-            h = this.stored_level.size_y;
-            old_w = w;
-            if (swap_dimensions) {
-                [w, h] = [h, w];
-                this.stored_level.size_x = w;
-                this.stored_level.size_y = h;
-            }
-            old_cells = this.stored_level.linear_cells;
-            this.stored_level.linear_cells = new_cells;
-        }
-        else {
-            // Do it to the selection
-            w = this.selection.rect.width;
-            h = this.selection.rect.height;
-            old_w = w;
-            if (swap_dimensions) {
-                [w, h] = [h, w];
-                // FIXME this will need more interesting rearranging
-                this.selection._set_from_rect(new DOMRect(
-                    this.selection.rect.x, this.selection.rect.y, w, h));
-            }
-            old_cells = this.selection.floated_cells;
-            this.selection.floated_cells = new_cells;
+        let w = this.stored_level.size_x;
+        let h = this.stored_level.size_y;
+        let old_w = w;
+        let old_h = h;
+        if (swap_dimensions) {
+            [w, h] = [h, w];
+            this.stored_level.size_x = w;
+            this.stored_level.size_y = h;
         }
 
-        for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-                let [old_x, old_y] = downgrade_coords(x, y, w, h);
-                let cell = old_cells[old_y * old_w + old_x];
+        if (! this.selection.is_empty) {
+            // Do it to the selection
+            this.selection._rearrange_cells(old_w, convert_coords, upgrade_tile);
+            return;
+        }
+
+        let old_cells = this.stored_level.linear_cells;
+        for (let y = 0; y < old_h; y++) {
+            for (let x = 0; x < old_w; x++) {
+                let [x2, y2] = convert_coords(x, y, w, h);
+                let cell = old_cells[y * old_w + x];
                 for (let tile of cell) {
                     if (tile) {
                         upgrade_tile(tile);
                     }
                 }
-                new_cells.push(cell);
+                let n2 = this.stored_level.coords_to_scalar(x2, y2);
+                if (new_cells[n2]) {
+                    console.error("Tile transformation overwriting the same cell twice:", x2, y2);
+                }
+                new_cells[n2] = cell;
             }
         }
+
+        this.stored_level.linear_cells = new_cells;
     }
 
     rotate_level_right() {
@@ -1622,6 +1641,11 @@ export class Editor extends PrimaryView {
         );
     }
     rotate_level_180() {
+        this._do_transform(
+            false,
+            () => this._rotate_level_180(),
+            () => this._rotate_level_180(),
+        );
     }
     mirror_level() {
         this._do_transform(
@@ -1635,6 +1659,20 @@ export class Editor extends PrimaryView {
             false,
             () => this._flip_level(),
             () => this._flip_level(),
+        );
+    }
+    pivot_level_main() {
+        this._do_transform(
+            true,
+            () => this._pivot_level_main(),
+            () => this._pivot_level_main(),
+        );
+    }
+    pivot_level_anti() {
+        this._do_transform(
+            true,
+            () => this._pivot_level_anti(),
+            () => this._pivot_level_anti(),
         );
     }
     _do_transform(affects_size, redo, undo) {
@@ -1656,34 +1694,34 @@ export class Editor extends PrimaryView {
         this.commit_undo();
     }
     _post_transform_cleanup(affects_size) {
-        if (this.selection.is_empty) {
-            if (affects_size) {
-                this.update_after_size_change();
-            }
-            else {
-                this.redraw_entire_level();
-            }
-        }
-        else {
-            // FIXME what if it affects size?
-            this.selection.redraw();
-        }
+        // The selection takes care of redrawing itself
+        if (! this.selection.is_empty)
+            return;
+
+        // We do basically the same work regardless of whether the size changed, so just do it
+        this.update_after_size_change();
     }
-    // TODO mirror diagonally?
 
     // Internal-use versions of the above.  These DO NOT create undo entries.
     _rotate_level_left() {
         this._rearrange_cells(
             true,
-            (x, y, w, h) => [h - 1 - y, x],
+            (x, y, w, h) => [y, w - 1 - x],
             tile => this.rotate_tile_left(tile, false),
         );
     }
     _rotate_level_right() {
         this._rearrange_cells(
             true,
-            (x, y, w, h) => [y, w - 1 - x],
+            (x, y, w, h) => [h - 1 - y, x],
             tile => this.rotate_tile_right(tile, false),
+        );
+    }
+    _rotate_level_180() {
+        this._rearrange_cells(
+            true,
+            (x, y, w, h) => [w - 1 - x, h - 1 - y],
+            tile => this.rotate_tile_180(tile, false),
         );
     }
     _mirror_level() {
@@ -1698,6 +1736,20 @@ export class Editor extends PrimaryView {
             false,
             (x, y, w, h) => [x, h - 1 - y],
             tile => this.flip_tile(tile),
+        );
+    }
+    _pivot_level_main() {
+        this._rearrange_cells(
+            true,
+            (x, y, w, h) => [y, x],
+            tile => this.pivot_tile_main(tile),
+        );
+    }
+    _pivot_level_anti() {
+        this._rearrange_cells(
+            true,
+            (x, y, w, h) => [w - 1 - y, h - 1 - x],
+            tile => this.pivot_tile_anti(tile),
         );
     }
 

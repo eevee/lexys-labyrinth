@@ -157,11 +157,12 @@ export class Selection {
         }
         else {
             // Just recreate it from scratch to avoid mixing old and new properties
+            let new_x = Math.min(this.bbox.x, rect.x);
+            let new_y = Math.min(this.bbox.y, rect.y);
             this.bbox = new DOMRect(
-                Math.min(this.bbox.x, rect.x),
-                Math.min(this.bbox.y, rect.y),
-                Math.max(this.bbox.right, rect.right) - this.bbox.x,
-                Math.max(this.bbox.bottom, rect.bottom) - this.bbox.y);
+                new_x, new_y,
+                Math.max(this.bbox.right, rect.right) - new_x,
+                Math.max(this.bbox.bottom, rect.bottom) - new_y);
         }
 
         this._update_outline();
@@ -398,28 +399,18 @@ export class Selection {
         this.ring_element.classList.remove('--visible');
     }
 
-    // TODO only used internally in one place?
-    *iter_coords() {
-        let stored_level = this.editor.stored_level;
-        for (let n of this.cells) {
-            let [x, y] = stored_level.scalar_to_coords(n);
-            if (this.floated_offset) {
-                x += this.floated_offset[0];
-                y += this.floated_offset[1];
-            }
-            yield [x, y, n];
-        }
-    }
-
     // Convert this selection into a floating selection, plucking all the selected cells from the
     // level and replacing them with blank cells.
     enfloat(copy = false) {
-        if (this.floated_cells)
+        if (this.floated_cells) {
             console.error("Trying to float a selection that's already floating");
+            return;
+        }
 
         let floated_cells = new Map;
         let stored_level = this.editor.stored_level;
-        for (let [x, y, n] of this.iter_coords()) {
+        for (let n of this.cells) {
+            let [x, y] = stored_level.scalar_to_coords(n);
             let cell = stored_level.linear_cells[n];
             if (copy) {
                 floated_cells.set(n, cell.map(tile => tile ? {...tile} : null));
@@ -441,37 +432,32 @@ export class Selection {
         );
     }
 
-    // Create floated_canvas and floated_element, based on floated_cells
+    // Create floated_canvas and floated_element, based on floated_cells, or update them if they
+    // already exist
     _init_floated_canvas() {
         let tileset = this.editor.renderer.tileset;
-        this.floated_canvas = mk('canvas', {
-            width: this.bbox.width * tileset.size_x,
-            height: this.bbox.height * tileset.size_y,
-        });
-        let ctx = this.floated_canvas.getContext('2d');
-        for (let n of this.cells) {
-            let [x, y] = this.editor.stored_level.scalar_to_coords(n);
-            this.editor.renderer.draw_static_generic({
-                // Incredibly stupid hack for just drawing one cell
-                x0: 0, x1: 0,
-                y0: 0, y1: 0,
-                width: 1,
-                cells: [this.floated_cells.get(n)],
-                ctx: ctx,
-                destx: x - this.bbox.left,
-                desty: y - this.bbox.top,
-            });
+        if (! this.floated_canvas) {
+            this.floated_canvas = mk('canvas');
         }
-        this.floated_element = mk_svg('g', mk_svg('foreignObject', {
-            x: 0,
-            y: 0,
-            width: this.floated_canvas.width,
-            height: this.floated_canvas.height,
-            transform: `scale(${1/tileset.size_x} ${1/tileset.size_y})`,
-        }, this.floated_canvas));
+        this.floated_canvas.width = this.bbox.width * tileset.size_x;
+        this.floated_canvas.height = this.bbox.height * tileset.size_y;
+        this.redraw();
+
+        if (! this.floated_element) {
+            this.floated_element = mk_svg('g', mk_svg('foreignObject', {
+                x: 0,
+                y: 0,
+                transform: `scale(${1/tileset.size_x} ${1/tileset.size_y})`,
+            }, this.floated_canvas));
+            // This goes first, so the selection ring still appears on top
+            this.selection_group.prepend(this.floated_element);
+        }
+        let foreign = this.floated_element.querySelector('foreignObject');
+        foreign.setAttribute('width', this.floated_canvas.width);
+        foreign.setAttribute('height', this.floated_canvas.height);
+
+        // The canvas only covers our bbox, so it needs to start where the bbox does
         this.floated_element.setAttribute('transform', `translate(${this.bbox.x} ${this.bbox.y})`);
-        // This goes first, so the selection ring still appears on top
-        this.selection_group.prepend(this.floated_element);
     }
 
     stamp_float(copy = false) {
@@ -545,6 +531,65 @@ export class Selection {
         );
     }
 
+    // Modifies the cells (and their arrangement) within a floating selection
+    _rearrange_cells(original_width, convert_coords, upgrade_tile) {
+        if (! this.floated_cells)
+            return;
+
+        let new_cells = new Set;
+        let new_floated_cells = new Map;
+        let w = this.editor.stored_level.size_x;
+        let h = this.editor.stored_level.size_y;
+        for (let n of this.cells) {
+            // Alas this needs manually computing since the level may have changed size
+            let x = n % original_width;
+            let y = Math.floor(n / original_width);
+            let [x2, y2] = convert_coords(x, y, w, h);
+            let n2 = x2 + w * y2;
+            let cell = this.floated_cells.get(n);
+            cell.x = x2;
+            cell.y = y2;
+            for (let tile of cell) {
+                if (tile) {
+                    upgrade_tile(tile);
+                }
+            }
+            new_cells.add(n2);
+            new_floated_cells.set(n2, cell);
+        }
+
+        // Track the old and new centers of the bboxes so the transform can be center-relative
+        let [cx0, cy0] = convert_coords(
+            Math.floor(this.bbox.x + this.bbox.width / 2),
+            Math.floor(this.bbox.y + this.bbox.height / 2),
+            w, h);
+
+        // Alter the bbox by just transforming two opposite corners
+        let [x1, y1] = convert_coords(this.bbox.left, this.bbox.top, w, h);
+        let [x2, y2] = convert_coords(this.bbox.right - 1, this.bbox.bottom - 1, w, h);
+        let xs = [x1, x2];
+        let ys = [y1, y2];
+        xs.sort((a, b) => a - b);
+        ys.sort((a, b) => a - b);
+        this.bbox = new DOMRect(xs[0], ys[0], xs[1] - xs[0] + 1, ys[1] - ys[0] + 1);
+
+        // Now make it center-relative by shifting the offsets
+        let [cx1, cy1] = convert_coords(
+            Math.floor(this.bbox.x + this.bbox.width / 2),
+            Math.floor(this.bbox.y + this.bbox.height / 2),
+            w, h);
+        this.floated_offset[0] += cx1 - cx0;
+        this.floated_offset[1] += cy1 - cy0;
+        this._update_floating_transform();
+
+        // No need for undo; this is undone by performing the reverse operation
+        this.cells = new_cells;
+        this.floated_cells = new_floated_cells;
+        this._init_floated_canvas();
+
+        this._update_outline();
+    }
+
     _delete_floating() {
         this.selection_group.removeAttribute('transform');
         this.ring_element.classList.remove('--floating');
@@ -561,20 +606,22 @@ export class Selection {
         if (! this.floated_canvas)
             return;
 
-        // FIXME uhoh, how do i actually do this?  we have no renderer of our own, we have a
-        // separate canvas, and all the renderer stuff expects to get ahold of a level.  i guess
-        // refactor it to draw a block of cells?
-        this.editor.renderer.draw_static_generic({
-            x0: 0, y0: 0,
-            x1: this.rect.width, y1: this.rect.height,
-            // FIXME this is now a set, not a flat list
-            cells: this.floated_cells,
-            width: this.rect.width,
-            ctx: this.floated_canvas.getContext('2d'),
-        });
+        let ctx = this.floated_canvas.getContext('2d');
+        for (let n of this.cells) {
+            let [x, y] = this.editor.stored_level.scalar_to_coords(n);
+            this.editor.renderer.draw_static_generic({
+                // Incredibly stupid hack for just drawing one cell
+                x0: 0, x1: 0,
+                y0: 0, y1: 0,
+                width: 1,
+                cells: [this.floated_cells.get(n)],
+                ctx: ctx,
+                destx: x - this.bbox.left,
+                desty: y - this.bbox.top,
+            });
+        }
     }
 
-    // TODO allow floating/dragging, ctrl-dragging to copy, anchoring...
     // TODO make more stuff respect this (more things should go through Editor for undo reasons anyway)
 }
 
