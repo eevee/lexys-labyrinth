@@ -1072,7 +1072,9 @@ const TILE_TYPES = {
             level.kill_actor(other, me, 'fall', null, 'fell');
         },
         visual_state(me) {
-            return (me && me.visual_state) ?? 'open';
+            // Default to the version of the tile that actually shows something; otherwise this
+            // looks like an error or gap in the editor
+            return (me && me.visual_state) ?? 'north';
         },
     },
     cracked_floor: {
@@ -1411,17 +1413,27 @@ const TILE_TYPES = {
             me.color = original.color;
         },
         visual_state(me) {
-            return me.color ?? 'red';
+            let color = me.color ?? 'red';
+            if (me && me.cell && ! me.movement_cooldown) {
+                let terrain = me.cell.get_terrain();
+                if (terrain.type.name === 'sokoban_button' && terrain.pressed) {
+                    return color + '_matched';
+                }
+            }
+            return color;
         },
     },
     sokoban_button: {
         layer: LAYERS.terrain,
         populate_defaults(me) {
             me.color = 'red';
+            me.pressed = false;
         },
         on_ready(me, level) {
-            if (me.cell.get_actor()) {
+            let actor = me.cell.get_actor();
+            if (actor && ! (actor.type.name === 'sokoban_block' && actor.color !== me.color)) {
                 // Already held down, make sure the level knows
+                me.pressed = true;
                 level.sokoban_buttons_unpressed[me.color] -= 1;
                 if (level.sokoban_buttons_unpressed[me.color] === 0) {
                     for (let cell of level.linear_cells) {
@@ -1436,6 +1448,7 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.name === 'sokoban_block' && me.color !== other.color)
                 return;
+            level._set_tile_prop(me, 'pressed', true);
             level.sfx.play_once('button-press', me.cell);
 
             level.sokoban_buttons_unpressed[me.color] -= 1;
@@ -1452,6 +1465,7 @@ const TILE_TYPES = {
             }
         },
         on_depart(me, level, other) {
+            level._set_tile_prop(me, 'pressed', false);
             if (other.type.name === 'sokoban_block' && me.color !== other.color)
                 return;
             level.sfx.play_once('button-release', me.cell);
@@ -1470,7 +1484,7 @@ const TILE_TYPES = {
             }
         },
         visual_state(me) {
-            return (me.color ?? 'red') + '_' + button_visual_state(me);
+            return (me.color ?? 'red') + '_' + (me.pressed ? 'pressed' : 'released');
         },
     },
     sokoban_wall: {
