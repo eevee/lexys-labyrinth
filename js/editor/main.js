@@ -16,6 +16,18 @@ import { SVGConnection, Selection } from './helpers.js';
 import * as mouseops from './mouseops.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
 
+// FIXME some idle thoughts
+// for adjust tool:
+// - preview gray button (or click to actually do it)
+// - preview wire reach
+// - preview destination teleporter (or maybe order)
+// - preview monster pathing
+// - preview ice/ff routing (what about e.g. doublemaze)
+// generally:
+// - show wires that are initially powered
+// - show traps that are initially closed
+// - show implicit red/brown connections
+// - selection and eyedropper should preserve red/brown button connections (somehow)
 
 // Edited levels are stored as follows.
 // StoredPack and StoredLevel both have an editor_metadata containing:
@@ -76,12 +88,12 @@ export class Editor extends PrimaryView {
                 mk_svg('marker', {id: 'overlay-arrowhead', markerWidth: 4, markerHeight: 4, refX: 3, refY: 2, orient: 'auto'},
                     mk_svg('polygon', {points: '0 0, 4 2, 0 4'}),
                 ),
-            ),
-            mk_svg('filter', {id: 'overlay-filter-outline'},
-                mk_svg('feMorphology', {'in': 'SourceAlpha', result: 'dilated', operator: 'dilate', radius: 0.03125}),
-                mk_svg('feFlood', {'flood-color': '#0009', result: 'fill'}),
-                mk_svg('feComposite', {'in': 'fill', in2: 'dilated', operator: 'in'}),
-                mk_svg('feComposite', {'in': 'SourceGraphic'}),
+                mk_svg('filter', {id: 'overlay-filter-outline'},
+                    mk_svg('feMorphology', {'in': 'SourceAlpha', result: 'dilated', operator: 'dilate', radius: 0.03125}),
+                    mk_svg('feFlood', {'flood-color': '#0009', result: 'fill'}),
+                    mk_svg('feComposite', {'in': 'fill', in2: 'dilated', operator: 'in'}),
+                    mk_svg('feComposite', {'in': 'SourceGraphic'}),
+                ),
             ),
             this.connections_g,
         );
@@ -143,9 +155,9 @@ export class Editor extends PrimaryView {
                         this.cancel_mouse_drag();
                     }
                     let new_rect = new DOMRect(0, 0, this.stored_level.size_x, this.stored_level.size_y);
-                    let old_rect = this.selection.rect;
-                    if (! (old_rect && old_rect.x === new_rect.x && old_rect.y === new_rect.y && old_rect.width === new_rect.width && old_rect.height === new_rect.height)) {
-                        this.selection.set_from_rect(new_rect);
+                    if (this.selection.cells.size !== this.stored_level.size_x * this.stored_level.size_y) {
+                        this.selection.clear();
+                        this.selection.add_rect(new_rect);
                         this.commit_undo();
                     }
                 }
@@ -156,7 +168,7 @@ export class Editor extends PrimaryView {
                         this.cancel_mouse_drag();
                     }
                     if (! this.selection.is_empty) {
-                        this.selection.defloat();
+                        this.selection.commit_floating();
                         this.selection.clear();
                         this.commit_undo();
                     }
@@ -285,6 +297,13 @@ export class Editor extends PrimaryView {
         });
         window.addEventListener('blur', () => {
             this.cancel_mouse_drag();
+
+            // Assume all modifiers are released
+            for (let mouse_op of this.mouse_ops) {
+                if (mouse_op) {
+                    mouse_op.clear_modifiers();
+                }
+            }
         });
         window.addEventListener('mouseleave', () => {
             this.mouse_coords = null;
@@ -1088,6 +1107,7 @@ export class Editor extends PrimaryView {
 
         this.zoom = zoom;
         this.renderer.canvas.style.setProperty('--scale', this.zoom);
+        this.svg_overlay.style.setProperty('--scale', this.zoom);
         this.actual_viewport_el.classList.toggle('--crispy', this.zoom >= 1);
         this.statusbar_zoom.textContent = `${this.zoom * 100}%`;
 
@@ -1556,6 +1576,7 @@ export class Editor extends PrimaryView {
             old_w = w;
             if (swap_dimensions) {
                 [w, h] = [h, w];
+                // FIXME this will need more interesting rearranging
                 this.selection._set_from_rect(new DOMRect(
                     this.selection.rect.x, this.selection.rect.y, w, h));
             }

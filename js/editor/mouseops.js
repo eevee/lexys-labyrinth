@@ -8,6 +8,15 @@ import { mk, mk_svg, walk_grid } from '../util.js';
 import { SVGConnection } from './helpers.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
 
+// TODO some minor grievances
+// - the track overlay doesn't explain "direction" (may not be necessary anyway), allows picking a
+// bad initial switch direction
+// - track tool should add a switch to a track on right-click, if possible (and also probably delete
+// it on ctrl-right-click?)
+// - no preview tile with force floor or track tool
+// - no ice drawing tool
+// - cursor box shows with selection tool which seems inappropriate
+// - controls do not exactly stand out and are just plain text
 const MOUSE_BUTTON_MASKS = [1, 4, 2];  // MouseEvent.button/buttons are ordered differently
 export class MouseOperation {
     constructor(editor, physical_button) {
@@ -127,6 +136,13 @@ export class MouseOperation {
     _update_modifiers(ev) {
         this.ctrl = ev.ctrlKey;
         this.shift = ev.shiftKey;
+        this.alt = ev.altKey;
+    }
+
+    clear_modifiers() {
+        this.ctrl = false;
+        this.shift = false;
+        this.alt = false;
     }
 
     do_commit() {
@@ -508,16 +524,21 @@ export class FillOperation extends MouseOperation {
 
 
 // TODO also, delete
-// TODO also, non-rectangular selections
 // TODO also, better marching ants, hard to see on gravel
 export class SelectOperation extends MouseOperation {
     handle_press() {
-        if (! this.editor.selection.is_empty && this.editor.selection.contains(this.click_cell_x, this.click_cell_y)) {
+        if (this.shift) {
+            // Extend selection
+            this.mode = 'extend';
+            this.pending_selection = this.editor.selection.create_pending();
+            this.update_pending_selection();
+        }
+        else if (! this.editor.selection.is_empty &&
+            this.editor.selection.contains(this.click_cell_x, this.click_cell_y))
+        {
             // Move existing selection
             this.mode = 'float';
-            if (this.ctrl) {
-                this.make_copy = true;
-            }
+            this.make_copy = this.ctrl;
         }
         else {
             // Create new selection
@@ -569,17 +590,31 @@ export class SelectOperation extends MouseOperation {
                 );
             }
         }
-        else {
-            // If there's an existing floating selection (which isn't what we're operating on),
-            // commit it before doing anything else
-            this.editor.selection.defloat();
-            if (! this.has_moved) {
-                // Plain click clears selection
-                this.pending_selection.discard();
-                this.editor.selection.clear();
+        else {  // create/extend
+            if (this.has_moved) {
+                // Drag either creates or extends the selection
+                // If there's an existing floating selection (which isn't what we're operating on),
+                // commit it before doing anything else
+                this.editor.selection.commit_floating();
+
+                if (this.mode === 'create') {
+                    this.editor.selection.clear();
+                }
+                this.pending_selection.commit();
             }
             else {
-                this.pending_selection.commit();
+                // Plain click clears selection.  But first, if there's a floating selection and
+                // it's moved, commit that movement as a separate undo entry
+                if (this.editor.selection.is_floating) {
+                    let float_moved = this.editor.selection.has_moved;
+                    if (float_moved) {
+                        this.editor.commit_undo();
+                    }
+                    this.editor.selection.commit_floating();
+                }
+
+                this.pending_selection.discard();
+                this.editor.selection.clear();
             }
         }
         this.editor.commit_undo();
@@ -591,6 +626,13 @@ export class SelectOperation extends MouseOperation {
         else {
             this.pending_selection.discard();
         }
+    }
+
+    do_destroy() {
+        // Don't let a floating selection persist when switching tools
+        this.editor.selection.commit_floating();
+        this.editor.commit_undo();
+        super.do_destroy();
     }
 }
 
@@ -1166,10 +1208,7 @@ export class CameraOperation extends MouseOperation {
         this.editor.viewport_el.style.cursor = cursor;
 
         // Create a text element to show the size while editing
-        this.size_text = mk_svg('text.overlay-edit-tip', {
-            // Center it within the rectangle probably (x and y are set in _update_size_text)
-            'text-anchor': 'middle', 'dominant-baseline': 'middle',
-        });
+        this.size_text = mk_svg('text.overlay-edit-tip');
         this._update_size_text();
         this.editor.svg_overlay.append(this.size_text);
     }

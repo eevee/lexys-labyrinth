@@ -2215,8 +2215,11 @@ svg.level-editor-overlay {
     /* allow clicks to go through us! */
     pointer-events: none;
 
+    /* not used to shrink us (absolute positioning does that), just to make the stroke width a
+     * consistent size at any zoom level */
+    --scale: 1;
     /* default svg properties */
-    stroke-width: 0.0625;
+    stroke-width: calc(0.0625px / var(--scale));
     fill: none;
 }
 svg.level-editor-overlay .overlay-transient {
@@ -2226,24 +2229,33 @@ svg.level-editor-overlay .overlay-transient.--visible {
     display: initial;
 }
 svg.level-editor-overlay rect.overlay-cursor {
-    x-stroke: hsla(220, 100%, 60%, 0.5);
-    fill: hsla(220, 100%, 75%, 0.25);
+    stroke: hsla(var(--main-hue), 100%, 90%, 0.75);
+    fill: hsla(var(--main-hue), 100%, 75%, 0.25);
 }
 svg.level-editor-overlay rect.overlay-pending-selection {
-    stroke: hsla(220, 100%, 60%, 0.5);
-    fill: hsla(220, 100%, 75%, 0.25);
+    stroke: hsla(var(--selected-hue), 100%, 60%, 0.5);
+    fill: hsla(var(--selected-hue), 100%, 75%, 0.25);
 }
-svg.level-editor-overlay rect.overlay-selection {
-    stroke: #000c;
-    fill: hsla(220, 0%, 75%, 0.25);
-    stroke-dasharray: 0.125, 0.125;
-    animation: marching-ants 1s linear infinite;
+svg.level-editor-overlay path.overlay-selection-background {
+    stroke: hsla(var(--selected-hue), 10%, 90%, 0.9);
+    fill: none;
+    pointer-events: none;
+}
+svg.level-editor-overlay path.overlay-selection {
+    stroke: hsla(var(--selected-hue), 10%, 10%, 0.75);
+    fill: hsla(var(--selected-hue), 50%, 75%, 0.375);
+    stroke-width: calc(0.125px / var(--scale));
+    stroke-dasharray: calc(0.125px / var(--scale)), calc(0.125px / var(--scale));
+    animation: marching-ants 0.5s linear infinite;
     pointer-events: auto;
     cursor: move;
 }
+svg.level-editor-overlay path.overlay-selection.--floating {
+    stroke: hsla(var(--selected-hue), 80%, 50%, 0.75);
+}
 @keyframes marching-ants {
     0% {
-        stroke-dashoffset: 0.25;
+        stroke-dashoffset: calc(0.25px / var(--scale));
     }
     100% {
         stroke-dashoffset: 0;
@@ -2269,8 +2281,11 @@ svg.level-editor-overlay text {
     font-size: 1px;
 }
 svg.level-editor-overlay text.overlay-edit-tip {
+    /* Used for showing e.g. the size of a pending selection.  Centered around its anchor */
     stroke: none;
-    fill: black;
+    fill: hsl(var(--selected-hue), 80%, 30%);
+    text-anchor: middle;
+    dominant-baseline: middle;
 }
 
 .editor-big-tooltip {
@@ -2293,7 +2308,7 @@ svg.level-editor-overlay text.overlay-edit-tip {
     text-transform: none;
     text-align: left;
     color: #d8d8d8;
-    background: hsl(220, 10%, 20%);
+    background: hsl(var(--main-hue), 10%, 20%);
     box-shadow: 0 1px 2px 1px #0004;
 }
 .editor-big-tooltip h3 {

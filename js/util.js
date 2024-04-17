@@ -337,6 +337,33 @@ export function* walk_grid(x0, y0, x1, y1, min_a, min_b, max_a, max_b) {
     }
 }
 
+
+// Baby's first bit vector
+export class BitVector {
+    constructor(size) {
+        this.array = new Uint32Array(Math.ceil(size / 32));
+    }
+
+    get(bit) {
+        let i = Math.floor(bit / 32);
+        let b = bit % 32;
+        return (this.array[i] & (1 << b)) !== 0;
+    }
+
+    set(bit) {
+        let i = Math.floor(bit / 32);
+        let b = bit % 32;
+        this.array[i] |= (1 << b);
+    }
+
+    clear(bit) {
+        let i = Math.floor(bit / 32);
+        let b = bit % 32;
+        this.array[i] &= ~(1 << b);
+    }
+}
+
+
 // Root class to indirect over where we might get files from
 // - a pool of uploaded in-memory files
 // - a single uploaded zip file
