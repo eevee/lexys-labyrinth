@@ -251,6 +251,7 @@ const TILE_TYPES = {
     floor: {
         layer: LAYERS.terrain,
         contains_wire: true,
+        wire_propagation_mode: 'cross',
         on_approach(me, level, other) {
             if (other.type.name === 'blob' || other.type.name === 'boulder') {
                 // Blobs spread slime onto floor
@@ -473,6 +474,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all,
         contains_wire: true,
+        wire_propagation_mode: 'cross',
     },
     canopy: {
         layer: LAYERS.canopy,
@@ -2406,6 +2408,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_block: true,
         contains_wire: true,
+        wire_propagation_mode: 'cross',
         can_reverse_on_railroad: true,
         movement_speed: 4,
         on_clone(me, original) {
@@ -2831,6 +2834,16 @@ const TILE_TYPES = {
                             removed_anything = true;
                         }
                         else {
+                            // Super duper weird special case: both CC2 and LL precompute the wiring
+                            // layout, and as a fun side effect, a destroyed blue teleporter becomes
+                            // a floor tile that can genuinely conduct in all four directions.
+                            // (The red teleporter, similarly, inhibits current.)
+                            // This doesn't require any real logic changes, but for readability,
+                            // inform the renderer.
+                            if (terrain.type.wire_propagation_mode) {
+                                level._set_tile_prop(terrain, 'wire_propagation_mode',
+                                    terrain.type.wire_propagation_mode);
+                            }
                             level.transmute_tile(terrain, 'floor');
                             removed_anything = true;
                         }

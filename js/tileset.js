@@ -1523,7 +1523,6 @@ export const LL_TILESET_LAYOUT = {
     },
     button_black: {
         __special__: 'wires',
-        __special__: 'wires',
         base: [0, 2],
         wired: {
             __special__: 'visual-state',
@@ -2253,14 +2252,15 @@ export class Tileset {
 
     _draw_wires(drawspec, name, tile, packet) {
         // This /should/ match CC2's draw order exactly, based on experimentation
-        let wire_radius = this.layout['#wire-width'] / 2;
         // TODO circuit block with a lightning bolt is always powered
         // TODO circuit block in motion doesn't inherit cell's power
         if (tile && tile.wire_directions && ! packet.hide_logic) {
             // Draw the base tile
             packet.blit(drawspec.base[0], drawspec.base[1]);
 
-            let is_crossed = (tile.wire_directions === 0x0f && drawspec.wired_cross);
+            let mode = tile.wire_propagation_mode || TILE_TYPES[name].wire_propagation_mode;
+            let is_crossed = (
+                tile.wire_directions === 0x0f && drawspec.wired_cross && mode === 'cross');
             if (is_crossed && tile.powered_edges && tile.powered_edges !== 0x0f) {
                 // For crossed wires with different power, order matters; horizontal is on top
                 // TODO note that this enforces the CC2 wire order
@@ -2275,6 +2275,14 @@ export class Tileset {
             }
             // Then draw the wired tile on top of it all
             this.draw_drawspec(is_crossed ? drawspec.wired_cross : drawspec.wired, name, tile, packet);
+
+            if (drawspec.wired_cross && mode === 'none') {
+                // Extremely weird case: this tile was /designed/ to be drawn crossed, but something
+                // has happened and it doesn't propagate current at all.  (This is usually because
+                // e.g. a red teleporter was destroyed, leaving floor in a weird mode.)
+                // Show the wires are disconnected by drawing a chunk of the base tile in the center
+                packet.blit(drawspec.base[0], drawspec.base[1], 0.375, 0.375, 0.25, 0.25);
+            }
         }
         else {
             // There's no wiring here, so just draw the base and then draw the wired part on top
