@@ -209,7 +209,7 @@ export function parse_level_metadata(bytes) {
 
 function parse_level(bytes, number) {
     let level = new format_base.StoredLevel(number);
-    level.has_custom_connections = true;
+    level.only_custom_connections = true;
     level.format = 'ccl';
     level.uses_ll_extensions = false;
     level.chips_required = 0;
@@ -353,7 +353,7 @@ function parse_level(bytes, number) {
                 let s = level.coords_to_scalar(button_x, button_y);
                 let d = level.coords_to_scalar(trap_x, trap_y);
                 if (level.linear_cells[s][LAYERS.terrain].type.name === 'button_brown') {
-                    level.custom_connections[s] = d;
+                    level.custom_connections.set(s, d);
                 }
             }
         }
@@ -372,7 +372,7 @@ function parse_level(bytes, number) {
                 let s = level.coords_to_scalar(button_x, button_y);
                 let d = level.coords_to_scalar(cloner_x, cloner_y);
                 if (level.linear_cells[s][LAYERS.terrain].type.name === 'button_red') {
-                    level.custom_connections[s] = d;
+                    level.custom_connections.set(s, d);
                 }
             }
         }
@@ -561,9 +561,10 @@ export function synthesize_level(stored_level) {
                 else if (other.type.name === 'button_brown') {
                     cxn_target = 'trap';
                 }
-                if (cxn_target && i in stored_level.custom_connections) {
-                    let dest = stored_level.custom_connections[i];
+                if (cxn_target && stored_level.custom_connections.has(i)) {
+                    let dest = stored_level.custom_connections.get(i);
                     let dest_cell = stored_level.linear_cells[dest];
+                    // FIXME these need to be sorted by destination actually
                     if (dest_cell && dest_cell[LAYERS.terrain].type.name === cxn_target) {
                         if (other.type.name === 'button_red') {
                             cloner_cxns.push(x, y, ...stored_level.scalar_to_coords(dest));
@@ -620,7 +621,7 @@ export function synthesize_level(stored_level) {
     // TODO do something with not-ascii; does TW support utf8 or latin1 or anything?
     add_block(3, util.bytestring_to_buffer(stored_level.title.substring(0, 63) + "\0"));
     // Trap and cloner connections
-    function to_words(cxns) {
+    function encode_connections(cxns) {
         let words = new ArrayBuffer(cxns.length * 2);
         let view = new DataView(words);
         for (let [i, val] of cxns.entries()) {
@@ -629,10 +630,10 @@ export function synthesize_level(stored_level) {
         return words;
     }
     if (trap_cxns.length > 0) {
-        add_block(4, to_words(trap_cxns));
+        add_block(4, encode_connections(trap_cxns));
     }
     if (cloner_cxns.length > 0) {
-        add_block(5, to_words(cloner_cxns));
+        add_block(5, encode_connections(cloner_cxns));
     }
     // Password
     // TODO support this for real lol

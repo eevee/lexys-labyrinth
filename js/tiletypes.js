@@ -1,3 +1,4 @@
+import { find_terrain_linear } from './algorithms.js';
 import { COLLISION, DIRECTIONS, DIRECTION_ORDER, LAYERS, TICS_PER_SECOND, PICKUP_PRIORITIES } from './defs.js';
 
 // TODO factor out some repeated stuff: common monster bits, common item bits, repeated collision
@@ -731,6 +732,8 @@ const TILE_TYPES = {
         speed_factor: 0.5,
     },
     grass: {
+        // TODO should bugs leave if they have no other option...?  that seems real hard.
+        // TODO teeth move at full speed?  that also seems hard.
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
         blocks(me, level, other) {
@@ -1778,7 +1781,9 @@ const TILE_TYPES = {
                 // TODO cc2 has a bug where, once it wraps around to the bottom right, it seems to
                 // forget that it was ever looking for an unwired teleport and will just grab the
                 // first one it sees
-                for (let dest of level.iter_tiles_in_reading_order_multiple(me.cell, ['teleport_blue', 'teleport_blue_exit'], true)) {
+                for (let [dest, cell] of find_terrain_linear(
+                    level, me.cell, new Set(['teleport_blue', 'teleport_blue_exit']), true))
+                {
                     if (! dest.wire_directions) {
                         yield [dest, exit_direction];
                     }
@@ -1871,13 +1876,13 @@ const TILE_TYPES = {
             // wires are directly connected to another neighboring wire.
             let iterable;
             if (me.is_active) {
-                iterable = level.iter_tiles_in_reading_order(me.cell, 'teleport_red');
+                iterable = find_terrain_linear(level, me.cell, new Set(['teleport_red']));
             }
             else {
-                iterable = [me];
+                iterable = [[me, me.cell]];
             }
             let exit_direction = other.direction;
-            for (let tile of iterable) {
+            for (let [tile, cell] of iterable) {
                 // Red teleporters allow exiting in any direction, searching clockwise, except for
                 // the teleporter you entered
                 if (tile === me) {
@@ -1926,7 +1931,7 @@ const TILE_TYPES = {
 
             // This iterator starts on the /next/ teleporter, so we appear last, and we can index
             // from zero to the second-to-last element.
-            let all = Array.from(level.iter_tiles_in_reading_order(me.cell, 'teleport_green'));
+            let all = Array.from(find_terrain_linear(level, me.cell, new Set(['teleport_green'])));
             if (all.length <= 1) {
                 // If this is the only teleporter, just walk out the other side — and, crucially, do
                 // NOT advance the PRNG
@@ -1938,6 +1943,7 @@ const TILE_TYPES = {
             let exit_direction = DIRECTION_ORDER[level.prng() % 4];
 
             let candidates;
+            all = all.map(([tile, cell]) => tile);
             if (level.compat.green_teleports_can_fail) {
                 // CC2 bug emulation: only look through "unclogged" exits
                 candidates = all.filter(tile => tile === me || ! tile.cell.get_actor());
@@ -1982,7 +1988,7 @@ const TILE_TYPES = {
         allow_player_override: true,
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;
-            for (let dest of level.iter_tiles_in_reading_order(me.cell, 'teleport_yellow', true)) {
+            for (let [dest, cell] of find_terrain_linear(level, me.cell, new Set(['teleport_yellow']), true)) {
                 yield [dest, exit_direction];
             }
         },
@@ -2113,7 +2119,7 @@ const TILE_TYPES = {
     },
     button_brown: {
         layer: LAYERS.terrain,
-        connects_to: 'trap',
+        connects_to: new Set(['trap']),
         connect_order: 'forward',
         on_ready(me, level) {
             // Inform the trap of any actors that start out holding us down
@@ -2145,7 +2151,7 @@ const TILE_TYPES = {
     },
     button_red: {
         layer: LAYERS.terrain,
-        connects_to: 'cloner',
+        connects_to: new Set(['cloner']),
         connect_order: 'forward',
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);

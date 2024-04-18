@@ -1514,7 +1514,7 @@ body.--debug .player-overlay-message {
     background: radial-gradient(#0004, hsla(330, 10%, 10%, 0.5) 40%, hsl(330, 20%, 10%));
 }
 .player-overlay-message[data-reason=success] {
-    background: radial-gradient(hsla(var(--main-hue), 60%, 5%, 0.75), 60%, hsla(var(--main-hue), 60%, 25%, 0.75));
+    background: radial-gradient(hsla(30, 80%, 10%, 0.75), 60%, hsla(40, 100%, 30%, 0.75));
 }
 .player-overlay-message[data-reason=ended] {
     /* Rearrange this entirely, to fit the ending image in */
@@ -2219,7 +2219,7 @@ svg.level-editor-overlay {
      * consistent size at any zoom level */
     --scale: 1;
     /* default svg properties */
-    stroke-width: calc(0.0625px / var(--scale));
+    stroke-width: calc(0.125px / var(--scale));
     fill: none;
 }
 svg.level-editor-overlay .overlay-transient {
@@ -2228,7 +2228,7 @@ svg.level-editor-overlay .overlay-transient {
 svg.level-editor-overlay .overlay-transient.--visible {
     display: initial;
 }
-svg.level-editor-overlay rect.overlay-cursor {
+svg.level-editor-overlay rect.overlay-pencil-cursor {
     stroke: hsla(var(--main-hue), 100%, 90%, 0.75);
     fill: hsla(var(--main-hue), 100%, 75%, 0.25);
 }
@@ -2264,10 +2264,23 @@ svg.level-editor-overlay path.overlay-selection.--floating {
 }
 #overlay-arrowhead {
     fill: white;
+    fill: context-stroke;
 }
 svg.level-editor-overlay g.overlay-connection {
-    stroke: white;
+    stroke: #e4e4e4;
     filter: url(#overlay-filter-outline);
+}
+svg.level-editor-overlay g.overlay-connection[data-source=button_red] {
+    stroke: hsl(0, 90%, 60%);
+}
+svg.level-editor-overlay g.overlay-connection[data-source=button_brown] {
+    stroke: hsl(20, 60%, 60%);
+}
+svg.level-editor-overlay g.overlay-connection[data-source=button_orange] {
+    stroke: hsl(30, 90%, 60%);
+}
+svg.level-editor-overlay g.overlay-connection.--implicit line.-arrow {
+    stroke-dasharray: calc(0.25px / var(--scale)), calc(0.25px / var(--scale));
 }
 svg.level-editor-overlay g.overlay-connection line.-arrow {
     marker-end: url(#overlay-arrowhead);

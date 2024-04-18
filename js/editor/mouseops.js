@@ -17,6 +17,7 @@ import { TILES_WITH_PROPS } from './tile-overlays.js';
 // - no ice drawing tool
 // - cursor box shows with selection tool which seems inappropriate
 // - controls do not exactly stand out and are just plain text
+// - set trap as initially open?  feels like a weird hack.  but it does appear in cc2lp1
 const MOUSE_BUTTON_MASKS = [1, 4, 2];  // MouseEvent.button/buttons are ordered differently
 export class MouseOperation {
     constructor(editor, physical_button) {
@@ -57,7 +58,7 @@ export class MouseOperation {
     // appropriate, and its position will be updated to match the position of the cursor
     set_cursor_element(el) {
         this.cursor_element = el;
-        el.setAttribute('data-mouseop', this.constructor.name);
+        el.setAttribute('data-name', this.constructor.name);
         if (! this.is_hover_visible) {
             el.style.display = 'none';
         }
@@ -834,14 +835,40 @@ export class TrackOperation extends MouseOperation {
 }
 
 export class ConnectOperation extends MouseOperation {
+    constructor(...args) {
+        super(...args);
+
+        // This is the SVGConnection structure but with only the source circle
+        this.connectable_circle = mk_svg('circle.-source', {r: 0.5});
+        this.connectable_cursor = mk_svg('g.overlay-connection', this.connectable_circle);
+        this.connectable_cursor.style.display = 'none';
+        // TODO how do i distinguish from existing ones
+        this.connectable_cursor.style.stroke = 'lime';
+        this.editor.svg_overlay.append(this.connectable_cursor);
+    }
+
+    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        let cell = this.cell(cell_x, cell_y);
+        let terrain = cell[LAYERS.terrain];
+        if (terrain.type.connects_to) {
+            this.connectable_cursor.style.display = '';
+            this.connectable_circle.setAttribute('cx', cell_x + 0.5);
+            this.connectable_circle.setAttribute('cy', cell_y + 0.5);
+        }
+        else {
+            this.connectable_cursor.style.display = 'none';
+        }
+    }
+
     handle_press(x, y) {
         // TODO restrict to button/cloner unless holding shift
         // TODO what do i do when you erase a button/cloner?  can i detect if you're picking it up?
         let src = this.editor.stored_level.coords_to_scalar(x, y);
+        let cell = this.cell(x, y);
+        let terrain = cell[LAYERS.terrain];
         if (this.alt_mode) {
             // Auto connect using Lynx rules
-            let cell = this.cell(x, y);
-            let terrain = cell[LAYERS.terrain];
+            // TODO just use the editor's existing implicits for this?
             let other = null;
             let swap = false;
             if (terrain.type.name === 'button_red') {
@@ -870,8 +897,17 @@ export class ConnectOperation extends MouseOperation {
             }
             return;
         }
+
+        // Otherwise, this is the start of a drag
+        if (! terrain.type.connects_to)
+            return;
+
         this.pending_cxn = new SVGConnection(x, y, x, y);
+        this.pending_source = src;
+        this.pending_type = terrain.type.name;
         this.editor.svg_overlay.append(this.pending_cxn.element);
+        // Hide the normal cursor for the duration
+        this.connectable_cursor.style.display = 'none';
     }
     // FIXME this is hella the sort of thing that should be on Editor, or in algorithms
     search_for(i0, name, dir) {
@@ -896,13 +932,45 @@ export class ConnectOperation extends MouseOperation {
         }
     }
     handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        if (! this.pending_cxn)
+            return;
+
+        this.pending_cxn.set_dest(cell_x, cell_y);
+
+        let cell = this.cell(cell_x, cell_y);
+        if (TILE_TYPES[this.pending_type].connects_to.has(cell[LAYERS.terrain].type.name)) {
+            this.pending_target = this.editor.stored_level.coords_to_scalar(cell_x, cell_y);
+            this.pending_cxn.element.style.opacity = 0.5;
+        }
+        else {
+            this.pending_target = null;
+            this.pending_cxn.element.style.opacity = '';
+        }
     }
     commit_press() {
+        // TODO
+        if (! this.pending_cxn)
+            return;
+
+        if (this.pending_target !== null) {
+            this.editor.set_custom_connection(this.pending_source, this.pending_target);
+        }
+
+        this.pending_cxn.element.remove();
+        this.pending_cxn = null;
     }
     abort_press() {
-        this.pending_cxn.element.remove();
+        if (this.pending_cxn) {
+            this.pending_cxn.element.remove();
+            this.pending_cxn = null;
+        }
     }
     cleanup_press() {
+    }
+
+    do_destroy() {
+        this.connectable_cursor.remove();
+        super.do_destroy();
     }
 }
 export class WireOperation extends MouseOperation {

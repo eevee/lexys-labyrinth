@@ -1,5 +1,6 @@
 import * as fflate from '../vendor/fflate.js';
 
+import * as algorithms from '../algorithms.js';
 import { DIRECTIONS, LAYERS } from '../defs.js';
 import * as format_base from '../format-base.js';
 import * as c2g from '../format-c2g.js';
@@ -81,7 +82,7 @@ export class Editor extends PrimaryView {
         this.renderer.show_facing = true;
 
         // FIXME need this in load_level which is called even if we haven't been setup yet
-        this.connections_g = mk_svg('g');
+        this.connections_g = mk_svg('g', {'data-name': 'connections'});
         // This SVG draws vectors on top of the editor, like monster paths and button connections
         this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'},
             mk_svg('defs',
@@ -89,9 +90,13 @@ export class Editor extends PrimaryView {
                     mk_svg('polygon', {points: '0 0, 4 2, 0 4'}),
                 ),
                 mk_svg('filter', {id: 'overlay-filter-outline'},
-                    mk_svg('feMorphology', {'in': 'SourceAlpha', result: 'dilated', operator: 'dilate', radius: 0.03125}),
-                    mk_svg('feFlood', {'flood-color': '#0009', result: 'fill'}),
-                    mk_svg('feComposite', {'in': 'fill', in2: 'dilated', operator: 'in'}),
+                    this._filter_morphology_element = mk_svg('feMorphology', {'in': 'SourceAlpha', result: 'dilated', operator: 'dilate', radius: 0.03125}),
+                    this._filter_morphology_element2 = mk_svg('feMorphology', {'in': 'SourceAlpha', result: 'dilated2', operator: 'dilate', radius: 0.0625}),
+                    mk_svg('feFlood', {'flood-color': '#000'}),
+                    mk_svg('feComposite', {in2: 'dilated', operator: 'in', result: 'fill'}),
+                    mk_svg('feFlood', {'flood-color': '#fffc'}),
+                    mk_svg('feComposite', {in2: 'dilated2', operator: 'in', result: 'fill2'}),
+                    mk_svg('feComposite', {'in': 'fill', in2: 'fill2'}),
                     mk_svg('feComposite', {'in': 'SourceGraphic'}),
                 ),
             ),
@@ -1043,22 +1048,25 @@ export class Editor extends PrimaryView {
 
         // Load connections
         // TODO what if the source tile is not connectable?
-        // TODO there's a has_custom_connections flag, is that important here or is it just because
-        // i can't test an object as a bool
         this.connections_g.textContent = '';
-        this.connections_elements = {};
-        for (let [src, dest] of Object.entries(this.stored_level.custom_connections)) {
+        this.connections_arrows = {};
+        for (let [src, dest] of this.stored_level.custom_connections) {
             let [sx, sy] = this.stored_level.scalar_to_coords(src);
             let [dx, dy] = this.stored_level.scalar_to_coords(dest);
-            let el = new SVGConnection(sx, sy, dx, dy).element;
-            this.connections_elements[src] = el;
-            this.connections_g.append(el);
+            let arrow = new SVGConnection(sx, sy, dx, dy);
+            this.connections_arrows[src] = arrow;
+            arrow.element.setAttribute(
+                'data-source', this.stored_level.linear_cells[src][LAYERS.terrain].type.name);
+            this.connections_g.append(arrow.element);
         }
         // TODO why are these in connections_g lol
         for (let [i, region] of this.stored_level.camera_regions.entries()) {
             let el = mk_svg('rect.overlay-camera', {x: region.x, y: region.y, width: region.width, height: region.height});
             this.connections_g.append(el);
         }
+
+        // Load *implicit* connections
+        this.recreate_implicit_connections();
 
         this.renderer.set_level(stored_level);
         if (this.active) {
@@ -1112,6 +1120,9 @@ export class Editor extends PrimaryView {
         this.svg_overlay.style.setProperty('--scale', this.zoom);
         this.actual_viewport_el.classList.toggle('--crispy', this.zoom >= 1);
         this.statusbar_zoom.textContent = `${this.zoom * 100}%`;
+        // The arrow outline isn't CSS, so we have to fix it manually
+        this._filter_morphology_element.setAttribute('radius', 0.03125 / this.zoom);
+        this._filter_morphology_element2.setAttribute('radius', 0.0625 / this.zoom);
 
         let index = ZOOM_LEVELS.findIndex(el => el >= this.zoom);
         if (index < 0) {
@@ -1737,33 +1748,94 @@ export class Editor extends PrimaryView {
         );
     }
 
+    // ------------------------------------------------------------------------------------------------
+    // Connections (buttons to things they control)
+
     // Create a connection between two cells and update the UI accordingly.  If dest is null or
     // undefined, delete any existing connection instead.
     set_custom_connection(src, dest) {
-        let prev = this.stored_level.custom_connections[src];
+        let prev = this.stored_level.custom_connections.get(src);
         this._do(
             () => this._set_custom_connection(src, dest),
             () => this._set_custom_connection(src, prev),
         );
     }
     _set_custom_connection(src, dest) {
-        if (this.connections_elements[src]) {
-            this.connections_elements[src].remove();
-        }
-
         if ((dest ?? null) === null) {
-            delete this.stored_level.custom_connections[src];
-            delete this.connections_elements[src];
+            if (this.connections_arrows[src]) {
+                this.connections_arrows[src].element.remove();
+            }
+            this.stored_level.custom_connections.delete(src)
+            delete this.connections_arrows[src];
         }
         else {
-            this.stored_level.custom_connections[src] = dest;
-            let el = new SVGConnection(
-                ...this.stored_level.scalar_to_coords(src),
-                ...this.stored_level.scalar_to_coords(dest),
-            ).element;
-            this.connections_elements[src] = el;
-            this.connections_g.append(el);
+            this.stored_level.custom_connections.set(src, dest);
+
+            if (this.connections_arrows[src]) {
+                this.connections_arrows[src].set_dest(
+                    ...this.stored_level.scalar_to_coords(dest));
+            }
+            else {
+                let arrow = new SVGConnection(
+                    ...this.stored_level.scalar_to_coords(src),
+                    ...this.stored_level.scalar_to_coords(dest));
+                this.connections_arrows[src] = arrow;
+                this.connections_g.append(arrow.element);
+            }
+            this.connections_arrows[src].element.setAttribute(
+                'data-source', this.stored_level.linear_cells[src][LAYERS.terrain].type.name);
         }
+    }
+
+    // TODO also use this to indicate traps or flame jets that are initially toggled (trickier with
+    // flame jets since that can make them look like they're the wrong tile...)
+    recreate_implicit_connections() {
+        this.implicit_connections = new Map;
+
+        for (let el of this.connections_g.querySelectorAll(':scope > .--implicit')) {
+            el.remove();
+        }
+
+        for (let [n, cell] of this.stored_level.linear_cells.entries()) {
+            if (this.stored_level.custom_connections.has(n))
+                continue;
+
+            let terrain = cell[LAYERS.terrain];
+            if (! terrain.type.connects_to)
+                continue;
+
+            let find_func;
+            if (terrain.type.connect_order === 'forward') {
+                find_func = algorithms.find_terrain_linear;
+            }
+            else if (terrain.type.connect_order === 'diamond') {
+                find_func = algorithms.find_terrain_diamond;
+            }
+
+            let target_cell = null;
+            for (let [found_tile, found_cell] of find_func(this.stored_level, cell, terrain.type.connects_to)) {
+                target_cell = found_cell;
+                break;
+            }
+            if (target_cell === null)
+                continue;
+
+            let svg = new SVGConnection(
+                ...this.stored_level.scalar_to_coords(n),
+                target_cell.x, target_cell.y);
+            this.implicit_connections.set(n, {
+                index: this.stored_level.coords_to_scalar(target_cell.x, target_cell.y),
+                svg_connection: svg,
+            });
+            svg.element.classList.add('--implicit');
+            svg.element.setAttribute('data-source', terrain.type.name);
+            this.connections_g.append(svg.element);
+        }
+    }
+
+    update_implicit_connection(cell, tile, previous_type) {
+        // TODO actually this should also update explicit ones, if the source/dest types are changed
+        // in such a way as to make the connection invalid
     }
 
     // ------------------------------------------------------------------------------------------------

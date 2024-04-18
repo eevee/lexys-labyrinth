@@ -476,53 +476,39 @@ export class Level extends LevelInterface {
         let cell = connectable.cell;
         let x = cell.x;
         let y = cell.y;
-        // FIXME this is a single string for red/brown buttons (to match iter_tiles_in_RO) but a
-        // set for orange buttons (because flame jet states are separate tiles), which sucks ass
         let goals = connectable.type.connects_to;
 
         // Check for custom wiring, for MSCC .DAT levels
         // TODO would be neat if this applied to orange buttons too
         // TODO RAINBOW TELEPORTER, ARBITRARY TILE TARGET HAHA
-        if (this.stored_level.has_custom_connections) {
+        if (this.stored_level.custom_connections.size > 0) {
             let n = this.stored_level.coords_to_scalar(x, y);
-            let target_cell_n = null;
-            if (connectable.type.name === 'button_brown' || connectable.type.name === 'button_red') {
-                target_cell_n = this.stored_level.custom_connections[n] ?? null;
-            }
-            if (target_cell_n && target_cell_n < this.width * this.height) {
+            let target_cell_n = this.stored_level.custom_connections.get(n) ?? null;
+            if (target_cell_n !== null && target_cell_n < this.width * this.height) {
                 let [tx, ty] = this.stored_level.scalar_to_coords(target_cell_n);
                 for (let tile of this.cell(tx, ty)) {
-                    if (tile && goals === tile.type.name) {
+                    if (tile && goals.has(tile.type.name)) {
                         connectable.connection = tile;
                         break;
                     }
                 }
             }
-            return;
+
+            if (this.stored_level.only_custom_connections)
+                return;
         }
 
         // Orange buttons do a really weird diamond search
         if (connectable.type.connect_order === 'diamond') {
-            for (let cell of algorithms.iter_cells_in_diamond(
-                this, connectable.cell.x, connectable.cell.y))
-            {
-                let target = null;
-                for (let tile of cell) {
-                    if (tile && goals.has(tile.type.name)) {
-                        target = tile;
-                        break;
-                    }
-                }
-                if (target !== null) {
-                    connectable.connection = target;
-                    break;
-                }
+            for (let [tile, _cell] of algorithms.find_terrain_diamond(this, cell, goals)) {
+                connectable.connection = tile;
+                break;
             }
             return;
         }
 
         // Otherwise, look in reading order
-        for (let tile of this.iter_tiles_in_reading_order(cell, goals)) {
+        for (let [tile, _cell] of algorithms.find_terrain_linear(this, cell, goals)) {
             // TODO ideally this should be a weak connection somehow, since dynamite can destroy
             // empty cloners and probably traps too
             connectable.connection = tile;
@@ -2365,67 +2351,6 @@ export class Level extends LevelInterface {
     }
 
     // Level inspection -------------------------------------------------------------------------------
-
-    get_neighboring_cell(cell, direction) {
-        let move = DIRECTIONS[direction].movement;
-        return this.cell(cell.x + move[0], cell.y + move[1]);
-    }
-
-    // Iterates over the grid in (reverse?) reading order and yields all tiles with the given name.
-    // The starting cell is iterated last.
-    *iter_tiles_in_reading_order(start_cell, name, reverse = false) {
-        let i = this.coords_to_scalar(start_cell.x, start_cell.y);
-        let index = TILE_TYPES[name].layer;
-        while (true) {
-            if (reverse) {
-                i -= 1;
-                if (i < 0) {
-                    i += this.size_x * this.size_y;
-                }
-            }
-            else {
-                i += 1;
-                i %= this.size_x * this.size_y;
-            }
-
-            let cell = this.linear_cells[i];
-            let tile = cell[index];
-            if (tile && tile.type.name === name) {
-                yield tile;
-            }
-
-            if (cell === start_cell)
-                return;
-        }
-    }
-
-    // Same as above, but accepts multiple tiles
-    *iter_tiles_in_reading_order_multiple(start_cell, names, reverse = false) {
-        let i = this.coords_to_scalar(start_cell.x, start_cell.y);
-        let index = TILE_TYPES[names[0]].layer;
-        while (true) {
-            if (reverse) {
-                i -= 1;
-                if (i < 0) {
-                    i += this.size_x * this.size_y;
-                }
-            }
-            else {
-                i += 1;
-                i %= this.size_x * this.size_y;
-            }
-
-            let cell = this.linear_cells[i];
-            let tile = cell[index];
-            // FIXME probably uh do a lookup here
-            if (tile && names.indexOf(tile.type.name) >= 0) {
-                yield tile;
-            }
-
-            if (cell === start_cell)
-                return;
-        }
-    }
 
     // FIXME require_stub should really just care whether we ourselves /can/ contain wire, and also
     // we should check that on our neighbor

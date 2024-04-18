@@ -4,12 +4,15 @@ import { BitVector, mk, mk_svg } from '../util.js';
 
 export class SVGConnection {
     constructor(sx, sy, dx, dy) {
-        this.source = mk_svg('circle.-source', {r: 0.5});
+        this.source = mk_svg('circle.-source', {r: 0.5, cx: sx + 0.5, cy: sy + 0.5});
         this.line = mk_svg('line.-arrow', {});
-        this.dest = mk_svg('rect.-dest', {width: 1, height: 1});
+        this.dest = mk_svg('rect.-dest', {x: dx, y: dy, width: 1, height: 1});
         this.element = mk_svg('g.overlay-connection', this.source, this.line, this.dest);
-        this.set_source(sx, sy);
-        this.set_dest(dx, dy);
+        this.sx = sx;
+        this.sy = sy;
+        this.dx = dx;
+        this.dy = dy;
+        this._update_line_endpoints();
     }
 
     set_source(sx, sy) {
@@ -17,17 +20,35 @@ export class SVGConnection {
         this.sy = sy;
         this.source.setAttribute('cx', sx + 0.5);
         this.source.setAttribute('cy', sy + 0.5);
-        this.line.setAttribute('x1', sx + 0.5);
-        this.line.setAttribute('y1', sy + 0.5);
+        this._update_line_endpoints();
     }
 
     set_dest(dx, dy) {
         this.dx = dx;
         this.dy = dy;
-        this.line.setAttribute('x2', dx + 0.5);
-        this.line.setAttribute('y2', dy + 0.5);
         this.dest.setAttribute('x', dx);
         this.dest.setAttribute('y', dy);
+        this._update_line_endpoints();
+    }
+
+    _update_line_endpoints() {
+        // Start the line at the edge of the circle, so, add 0.5 in the direction of the line
+        let vx = this.dx - this.sx;
+        let vy = this.dy - this.sy;
+        let line_length = Math.sqrt(vx*vx + vy*vy);
+        let trim_x = 0;
+        let trim_y = 0;
+        if (line_length >= 1) {
+            trim_x = 0.5 * vx / line_length;
+            trim_y = 0.5 * vy / line_length;
+        }
+        this.line.setAttribute('x1', this.sx + 0.5 + trim_x);
+        this.line.setAttribute('y1', this.sy + 0.5 + trim_y);
+        // Technically this isn't quite right, since the ending is a square and the arrowhead will
+        // poke into it a bit from angles near 45°, but that requires a bit more trig than seems
+        // worth it
+        this.line.setAttribute('x2', this.dx + 0.5 - trim_x);
+        this.line.setAttribute('y2', this.dy + 0.5 - trim_y);
     }
 }
 

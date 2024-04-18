@@ -1,4 +1,65 @@
-import { DIRECTIONS } from './defs.js';
+import { DIRECTIONS, LAYERS } from './defs.js';
+
+// Iterates over every terrain tile in the grid that has one of the given types (a Set of type
+// names), in linear order, optionally in reverse.  The starting cell is checked last.
+// Yields [tile, cell].
+export function* find_terrain_linear(levelish, start_cell, type_names, reverse = false) {
+    let i = levelish.coords_to_scalar(start_cell.x, start_cell.y);
+    while (true) {
+        if (reverse) {
+            i -= 1;
+            if (i < 0) {
+                i += levelish.size_x * levelish.size_y;
+            }
+        }
+        else {
+            i += 1;
+            i %= levelish.size_x * levelish.size_y;
+        }
+
+        let cell = levelish.linear_cells[i];
+        let tile = cell[LAYERS.terrain];
+        if (tile && type_names.has(tile.type.name)) {
+            yield [tile, cell];
+        }
+
+        if (cell === start_cell)
+            return;
+    }
+}
+
+// Iterates over every terrain tile in the grid that has one of the given types (a Set of type
+// names), spreading outward in a diamond pattern.  The starting cell is not included.
+// Only used by orange buttons.
+// Yields [tile, cell].
+export function* find_terrain_diamond(levelish, start_cell, type_names) {
+    let max_search_radius = (
+        Math.max(start_cell.x, levelish.size_x - start_cell.x) +
+        Math.max(start_cell.y, levelish.size_y - start_cell.y));
+    for (let dist = 1; dist <= max_search_radius; dist++) {
+        // Start east and move counterclockwise
+        let sx = start_cell.x + dist;
+        let sy = start_cell.y;
+        for (let direction of [[-1, -1], [-1, 1], [1, 1], [1, -1]]) {
+            for (let i = 0; i < dist; i++) {
+                let cell = levelish.cell(sx, sy);
+                sx += direction[0];
+                sy += direction[1];
+
+                if (! cell)
+                    continue;
+                let terrain = cell[LAYERS.terrain];
+                if (type_names.has(terrain.type.name)) {
+                    yield [terrain, cell];
+                }
+            }
+        }
+    }
+}
+
+// TODO make this guy work generically for orange, red, brown buttons?  others...?
+export function find_implicit_connection() {
+}
 
 export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_dead_end) {
     let is_first = true;
@@ -117,31 +178,6 @@ export function find_matching_wire_tunnel(level, x, y, direction) {
         }
         if ((neighbor.wire_tunnel_directions ?? 0) & dirinfo.bit) {
             nesting += 1;
-        }
-    }
-}
-
-// TODO make this guy work generically for orange, red, brown buttons?  others...?
-export function find_implicit_connection() {
-}
-
-// Iterates over a grid in a diamond pattern, spreading out from the given start cell (but not
-// including it).  Only used for connecting orange buttons.
-export function* iter_cells_in_diamond(levelish, x0, y0) {
-    let max_search_radius = Math.max(levelish.size_x, levelish.size_y) + 1;
-    for (let dist = 1; dist <= max_search_radius; dist++) {
-        // Start east and move counterclockwise
-        let sx = x0 + dist;
-        let sy = y0;
-        for (let direction of [[-1, -1], [-1, 1], [1, 1], [1, -1]]) {
-            for (let i = 0; i < dist; i++) {
-                let cell = levelish.cell(sx, sy);
-                if (cell) {
-                    yield cell;
-                }
-                sx += direction[0];
-                sy += direction[1];
-            }
         }
     }
 }

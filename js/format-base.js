@@ -1,4 +1,4 @@
-import { LAYERS } from './defs.js';
+import { DIRECTIONS, LAYERS } from './defs.js';
 import * as util from './util.js';
 
 export class StoredCell extends Array {
@@ -89,6 +89,11 @@ export class LevelInterface {
             return null;
         }
     }
+
+    get_neighboring_cell(cell, direction) {
+        let move = DIRECTIONS[direction].movement;
+        return this.cell(cell.x + move[0], cell.y + move[1]);
+    }
 }
 
 export class StoredLevel extends LevelInterface {
@@ -128,8 +133,10 @@ export class StoredLevel extends LevelInterface {
         this.linear_cells = [];
 
         // Maps of button positions to trap/cloner positions, as scalars
-        this.has_custom_connections = false;
-        this.custom_connections = {};
+        // Not supported by Steam CC2, but supported by Tile World even in Lynx mode
+        this.custom_connections = new Map;
+        // If true, Lynx-style implicit connections don't work at all
+        this.only_custom_connections = false;
 
         // New LL feature: custom camera regions, as lists of {x, y, width, height}
         this.camera_regions = [];
