@@ -1551,13 +1551,13 @@ export class Level extends LevelInterface {
         let thin_walls = cell[LAYERS.thin_wall];
         let blocker;
 
-        if (thin_walls && thin_walls.type.blocks_leaving && thin_walls.type.blocks_leaving(thin_walls, actor, direction)) {
+        if (thin_walls && thin_walls.type.blocks_leaving && thin_walls.type.blocks_leaving(thin_walls, this, actor, direction)) {
             blocker = thin_walls;
         }
         else if (terrain.type.traps && terrain.type.traps(terrain, this, actor)) {
             blocker = terrain;
         }
-        else if (terrain.type.blocks_leaving && terrain.type.blocks_leaving(terrain, actor, direction)) {
+        else if (terrain.type.blocks_leaving && terrain.type.blocks_leaving(terrain, this, actor, direction)) {
             blocker = terrain;
         }
 
