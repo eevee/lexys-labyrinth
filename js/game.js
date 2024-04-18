@@ -1217,26 +1217,30 @@ export class Level extends LevelInterface {
 
     _do_post_actor_phase() {
         if (this.pending_green_toggle) {
-            // Swap green floors and walls
-            // TODO could probably make this more compact for undo purposes
-            for (let cell of this.linear_cells) {
-                let terrain = cell.get_terrain();
-                if (terrain.type.name === 'green_floor') {
-                    this.transmute_tile(terrain, 'green_wall');
-                }
-                else if (terrain.type.name === 'green_wall') {
-                    this.transmute_tile(terrain, 'green_floor');
-                }
-
-                let item = cell.get_item();
-                if (item && item.type.name === 'green_chip') {
-                    this.transmute_tile(item, 'green_bomb');
-                }
-                else if (item && item.type.name === 'green_bomb') {
-                    this.transmute_tile(item, 'green_chip');
-                }
-            }
+            // Swap green objects
+            this.__toggle_green_tiles();
+            this._push_pending_undo(() => {
+                this.__toggle_green_tiles();
+            });
             this.pending_green_toggle = false;
+        }
+    }
+
+    __toggle_green_tiles() {
+        // This is NOT undo-safe; it's undone by calling it again!
+        // Assumes:
+        // 1. Green tile types come in pairs, which toggle into one another
+        // 2. A pair of green tile types appear on the same layer
+        for (let cell of this.linear_cells) {
+            let terrain = cell.get_terrain();
+            if (terrain.type.green_toggle_counterpart) {
+                terrain.type = TILE_TYPES[terrain.type.green_toggle_counterpart];
+            }
+
+            let item = cell.get_item();
+            if (item && item.type.green_toggle_counterpart) {
+                item.type = TILE_TYPES[item.type.green_toggle_counterpart];
+            }
         }
     }
 

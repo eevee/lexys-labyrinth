@@ -1317,6 +1317,7 @@ const TILE_TYPES = {
     },
     green_floor: {
         layer: LAYERS.terrain,
+        green_toggle_counterpart: 'green_wall',
         blocks(me, level, other) {
             // Toggle walls don't toggle until the end of the frame, but the collision takes into
             // account whether a toggle is coming
@@ -1333,6 +1334,7 @@ const TILE_TYPES = {
     },
     green_wall: {
         layer: LAYERS.terrain,
+        green_toggle_counterpart: 'green_floor',
         blocks(me, level, other) {
             // Same as above
             return (
@@ -1350,6 +1352,7 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         is_chip: true,
         is_required_chip: true,
+        green_toggle_counterpart: 'green_bomb',
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         on_pickup(me, level, other) {
@@ -1361,6 +1364,7 @@ const TILE_TYPES = {
     green_bomb: {
         layer: LAYERS.item,
         is_required_chip: true,
+        green_toggle_counterpart: 'green_chip',
         on_arrive(me, level, other) {
             // Unlike regular bombs, these only seem to respond to being stepped on, not stood on
             level.remove_tile(me);
