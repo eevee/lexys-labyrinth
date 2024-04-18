@@ -286,7 +286,6 @@ export const PALETTE = [{
         'skeleton_key',
         'ankh',
         'score_5x',
-        'raft',
     ],
 }];
 
@@ -993,11 +992,11 @@ export const TILE_DESCRIPTIONS = {
         name: "×5 bonus",
         desc: "Quintuples the player's current bonus points.  Can be collected by doppelgangers, rovers, and bowling balls, but will not grant bonus points.",
     },
+    // TODO on the chopping block
     raft: {
         name: "Raft",
         desc: "A vehicle for crossing water safely.  Follows its passenger until they reach land.  Can be pushed around (like a single-push block) while swimming.",
     },
-    // TODO aspirational
     iceberg: {
         name: "Iceberg",
         desc: "Behaves like ice when stepped on.  Can be pushed around (like a multi-push block) while swimming.",
