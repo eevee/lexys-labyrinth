@@ -47,6 +47,7 @@ export class MouseOperation {
         this.click_frac_cell_y = null;
 
         this.cursor_element = null;
+        this.preview_element = null;
 
         // Assume we're hidden until proven otherwise
         // TODO obviously suboptimal when switching tools with the mouse over the canvas...  maybe
@@ -58,6 +59,17 @@ export class MouseOperation {
     // appropriate, and its position will be updated to match the position of the cursor
     set_cursor_element(el) {
         this.cursor_element = el;
+        el.setAttribute('data-name', this.constructor.name);
+        if (! this.is_hover_visible) {
+            el.style.display = 'none';
+        }
+        this.editor.svg_overlay.append(el);
+    }
+
+    // Register an SVG element as the preview.  Similar to the cursor element, but it's assumed to
+    // be positioned relative to the whole level, and won't be moved around
+    set_preview_element(el) {
+        this.preview_element = el;
         el.setAttribute('data-name', this.constructor.name);
         if (! this.is_hover_visible) {
             el.style.display = 'none';
@@ -148,6 +160,9 @@ export class MouseOperation {
             if (this.cursor_element) {
                 this.cursor_element.style.display = '';
             }
+            if (this.preview_element) {
+                this.preview_element.style.display = '';
+            }
         }
     }
 
@@ -156,6 +171,9 @@ export class MouseOperation {
             this.is_hover_visible = false;
             if (this.cursor_element) {
                 this.cursor_element.style.display = 'none';
+            }
+            if (this.preview_element) {
+                this.preview_element.style.display = 'none';
             }
         }
     }
@@ -192,10 +210,12 @@ export class MouseOperation {
 
     do_destroy() {
         this.do_abort();
-        this.cleanup_hover();
 
         if (this.cursor_element) {
             this.cursor_element.remove();
+        }
+        if (this.preview_element) {
+            this.preview_element.remove();
         }
     }
 
@@ -231,8 +251,6 @@ export class MouseOperation {
     handle_tile_updated(is_bg = false) {}
     // Called when the mouse leaves the level or viewport while the button is NOT held down
     handle_leave() {}
-    // Called when the hover ends??
-    cleanup_hover() {}
 }
 
 export class PanOperation extends MouseOperation {
@@ -310,7 +328,7 @@ export class PencilOperation extends MouseOperation {
         super(...args);
 
         // Our cursor has two parts, so it's really a group
-        this.preview_element = mk_svg('image', {
+        this.tile_element = mk_svg('image', {
             id: 'svg-editor-preview-tile',
             x: 0,
             y: 0,
@@ -319,7 +337,7 @@ export class PencilOperation extends MouseOperation {
             opacity: 0.5,
         });
         this.set_cursor_element(mk_svg('g',
-            this.preview_element,
+            this.tile_element,
             mk_svg('rect.overlay-pencil-cursor', {x: 0, y: 0, width: 1, height: 1}),
         ));
         this.handle_tile_updated();
@@ -329,7 +347,7 @@ export class PencilOperation extends MouseOperation {
     handle_tile_updated(is_bg = false) {
         if (is_bg)
             return;
-        this.preview_element.setAttribute('href', this.editor.fg_tile_el.toDataURL());
+        this.tile_element.setAttribute('href', this.editor.fg_tile_el.toDataURL());
     }
 
     handle_press(x, y) {
@@ -396,12 +414,12 @@ export class FillOperation extends MouseOperation {
             width: renderer.canvas.width,
             height: renderer.canvas.height,
         });
-        this.foreign_object = mk_svg('foreignObject', {
+        this.set_preview_element(mk_svg('foreignObject', {
             x: 0, y: 0,
             width: this.canvas.width, height: this.canvas.height,
             transform: `scale(${1/renderer.tileset.size_x} ${1/renderer.tileset.size_y})`,
-        }, this.canvas);
-        this.editor.preview_g.append(this.foreign_object);
+            opacity: 0.5,
+        }, this.canvas));
 
         // array of (true: in flood, false: definitely not), or null if not yet populated
         this.fill_state = null;
@@ -523,10 +541,6 @@ export class FillOperation extends MouseOperation {
                 this._floodfill_from(...this.last_known_coords);
             }
         }
-    }
-
-    cleanup_hover() {
-        this.foreign_object.remove();
     }
 
     handle_press() {
