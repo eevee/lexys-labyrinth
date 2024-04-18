@@ -44,6 +44,24 @@ export class MouseOperation {
         this.click_cell_y = null;
         this.click_frac_cell_x = null;
         this.click_frac_cell_y = null;
+
+        this.cursor_element = null;
+
+        // Assume we're hidden until proven otherwise
+        // TODO obviously suboptimal when switching tools with the mouse over the canvas...  maybe
+        // editor should send us a fake mousemove in that case, idk
+        this.hide();
+    }
+
+    // Register an SVG element as the cursor.  This will be automatically shown and hidden when
+    // appropriate, and its position will be updated to match the position of the cursor
+    set_cursor_element(el) {
+        this.cursor_element = el;
+        el.setAttribute('data-mouseop', this.constructor.name);
+        if (! this.is_hover_visible) {
+            el.style.display = 'none';
+        }
+        this.editor.svg_overlay.append(el);
     }
 
     cell(x, y) {
@@ -78,6 +96,10 @@ export class MouseOperation {
 
         if (this.is_held && (ev.buttons & MOUSE_BUTTON_MASKS[this.physical_button]) === 0) {
             this.do_abort();
+        }
+
+        if (this.cursor_element) {
+            this.cursor_element.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
         }
 
         if (this.is_held) {
@@ -119,19 +141,21 @@ export class MouseOperation {
         this.hide();
     }
 
-    // XXX uhhh seems weird to control a shared resource like this????
-    // XXX also it's visible initially until you move the mouse over the canvas lol
     show() {
         if (! this.is_hover_visible) {
             this.is_hover_visible = true;
-            this.editor.preview_g.style.display = '';
+            if (this.cursor_element) {
+                this.cursor_element.style.display = '';
+            }
         }
     }
 
     hide() {
         if (this.is_hover_visible) {
             this.is_hover_visible = false;
-            this.editor.preview_g.style.display = 'none';
+            if (this.cursor_element) {
+                this.cursor_element.style.display = 'none';
+            }
         }
     }
 
@@ -168,6 +192,10 @@ export class MouseOperation {
     do_destroy() {
         this.do_abort();
         this.cleanup_hover();
+
+        if (this.cursor_element) {
+            this.cursor_element.remove();
+        }
     }
 
     *iter_touched_cells(frac_cell_x, frac_cell_y) {
@@ -217,7 +245,8 @@ export class PanOperation extends MouseOperation {
 }
 
 // FIXME handle moving the mouse while the button is down; should continuously eyedrop
-// (seems like that /should/ work...)
+// FIXME also the pencil cursor doesn't move when right-dragging, because it's not active and
+// doesn't receive events any more whoops?  but wait, panning DOES hide the cursor, so what the hell
 export class EyedropOperation extends MouseOperation {
     constructor(...args) {
         super(...args);
@@ -279,14 +308,19 @@ export class PencilOperation extends MouseOperation {
     constructor(...args) {
         super(...args);
 
-        this.image = mk_svg('image', {
+        // Our cursor has two parts, so it's really a group
+        this.preview_element = mk_svg('image', {
             id: 'svg-editor-preview-tile',
             x: 0,
             y: 0,
             width: 1,
             height: 1,
+            opacity: 0.5,
         });
-        this.editor.preview_g.append(this.image);
+        this.set_cursor_element(mk_svg('g',
+            this.preview_element,
+            mk_svg('rect.overlay-pencil-cursor', {x: 0, y: 0, width: 1, height: 1}),
+        ));
         this.handle_tile_updated();
     }
 
@@ -294,14 +328,7 @@ export class PencilOperation extends MouseOperation {
     handle_tile_updated(is_bg = false) {
         if (is_bg)
             return;
-        this.image.setAttribute('href', this.editor.fg_tile_el.toDataURL());
-    }
-    handle_hover(_mx, _my, _cxf, _cyf, cell_x, cell_y) {
-        this.image.setAttribute('x', cell_x);
-        this.image.setAttribute('y', cell_y);
-    }
-    cleanup_hover() {
-        this.image.remove();
+        this.preview_element.setAttribute('href', this.editor.fg_tile_el.toDataURL());
     }
 
     handle_press(x, y) {
@@ -311,9 +338,6 @@ export class PencilOperation extends MouseOperation {
         for (let [x, y] of this.iter_touched_cells(frac_cell_x, frac_cell_y)) {
             this.draw_in_cell(x, y);
         }
-
-        // Also update the preview tile position
-        this.handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y);
     }
 
     draw_in_cell(x, y) {
@@ -525,10 +549,9 @@ export class FillOperation extends MouseOperation {
 }
 
 
-// TODO also, delete
-// FIXME i broke transforms
+// TODO also, delete?  there's no delete??
 // FIXME don't show the overlay text until has_moved
-// FIXME hide the god damn cursor
+// TODO cursor: 'cell' by default...?
 export class SelectOperation extends MouseOperation {
     handle_press() {
         if (this.shift) {
@@ -1095,6 +1118,33 @@ const ADJUST_TOGGLES_CCW = {};
         }
     }
 }
+// Tiles with special behavior when clicked
+const ADJUST_SPECIAL = {
+    button_green(editor) {
+        // Toggle green objects
+        editor._do(
+            () => ADJUST_SPECIAL._button_green(editor),
+            () => ADJUST_SPECIAL._button_green(editor),
+        );
+        // TODO play button sound?
+    },
+    _button_green(editor) {
+        for (let cell of editor.stored_level.linear_cells) {
+            for (let tile of cell) {
+                if (tile && tile.type.green_toggle_counterpart) {
+                    tile.type = TILE_TYPES[tile.type.green_toggle_counterpart];
+                    editor.mark_cell_dirty(cell);
+                }
+            }
+        }
+    },
+
+};
+// TODO maybe better visual feedback of what will happen when you click?
+// - rotate terrain (cw, ccw)
+// - change terrain
+// - rotate actor (cw, ccw)
+// - press button
 export class AdjustOperation extends MouseOperation {
     handle_press() {
         let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
@@ -1130,10 +1180,18 @@ export class AdjustOperation extends MouseOperation {
             }
 
             // Toggle tiles that go in obvious pairs
-            let other = (this.alt_mode ? ADJUST_TOGGLES_CCW : ADJUST_TOGGLES_CW)[tile.type.name];
-            if (other) {
-                tile.type = TILE_TYPES[other];
+            let toggled = (this.alt_mode ? ADJUST_TOGGLES_CCW : ADJUST_TOGGLES_CW)[tile.type.name];
+            if (toggled) {
+                tile.type = TILE_TYPES[toggled];
                 this.editor.place_in_cell(cell, tile);
+                this.editor.commit_undo();
+                break;
+            }
+
+            // Other special tile behavior
+            let special = ADJUST_SPECIAL[tile.type.name];
+            if (special) {
+                special(this.editor);
                 this.editor.commit_undo();
                 break;
             }

@@ -62,7 +62,7 @@ export const TOOLS = {
     adjust: {
         icon: 'icons/tool-adjust.png',
         name: "Adjust",
-        desc: "Edit existing tiles.\n\n[mouse1] Rotate actor / toggle terrain\n[mouse2] Rotate/toggle in the other direction\n[shift] Affect terrain\n\n[ctrl] [mouse1] Edit properties of complex tiles\n(wires, railroads, hints, etc.)",
+        desc: "Inspect and edit existing tiles in a variety of ways.  Give it a try!\n\n[mouse1] Rotate actor\n[mouse1] Rotate or change terrain\n[mouse1] Press button\n[mouse2] Rotate/toggle in the other direction\n[shift] Always target terrain\n\n[ctrl] [mouse1] Edit properties of complex tiles\n(wires, railroads, hints, etc.)",
         op1: mouseops.AdjustOperation,
         op2: mouseops.AdjustOperation,
         shortcut: 'a',

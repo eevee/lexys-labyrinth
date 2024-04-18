@@ -107,11 +107,6 @@ export class Editor extends PrimaryView {
     }
 
     setup() {
-        // Add more bits to SVG overlay
-        this.preview_g = mk_svg('g', {opacity: 0.5});
-        this.svg_cursor = mk_svg('rect.overlay-transient.overlay-cursor', {x: 0, y: 0, width: 1, height: 1});
-        this.svg_overlay.append(this.preview_g, this.svg_cursor);
-
         // Populate status bar (needs doing before the mouse stuff, which tries to update it)
         let statusbar = this.root.querySelector('#editor-statusbar');
         this.statusbar_zoom = mk('output');
@@ -253,20 +248,9 @@ export class Editor extends PrimaryView {
             // TODO only do this stuff if the cell coords changed
             let cell = this.cell(x, y);
             if (cell) {
-                this.svg_cursor.classList.add('--visible');
-                this.svg_cursor.setAttribute('x', x);
-                this.svg_cursor.setAttribute('y', y);
-
                 this.statusbar_cursor.textContent = `(${x}, ${y})`;
-
-                // TODO don't /always/ do this.  maybe make it optionally always visible, and have
-                // an inspection tool that does it on point
-                let terrain = cell[LAYERS.terrain];
-                if (terrain.type.name === 'button_gray') {
-                }
             }
             else {
-                this.svg_cursor.classList.remove('--visible');
                 this.statusbar_cursor.textContent = `—`;
             }
 
