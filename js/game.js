@@ -68,7 +68,6 @@ export class Tile {
 
         // Blocks being pulled are blocked by their pullers (which are, presumably, the only things
         // they can be moving towards)
-        // FIXME something about this broke pulling blocks through teleporters; see #99 Delirium
         if (this.type.is_actor && other.type.is_block && other.is_pulled)
             return true;
 
@@ -1726,11 +1725,16 @@ export class Level extends LevelInterface {
             // blocked by anything.
         }
         else if (tile.type.is_real_player) {
-            if (actor.type.is_monster) {
+            if (actor.is_pulled) {
+                // We can't be killed by something we're pulling.  Even if that thing is a monster,
+                // which is not something we can pull!  See CC2LP1 #110 Hoopla
+                return false;
+            }
+            else if (actor.type.is_monster) {
                 this.kill_actor(tile, actor);
                 return true;
             }
-            else if (actor.type.is_block && ! actor.is_pulled) {
+            else if (actor.type.is_block) {
                 this.kill_actor(tile, actor, null, null, 'squished');
                 return true;
             }
@@ -1780,10 +1784,14 @@ export class Level extends LevelInterface {
                     if (behind_actor.movement_cooldown) {
                         return false;
                     }
-                    else if (behind_actor.type.is_block && push_mode === 'push') {
+                    else if (push_mode === 'push') {
+                        // Only blocks can actually be moved via pulling, but monsters can still
+                        // count as pulled, which stops them from killing us
                         this._set_tile_prop(behind_actor, 'is_pulled', true);
-                        this._set_tile_prop(behind_actor, 'pending_push', direction);
-                        behind_actor.decision = direction;
+                        if (behind_actor.type.is_block) {
+                            this._set_tile_prop(behind_actor, 'pending_push', direction);
+                            behind_actor.decision = direction;
+                        }
                     }
                 }
             }
