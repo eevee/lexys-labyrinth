@@ -378,7 +378,7 @@ export class FileSource {
     async get(path) {}
 
     // Get a list of all files under here, recursively
-    async *iter_all_files() {}
+    // async *iter_all_files() {}
 }
 // Files we have had uploaded one at a time (note that each upload becomes its own source)
 export class FileFileSource extends FileSource {
@@ -541,5 +541,9 @@ export class ZipFileSource extends FileSource {
             throw new LLError(`No such file in zip: ${path}`);
 
         return file.buffer;
+    }
+
+    iter_all_files() {
+        return Object.keys(this.files);
     }
 }
