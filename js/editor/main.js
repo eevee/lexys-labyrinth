@@ -488,9 +488,7 @@ export class Editor extends PrimaryView {
 
         let export_items = [
             ["Share this level with a link", () => {
-                // FIXME enable this once gliderbot can understand it
-                //let data = util.b64encode(fflate.zlibSync(new Uint8Array(c2g.synthesize_level(this.stored_level))));
-                let data = util.b64encode(c2g.synthesize_level(this.stored_level));
+                let data = util.b64encode(fflate.zlibSync(c2g.synthesize_level(this.stored_level)));
                 let url = new URL(location);
                 url.searchParams.delete('level');
                 url.searchParams.delete('setpath');
