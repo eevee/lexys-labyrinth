@@ -17,16 +17,16 @@ body {
     background-size: 12em;
     color: #ececec;
 
-    --main-hue: 350;
-    --hover-hue: 5;
-    --selected-hue: 10;
-    --panel-bg-color: hsl(var(--main-hue), 10%, 10%);
-    --button-bg-color: hsl(var(--main-hue), 40%, 20%);
+    --main-hue: 345;
+    --hover-hue: 8;
+    --selected-hue: 320;
+    --panel-bg-color: hsl(var(--main-hue), 20%, 10%);
+    --button-bg-color: hsl(var(--main-hue), 50%, 20%);
     --button-bg-gradient: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
     --button-bg-shadow-color: #fff1;
-    --button-bg-hover-color: hsl(var(--hover-hue), 50%, 35%);
+    --button-bg-hover-color: hsl(var(--hover-hue), 60%, 35%);
     --generic-bg-hover-on-white: hsl(var(--hover-hue), 60%, 90%);
-    --generic-bg-selected-on-white: hsl(var(--selected-hue), 75%, 90%);
+    --generic-bg-selected-on-white: hsl(var(--selected-hue), 50%, 85%);
     --generic-border-selected-on-white: hsl(var(--selected-hue), 60%, 75%);
 }
 
@@ -55,12 +55,12 @@ button,
     color: white;
     background-color: var(--button-bg-color);
     background-image: var(--button-bg-gradient);
-    border: 1px solid hsl(var(--main-hue), 10%, 7.5%);
+    border: 1px solid hsl(var(--main-hue), 10%, 2.5%);
     box-shadow:
-        inset 0 0 1px 1px #fff2,
+        inset 0 0 3px 1px #ffffff18,
         0 1px 1px hsl(var(--main-hue), 10%, 7.5%);
     border-radius: 0.25em;
-    text-shadow: 0 1px 0 #0004;
+    text-shadow: 0 1px 0 #0006;
     text-transform: lowercase;
     cursor: pointer;
 }
@@ -75,10 +75,10 @@ button:active,
     z-index: 1;
 }
 button:enabled.button-bright {
-    background-color: hsl(var(--main-hue), 60%, 30%);
+    background-color: hsl(var(--main-hue), 60%, 35%);
 }
 button:enabled.button-bright:hover {
-    background-color: hsl(var(--hover-hue), 65%, 40%);
+    background-color: hsl(var(--hover-hue), 65%, 50%);
 }
 button:disabled {
     color: #606060;
@@ -844,9 +844,9 @@ pre.stack-trace {
     height: auto;
 }
 #splash h2 {
-    border-bottom: 1px solid #404040;
-    color: #909090;
-    text-shadow: 0 1px #0004;
+    border-bottom: 1px solid hsl(var(--main-hue), 10%, 30%);
+    color: hsl(var(--main-hue), 40%, 75%);
+    text-shadow: 0 1px #000c;
 }
 #splash * + h2 {
     margin-top: 1rem;
@@ -983,7 +983,7 @@ pre.stack-trace {
     position: relative;
     z-index: 1;
     padding: 0.25em;
-    border: 1px solid hsl(var(--main-hue), 25%, 40%);
+    border: 1px solid hsl(var(--main-hue), 40%, 40%);
     text-shadow: 0 1px 1px black;
     text-align: center;
 }
@@ -998,11 +998,11 @@ pre.stack-trace {
 }
 .played-pack-list .-progress > .-levels::before {
     width: calc(var(--cleared) * 100%);
-    background: hsl(var(--main-hue), 25%, 30%);
+    background: hsl(var(--main-hue), 50%, 25%);
 }
 .played-pack-list .-progress > .-levels::after {
     width: calc(var(--aidless) * 100%);
-    background: hsl(var(--main-hue), 25%, 40%);
+    background: hsl(var(--main-hue), 40%, 40%);
 }
 .played-pack-list .-progress > .-score {
     grid-area: score;
@@ -2219,7 +2219,8 @@ svg.level-editor-overlay {
      * consistent size at any zoom level */
     --scale: 1;
     /* default svg properties */
-    stroke-width: calc(0.125px / var(--scale));
+    --stroke-width: calc(0.125 / var(--scale));
+    stroke-width: calc(1px * var(--stroke-width));
     fill: none;
 }
 svg.level-editor-overlay .overlay-transient {
@@ -2229,8 +2230,12 @@ svg.level-editor-overlay .overlay-transient.--visible {
     display: initial;
 }
 svg.level-editor-overlay rect.overlay-pencil-cursor {
-    stroke: hsla(var(--main-hue), 100%, 90%, 0.75);
+    stroke: hsla(var(--main-hue), 80%, 40%, 0.9);
     fill: hsla(var(--main-hue), 100%, 75%, 0.25);
+    /* Automatically scale the cursor up just enough that the outline appears outside the cell,
+     * rather than straddling it */
+    transform: scale(calc(100% * (1 + var(--stroke-width))));
+    transform-origin: 0.5px 0.5px;
 }
 svg.level-editor-overlay rect.overlay-pending-selection {
     stroke: hsla(var(--selected-hue), 100%, 60%, 0.5);
@@ -2411,8 +2416,11 @@ svg.level-editor-overlay text.overlay-edit-tip {
     border-radius: 2px;
     box-shadow: none;
 }
+.icon-button-set button:hover {
+    background: hsl(var(--hover-hue), 40%, 30%);
+}
 .icon-button-set button.-selected {
-    background: hsl(var(--selected-hue), 90%, 70%);
+    background: hsl(var(--selected-hue), 50%, 75%);
 }
 .icon-button-set button img {
     display: block;

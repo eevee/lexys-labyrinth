@@ -2803,9 +2803,9 @@ class Splash extends PrimaryView {
         else {
             progress.querySelector('.-time').textContent = util.format_duration(packinfo.total_abstime / TICS_PER_SECOND, 2);
             let levels = (
-                `cleared ${packinfo.cleared_levels} of ${packinfo.total_levels} `
-                + `level${packinfo.total_levels === 1 ? "" : "s"}, `
-                + `${packinfo.aidless_levels}★ without aid`);
+                `${packinfo.cleared_levels} of ${packinfo.total_levels} `
+                + `level${packinfo.total_levels === 1 ? "" : "s"} cleared · `
+                + `${packinfo.aidless_levels}★ unaided`);
             level_el.textContent = levels;
             level_el.style.setProperty('--cleared', packinfo.cleared_levels / packinfo.total_levels);
             level_el.style.setProperty('--aidless', packinfo.aidless_levels / packinfo.total_levels);
