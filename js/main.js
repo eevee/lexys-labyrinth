@@ -2473,7 +2473,7 @@ class Player extends PrimaryView {
 }
 
 
-const BUILTIN_LEVEL_PACKS = [{
+const BUILTIN_PACKS = [{
     path: 'levels/lexys-lessons.zip',
     preview: 'levels/previews/lexys-lessons.png',
     ident: "Lexy's Lessons",
@@ -2521,103 +2521,11 @@ const BUILTIN_LEVEL_PACKS = [{
     title: "Chip's Challenge Level Pack 5",
     desc: "The latest and greatest.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_5',
-/*
- * TODO: this is tricky.  it's a massive hodgepodge of levels mostly made by individual people...
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'jblp1',
-    title: "JBLP1",
-    author: 'jb',
-    desc: "\"Meant to be simple and straightforward in the spirit of the original game, though the difficulty peak is ultimately a bit higher.\"",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Pit of 100 Tiles",
-    author: 'ajmiam',
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "The Other 100 Tiles",
-    author: 'ajmiam',
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "JoshL5",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "JoshL6",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "JoshL7",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Neverstopgaming",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Ultimate Chip 4",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Ultimate Chip 5",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Ultimate Chip 6",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Walls of CCLP 1",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Walls of CCLP 3",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Walls of CCLP 4",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "TS0",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "TS1",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "TS2",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "Chip56",
-    desc: "A tough challenge, by and for veteran players.",
-}, {
-    path: 'levels/CCLP3.ccl',
-    ident: 'cclp3',
-    title: "kidsfair",
-    desc: "A tough challenge, by and for veteran players.",
-    */
 }];
+const BUILTIN_PACKS_BY_IDENT = {};
+for (let packdef of BUILTIN_PACKS) {
+    BUILTIN_PACKS_BY_IDENT[packdef.ident] = packdef;
+}
 
 class Splash extends PrimaryView {
     constructor(conductor) {
@@ -2627,7 +2535,7 @@ class Splash extends PrimaryView {
         let stock_pack_list = document.querySelector('#splash-stock-pack-list');
         this.played_pack_elements = {};
         let stock_pack_idents = new Set;
-        for (let packdef of BUILTIN_LEVEL_PACKS) {
+        for (let packdef of BUILTIN_PACKS) {
             stock_pack_idents.add(packdef.ident);
             stock_pack_list.append(this._create_pack_element(packdef.ident, packdef));
             this.update_pack_score(packdef.ident);
@@ -2803,7 +2711,7 @@ class Splash extends PrimaryView {
         let button = mk('button.button-big.button-bright', {type: 'button'}, title);
         if (packdef) {
             button.addEventListener('click', ev => {
-                this.conductor.fetch_pack(packdef.path, packdef.title);
+                this.conductor.fetch_pack(packdef.path, packdef.title, packdef.ident);
             });
         }
         else {
@@ -2906,12 +2814,7 @@ class Splash extends PrimaryView {
 
     // Look for something we can load, and load it
     async search_multi_source(source) {
-        // TODO not entiiirely kosher, but not sure if we should have an api for this or what
-        if (source._loaded_promise) {
-            await source._loaded_promise;
-        }
-
-        let paths = Object.keys(source.files);
+        let paths = await Array.fromAsync(source.iter_all_files());
         // TODO should handle having multiple candidates, but this is good enough for now
         paths.sort((a, b) => a.length - b.length);
         for (let path of paths) {
@@ -2945,7 +2848,41 @@ const BUILTIN_TILESETS = {
     },
 };
 
-// Report an error when a level fails to load
+const BLOCKED_GLIDERBOT_SETS = new Set([
+    'cc1/CC1.dat',
+    'cc1/CC1AtariST.dat',
+    'cc1/CC164PAL.dat',
+    'cc1/CC164PALorder.dat',
+    'cc1/CC1DOS.dat',
+    'cc1/CC1LYNX.dat',
+    'cc1/CC1NES.dat',
+    'cc1/CHIPS.dat',
+    'cc1/CHIPS9.dat',
+    'cc1/CHIPS_Catacombs.dat',
+    'cc1/CHIPS_Corrupted_Spirals.dat',
+    'cc2/CC1STEAM',
+    'cc2/cc2',
+    'cc2/steamcc1',
+    // Also block the indexes themselves
+    'cc1',
+    'cc2',
+]);
+
+
+// TODO i don't know how to cancel xmlhttprequests but it would be nice to put this in somewheres
+class LoadingOverlay extends DialogOverlay {
+    constructor(conductor, on_cancel) {
+        super(conductor);
+
+        this.main.append(mk('p', "Hang on, loading some stuff..."));
+        this.add_button("cancel", () => {
+            on_cancel();
+            this.close();
+        });
+    }
+}
+
+// Report an error when a level or pack fails to load
 class LevelErrorOverlay extends DialogOverlay {
     constructor(conductor, error) {
         super(conductor);
@@ -2959,7 +2896,7 @@ class LevelErrorOverlay extends DialogOverlay {
                 "This is just a prerecorded message, so it's hard for me to tell!  ",
                 "But if it's my fault and you're feeling up to it, you can let me know by ",
                 mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/issues'}, "filing an issue on GitHub"),
-                " or finding me on Discord or Twitter or whatever.",
+                " or finding me on Discord or whatever.",
             ),
             mk('p', "In the more immediate future, you can see if any other levels work by jumping around manually with the 'level select' button.  Unless this was the first level of a set, in which case you're completely out of luck."),
         );
@@ -2968,6 +2905,28 @@ class LevelErrorOverlay extends DialogOverlay {
         }, true);
     }
 }
+
+class PackErrorOverlay extends DialogOverlay {
+    constructor(conductor, error) {
+        super(conductor);
+        this.set_title("bummer");
+        this.main.append(
+            mk('p', "Argh...  Ourrgh...  I can't load this level pack at all!!  All the computer told me was this:"),
+            mk('pre.error', error.toString()),
+            mk('p',
+                "Sorry!  I'm just a prerecorded message, so I can't really do much about it.  ",
+                "But if this sounds like my fault, you can let me know by ",
+                mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/issues'}, "filing an issue on GitHub"),
+                " or finding me on Discord or whatever.",
+            ),
+            mk('p', "In the more immediate future, you can see if any other levels work by jumping around manually with the 'level select' button.  Unless this was the first level of a set, in which case you're completely out of luck."),
+        );
+        this.add_button("welp, you get what you pay for", ev => {
+            this.close();
+        }, true);
+    }
+}
+
 
 // Options dialog
 const TILESET_SLOTS = [{
@@ -3904,7 +3863,8 @@ const STORAGE_PACK_PREFIX = "Lexy's Labyrinth: ";
 // - list of the levels they own and basic metadata like name
 // Stored individual levels: given dummy names, all indexed on their own
 class Conductor {
-    constructor() {
+    constructor(running_locally) {
+        this.running_locally = running_locally;
         this.stored_game = null;
 
         this.stash = JSON.parse(window.localStorage.getItem(STORAGE_KEY));
@@ -4093,6 +4053,20 @@ class Conductor {
         this.update_nav_buttons();
         document.querySelector('#loading').setAttribute('hidden', '');
         this.switch_to_splash();
+
+        // Handle fragment parameters
+        // Local-only, load-time-only param: 'debug', to auto start in debug mode
+        let params = new URLSearchParams(location.hash.substr(1));
+        if (this.running_locally && params.has('debug')) {
+            this.player._start_in_debug_mode = true;
+        }
+        // Parse the rest of them
+        this.navigate(params);
+
+        window.addEventListener('hashchange', ev => {
+            let new_url = new URL(ev.newURL);
+            this.navigate(new URLSearchParams(new_url.hash.substr(1)));
+        });
     }
 
     switch_to_splash() {
@@ -4332,16 +4306,16 @@ class Conductor {
         }
     }
 
-    async fetch_pack(path, title) {
+    async fetch_pack(path, title, identifier) {
         // TODO indicate we're downloading something
         // TODO handle errors
         // TODO cancel a download if we start another one?
         let buf = await util.fetch(path);
-        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, undefined, title);
+        await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, identifier, title);
     }
 
     async parse_and_load_game(buf, source, path, identifier, title) {
-        if (identifier === undefined) {
+        if (! identifier) {
             identifier = this.extract_identifier_from_path(path);
         }
 
@@ -4412,39 +4386,113 @@ class Conductor {
             this.switch_to_player();
         }
     }
-}
 
+    async navigate(params) {
+        // Fragment, the newfangled form of arguments, conveniently documented here
+        // level: one-off shared level, encoded as an entire c2m, optionally zlib'd, then base64
+        //   (overrides pack/n)
+        // pack: one of:
+        // - identifier of a built-in pack
+        // - 'gb:path' to download a pack from https://bitbusters.club/gliderbot/sets/{path}
+        //   (the .dat suffix on a cc1 is optional)
+        //   (also CC1 and CC2 are specifically blocked, sorry folks)
+        // - a full URL to another pack
+        // - a relative path to a local pack
+        //   (local only)
+        // n: number of the level to jump to
+        // compat: name of a compat level to force for the session
+
+        // Pick a level (set)
+        // TODO error handling  :(
+        if (params.has('level')) {
+            let buf = util.b64decode(params.get('level'));
+            let u8array = new Uint8Array(buf);
+            if (u8array[0] === 0x78) {
+                // zlib compressed
+                buf = fflate.unzlibSync(u8array).buffer;
+            }
+            await this.parse_and_load_game(buf, null, 'shared.c2m', null, "Shared level");
+        }
+        else if (params.has('pack')) {
+            let path = params.get('pack');
+
+            // Built-in pack
+            if (BUILTIN_PACKS_BY_IDENT[path]) {
+                let packdef = BUILTIN_PACKS_BY_IDENT[path];
+                await this.fetch_pack(packdef.path, packdef.title, packdef.ident);
+            }
+            // GliderBot-hosted path
+            else if (path.startsWith('gb:')) {
+                path = path.substring(3);
+
+                // Canonicalize: delete any . or .. segments, trim off a trailing slash (for
+                // canonicalization reasons; we add it back in a moment)
+                if (path.endsWith('/')) {
+                    path = path.substring(0, path.length - 1);
+                }
+                path = path.replaceAll(/(^|[/])(?:[.](?:[/]|$))+/g, '$1');
+                // This doesn't correctly handle ../../, but they shouldn't be in here anyway so I
+                // don't really care
+                path = path.replaceAll(/(?:^|[^/]*[/])(?:[.][.]([/]|$))+/g, '');
+
+                // Add .dat to a cc1 path if missing
+                if (path.startsWith('cc1/') && ! path.endsWith('.dat')) {
+                    path += '.dat';
+                }
+
+                // Block hosted versions of the official levels
+                if (BLOCKED_GLIDERBOT_SETS.has(path)) {
+                    return;
+                }
+
+                // OK, try to load it
+                if (path.startsWith('cc2/')) {
+                    path += '/';
+                }
+                let url = new URL(path, 'https://bitbusters.club/gliderbot/sets/');
+                if (path.startsWith('cc2/')) {
+                    // This is a directory, which will require some scanning
+                    await this.splash.search_multi_source(new util.HTTPNginxDirectorySource(url));
+                }
+                else {
+                    // Should be a single file, so just grab it
+                    let ident = path.match(/[/]([^/]+)[.]dat$/)[1];
+                    await this.fetch_pack(url, ident, ident);
+                }
+            }
+            // TODO full url to a pack to try to download
+            // Local path
+            else if (this.running_locally && ! path.startsWith('.')) {
+                await this.fetch_pack(path);
+            }
+
+            if (params.has('n')) {
+                let n = parseInt(params.get('n'), 10);
+                if (n) {
+                    this.maybe_change_level(n - 1);
+                }
+            }
+        }
+    }
+}
 
 async function main() {
     let local = !! location.host.match(/localhost/);
-    let query = new URLSearchParams(location.search);
 
-    let conductor = new Conductor();
+    // Convert query to fragment
+    let query = new URLSearchParams(location.search);
+    if (query.size > 0) {
+        let new_url = new URL(location);
+        new_url.search = '';
+        query.sort();
+        new_url.hash = '#' + query.toString();
+        location.replace(new_url);
+        return;
+    }
+
+    let conductor = new Conductor(local);
     await conductor.load();
     window._conductor = conductor;
-
-    // Allow putting us in debug mode automatically if we're in development
-    if (local && query.has('debug')) {
-        conductor.player._start_in_debug_mode = true;
-    }
-
-    // Pick a level (set)
-    // TODO error handling  :(
-    let path = query.get('setpath');
-    let b64level = query.get('level');
-    if (path && path.match(/^levels[/]/)) {
-        conductor.fetch_pack(path);
-    }
-    else if (b64level) {
-        // TODO all the more important to show errors!!
-        let buf = util.b64decode(b64level);
-        let u8array = new Uint8Array(buf);
-        if (u8array[0] === 0x78) {
-            // zlib compressed
-            buf = fflate.unzlibSync(u8array).buffer;
-        }
-        await conductor.parse_and_load_game(buf, null, 'shared.c2m', null, "Shared level");
-    }
 }
 
 (async () => {

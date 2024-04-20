@@ -167,11 +167,11 @@ export function promise_event(element, success_event, failure_event) {
 }
 
 
-export async function fetch(url) {
+export async function fetch(url, response_type = 'arraybuffer') {
     let xhr = new XMLHttpRequest;
     let promise = promise_event(xhr, 'load', 'error');
     xhr.open('GET', url);
-    xhr.responseType = 'arraybuffer';
+    xhr.responseType = response_type;
     xhr.send();
     await promise;
     if (xhr.status !== 200)
@@ -376,6 +376,9 @@ export class FileSource {
 
     // Get a file's contents as an ArrayBuffer
     async get(path) {}
+
+    // Get a list of all files under here, recursively
+    async *iter_all_files() {}
 }
 // Files we have had uploaded one at a time (note that each upload becomes its own source)
 export class FileFileSource extends FileSource {
@@ -408,6 +411,58 @@ export class HTTPFileSource extends FileSource {
     get(path) {
         let url = new URL(path, this.root);
         return fetch(url);
+    }
+}
+// Regular HTTP fetch, but for a directory structure from nginx's index module
+export class HTTPNginxDirectorySource extends FileSource {
+    // Should be given a URL object as a root
+    constructor(root) {
+        super();
+        this.root = root;
+        if (! this.root.pathname.endsWith('/')) {
+            this.root.pathname += '/';
+        }
+    }
+
+    get(path) {
+        // TODO should strip off multiple of these
+        // TODO and canonicalize, and disallow going upwards
+        if (path.startsWith('/')) {
+            path = path.substring(1);
+        }
+        let url = new URL(path, this.root);
+        return fetch(url);
+    }
+
+    async *iter_all_files() {
+        let fetch_count = 0;
+        let paths = [''];
+        while (paths.length > 0) {
+            let next_paths = [];
+            for (let path of paths) {
+                if (fetch_count >= 50) {
+                    throw new Error("Too many subdirectories to fetch one at a time; is this really a single CC2 set?");
+                }
+                let response = await fetch(new URL(path, this.root), 'text');
+                fetch_count += 1;
+                let doc = document.implementation.createHTMLDocument();
+                doc.write(response);
+                doc.close();
+                for (let link of doc.querySelectorAll('a')) {
+                    let subpath = link.getAttribute('href');
+                    if (subpath === '../') {
+                        continue;
+                    }
+                    else if (subpath.endsWith('/')) {
+                        next_paths.push(path + subpath);
+                    }
+                    else {
+                        yield path + subpath;
+                    }
+                }
+            }
+            paths = next_paths;
+        }
     }
 }
 // WebKit Entry interface
@@ -459,6 +514,11 @@ export class EntryFileSource extends FileSource {
 
         let file = await new Promise((res, rej) => entry.file(res, rej));
         return await file.arrayBuffer();
+    }
+
+    async iter_all_files() {
+        await this._loaded_promise;
+        return Object.keys(this.files);
     }
 }
 // Zip files, using fflate
