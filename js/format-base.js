@@ -159,6 +159,7 @@ export class StoredLevel extends LevelInterface {
 
 export class StoredPack {
     constructor(identifier, level_loader) {
+        // This isn't very strongly defined, but it's used to distinguish scores for packs and URLs
         this.identifier = identifier;
         this.title = "";
         this._level_loader = level_loader;

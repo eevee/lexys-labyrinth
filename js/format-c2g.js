@@ -1775,7 +1775,7 @@ const TOKENIZE_RX = RegExp(
         // 2: Comments are preceded by ; or // for some reason and run to the end of the line
         '|(?:;|//)(.*)' +
         // 3: Strings are double-quoted (only!) and contain no escapes
-        '|"([^"]*?)"' +
+        '|"([^"]*?)(?:"|$)' +
         // 4: Labels are indicated by a #, including when used with 'goto'
         // (the exact set of allowed characters is unclear and i'm fudging it here)
         '|#(\\w+)' +
@@ -1790,7 +1790,7 @@ const TOKENIZE_RX = RegExp(
         '|([a-zA-Z]\\S*)' +
         // 8: Anything else is an error
         '|(\\S+)' +
-    ')', 'g');
+    ')', 'gm');
 const DIRECTIVES = {
     // Important stuff
     'chdir': ['string'],
@@ -1894,6 +1894,7 @@ class ParseError extends Error {
         super(`${message} at line ${parser.lineno}`);
     }
 }
+ParseError.prototype.name = 'ParseError';
 
 class Parser {
     constructor(string) {
@@ -2191,8 +2192,9 @@ const MAX_SIMULTANEOUS_REQUESTS = 5;
         if (stmt.kind === 'directive' && stmt.name === 'map') {
             let path = stmt.args[0].value;
             path = path.replace(/\\/, '/');
+            // FIXME can we get away with not downloading all of them eagerly?
             fetch_map(path, level_number);
-            level_number++;
+            level_number += 1;
         }
         else if (stmt.kind === 'directive' && stmt.name === 'game') {
             // TODO apparently cc2 lets you change this mid-game and will then use a different save
