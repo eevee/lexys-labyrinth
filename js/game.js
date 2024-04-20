@@ -1158,7 +1158,9 @@ export class Level extends LevelInterface {
                 else if (terrain.type.name === 'popdown_floor') {
                     this.sfx.play_once('step-popdown');
                 }
-                else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad') {
+                else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad' ||
+                    terrain.type.name === 'sand' || terrain.type.name === 'grass')
+                {
                     this.sfx.play_once('step-gravel');
                 }
                 else if (terrain.type.name === 'water') {
@@ -1907,7 +1909,7 @@ export class Level extends LevelInterface {
         let terrain = goal_cell.get_terrain();
         let ignore = actor.ignores(terrain.type.name) || actor.slide_ignores(terrain.type.name);
         if (terrain.type.speed_factor && ! ignore) {
-            speed /= terrain.type.speed_factor;
+            speed *= terrain.type.speed_factor;
         }
         // Speed boots speed us up, UNLESS we're entering a terrain with a speed factor and an
         // unignored slide mode -- so e.g. we gain 2x on teleports, ice + ice skates, force floors +

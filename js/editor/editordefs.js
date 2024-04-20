@@ -924,7 +924,7 @@ export const TILE_DESCRIPTIONS = {
     },
     sand: {
         name: "Sand",
-        desc: "Anything walking on it moves at half speed.  Stops all blocks.",
+        desc: "Anything walking on it moves 50% slower.  Stops all blocks.",
     },
     grass: {
         name: "Grass",

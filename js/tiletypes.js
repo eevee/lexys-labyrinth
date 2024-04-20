@@ -56,7 +56,7 @@ function _define_force_floor(direction, opposite_type) {
     return {
         layer: LAYERS.terrain,
         slide_mode: 'force',
-        speed_factor: 2,
+        speed_factor: 0.5,
         allow_player_override: true,
         // Used by Lynx to prevent backwards overriding
         force_floor_direction: direction,
@@ -729,7 +729,7 @@ const TILE_TYPES = {
     sand: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.block_cc2,
-        speed_factor: 0.5,
+        speed_factor: 1.5,
     },
     grass: {
         // TODO should bugs leave if they have no other option...?  that seems real hard.
@@ -759,7 +759,7 @@ const TILE_TYPES = {
     },
     dash_floor: {
         layer: LAYERS.terrain,
-        speed_factor: 2,
+        speed_factor: 0.5,
     },
     spikes: {
         layer: LAYERS.terrain,
@@ -919,7 +919,7 @@ const TILE_TYPES = {
     cracked_ice: {
         layer: LAYERS.terrain,
         slide_mode: 'ice',
-        speed_factor: 2,
+        speed_factor: 0.5,
         on_arrive(me, level, other) {
             level.schedule_actor_slide(other);
         },
@@ -932,7 +932,7 @@ const TILE_TYPES = {
     ice: {
         layer: LAYERS.terrain,
         slide_mode: 'ice',
-        speed_factor: 2,
+        speed_factor: 0.5,
         on_arrive(me, level, other) {
             level.schedule_actor_slide(other);
         },
@@ -941,7 +941,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         thin_walls: new Set(['south', 'west']),
         slide_mode: 'ice',
-        speed_factor: 2,
+        speed_factor: 0.5,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             let direction = {
@@ -957,7 +957,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         thin_walls: new Set(['north', 'west']),
         slide_mode: 'ice',
-        speed_factor: 2,
+        speed_factor: 0.5,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             let direction = {
@@ -973,7 +973,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         thin_walls: new Set(['north', 'east']),
         slide_mode: 'ice',
-        speed_factor: 2,
+        speed_factor: 0.5,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             let direction = {
@@ -989,7 +989,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         thin_walls: new Set(['south', 'east']),
         slide_mode: 'ice',
-        speed_factor: 2,
+        speed_factor: 0.5,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
             let direction = {
@@ -1008,7 +1008,7 @@ const TILE_TYPES = {
     force_floor_all: {
         layer: LAYERS.terrain,
         slide_mode: 'force',
-        speed_factor: 2,
+        speed_factor: 0.5,
         allow_player_override: true,
         blocks(me, level, other) {
             return (level.compat.rff_blocks_monsters &&
