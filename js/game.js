@@ -1120,6 +1120,11 @@ export class Level extends LevelInterface {
             // trapped in one, so...  i don't knoww...
             // FIXME showing a teleport sparkle through an inactive red teleporter also feels buggy
             this.schedule_actor_slide(actor);
+            // TODO this is copy-pasted from attempt_teleport, which kind of implies it should be
+            // somewhere more central?  do we also simulate stepping on a red teleport??
+            if (actor.type.is_real_player && terrain.type.allow_player_override) {
+                this._set_tile_prop(actor, 'can_override_slide', true);
+            }
         }
 
         return false;
@@ -2144,6 +2149,8 @@ export class Level extends LevelInterface {
 
         // Teleport slides happen when coming out of a teleporter, but not other times when standing
         // on a teleporter, so they need to be performed explicitly here
+        // TODO is this set by a teleporter's on_arrive, maybe?  hence why you slide even if you
+        // don't teleport?  but that doesn't make sense for yellow teleporters
         this.schedule_actor_slide(actor);
         // Real players might be able to immediately override the resulting slide
         if (actor.type.is_real_player && teleporter.type.allow_player_override) {
