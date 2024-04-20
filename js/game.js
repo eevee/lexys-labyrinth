@@ -1009,45 +1009,9 @@ export class Level extends LevelInterface {
         // Actor is allowed to move, so do so
         let success = this.attempt_step(actor, direction);
 
-        // CC2 handles bonking for all kinds of sliding here -- bonking on ice causes an immediate
-        // turnaround, and bonking on a force floor tries again (including rolling a new RFF)
-        // TODO this assumes the slide comes from the terrain, which is always the case atm
-        if (! success) {
-            let terrain = actor.cell.get_terrain();
-            if (terrain && (
-                // Actors bonk on ice even if they're not already sliding (whether because they
-                // started on ice or dropped boots on ice)
-                // TODO weird cc2 quirk/bug: ghosts bonk on ice even though they don't slide on it
-                // FIXME and if they have cleats, they get stuck instead (?!)
-                (terrain.type.slide_mode === 'ice' && (
-                    ! actor.ignores(terrain.type.name) || actor.type.name === 'ghost')) ||
-                // But they only bonk on a force floor if it affects them
-                (terrain.type.slide_mode === 'force' && ! actor.ignores(terrain.type.name))))
-            {
-                // Turn the actor around so ice corners bonk correctly
-                if (terrain.type.slide_mode === 'ice') {
-                    this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
-                }
-                // Pretend they stepped on the cell again -- this is what allows item bestowal to
-                // function, as a bonking monster will notice the item now and take it.
-                this.step_on_cell(actor, actor.cell);
-
-                // If we changed direction, try moving again.
-                // (This is why ghosts bonk even on ice corners, which they can pass through)
-                if (actor.direction !== direction &&
-                    // CC1: Wait until next tic to start moving again
-                    // XXX seems reasonable, do i want that as default behavior?  when does it come up?
-                    ! this.compat.bonking_isnt_instant)
-                {
-                    success = this.attempt_step(actor, actor.direction);
-                }
-            }
-            else if (terrain.type.name === 'teleport_red' && ! terrain.is_active) {
-                // Curious special-case red teleporter behavior: if you pass through a wired but
-                // inactive one, you keep sliding indefinitely.  Players can override out of it, but
-                // other actors are just stuck.  So, set this again.
-                this.schedule_actor_slide(actor);
-            }
+        // If we're blocked (and didn't become an animation, which no longer moves), we might bonk
+        if (! success && ! actor.type.ttl) {
+            success = this._possibly_bonk(actor, direction);
         }
 
         // Track whether the player is blocked, both for visual effect and for doppelgangers
@@ -1062,6 +1026,103 @@ export class Level extends LevelInterface {
         }
 
         return success;
+    }
+
+    _possibly_bonk(actor, direction) {
+        // TODO this assumes the slide comes from the terrain, which is always the case atm
+        let terrain = actor.cell.get_terrain();
+        if (terrain.type.slide_mode === 'force') {
+            // Force floor quirks:
+            // - Force floors cause actors to slide, passively, every frame.  (I'm guessing this was
+            //   done to make flipping force floors with wire actually work.)  An actor starting on
+            //   a force floor is thus made to slide on the very first frame, before it even has a
+            //   chance to move.  (This is what causes a player to be stuck when starting on a force
+            //   floor loop; they move immediately, but in such a way that they never finish a move
+            //   on the same frame that they're allowed to make a decision.)
+            // - Bonking on a force floor causes an actor to immediately step on the entire cell
+            //   again, then try to move again.  We know this for two reasons: one, it's visible
+            //   from the timing of the RFF cycle when something bonks on an RFF; and two, monsters
+            //   that begin on a force floor *and an item* will pick up the item ("item bestowal"),
+            //   implying that they "notice" they've stepped on the item due to the bonk.  Monsters
+            //   aren't intended to pick up items, of course, but they're usually blocked by items.
+            // - Item bestowal still happens if the actor is a player with suction boots, standing
+            //   on an item they've just dropped and deliberately pushing against a wall!  So the
+            //   actor doesn't have to be sliding at all, just standing on a sliding tile.  (But
+            //   note that most monsters will notice when they're blocked at decision time and try
+            //   to avoid making a blocked move.)
+
+            // So first, immediately pretend it stepped on the cell again
+            this.step_on_cell(actor, actor.cell);
+
+            // If the actor changed direction, immediately try to move again
+            if (actor.direction !== direction && ! this.compat.bonking_isnt_instant) {
+                // CC1: Wait until next tic to start moving again, actually
+                return this.attempt_step(actor, actor.direction);
+            }
+        }
+        else if (terrain.type.slide_mode === 'ice') {
+            // Ice quirks:
+            // - It's fundamentally built around turning around, so directing the actor is slightly
+            //   more complicated.
+            // - Item bestowal doesn't happen on ice, EXCEPT for Cerise (and doppel-Cerise) when NOT
+            //   wearing cleats.  It's not clear to me how this could have happened by accident, and
+            //   it's too obscure to be deliberate, so I've just special-cased this here.
+            // - Ghosts turn around when they bonk on ice, even though they're otherwise not
+            //   affected by it.  If they have cleats, they instead get stuck in place forever.
+            //   I strongly suspect this is deliberate (except for the cleats part) -- the game
+            //   would HAVE to force ghosts to ignore their normal decision-time collision check to
+            //   force a bonk in the first place, or they'd simply turn left instead.  The cleats
+            //   issue is a natural side effect of that: cleats prevent bonking, and bonking is what
+            //   causes the turnaround, so a ghost with cleats will charge into the wall forever.
+            // - An actor that starts out on an ice corner will oscillate between the two open
+            //   directions, every frame, which suggests that the corner's direction-changing behavior
+            //   happens on_stand, but the ice sliding effect itself happens on arrive.
+            //   (TODO this part isn't done, but seems very unlikely to have gameplay impact)
+
+            if (actor.has_item('cleats')) {
+                // Don't do anything special; we're still blocked
+                return false;
+            }
+            else if (actor.type.name === 'player2' || actor.type.name === 'doppelganger2') {
+                // Cerise behavior: Bonk like it's a force floor, do nothing else
+                this.step_on_cell(actor, actor.cell);
+                return false;
+            }
+            else {
+                // Normal bonking behavior: Turn around, step on /only the terrain/ (to get the
+                // turnaround effect)
+                this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
+
+                // Now check for ignores for real, so ice corners don't affect ghosts
+                if (! actor.ignores(terrain.type.name)) {
+                    if (terrain.type.on_arrive) {
+                        terrain.type.on_arrive(terrain, this, actor);
+                    }
+                    if (terrain.type.on_stand) {
+                        terrain.type.on_stand(terrain, this, actor, true);
+                    }
+                }
+
+                // Immediately try moving again, since we're guaranteed to have changed direction
+                if (! this.compat.bonking_isnt_instant) {
+                    // CC1: Wait until next tic to start moving again
+                    return this.attempt_step(actor, actor.direction);
+                }
+            }
+        }
+        else if (terrain.type.name === 'teleport_red' && ! terrain.is_active) {
+            // Teleport slides do not bonk, with one oddball special case for red teleporters:
+            // If you pass through a wired but inactive one, you keep sliding indefinitely.  Players
+            // can override out of it, but other actors are just stuck.  So, re-slide them here.
+            // TODO not sure if this goes here; feels like a bug, of course, but what did it fall
+            // out of exactly?  possibly relevant: slide overriding goes here too
+            // FIXME this feels very much like a bug to me...  but you can also free a monster
+            // trapped in one, so...  i don't knoww...
+            // FIXME showing a teleport sparkle through an inactive red teleporter also feels buggy
+            this.schedule_actor_slide(actor);
+        }
+
+        return false;
     }
 
     _do_actor_cooldown(actor, cooldown = 3) {

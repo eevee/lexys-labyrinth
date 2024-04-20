@@ -173,14 +173,14 @@ function pursue_player(me, level) {
         return null;
 
     let player = level.player;
-    // CC2 behavior (not Lynx (TODO compat?)): pursue the player's apparent position, not just the
-    // cell they're in
     let px, py;
     if (level.compat.teeth_target_internal_position) {
+        // Lynx: pursue the player's current cell
         px = player.cell.x;
         py = player.cell.y;
     }
     else {
+        // CC2: pursue the player's apparent position, not just the cell they're in
         [px, py] = player.visual_position();
     }
 
