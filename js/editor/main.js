@@ -488,11 +488,15 @@ export class Editor extends PrimaryView {
 
         let export_items = [
             ["Share this level with a link", () => {
-                let data = util.b64encode(fflate.zlibSync(c2g.synthesize_level(this.stored_level)));
+                let level_data = new Uint8Array(c2g.synthesize_level(this.stored_level));
+                // In my brief experience the compressed URLs are about 25% smaller
+                let compressed_data = fflate.zlibSync(level_data);
+                let data = util.b64encode(compressed_data);
+                let params = new URLSearchParams;
+                params.set('level', data);
                 let url = new URL(location);
-                url.searchParams.delete('level');
-                url.searchParams.delete('setpath');
-                url.searchParams.append('level', data);
+                url.search = '';
+                url.hash = '#' + params.toString();
                 new dialogs.EditorShareOverlay(this.conductor, url.toString()).open();
             }],
             ["Download level as C2M (new CC2 format)", () => {
