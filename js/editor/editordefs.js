@@ -928,7 +928,7 @@ export const TILE_DESCRIPTIONS = {
     },
     grass: {
         name: "Grass",
-        desc: "Stops all blocks, tanks, and rovers.  Turns to fire when a fireball touches it.",
+        desc: "Stops all blocks, tanks, and rovers.  Turns to fire when a fireball touches it.  Both types of bug refuse to leave once they enter.",
     },
     cracked_ice: {
         name: "Cracked ice",
