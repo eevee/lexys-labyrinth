@@ -624,23 +624,23 @@ export class Editor extends PrimaryView {
                 tile.type = TILE_TYPES[tile.name];
                 delete tile.name;
                 if (fg) {
-                    this.select_foreground_tile(tile, true);
+                    this.select_foreground_tile(tile, 'palette');
                 }
                 else {
                     if (tile.type.layer !== LAYERS.terrain)
                         return;
-                    this.select_background_tile(tile, true);
+                    this.select_background_tile(tile, 'palette');
                 }
             }
             else {
                 // Regular tile name
                 if (fg) {
-                    this.select_foreground_tile(key, true);
+                    this.select_foreground_tile(key, 'palette');
                 }
                 else {
                     if (TILE_TYPES[key].layer !== LAYERS.terrain)
                         return;
-                    this.select_background_tile(key, true);
+                    this.select_background_tile(key, 'palette');
                 }
             }
         });
@@ -668,10 +668,12 @@ export class Editor extends PrimaryView {
 
         this.fg_tile = null;  // used for most drawing
         this.fg_tile_from_palette = false;
+        this.fg_tile_source_cell = null;
         this.palette_fg_selected_el = null;
-        this.select_foreground_tile('wall', true);
         this.bg_tile = null;  // used to populate new/cleared cells
-        this.select_background_tile('floor', true);
+        this.bg_tile_source_cell = null;
+        this.select_foreground_tile('wall', 'palette');
+        this.select_background_tile('floor', 'palette');
 
         this.selection = new Selection(this);
 
@@ -1048,13 +1050,23 @@ export class Editor extends PrimaryView {
             save_json_to_storage(pack_key, pack_stash);
         }
 
+        this.connectable_types = new Set;
+        for (let [name, type] of Object.entries(TILE_TYPES)) {
+            if (type.connects_to) {
+                this.connectable_types.add(name);
+                for (let to_name of type.connects_to) {
+                    this.connectable_types.add(to_name);
+                }
+            }
+        }
+
         // Load connections
         // TODO what if the source tile is not connectable?
         this.connections_g.textContent = '';
         this.connections_arrows = {};
         for (let [src, dest] of this.stored_level.custom_connections) {
-            let [sx, sy] = this.stored_level.scalar_to_coords(src);
-            let [dx, dy] = this.stored_level.scalar_to_coords(dest);
+            let [sx, sy] = this.scalar_to_coords(src);
+            let [dx, dy] = this.scalar_to_coords(dest);
             let arrow = new SVGConnection(sx, sy, dx, dy);
             this.connections_arrows[src] = arrow;
             arrow.element.setAttribute(
@@ -1085,7 +1097,7 @@ export class Editor extends PrimaryView {
     update_cell_coordinates() {
         // We rely on each StoredCell having .x and .y for partial redrawing
         for (let [i, cell] of this.stored_level.linear_cells.entries()) {
-            [cell.x, cell.y] = this.stored_level.scalar_to_coords(i);
+            [cell.x, cell.y] = this.scalar_to_coords(i);
         }
     }
 
@@ -1250,7 +1262,10 @@ export class Editor extends PrimaryView {
         return [name, tile];
     }
 
-    select_foreground_tile(name_or_tile, from_palette = false) {
+    // Sets the current tile used by the pencil.
+    // source: either 'palette' for a palette-sourced tile (which may have combining behavior), or a
+    // cell index (used to track explicit connections).
+    select_foreground_tile(name_or_tile, source) {
         let [name, tile] = this._name_or_tile_to_name_and_tile(name_or_tile);
 
         // Deselect any previous selection
@@ -1260,7 +1275,14 @@ export class Editor extends PrimaryView {
 
         // Store the tile
         this.fg_tile = tile;
-        this.fg_tile_from_palette = from_palette;
+        if (source === 'palette') {
+            this.fg_tile_from_palette = true;
+            this.fg_tile_source_cell = null;
+        }
+        else {
+            this.fg_tile_from_palette = false;
+            this.fg_tile_source_cell = source;
+        }
 
         // Select it in the palette, if possible
         let key = name;
@@ -1282,10 +1304,16 @@ export class Editor extends PrimaryView {
         }
     }
 
-    select_background_tile(name_or_tile) {
+    select_background_tile(name_or_tile, source) {
         let [_name, tile] = this._name_or_tile_to_name_and_tile(name_or_tile);
 
         this.bg_tile = tile;
+        if (source === 'palette') {
+            this.bg_tile_source_cell = null;
+        }
+        else {
+            this.bg_tile_source_cell = source;
+        }
 
         this.redraw_background_tile();
     }
@@ -1437,6 +1465,18 @@ export class Editor extends PrimaryView {
     // ------------------------------------------------------------------------------------------------
     // Utility/inspection
 
+    scalar_to_coords(n) {
+        return this.stored_level.scalar_to_coords(n);
+    }
+
+    coords_to_scalar(x, y) {
+        return this.stored_level.coords_to_scalar(x, y);
+    }
+
+    cell_to_scalar(cell) {
+        return this.stored_level.cell_to_scalar(cell);
+    }
+
     is_in_bounds(x, y) {
         return this.stored_level.is_point_within_bounds(x, y);
     }
@@ -1500,6 +1540,7 @@ export class Editor extends PrimaryView {
     }
 
     erase_tile(cell, tile = null) {
+        // TODO this is only used in one place, by pencil, and doesn't pass 'tile'
         // TODO respect selection
 
         if (tile === null) {
@@ -1536,19 +1577,21 @@ export class Editor extends PrimaryView {
     replace_cell(cell, new_cell) {
         // Save the coordinates so it doesn't matter what they are when undoing
         let x = cell.x, y = cell.y;
-        let n = this.stored_level.coords_to_scalar(x, y);
+        let n = this.coords_to_scalar(x, y);
         this._do(
             () => {
                 this.stored_level.linear_cells[n] = new_cell;
                 new_cell.x = x;
                 new_cell.y = y;
                 this.mark_cell_dirty(new_cell);
+                this._update_connections(new_cell, cell[LAYERS.terrain], new_cell[LAYERS.terrain]);
             },
             () => {
                 this.stored_level.linear_cells[n] = cell;
                 cell.x = x;
                 cell.y = y;
                 this.mark_cell_dirty(cell);
+                this._update_connections(cell, new_cell[LAYERS.terrain], cell[LAYERS.terrain]);
             },
         );
     }
@@ -1612,7 +1655,7 @@ export class Editor extends PrimaryView {
                         upgrade_tile(tile);
                     }
                 }
-                let n2 = this.stored_level.coords_to_scalar(x2, y2);
+                let n2 = this.coords_to_scalar(x2, y2);
                 if (new_cells[n2]) {
                     console.error("Tile transformation overwriting the same cell twice:", x2, y2);
                 }
@@ -1775,12 +1818,12 @@ export class Editor extends PrimaryView {
 
             if (this.connections_arrows[src]) {
                 this.connections_arrows[src].set_dest(
-                    ...this.stored_level.scalar_to_coords(dest));
+                    ...this.scalar_to_coords(dest));
             }
             else {
                 let arrow = new SVGConnection(
-                    ...this.stored_level.scalar_to_coords(src),
-                    ...this.stored_level.scalar_to_coords(dest));
+                    ...this.scalar_to_coords(src),
+                    ...this.scalar_to_coords(dest));
                 this.connections_arrows[src] = arrow;
                 this.connections_g.append(arrow.element);
             }
@@ -1792,7 +1835,9 @@ export class Editor extends PrimaryView {
     // TODO also use this to indicate traps or flame jets that are initially toggled (trickier with
     // flame jets since that can make them look like they're the wrong tile...)
     recreate_implicit_connections() {
+        let t0 = performance.now();
         this.implicit_connections = new Map;
+        this.reverse_implicit_connections = new Map;
 
         for (let el of this.connections_g.querySelectorAll(':scope > .--implicit')) {
             el.remove();
@@ -1803,41 +1848,146 @@ export class Editor extends PrimaryView {
                 continue;
 
             let terrain = cell[LAYERS.terrain];
-            if (! terrain.type.connects_to)
-                continue;
-
-            let find_func;
-            if (terrain.type.connect_order === 'forward') {
-                find_func = algorithms.find_terrain_linear;
+            if (terrain.type.connects_to){
+                this._implicit_connect_tile(terrain, cell, n);
             }
-            else if (terrain.type.connect_order === 'diamond') {
-                find_func = algorithms.find_terrain_diamond;
-            }
+        }
+        console.log("implicit connections time", performance.now() - t0);
+    }
 
-            let target_cell = null;
-            for (let [found_tile, found_cell] of find_func(this.stored_level, cell, terrain.type.connects_to)) {
-                target_cell = found_cell;
-                break;
-            }
-            if (target_cell === null)
-                continue;
+    _implicit_connect_tile(tile, cell, n) {
+        if (this.stored_level.custom_connections.has(n))
+            return;
 
-            let svg = new SVGConnection(
-                ...this.stored_level.scalar_to_coords(n),
-                target_cell.x, target_cell.y);
-            this.implicit_connections.set(n, {
-                index: this.stored_level.coords_to_scalar(target_cell.x, target_cell.y),
-                svg_connection: svg,
-            });
-            svg.element.classList.add('--implicit');
-            svg.element.setAttribute('data-source', terrain.type.name);
-            this.connections_g.append(svg.element);
+        let find_func = algorithms.CONNECTION_FUNCTIONS[tile.type.connect_order];
+        let target_cell = null;
+        for (let [found_tile, found_cell] of find_func(this.stored_level, cell, tile.type.connects_to)) {
+            target_cell = found_cell;
+            break;
+        }
+        if (target_cell) {
+            this.__add_implicit_connection(
+                n, this.coords_to_scalar(target_cell.x, target_cell.y), tile.type.name);
         }
     }
 
-    update_implicit_connection(cell, tile, previous_type) {
+    // TODO explicit connection stuff left:
+    // - adding an explicit connection should delete all the implicit ones from the source
+    // - deleting an explicit connection should add an auto implicit connection
+    // - altering the src/dest of an explicit connection should...  delete it idk
+    // - eyedropping an explicit src and then penciling it elsewhere should create a new explicit
+    // connection
+    // - stamping an explicit connection...
+    //   - if src and dest are in the selection, create a new connection
+    //   - if only src, copy original dest
+    //   - if only dest, then stamping should only do it if it doesn't already exist?
+    //     also arrow should follow the selection
+    _update_connections(cell, old_tile, new_tile) {
+        if (! (old_tile && ! this.connectable_types.has(old_tile.type.name)) &&
+            ! (new_tile && ! this.connectable_types.has(new_tile.type.name)))
+        {
+            // Nothing to do
+            return;
+        }
+        if (old_tile.type.name === new_tile.type.name)
+            return;
+
         // TODO actually this should also update explicit ones, if the source/dest types are changed
         // in such a way as to make the connection invalid
+
+        let n = this.cell_to_scalar(cell);
+
+        // Remove an old outgoing connection
+        if (old_tile.type.connects_to) {
+            this.__delete_implicit_connection(n);
+        }
+        // Remove an old incoming connection
+        if (old_tile.type.connects_from) {
+            let sources = this.reverse_implicit_connections.get(n);
+            if (sources) {
+                // All the buttons pointing at us are now dangling.  We could be a little clever
+                // here (e.g., red/brown buttons only need to start searching from us, not from
+                // themselves), but frankly, fuck it, just rescan everyone.
+                for (let src of sources) {
+                    this.__delete_implicit_connection(src);
+                    let source_cell = this.stored_level.linear_cells[src];
+                    this._implicit_connect_tile(source_cell[LAYERS.terrain], source_cell, src);
+                }
+            }
+        }
+
+        // Add a new outgoing connection
+        if (new_tile.type.connects_to) {
+            this._implicit_connect_tile(new_tile, cell, n);
+        }
+        // Add a new incoming connection, which is a bit more complicated
+        if (new_tile.type.connects_from) {
+            for (let source_type_name of new_tile.type.connects_from) {
+                let source_type = TILE_TYPES[source_type_name];
+                // For a trap or cloner, we can search backwards until we see another trap or
+                // cloner, and we know we're the target of every button we see in the meantime
+                if (source_type.connect_order === 'forward') {
+                    for (let [other_tile, other_cell] of algorithms.find_terrain_linear(
+                        this.stored_level, cell, new Set([new_tile.type.name, source_type_name]), true))
+                    {
+                        if (other_tile.type.name === new_tile.type.name)
+                            break;
+                        if (other_tile.type.name === source_type_name) {
+                            let src = this.cell_to_scalar(other_cell);
+                            if (! this.stored_level.custom_connections.has(src)) {
+                                this.__add_implicit_connection(src, n, source_type_name);
+                            }
+                        }
+                    }
+                }
+                // For flame jets...  I don't think there's any way to be sure except to re-check
+                // every orange button in the level!
+                else if (source_type.connect_order === 'diamond') {
+                    for (let source_cell of this.stored_level.linear_cells) {
+                        let terrain = source_cell.get_terrain();
+                        if (terrain.type !== source_type)
+                            continue;
+
+                        this._implicit_connect_tile(terrain, source_cell, this.cell_to_scalar(source_cell));
+                    }
+                }
+            }
+        }
+    }
+
+    __add_implicit_connection(src, dest, type_name) {
+        let [x0, y0] = this.scalar_to_coords(src);
+        let [x1, y1] = this.scalar_to_coords(dest);
+        let cxn;
+
+        if (this.implicit_connections.has(src)) {
+            cxn = this.implicit_connections.get(src);
+            this.reverse_implicit_connections.get(cxn.index).delete(src);
+            cxn.svg_connection.set_dest(x1, y1);
+        }
+        else {
+            let svg = new SVGConnection(x0, y0, x1, y1);
+            cxn = {
+                index: dest,
+                svg_connection: svg,
+            };
+            this.implicit_connections.set(src, cxn);
+        }
+
+        util.setdefault(this.reverse_implicit_connections, dest, () => new Set).add(src);
+
+        cxn.svg_connection.element.classList.add('--implicit');
+        cxn.svg_connection.element.setAttribute('data-source', type_name);
+        this.connections_g.append(cxn.svg_connection.element);
+    }
+
+    __delete_implicit_connection(src) {
+        let cxn = this.implicit_connections.get(src);
+        if (cxn) {
+            cxn.svg_connection.element.remove();
+            this.implicit_connections.delete(src);
+            this.reverse_implicit_connections.get(cxn.index).delete(src);
+        }
     }
 
     // ------------------------------------------------------------------------------------------------
@@ -1861,10 +2011,12 @@ export class Editor extends PrimaryView {
             () => {
                 cell[layer] = new_tile;
                 this.mark_cell_dirty(cell);
+                this._update_connections(cell, old_tile, new_tile);
             },
             () => {
                 cell[layer] = old_tile;
                 this.mark_cell_dirty(cell);
+                this._update_connections(cell, new_tile, old_tile);
             },
         );
     }

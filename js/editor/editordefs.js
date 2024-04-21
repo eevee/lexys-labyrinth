@@ -7,7 +7,7 @@ export const TOOLS = {
     pencil: {
         icon: 'icons/tool-pencil.png',
         name: "Pencil",
-        desc: "Place, erase, and select tiles.\n\n[mouse1] Draw\n[ctrl] [mouse1] Erase\n[shift] [mouse1] Draw, replacing everything\n\n[mouse2] Pick foreground tile\n[ctrl] [mouse2] Pick background tile",
+        desc: "Place, erase, and select tiles.\n\n[mouse1] Draw\n[shift] [mouse1] Draw, replacing entire cell\n[ctrl] [mouse1] Erase (terrain becomes background)\n[ctrl] [shift] [mouse1] Erase entire cell\n\n[mouse2] Pick foreground tile\n[ctrl] [mouse2] Pick background tile",
         uses_palette: true,
         op1: mouseops.PencilOperation,
         op2: mouseops.EyedropOperation,

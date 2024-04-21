@@ -57,9 +57,11 @@ export function* find_terrain_diamond(levelish, start_cell, type_names) {
     }
 }
 
-// TODO make this guy work generically for orange, red, brown buttons?  others...?
-export function find_implicit_connection() {
-}
+export const CONNECTION_FUNCTIONS = {
+    forward: find_terrain_linear,
+    diamond: find_terrain_diamond,
+};
+
 
 export class Circuit {
     constructor() {

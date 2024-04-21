@@ -8,6 +8,17 @@ export function random_choice(list) {
     return list[Math.floor(Math.random() * list.length)];
 }
 
+export function setdefault(map, key, defaulter) {
+    if (map.has(key)) {
+        return map.get(key);
+    }
+    else {
+        let value = defaulter();
+        map.set(key, value);
+        return value;
+    }
+}
+
 
 // DOM stuff
 function _mk(el, children) {

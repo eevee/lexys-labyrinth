@@ -284,10 +284,11 @@ export class EyedropOperation extends MouseOperation {
             this.last_eyedropped_coords = null;
             return;
         }
+        let n = this.editor.coords_to_scalar(x, y);
 
         // If we're picking the background, we always use the terrain
         if (this.ctrl) {
-            this.editor.select_background_tile(cell[LAYERS.terrain]);
+            this.editor.select_background_tile(cell[LAYERS.terrain], n);
             return;
         }
 
@@ -306,7 +307,7 @@ export class EyedropOperation extends MouseOperation {
             if (! tile)
                 continue;
 
-            this.editor.select_foreground_tile(tile);
+            this.editor.select_foreground_tile(tile, n);
             this.last_eyedropped_coords = [x, y];
             this.last_layer = layer;
             return;
@@ -436,7 +437,7 @@ export class FillOperation extends MouseOperation {
         this._floodfill_from(cell_x, cell_y);
     }
     _floodfill_from(x0, y0) {
-        let i0 = this.editor.stored_level.coords_to_scalar(x0, y0);
+        let i0 = this.editor.coords_to_scalar(x0, y0);
         if (this.fill_state && this.fill_state[i0]) {
             // This cell is already part of the pending fill, so there's nothing to do
             return;
@@ -877,7 +878,7 @@ export class ConnectOperation extends MouseOperation {
     handle_press(x, y) {
         // TODO restrict to button/cloner unless holding shift
         // TODO what do i do when you erase a button/cloner?  can i detect if you're picking it up?
-        let src = this.editor.stored_level.coords_to_scalar(x, y);
+        let src = this.editor.coords_to_scalar(x, y);
         let cell = this.cell(x, y);
         let terrain = cell[LAYERS.terrain];
         if (this.alt_mode) {
@@ -953,7 +954,7 @@ export class ConnectOperation extends MouseOperation {
 
         let cell = this.cell(cell_x, cell_y);
         if (TILE_TYPES[this.pending_type].connects_to.has(cell[LAYERS.terrain].type.name)) {
-            this.pending_target = this.editor.stored_level.coords_to_scalar(cell_x, cell_y);
+            this.pending_target = this.editor.coords_to_scalar(cell_x, cell_y);
             this.pending_cxn.element.style.opacity = 0.5;
         }
         else {

@@ -3374,6 +3374,17 @@ for (let [name, type] of Object.entries(TILE_TYPES)) {
         if (type.item_priority === undefined)
             console.error(`Tile type ${name} is an item but has no item priority`);
     }
+
+    // Add a .connects_from, used only by the editor
+    if (type.connects_to) {
+        for (let other_name of type.connects_to) {
+            let other = TILE_TYPES[other_name];
+            if (! other.connects_from) {
+                other.connects_from = new Set;
+            }
+            other.connects_from.add(name);
+        }
+    }
 }
 
 export default TILE_TYPES;
