@@ -25,6 +25,11 @@ function pad(s, n) {
 }
 
 const RESULT_TYPES = {
+    pending: {
+        // not a real result type, but used for the initial display
+        color: "\x1b[90m",
+        symbol: "?",
+    },
     skipped: {
         color: "\x1b[90m",
         symbol: "-",
@@ -351,21 +356,35 @@ async function test_pack(testdef) {
     let dots_per_row = columns - title_width - 1 - 1 - 9 - 1;
     // TODO factor out the common parts maybe?
     stdout.write(pad(`${pack.title} (${ruleset})`, title_width) + " ");
-    let d = num_levels;
+    let indices = [];
     let num_dot_lines = 1;
-    while (d > 0) {
-        let n = Math.min(d, dots_per_row);
-        stdout.write("\x1b[90m");
-        stdout.write("?".repeat(n));
-        d -= n;
-        if (d > 0) {
+    let previous_type = null;
+    for (let i = 0; i < num_levels; i++) {
+        if (i > 0 && i % dots_per_row === 0) {
             stdout.write("\n");
             stdout.write(" ".repeat(title_width + 1));
             num_dot_lines += 1;
         }
+
+        let type = (level_filter && ! level_filter.has(i)) ? 'skipped' : 'pending';
+        if (type !== previous_type) {
+            stdout.write(RESULT_TYPES[type].color);
+        }
+        stdout.write(RESULT_TYPES[type].symbol);
+        previous_type = type;
+
+        if (type === 'pending') {
+            indices.push(i);
+        }
     }
     ansi_cursor_move(0, -(num_dot_lines - 1));
     stdout.write(`\x1b[${title_width + 2}G`);
+
+    // We really really don't want to have only a single thread left running at the end on a single
+    // remaining especially-long replay, so it would be nice to run the levels in reverse order of
+    // complexity.  But that sounds hard so instead just run them backwards, since the earlier
+    // levels in any given pack tend to be easier.
+    indices.reverse();
 
     let num_passed = 0;
     let num_missing = 0;
@@ -374,7 +393,6 @@ async function test_pack(testdef) {
     let last_pause = t0;
     let failures = [];
     let promises = [];
-    let indices = [...Array(num_levels).keys()];
     for await (let result of run_in_thread_pool(4, testdef, indices)) {
         //let result = test_level_wrapper(pack, i, level_filter, compat);
         let result_stuff = RESULT_TYPES[result.type];
