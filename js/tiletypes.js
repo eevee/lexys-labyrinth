@@ -66,6 +66,7 @@ function _define_force_floor(direction, opposite_type) {
         activate(me, level) {
             level.transmute_tile(me, opposite_type);
         },
+        is_gray_button_editor_safe: true,
         on_gray_button: activate_me,
         on_power: activate_me,
     };
@@ -505,6 +506,7 @@ const TILE_TYPES = {
         activate(me, level) {
             level.transmute_tile(me, 'swivel_se');
         },
+        is_gray_button_editor_safe: true,
         on_gray_button: activate_me,
         on_power: activate_me,
     },
@@ -522,6 +524,7 @@ const TILE_TYPES = {
         activate(me, level) {
             level.transmute_tile(me, 'swivel_sw');
         },
+        is_gray_button_editor_safe: true,
         on_gray_button: activate_me,
         on_power: activate_me,
     },
@@ -539,6 +542,7 @@ const TILE_TYPES = {
         activate(me, level) {
             level.transmute_tile(me, 'swivel_nw');
         },
+        is_gray_button_editor_safe: true,
         on_gray_button: activate_me,
         on_power: activate_me,
     },
@@ -556,6 +560,7 @@ const TILE_TYPES = {
         activate(me, level) {
             level.transmute_tile(me, 'swivel_ne');
         },
+        is_gray_button_editor_safe: true,
         on_gray_button: activate_me,
         on_power: activate_me,
     },
@@ -653,6 +658,7 @@ const TILE_TYPES = {
         on_power(me, level) {
             me.type._switch_track(me, level);
         },
+        is_gray_button_editor_safe: true,
         on_gray_button(me, level) {
             me.type._switch_track(me, level);
         },
@@ -791,6 +797,7 @@ const TILE_TYPES = {
         activate(me, level) {
             level.transmute_tile(me, 'turntable_ccw');
         },
+        is_gray_button_editor_safe: true,
         on_gray_button: activate_me,
         on_power: activate_me,
     },
@@ -812,6 +819,7 @@ const TILE_TYPES = {
         activate(me, level) {
             level.transmute_tile(me, 'turntable_cw');
         },
+        is_gray_button_editor_safe: true,
         on_gray_button: activate_me,
         on_power: activate_me,
     },
@@ -1328,12 +1336,12 @@ const TILE_TYPES = {
                 level.pending_green_toggle &&
                 (other.type.collision_mask & COLLISION.all_but_ghost));
         },
-        on_gray_button(me, level) {
+        activate(me, level) {
             level.transmute_tile(me, 'green_wall');
         },
-        on_power(me, level) {
-            me.type.on_gray_button(me, level);
-        },
+        is_gray_button_editor_safe: true,
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     green_wall: {
         layer: LAYERS.terrain,
@@ -1344,12 +1352,12 @@ const TILE_TYPES = {
                 ! level.pending_green_toggle &&
                 (other.type.collision_mask & COLLISION.all_but_ghost));
         },
-        on_gray_button(me, level) {
+        activate(me, level) {
             level.transmute_tile(me, 'green_floor');
         },
-        on_power(me, level) {
-            me.type.on_gray_button(me, level);
-        },
+        is_gray_button_editor_safe: true,
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     green_chip: {
         layer: LAYERS.item,
@@ -1377,28 +1385,24 @@ const TILE_TYPES = {
     },
     purple_floor: {
         layer: LAYERS.terrain,
-        on_gray_button(me, level) {
+        activate(me, level) {
             level.transmute_tile(me, 'purple_wall');
         },
-        on_power(me, level) {
-            me.type.on_gray_button(me, level);
-        },
-        on_depower(me, level) {
-            me.type.on_gray_button(me, level);
-        },
+        is_gray_button_editor_safe: true,
+        on_gray_button: activate_me,
+        on_power: activate_me,
+        on_depower: activate_me,
     },
     purple_wall: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
-        on_gray_button(me, level) {
+        activate(me, level) {
             level.transmute_tile(me, 'purple_floor');
         },
-        on_power(me, level) {
-            me.type.on_gray_button(me, level);
-        },
-        on_depower(me, level) {
-            me.type.on_gray_button(me, level);
-        },
+        is_gray_button_editor_safe: true,
+        on_gray_button: activate_me,
+        on_power: activate_me,
+        on_depower: activate_me,
     },
 
     // Sokoban blocks, buttons, and walls -- they each come in four colors, the buttons can be
@@ -1578,9 +1582,8 @@ const TILE_TYPES = {
         on_power(me, level) {
             me.type.activate(me, level, true);
         },
-        on_gray_button(me, level) {
-            me.type.activate(me, level);
-        },
+        is_gray_button_editor_safe: false,
+        on_gray_button: activate_me,
     },
     trap: {
         layer: LAYERS.terrain,
@@ -2004,24 +2007,18 @@ const TILE_TYPES = {
             // Do NOT immediately nuke anything on us, or it'd be impossible to push a block off an
             // adjacent orange button; this is probably why flame jets kill on tics
         },
-        on_gray_button(me, level) {
-            me.type.activate(me, level);
-        },
-        on_power(me, level) {
-            me.type.activate(me, level);
-        },
+        is_gray_button_editor_safe: true,
+        on_gray_button: activate_me,
+        on_power: activate_me,
     },
     flame_jet_on: {
         layer: LAYERS.terrain,
         activate(me, level) {
             level.transmute_tile(me, 'flame_jet_off');
         },
-        on_gray_button(me, level) {
-            me.type.activate(me, level);
-        },
-        on_power(me, level) {
-            me.type.activate(me, level);
-        },
+        is_gray_button_editor_safe: true,
+        on_gray_button: activate_me,
+        on_power: activate_me,
         on_stand(me, level, other) {
             // Note that (dirt?) blocks, fireballs, and anything with fire boots are immune
             // TODO would be neat if this understood "ignores anything with fire immunity" but that

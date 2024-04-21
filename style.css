@@ -2290,6 +2290,14 @@ svg.level-editor-overlay g.overlay-connection.--implicit line.-arrow {
 svg.level-editor-overlay g.overlay-connection line.-arrow {
     marker-end: url(#overlay-arrowhead);
 }
+svg.level-editor-overlay .overlay-adjust-gray-button-radius {
+    stroke: #f4f4f4;
+    fill: hsla(10, 10%, 80%, 0.125);
+}
+svg.level-editor-overlay .overlay-adjust-gray-button-shroud {
+    stroke: none;
+    fill: hsla(10, 10%, 60%, 0.75);
+}
 svg.level-editor-overlay rect.overlay-camera {
     stroke: #808080;
     fill: #80808040;

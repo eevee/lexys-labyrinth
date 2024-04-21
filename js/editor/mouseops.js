@@ -1201,6 +1201,42 @@ const ADJUST_TOGGLES_CCW = {};
         }
     }
 }
+// Little wrapper that allows calling (simple) callbacks on tile types from the editor.
+// Note that editor tiles don't even have .cell, so we have to fake that too
+class DummyRunningLevel {
+    constructor(editor, tile, cell) {
+        this.editor = editor;
+        this.tile = tile;
+        this.cell = cell;
+    }
+
+    _set_tile_prop(tile, key, value) {
+        if (tile !== this.tile) {
+            console.error("DummyRunningLevel._set_tile_prop called on an unknown tile:", tile, "expected:", this.tile);
+            return;
+        }
+
+        this.editor.place_in_cell(this.cell, {...tile, key: value});
+    }
+
+    transmute_tile(tile, type_name) {
+        if (tile !== this.tile) {
+            console.error("DummyRunningLevel.transmute_tile called on an unknown tile:", tile, "expected:", this.tile);
+            return;
+        }
+        let type = TILE_TYPES[type_name];
+        if (! type) {
+            console.error("DummyRunningLevel.transmute_tile called with bad type:", type_name);
+            return;
+        }
+        if (tile.type.layer !== type.layer) {
+            console.error("DummyRunningLevel.transmute_tile refusing to change tile layers:", tile, type_name);
+            return;
+        }
+
+        this.editor.place_in_cell(this.cell, {...tile, type});
+    }
+}
 // Tiles with special behavior when clicked
 const ADJUST_SPECIAL = {
     button_green(editor) {
@@ -1221,7 +1257,24 @@ const ADJUST_SPECIAL = {
             }
         }
     },
+    button_gray(editor, tile, cell) {
+        // Toggle gray objects...  er...  objects affected by gray buttons
+        for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+                if (dx === 0 && dy === 0)
+                    continue;
+                let other_cell = editor.cell(cell.x + dx, cell.y + dy);
+                if (! other_cell)
+                    continue;
 
+                for (let other of other_cell) {
+                    if (other && other.type.on_gray_button && other.type.is_gray_button_editor_safe) {
+                        other.type.on_gray_button(other, new DummyRunningLevel(editor, other, other_cell));
+                    }
+                }
+            }
+        }
+    },
 };
 // TODO maybe better visual feedback of what will happen when you click?
 // - rotate terrain (cw, ccw)
@@ -1229,6 +1282,59 @@ const ADJUST_SPECIAL = {
 // - rotate actor (cw, ccw)
 // - press button
 export class AdjustOperation extends MouseOperation {
+    constructor(...args) {
+        super(...args);
+
+        this.gray_button_preview = mk_svg('g.overlay-transient', {'data-source': 'AdjustOperation'});
+        this.gray_button_preview.append(mk_svg('rect.overlay-adjust-gray-button-radius', {
+            x: -2,
+            y: -2,
+            width: 5,
+            height: 5,
+        }));
+        this.editor.svg_overlay.append(this.gray_button_preview);
+
+    }
+
+    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        let cell = this.cell(cell_x, cell_y);
+        let terrain = cell[LAYERS.terrain];
+        if (terrain.type.name === 'button_gray') {
+            this.gray_button_preview.classList.add('--visible');
+            this.gray_button_preview.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
+            for (let el of this.gray_button_preview.querySelectorAll('rect.overlay-adjust-gray-button-shroud')) {
+                el.remove();
+            }
+            // The easiest way I can find to preview this is to slap an overlay on everything NOT
+            // affected by the button.  Try to consolidate some of the resulting rectangles though
+            for (let dy = -2; dy <= 2; dy++) {
+                let last_rect, last_dx;
+                for (let dx = -2; dx <= 2; dx++) {
+                    let target = this.cell(cell_x + dx, cell_y + dy);
+                    if (target && target !== cell && target[LAYERS.terrain].type.on_gray_button)
+                        continue;
+
+                    if (last_rect && last_dx === dx - 1) {
+                        last_rect.setAttribute('width', 1 + parseInt(last_rect.getAttribute('width'), 10));
+                    }
+                    else {
+                        last_rect = mk_svg('rect.overlay-adjust-gray-button-shroud', {
+                            x: dx,
+                            y: dy,
+                            width: 1,
+                            height: 1,
+                        });
+                        this.gray_button_preview.append(last_rect);
+                    }
+                    last_dx = dx;
+                }
+            }
+        }
+        else {
+            this.gray_button_preview.classList.remove('--visible');
+        }
+    }
+
     handle_press() {
         let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
         if (this.ctrl) {
@@ -1274,7 +1380,7 @@ export class AdjustOperation extends MouseOperation {
             // Other special tile behavior
             let special = ADJUST_SPECIAL[tile.type.name];
             if (special) {
-                special(this.editor);
+                special(this.editor, tile, cell);
                 this.editor.commit_undo();
                 break;
             }
@@ -1283,6 +1389,10 @@ export class AdjustOperation extends MouseOperation {
     // Adjust tool doesn't support dragging
     // TODO should it?
     // TODO if it does then it should end as soon as you spawn a popup
+    do_destroy() {
+        this.gray_button_preview.remove();
+        super.do_destroy();
+    }
 }
 
 // FIXME currently allows creating outside the map bounds and moving beyond the right/bottom, sigh
