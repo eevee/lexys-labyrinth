@@ -520,21 +520,10 @@ export class Level extends LevelInterface {
         // Build circuits out of connected wires
         // TODO document this idea
 
-        if (!first_time) {
-            for (let circuit of this.circuits) {
-                for (let tile of circuit.tiles) {
-                    tile[0].circuits = [null, null, null, null];
-                }
-            }
-        }
-
         this.circuits = [];
         this.power_sources = [];
         let wired_outputs = new Set;
-        this.wired_outputs = [];
-        let add_to_edge_map = (map, item, edges) => {
-            map.set(item, (map.get(item) ?? 0) | edges);
-        };
+        let seen_edges = new Map;
         for (let cell of this.linear_cells) {
             // We're interested in static circuitry, which means terrain
             // OR circuit blocks on top
@@ -585,73 +574,49 @@ export class Level extends LevelInterface {
                 if (! ((wire_directions | terrain.wire_tunnel_directions) & dirinfo.bit))
                     continue;
 
-                if (terrain.circuits && terrain.circuits[dirinfo.index])
+                if ((seen_edges.get(terrain) ?? 0) & dirinfo.bit)
                     continue;
 
-                let circuit = {
-                    is_powered: first_time ? false : null,
-                    tiles: new Map,
-                    inputs: new Map,
-                };
-                this.circuits.push(circuit);
                 // At last, a wired cell edge we have not yet handled.  Floodfill from here
-                algorithms.trace_floor_circuit(
-                    this, terrain.cell, direction,
-                    // Wire handling
-                    (tile, edges) => {
-                        if (! tile.circuits) {
-                            tile.circuits = [null, null, null, null];
-                        }
-                        for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
-                            if (edges & dirinfo.bit) {
-                                tile.circuits[dirinfo.index] = circuit;
-                            }
-                        }
-                        add_to_edge_map(circuit.tiles, tile, edges);
-                        if (tile.type.on_power) {
-                            // Red teleporters contain wires and /also/ have an on_power
-                            // FIXME this isn't quite right since there's seemingly a 1-frame delay
-                            wired_outputs.add(tile);
-                        }
-
-                        if (tile.type.is_power_source) {
-                            // TODO could just do this in a pass afterwards
-                            add_to_edge_map(circuit.inputs, tile, edges);
-                        }
-                    },
-                    // Dead end handling (potentially logic gates, etc.)
-                    (cell, edge) => {
-                        for (let tile of cell) {
-                            if (! tile) {
-                                continue;
-                            }
-                            else if (tile.type.name === 'logic_gate') {
-                                // Logic gates are the one non-wired tile that get attached to circuits,
-                                // mostly so blue teleporters can follow them
-                                if (! tile.circuits) {
-                                    tile.circuits = [null, null, null, null];
-                                }
-                                tile.circuits[DIRECTIONS[edge].index] = circuit;
-
-                                let wire = tile.type._gate_types[tile.gate_type][
-                                    (DIRECTIONS[edge].index - DIRECTIONS[tile.direction].index + 4) % 4];
-                                if (! wire)
-                                    return;
-                                add_to_edge_map(circuit.tiles, tile, DIRECTIONS[edge].bit);
-                                if (wire.match(/^out/)) {
-                                    add_to_edge_map(circuit.inputs, tile, DIRECTIONS[edge].bit);
-                                }
-                            }
-                            else if (tile.type.on_power) {
-                                // FIXME this isn't quite right since there's seemingly a 1-frame delay
-                                add_to_edge_map(circuit.tiles, tile, DIRECTIONS[edge].bit);
-                                wired_outputs.add(tile);
-                            }
-                        }
-                    },
+                let circuit = algorithms.trace_floor_circuit(
+                    this, this.compat.tiles_react_instantly ? 'always' : 'still',
+                    terrain.cell, direction,
                 );
+                this.circuits.push(circuit);
+
+                // All wires are explicitly off when the level starts
+                // TODO what does this mean for recomputing due to circuit blocks?  might we send a
+                // pulse despite the wires never visibly turning off??
+                // TODO wait what happens if you push a circuit block on a pink button...
+                if (first_time) {
+                    circuit.is_powered = false;
+                }
+
+                // Search the circuit for tiles that act as outputs, so we can check whether to
+                // update them during each wire phase
+                for (let [tile, edges] of circuit.tiles) {
+                    seen_edges.set((seen_edges.get(tile) ?? 0) | edges);
+                    if (tile.type.on_power) {
+                        wired_outputs.add(tile);
+                    }
+                }
             }
         }
+
+        // Make an index of cell indices to the circuits they belong to
+        this.cells_to_circuits = new Map;
+        for (let circuit of this.circuits) {
+            for (let tile of circuit.tiles.keys()) {
+                let n = this.cell_to_scalar(tile.cell);
+                let set = this.cells_to_circuits.get(n);
+                if (! set) {
+                    set = new Set;
+                    this.cells_to_circuits.set(n, set);
+                }
+                set.add(circuit);
+            }
+        }
+
         this.wired_outputs = Array.from(wired_outputs);
         this.wired_outputs.sort((a, b) => this.coords_to_scalar(b.cell.x, b.cell.y) - this.coords_to_scalar(a.cell.x, a.cell.y));
 
@@ -2349,10 +2314,8 @@ export class Level extends LevelInterface {
                 let wired_tile = actor.cell.get_wired_tile();
                 if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor' || wired_tile.type.name === 'electrified_floor')) {
                     emitting = wired_tile.wire_directions;
-                    for (let circuit of wired_tile.circuits) {
-                        if (circuit) {
-                            externally_powered_circuits.add(circuit);
-                        }
+                    for (let circuit of this.cells_to_circuits.get(this.cell_to_scalar(wired_tile.cell))) {
+                        externally_powered_circuits.add(circuit);
                     }
                 }
             }

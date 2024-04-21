@@ -1808,14 +1808,14 @@ const TILE_TYPES = {
             // Anyway, let's do a breadth-first search for teleporters.
             let walked_circuits = new Set;
             let candidate_teleporters = new Set;
-            let circuits = me.circuits;
+            let circuits = [...level.cells_to_circuits.get(level.cell_to_scalar(me.cell))];
             for (let i = 0; i < circuits.length; i++) {
                 let circuit = circuits[i];
                 if (! circuit || walked_circuits.has(circuit))
                     continue;
                 walked_circuits.add(circuit);
 
-                for (let [tile, edges] of circuit.tiles.entries()) {
+                for (let tile of circuit.tiles.keys()) {
                     if (tile.type === me.type || tile.type.name === 'teleport_blue_exit') {
                         candidate_teleporters.add(tile);
                     }
@@ -1823,7 +1823,7 @@ const TILE_TYPES = {
                         // This logic gate is functioning as an output, so walk through it and also
                         // trace any circuits that treat it as an input (as long as those circuits
                         // are currently powered)
-                        for (let subcircuit of tile.circuits) {
+                        for (let subcircuit of level.cells_to_circuits.get(level.cell_to_scalar(tile.cell))) {
                             if (subcircuit && subcircuit.is_powered && subcircuit.inputs.get(tile)) {
                                 circuits.push(subcircuit);
                             }

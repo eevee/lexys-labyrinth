@@ -77,6 +77,10 @@ export class LevelInterface {
         return x + y * this.size_x;
     }
 
+    cell_to_scalar(cell) {
+        return this.coords_to_scalar(cell.x, cell.y);
+    }
+
     is_point_within_bounds(x, y) {
         return (x >= 0 && x < this.size_x && y >= 0 && y < this.size_y);
     }

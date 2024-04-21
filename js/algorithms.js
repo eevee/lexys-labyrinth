@@ -61,10 +61,33 @@ export function* find_terrain_diamond(levelish, start_cell, type_names) {
 export function find_implicit_connection() {
 }
 
-export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_dead_end) {
+export class Circuit {
+    constructor() {
+        this.is_powered = null;
+        this.tiles = new Map;
+        this.inputs = new Map;
+    }
+
+    add_tile_edge(tile, edgebits) {
+        this.tiles.set(tile, (this.tiles.get(tile) ?? 0) | edgebits);
+    }
+
+    add_input_edge(tile, edgebits) {
+        this.inputs.set(tile, (this.inputs.get(tile) ?? 0) | edgebits);
+    }
+}
+
+// Traces a wire circuit and calls the given callbacks when finding either a new wire or an ending.
+// actor_mode describes how to handle circuit blocks:
+// - still: Actor wires are examined only for actors with a zero cooldown.  (Normal behavior.)
+// - always: Actor wires are always examined.  (compat.tiles_react_instantly behavior.)
+// - ignore: Skip actors entirely.  (Editor behavior.)
+// Returns a Circuit.
+export function trace_floor_circuit(levelish, actor_mode, start_cell, start_edge, on_wire, on_dead_end) {
     let is_first = true;
     let pending = [[start_cell, start_edge]];
     let seen_cells = new Map;
+    let circuit = new Circuit;
     while (pending.length > 0) {
         let next = [];
         for (let [cell, edge] of pending) {
@@ -80,7 +103,7 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
             let tile = terrain;
             let actor = cell.get_actor();
             if (actor && actor.type.contains_wire && (
-                actor.movement_cooldown === 0 || level.compat.tiles_react_instantly))
+                (actor_mode === 'still' && actor.movement_cooldown === 0) || actor_mode === 'always'))
             {
                 tile = actor;
             }
@@ -90,10 +113,27 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
             let connections = edgeinfo.bit;
             let mode = tile.wire_propagation_mode ?? tile.type.wire_propagation_mode;
             if (! is_first && ((tile.wire_directions ?? 0) & edgeinfo.bit) === 0) {
-                // There's not actually a wire here (but not if this is our starting cell, in which
-                // case we trust the caller)
-                if (on_dead_end) {
-                    on_dead_end(cell, edge);
+                // There's not actually a wire here, so check for things that respond to receiving
+                // power...  but if this is the starting cell, we trust the caller and skip it (XXX why)
+                for (let tile2 of cell) {
+                    if (! tile2)
+                        continue;
+
+                    if (tile2.type.name === 'logic_gate') {
+                        // Logic gates are technically not wired, but still attached to
+                        // circuits, mostly so blue teleporters can follow them
+                        let wire = tile2.type._gate_types[tile2.gate_type][
+                            (DIRECTIONS[edge].index - DIRECTIONS[tile2.direction].index + 4) % 4];
+                        if (! wire)
+                            continue;
+                        circuit.add_tile_edge(tile2, DIRECTIONS[edge].bit);
+                        if (wire.match(/^out/)) {
+                            circuit.add_input_edge(tile2, DIRECTIONS[edge].bit);
+                        }
+                    }
+                    else if (tile2.type.on_power) {
+                        circuit.add_tile_edge(tile2, DIRECTIONS[edge].bit);
+                    }
                 }
                 continue;
             }
@@ -113,8 +153,11 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
 
             seen_cells.set(cell, seen_edges | connections);
 
-            if (on_wire) {
-                on_wire(tile, connections);
+            circuit.add_tile_edge(tile, connections);
+
+            if (tile.type.is_power_source) {
+                // TODO could just do this in a pass afterwards?
+                circuit.add_input_edge(tile, connections);
             }
 
             for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
@@ -130,10 +173,10 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
                     // Search in this direction for a matching tunnel
                     // Note that while actors (the fuckin circuit block) can be wired, tunnels ONLY
                     // appear on terrain, and are NOT affected by actors on top
-                    neighbor = find_matching_wire_tunnel(level, cell.x, cell.y, direction);
+                    neighbor = find_matching_wire_tunnel(levelish, cell.x, cell.y, direction);
                 }
                 else {
-                    neighbor = level.get_neighboring_cell(cell, direction);
+                    neighbor = levelish.get_neighboring_cell(cell, direction);
                 }
 
                 /*
@@ -151,16 +194,18 @@ export function trace_floor_circuit(level, start_cell, start_edge, on_wire, on_d
         pending = next;
         is_first = false;
     }
+
+    return circuit;
 }
 
-export function find_matching_wire_tunnel(level, x, y, direction) {
+export function find_matching_wire_tunnel(levelish, x, y, direction) {
     let dirinfo = DIRECTIONS[direction];
     let [dx, dy] = dirinfo.movement;
     let nesting = 0;
     while (true) {
         x += dx;
         y += dy;
-        let candidate = level.cell(x, y);
+        let candidate = levelish.cell(x, y);
         if (! candidate)
             return null;
 
