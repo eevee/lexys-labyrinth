@@ -537,10 +537,7 @@ export class Level extends LevelInterface {
 
             let actor = cell.get_actor();
             let wire_directions = terrain.wire_directions;
-            // FIXME this doesn't allow a blank circuit block to erase wires,
-            // but it can't anyway because Tile.wire_directions = 0; need some
-            // other way to identify a tile as wired, or at least an actor
-            if (actor && actor.wire_directions &&
+            if (actor && actor.contains_wire &&
                 (actor.movement_cooldown === 0 || this.compat.actors_move_instantly))
             {
                 wire_directions = actor.wire_directions;
@@ -584,14 +581,6 @@ export class Level extends LevelInterface {
                 );
                 this.circuits.push(circuit);
 
-                // All wires are explicitly off when the level starts
-                // TODO what does this mean for recomputing due to circuit blocks?  might we send a
-                // pulse despite the wires never visibly turning off??
-                // TODO wait what happens if you push a circuit block on a pink button...
-                if (first_time) {
-                    circuit.is_powered = false;
-                }
-
                 // Search the circuit for tiles that act as outputs, so we can check whether to
                 // update them during each wire phase
                 for (let [tile, edges] of circuit.tiles) {
@@ -606,6 +595,13 @@ export class Level extends LevelInterface {
         // Make an index of cell indices to the circuits they belong to
         this.cells_to_circuits = new Map;
         for (let circuit of this.circuits) {
+            // Also, all wires are explicitly off when the level starts
+            // TODO what does this mean for recomputing due to circuit blocks?  might we send a
+            // pulse despite the wires never visibly turning off??
+            if (first_time) {
+                circuit.is_powered = false;
+            }
+
             for (let tile of circuit.tiles.keys()) {
                 let n = this.cell_to_scalar(tile.cell);
                 let set = this.cells_to_circuits.get(n);
