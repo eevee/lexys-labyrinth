@@ -1524,6 +1524,7 @@ class Player extends PrimaryView {
 
         this.turn_based_mode_waiting = false;
         this.last_advance = 0;
+        this.last_input = 0;
         this.current_keyring = {};
         this.current_toolbelt = [];
         this.previous_hint_tile = null;
@@ -1613,12 +1614,6 @@ class Player extends PrimaryView {
             }
         }
 
-        if (this.debug.enabled) {
-            for (let [action, el] of Object.entries(this.debug.input_els)) {
-                el.classList.toggle('--held', (input & INPUT_BITS[action]) !== 0);
-            }
-        }
-
         return input;
     }
 
@@ -1627,6 +1622,7 @@ class Player extends PrimaryView {
         for (let i = 0; i < tics; i++) {
             // FIXME turn-based mode should be disabled during a replay
             let input = this.get_input();
+            this.last_input = input;
             // Extract the fake 'wait' bit, if any
             let wait = input & INPUT_BITS['wait'];
             input &= ~wait;
@@ -1727,6 +1723,15 @@ class Player extends PrimaryView {
 
     undo() {
         this.level.undo();
+
+        if (this.debug.enabled && this.debug.replay) {
+            // Forward, we show the input from tic N and the result from tic N + 1.
+            // So backward, we just rewound to the result from tic N; show the input from tic N - 1.
+            this.last_input = this.debug.replay.get(this.level.tic_counter - 1);
+        }
+        else {
+            this.last_input = 0;
+        }
     }
 
     undo_last_move() {
@@ -1935,6 +1940,10 @@ class Player extends PrimaryView {
             this.debug.time_tics_el.textContent = current_tic;
             this.debug.time_moves_el.textContent = `${Math.floor(t/4)}`;
             this.debug.time_secs_el.textContent = (t / 20).toFixed(2);
+
+            for (let [action, el] of Object.entries(this.debug.input_els)) {
+                el.classList.toggle('--held', (this.last_input & INPUT_BITS[action]) !== 0);
+            }
 
             if (this.debug.replay) {
                 this.debug.replay_progress_el.setAttribute('value', t);
