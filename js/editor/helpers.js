@@ -46,9 +46,17 @@ export class SVGConnection {
         this.line.setAttribute('y1', this.sy + 0.5 + trim_y);
         // Technically this isn't quite right, since the ending is a square and the arrowhead will
         // poke into it a bit from angles near 45°, but that requires a bit more trig than seems
-        // worth it
-        this.line.setAttribute('x2', this.dx + 0.5 - trim_x);
-        this.line.setAttribute('y2', this.dy + 0.5 - trim_y);
+        // worth it, and it looks kinda neat anyway.
+        // Also, one nicety: if the cells are adjacent, don't trim the endpoint, or we won't have
+        // an arrow at all.
+        if (line_length < 2) {
+            this.line.setAttribute('x2', this.dx + 0.5);
+            this.line.setAttribute('y2', this.dy + 0.5);
+        }
+        else {
+            this.line.setAttribute('x2', this.dx + 0.5 - trim_x);
+            this.line.setAttribute('y2', this.dy + 0.5 - trim_y);
+        }
     }
 }
 
