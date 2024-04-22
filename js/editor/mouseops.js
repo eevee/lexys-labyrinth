@@ -276,6 +276,9 @@ export class MouseOperation {
     handle_tile_updated(is_bg = false) {}
     // Called when the mouse leaves the level or viewport while the button is NOT held down
     handle_leave() {}
+    // Called when any hover state should be thrown away, due to some external change, just before
+    // handle_drag or handle_hover is called
+    handle_refresh() {}
 }
 
 export class PanOperation extends MouseOperation {
@@ -800,10 +803,18 @@ export class ForceFloorOperation extends MouseOperation {
 // fix it if it wasn't there?
 // TODO gonna need an ice tool too, so maybe i can merge all three with some base thing that tracks
 // the directions the mouse is moving?  or is FF tool too different?
+// TODO would be nice if i could add or remove individual tracks with a single click, too.
+// and/or pop open the track editor bubble thing?
 export class TrackOperation extends MouseOperation {
     handle_press() {
         // Do nothing to start; we only lay track when the mouse leaves a cell
         this.entry_direction = null;
+
+        // ...unless...
+        let tri_x = Math.floor((this.click_frac_cell_x - this.click_cell_x) * 3);
+        let tri_y = Math.floor((this.click_frac_cell_y - this.click_cell_y) * 3);
+        // TODO add or remove track on the edge clicked here?  hover preview?
+        // TODO ctrl-mouse2 for the popup?
     }
     handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
         // Walk the mouse movement and, for every tile we LEAVE, add a railroad track matching the
@@ -1314,6 +1325,26 @@ export class RotateOperation extends MouseOperation {
             cy: 0.5,
             r: 0.75,
         }));
+        // TODO better preview
+        /*
+        let renderer = this.editor.renderer;
+        this.canvas = mk('canvas', {
+            width: renderer.tileset.size_x,
+            height: renderer.tileset.size_y,
+        });
+        // Need an extra <g> here so the translate transform doesn't clobber the scale on the
+        // foreignObject
+        this.set_cursor_element(mk_svg('g.overlay-transient',
+            mk_svg('foreignObject', {
+                x: 0,
+                y: 0,
+                width: this.canvas.width,
+                height: this.canvas.height,
+                transform: `scale(${1/renderer.tileset.size_x} ${1/renderer.tileset.size_y})`,
+                opacity: 0.75,
+            }, this.canvas),
+        ));
+        */
     }
 
     _find_target_tile(cell) {
@@ -1621,10 +1652,34 @@ export class AdjustOperation extends MouseOperation {
         this.hovered_layer = null;
     }
 
-    _find_target_tile(cell) {
+    // The real work happens on hover, since we need to actually adjust the tile in order to preview
+    // it anyway; clicking just commits it.
+    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        // TODO hrmm if we undo without moving the mouse then this becomes wrong (even without the
+        // stuff here)
+        // TODO uhhh that's true for all kinds of kb shortcuts actually, even for pressing/releasing
+        // ctrl or shift to change the target.  dang
+        if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y &&
+            (! this.hovered_edge || this.hovered_edge === this.get_tile_edge()) &&
+            ! this.hover_stale)
+        {
+            return;
+        }
+
+        let cell = this.cell(cell_x, cell_y);
+
+        // Find our target tile, and in most cases, adjust it
+        this.hover_stale = false;
+        this.adjusted_tile = null;
+        this.hovered_edge = null;
         let top_layer = LAYERS.MAX - 1;
         let bottom_layer = 0;
-        if (this.ctrl) {
+        if (this.ctrl && this.shift) {
+            // ctrl-shift: explicitly target item
+            top_layer = LAYERS.item;
+            bottom_layer = LAYERS.item;
+        }
+        else if (this.ctrl) {
             // ctrl: explicitly target terrain
             top_layer = LAYERS.terrain;
             bottom_layer = LAYERS.terrain;
@@ -1640,39 +1695,55 @@ export class AdjustOperation extends MouseOperation {
                 continue;
 
             // This is kind of like documentation for everything the adjust tool can do I guess
-            if (TILE_TYPES['transmogrifier']._mogrifications[tile.type.name]) {
-                // Toggle between related tile types
-                return [layer, "Mogrify"];
-            }
             if (ADJUST_TILE_TYPES[tile.type.name]) {
                 // Toggle between related tile types
-                return [layer, ADJUST_TILE_TYPES[tile.type.name].verb];
+                let adjustment = ADJUST_TILE_TYPES[tile.type.name];
+                //verb = adjustment.verb;
+                this.adjusted_tile = {...tile, type: TILE_TYPES[adjustment.next]};
+                break;
             }
             if (tile.type.name === 'logic_gate' && ADJUST_GATE_TYPES[tile.gate_type]) {
                 // Also toggle between related logic gate types
-                return [layer, "Change"];
+                //verb = "Change";
+                this.adjusted_tile = {...tile, gate_type: ADJUST_GATE_TYPES[tile.gate_type].next};
+                break;
             }
-            if (tile.type.name === 'logic_gate' && tile.gate_type === 'counter') {
-                // Adjust the starting number on a logic gate
-                return [layer, "Count"];
+            let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
+            if (behavior && behavior.adjust_forward) {
+                // Do faux-rotation, which includes incrementing counter gates
+                //verb = "Adjust";
+                this.adjusted_tile = {...tile};
+                behavior.adjust_forward(this.adjusted_tile);
+                break;
             }
             if (layer === LAYERS.thin_wall) {
                 // Place or delete individual thin walls
-                return [layer, "Place"];
+                let edge = this.get_tile_edge();
+                this.hovered_edge = edge;
+                this.adjusted_tile = {...tile};
+                this.adjusted_tile.edges ^= DIRECTIONS[edge].bit;
+                break;
             }
-            if (tile.type.name === 'frame block') {
+            if (tile.type.name === 'frame_block') {
                 // Place or delete individual frame block arrows
-                return [layer, "Place"];
+                // TODO this kinda obviates the need for a frame block editor
+                this.adjusted_tile = {...tile, arrows: new Set(tile.arrows)};
+                let edge = this.get_tile_edge();
+                this.hovered_edge = edge;
+                if (this.adjusted_tile.arrows.has(edge)) {
+                    this.adjusted_tile.arrows.delete(edge);
+                }
+                else {
+                    this.adjusted_tile.arrows.add(edge);
+                }
+                break;
             }
 
             // These are
             // TODO need a single-click thing to do for 
-            let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
-            if (behavior && behavior.adjust_forward) {
-                // 
-                return [layer, "Adjust"];
-            }
 
+            // TODO hmm. what do i do with these
+            /*
             if (TILES_WITH_PROPS[tile.type.name]) {
                 // Open special tile editors
                 return [layer, "Edit"];
@@ -1681,22 +1752,9 @@ export class AdjustOperation extends MouseOperation {
             if (ADJUST_SPECIAL[tile.type.name]) {
                 return [layer, "Press"];
             }
+            */
         }
-
-        return [null, null];
-    }
-
-    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        // TODO hrmm if we undo without moving the mouse then this becomes wrong (even without the
-        // stuff here)
-        // TODO uhhh that's true for all kinds of kb shortcuts actually, even for pressing/releasing
-        // ctrl or shift to change the target.  dang
-        if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y)
-            return;
-
-        let cell = this.cell(cell_x, cell_y);
-        let [layer, hint] = this._find_target_tile(cell);
-        this.hovered_layer = layer;
+        /*
         if (hint === null) {
             this.click_hint.classList.remove('--visible');
         }
@@ -1706,47 +1764,26 @@ export class AdjustOperation extends MouseOperation {
             this.click_hint.setAttribute('y', cell_y - 0.125);
             this.click_hint.textContent = hint;
         }
+        */
 
-        if (layer === null) {
+        if (! this.adjusted_tile) {
             this.cursor_element.classList.remove('--visible');
             this.gray_button_preview.classList.remove('--visible');
             return;
         }
-        let tile = cell[layer];
 
-        /*
+        // Draw the altered tile on top of everything else
         this.cursor_element.classList.add('--visible');
-        if (layer === LAYERS.terrain) {
-            this.cursor_element.setAttribute('data-layer', 'terrain');
+        let ctx = this.canvas.getContext('2d');
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this.adjusted_tile.type.layer !== LAYERS.terrain) {
+            this.editor.renderer.draw_single_tile_type('floor', null, this.canvas);
         }
-        else if (layer === LAYERS.item) {
-            this.cursor_element.setAttribute('data-layer', 'item');
-        }
-        else if (layer === LAYERS.actor) {
-            this.cursor_element.setAttribute('data-layer', 'actor');
-        }
-        else if (layer === LAYERS.thin_wall) {
-            this.cursor_element.setAttribute('data-layer', 'thin-wall');
-        }
-        */
-
-        if (cell.filter(t => t).length <= 1) {
-            // Only one tile, so the canvas is pointless
-            this.cursor_element.classList.remove('--visible');
-        }
-        else {
-            // Draw the targeted tile on top of everything else
-            this.cursor_element.classList.add('--visible');
-            let ctx = this.canvas.getContext('2d');
-            ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            if (layer !== LAYERS.terrain) {
-                this.editor.renderer.draw_single_tile_type('floor', null, this.canvas);
-            }
-            this.editor.renderer.draw_single_tile_type(tile.type.name, tile, this.canvas);
-        }
+        this.editor.renderer.draw_single_tile_type(
+            this.adjusted_tile.type.name, this.adjusted_tile, this.canvas);
 
         // Special previewing behavior
-        if (tile.type.name === 'button_gray') {
+        if (this.adjusted_tile.type.name === 'button_gray') {
             this.cursor_element.classList.remove('--visible');
             this.gray_button_preview.classList.add('--visible');
             let gx0 = Math.max(0, cell_x - 2);
@@ -1793,63 +1830,16 @@ export class AdjustOperation extends MouseOperation {
 
     handle_press() {
         let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
-        let tile = cell[this.hovered_layer];
-        if (! tile)
-            return;
-        let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
 
-        // Same order as _find_target_tile
-        if (TILE_TYPES['transmogrifier']._mogrifications[tile.type.name]) {
-            // Toggle between related tile types
-            tile.type = TILE_TYPES[TILE_TYPES['transmogrifier']._mogrifications[tile.type.name]];
-            this.editor.place_in_cell(cell, tile);
+        if (this.adjusted_tile) {
+            this.editor.place_in_cell(cell, this.adjusted_tile);
             this.editor.commit_undo();
+            // The tile has changed, so invalidate our hover
+            // TODO should the editor do this automatically, since the cell changed?
+            this.handle_refresh();
+            this.handle_hover(null, null, null, null, this.prev_cell_x, this.prev_cell_y);
         }
-        else if (ADJUST_TILE_TYPES[tile.type.name]) {
-            // Toggle between related tile types
-            // TODO can you go backwards any more, or no?
-            let toggled = ADJUST_TILE_TYPES[tile.type.name].next;
-            tile.type = TILE_TYPES[toggled];
-            this.editor.place_in_cell(cell, tile);
-            this.editor.commit_undo();
-        }
-        else if (tile.type.name === 'logic_gate' && ADJUST_GATE_TYPES[tile.gate_type]) {
-            // Also toggle between related logic gate types
-            let toggled = ADJUST_GATE_TYPES[tile.gate_type].next;
-            tile.gate_type = toggled;
-            this.editor.place_in_cell(cell, tile);
-            this.editor.commit_undo();
-        }
-        else if (tile.type.name === 'logic_gate' && tile.gate_type === 'counter') {
-            // Adjust the starting number on a logic gate
-            // TODO is this in adjust_forward or...?
-        }
-        else if (this.hovered_layer === LAYERS.thin_wall) {
-            // Place or delete individual thin walls
-            // XXX don't allow deleting ALL the thin walls...??
-            let bit = DIRECTIONS[this.get_tile_edge()].bit;
-            tile.edges ^= bit;
-            this.editor.place_in_cell(cell, tile);
-            this.editor.commit_undo();
-        }
-        else if (tile.type.name === 'frame_block') {
-            // Place or delete individual frame block arrows
-            let edge = this.get_tile_edge();
-            tile.arrows = new Set(tile.arrows);
-            if (tile.arrows.has(edge)) {
-                tile.arrows.delete(edge);
-            }
-            else {
-                tile.arrows.add(edge);
-            }
-            this.editor.place_in_cell(cell, tile);
-            this.editor.commit_undo();
-        }
-        else if (behavior && behavior.adjust_forward) {
-            behavior.adjust_forward(tile);
-            this.editor.place_in_cell(cell, tile);
-            this.editor.commit_undo();
-        }
+        /*
         else if (ADJUST_SPECIAL[tile.type.name]) {
             ADJUST_SPECIAL[tile.type.name](this.editor, tile, cell);
             this.editor.commit_undo();
@@ -1860,7 +1850,13 @@ export class AdjustOperation extends MouseOperation {
             this.editor.open_tile_prop_overlay(
                 tile, cell, this.editor.renderer.get_cell_rect(cell.x, cell.y));
         }
+        */
     }
+
+    handle_refresh() {
+        this.hover_stale = true;
+    }
+
     // Adjust tool doesn't support dragging
     // TODO should it?
     // TODO if it does then it should end as soon as you spawn a popup
