@@ -207,6 +207,15 @@ export class Editor extends PrimaryView {
                         this.redraw_foreground_tile();
                     }
                 }
+                else if (ev.key === '-') {
+                    this.zoom_by(-1);
+                }
+                else if (ev.key === '=') {
+                    this.zoom_by(+1);
+                }
+                else if (ev.key === '1') {
+                    this.set_canvas_zoom(1);
+                }
                 else if (TOOL_SHORTCUTS[ev.key]) {
                     this.select_tool(TOOL_SHORTCUTS[ev.key]);
                 }
@@ -309,35 +318,12 @@ export class Editor extends PrimaryView {
 
             // TODO Alt: Scroll through palette
 
-            let index = ZOOM_LEVELS.findIndex(el => el >= this.zoom);
-            if (index < 0) {
-                index = ZOOM_LEVELS.length - 1;
-            }
-
-            let new_zoom;
             if (ev.deltaY > 0) {
-                // Zoom out
-                if (ZOOM_LEVELS[index] !== this.zoom) {
-                    // If we're between levels, pretend we're one level in
-                    index += 1;
-                }
-                if (index <= 0)
-                    return;
-                new_zoom = ZOOM_LEVELS[index - 1];
+                this.zoom_by(-1, ev.clientX, ev.clientY);
             }
             else {
-                // Zoom in
-                if (ZOOM_LEVELS[index] !== this.zoom) {
-                    index -= 1;
-                }
-                if (index >= ZOOM_LEVELS.length - 1)
-                    return;
-                new_zoom = ZOOM_LEVELS[index + 1];
+                this.zoom_by(+1, ev.clientX, ev.clientY);
             }
-            // FIXME preserve the panning such that the point under the cursor doesn't move
-            // (possibly difficult given that i can't pan at all if there are no scrollbars??)
-            // FIXME add a widget to status bar
-            this.set_canvas_zoom(new_zoom, ev.clientX, ev.clientY);
         });
 
         // Toolbox
@@ -1122,13 +1108,43 @@ export class Editor extends PrimaryView {
 
     // ------------------------------------------------------------------------------------------------
 
+    zoom_by(dz, origin_x = null, origin_y = null) {
+        if (dz === 0)
+            return;
+
+        let index = ZOOM_LEVELS.findIndex(el => el >= this.zoom);
+        if (index < 0) {
+            index = ZOOM_LEVELS.length - 1;
+        }
+
+        let new_zoom;
+        if (ZOOM_LEVELS[index] !== this.zoom) {
+            // If we're between levels, round to the level away from the direction we're trying to
+            // zoom, so that one notch will take us to the next nearest zoom level
+            index -= Math.sign(dz);
+        }
+
+        index += dz;
+        if (index < 0 || index >= ZOOM_LEVELS.length)
+            return;
+
+        this.set_canvas_zoom(ZOOM_LEVELS[index], origin_x, origin_y);
+    }
+
     set_canvas_zoom(zoom, origin_x = null, origin_y = null) {
         // Adjust scrolling so that the point under the mouse cursor remains fixed
         let scroll_adjust_x = null;
         let scroll_adjust_y = null;
-        if (origin_x !== null && this.zoom) {
+        if (this.zoom) {
+            if (origin_x === null) {
+                // Default to zooming around the center of the viewport
+                let bbox = this.viewport_el.getBoundingClientRect();
+                origin_x = bbox.left + bbox.width / 2;
+                origin_y = bbox.top + bbox.height / 2;
+            }
             // FIXME possible sign of a bad api
             let [frac_cell_x, frac_cell_y] = this.renderer.real_cell_coords_from_event({clientX: origin_x, clientY: origin_y});
+
             // Zooming is really just resizing a DOM element, which doesn't affect either the
             // transparent border or the scroll position, so zooming from Z1 to Z2 will move a point
             // from X * Z1 to X * Z2.  To keep it at the same client point, the scroll position
