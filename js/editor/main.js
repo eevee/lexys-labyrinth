@@ -1052,12 +1052,12 @@ export class Editor extends PrimaryView {
         // Load connections
         // TODO what if the source tile is not connectable?
         this.connections_g.textContent = '';
-        this.connections_arrows = {};
+        this.connections_arrows = new Map;
         for (let [src, dest] of this.stored_level.custom_connections) {
             let [sx, sy] = this.scalar_to_coords(src);
             let [dx, dy] = this.scalar_to_coords(dest);
             let arrow = new SVGConnection(sx, sy, dx, dy);
-            this.connections_arrows[src] = arrow;
+            this.connections_arrows.set(src, arrow);
             arrow.element.setAttribute(
                 'data-source', this.stored_level.linear_cells[src][LAYERS.terrain].type.name);
             this.connections_g.append(arrow.element);
@@ -1700,6 +1700,25 @@ export class Editor extends PrimaryView {
         }
 
         this.stored_level.linear_cells = new_cells;
+
+        // Update all the coordinates in explicit connections
+        let old_connections = this.stored_level.custom_connections;
+        let old_arrows = this.connections_arrows;
+        this.stored_level.custom_connections = new Map;
+        this.connections_arrows = new Map;
+        for (let [old_src, old_dest] of old_connections) {
+            let [sx, sy] = convert_coords(old_src % old_w, Math.floor(old_src / old_w), w, h);
+            let [dx, dy] = convert_coords(old_dest % old_w, Math.floor(old_dest / old_w), w, h);
+            let new_src = this.coords_to_scalar(sx, sy);
+            let new_dest = this.coords_to_scalar(dx, dy);
+            this.stored_level.custom_connections.set(new_src, new_dest);
+            let arrow = old_arrows.get(old_src);
+            arrow.set_source(sx, sy);
+            arrow.set_dest(dx, dy);
+            this.connections_arrows.set(new_src, arrow);
+        }
+        // All the implicit connections are nonsense now, so fuck it
+        this.recreate_implicit_connections();
     }
 
     rotate_level_right() {
@@ -1843,27 +1862,27 @@ export class Editor extends PrimaryView {
     }
     _set_custom_connection(src, dest) {
         if ((dest ?? null) === null) {
-            if (this.connections_arrows[src]) {
-                this.connections_arrows[src].element.remove();
+            if (this.connections_arrows.has(src)) {
+                this.connections_arrows.get(src).element.remove();
             }
             this.stored_level.custom_connections.delete(src)
-            delete this.connections_arrows[src];
+            this.connections_arrows.delete(src);
         }
         else {
             this.stored_level.custom_connections.set(src, dest);
 
-            if (this.connections_arrows[src]) {
-                this.connections_arrows[src].set_dest(
+            if (this.connections_arrows.has(src)) {
+                this.connections_arrows.get(src).set_dest(
                     ...this.scalar_to_coords(dest));
             }
             else {
                 let arrow = new SVGConnection(
                     ...this.scalar_to_coords(src),
                     ...this.scalar_to_coords(dest));
-                this.connections_arrows[src] = arrow;
+                this.connections_arrows.set(src, arrow);
                 this.connections_g.append(arrow.element);
             }
-            this.connections_arrows[src].element.setAttribute(
+            this.connections_arrows.get(src).element.setAttribute(
                 'data-source', this.stored_level.linear_cells[src][LAYERS.terrain].type.name);
         }
     }
