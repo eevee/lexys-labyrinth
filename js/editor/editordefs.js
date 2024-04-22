@@ -59,10 +59,18 @@ export const TOOLS = {
         op1: mouseops.TrackOperation,
         op2: mouseops.TrackOperation,
     },
+    rotate: {
+        icon: 'icons/tool-rotate.png',
+        name: "Rotate",
+        desc: "Rotate existing tiles.\nAffects the top-most tile by default.\n\n[mouse1] Rotate clockwise\n[mouse2] Rotate counter-clockwise\n[ctrl] Target terrain\n[shift] Target actor",  // TODO? \n[ctrl] [shift] Affect actor without rotating 
+        op1: mouseops.RotateOperation,
+        op2: mouseops.RotateOperation,
+        shortcut: 'r',
+    },
     adjust: {
         icon: 'icons/tool-adjust.png',
         name: "Adjust",
-        desc: "Inspect and edit existing tiles in a variety of ways.  Give it a try!\n\n[mouse1] Rotate actor\n[mouse1] Rotate or change terrain\n[mouse1] Press button\n[mouse2] Rotate/toggle in the other direction\n[shift] Always target terrain\n\n[ctrl] [mouse1] Edit properties of complex tiles\n(wires, railroads, hints, etc.)",
+        desc: "Inspect and alter miscellaneous tiles in a variety of ways.\nGive it a try!  Affects the top-most tile by default.\n\n[mouse1] Toggle tile type\n[mouse1] Press button\n[mouse2] Edit properties of complex tiles\n(wires, railroads, hints, etc.)\n[ctrl] Target terrain\n[shift] Target actor\n[ctrl] [shift] Target item",
         op1: mouseops.AdjustOperation,
         op2: mouseops.AdjustOperation,
         shortcut: 'a',
@@ -102,7 +110,7 @@ export const TOOLS = {
     // slade when you have some selected?
     // TODO ah, railroads...
 };
-export const TOOL_ORDER = ['pencil', 'select_box', 'fill', 'adjust', 'force-floors', 'tracks', 'connect', 'wire', 'camera'];
+export const TOOL_ORDER = ['pencil', 'select_box', 'fill', 'rotate', 'adjust', 'force-floors', 'tracks', 'connect', 'wire', 'camera'];
 export const TOOL_SHORTCUTS = {};
 for (let [tool, tooldef] of Object.entries(TOOLS)) {
     if (tooldef.shortcut) {
@@ -139,10 +147,10 @@ export const PALETTE = [{
         'no_player1_sign',
         'no_player2_sign',
 
-        'floor_custom_green', 'floor_custom_pink', 'floor_custom_yellow', 'floor_custom_blue',
-        'wall_custom_green', 'wall_custom_pink', 'wall_custom_yellow', 'wall_custom_blue',
+        'floor_custom_pink', 'floor_custom_blue', 'floor_custom_yellow', 'floor_custom_green',
+        'wall_custom_pink', 'wall_custom_blue', 'wall_custom_yellow', 'wall_custom_green',
 
-        'door_blue', 'door_red', 'door_yellow', 'door_green',
+        'door_red', 'door_blue', 'door_yellow', 'door_green',
         'swivel_nw',
         'railroad/straight',
         'railroad/curve',
@@ -156,8 +164,8 @@ export const PALETTE = [{
 }, {
     title: "Items",
     tiles: [
-        'key_blue', 'key_red', 'key_yellow', 'key_green',
-        'flippers', 'fire_boots', 'cleats', 'suction_boots',
+        'key_red', 'key_blue', 'key_yellow', 'key_green',
+        'cleats', 'suction_boots', 'fire_boots', 'flippers',
         'hiking_boots', 'speed_boots', 'lightning_bolt', 'railroad_sign',
         'helmet', 'foil', 'hook', 'xray_eye',
         'bribe', 'bowling_ball', 'dynamite', 'no_sign',
@@ -210,10 +218,10 @@ export const PALETTE = [{
         'button_orange', 'flame_jet_off', 'flame_jet_on',
         'transmogrifier',
 
-        'teleport_blue',
         'teleport_red',
-        'teleport_green',
+        'teleport_blue',
         'teleport_yellow',
+        'teleport_green',
         'stopwatch_bonus',
         'stopwatch_penalty',
         'stopwatch_toggle',
@@ -248,17 +256,17 @@ export const PALETTE = [{
     tiles: [
         'sokoban_block/red',
         'sokoban_block/blue',
-        'sokoban_block/green',
         'sokoban_block/yellow',
+        'sokoban_block/green',
         'sokoban_button/red',
         'sokoban_button/blue',
-        'sokoban_button/green',
         'sokoban_button/yellow',
+        'sokoban_button/green',
 
         'sokoban_wall/red',
         'sokoban_wall/blue',
-        'sokoban_wall/green',
         'sokoban_wall/yellow',
+        'sokoban_wall/green',
         'gate_red',
         'gate_blue',
         'gate_yellow',

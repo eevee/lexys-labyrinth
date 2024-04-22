@@ -1222,6 +1222,7 @@ const TILE_TYPES = {
         can_reveal_walls: true,
         can_reverse_on_railroad: true,
         movement_speed: 4,
+        // TODO why does this have a Set where most things have a bitmask
         allows_push(me, direction) {
             return me.arrows && me.arrows.has(direction);
         },

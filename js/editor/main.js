@@ -80,11 +80,12 @@ export class Editor extends PrimaryView {
         this.renderer = new CanvasRenderer(this.conductor.tilesets['ll'], 32);
         this.renderer.perception = 'editor';
         this.renderer.show_facing = true;
+        this.renderer.canvas.classList.add('editor-renderer-canvas');
 
         // FIXME need this in load_level which is called even if we haven't been setup yet
         this.connections_g = mk_svg('g', {'data-name': 'connections'});
         // This SVG draws vectors on top of the editor, like monster paths and button connections
-        this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '0 0 32 32'},
+        this.svg_overlay = mk_svg('svg.level-editor-overlay', {viewBox: '-1 -1 34 34'},
             mk_svg('defs',
                 mk_svg('marker', {id: 'overlay-arrowhead', markerWidth: 4, markerHeight: 4, refX: 3, refY: 2, orient: 'auto'},
                     mk_svg('polygon', {points: '0 0, 4 2, 0 4'}),
@@ -305,6 +306,8 @@ export class Editor extends PrimaryView {
                 return;
             ev.stopPropagation();
             ev.preventDefault();
+
+            // TODO Alt: Scroll through palette
 
             let index = ZOOM_LEVELS.findIndex(el => el >= this.zoom);
             if (index < 0) {
@@ -1082,6 +1085,9 @@ export class Editor extends PrimaryView {
         // Load *implicit* connections
         this.recreate_implicit_connections();
 
+        // Trace out circuitry
+        this.update_circuits();
+
         this.renderer.set_level(stored_level);
         if (this.active) {
             this.redraw_entire_level();
@@ -1103,7 +1109,9 @@ export class Editor extends PrimaryView {
 
     update_viewport_size() {
         this.renderer.set_viewport_size(this.stored_level.size_x, this.stored_level.size_y);
-        this.svg_overlay.setAttribute('viewBox', `0 0 ${this.stored_level.size_x} ${this.stored_level.size_y}`);
+        this.svg_overlay.setAttribute('viewBox', `-1 -1 ${this.stored_level.size_x + 2} ${this.stored_level.size_y + 2}`);
+        this.svg_overlay.style.setProperty('--tile-width', `${this.renderer.tileset.size_x}px`);
+        this.svg_overlay.style.setProperty('--tile-height', `${this.renderer.tileset.size_y}px`);
     }
 
     update_after_size_change() {
@@ -1188,25 +1196,37 @@ export class Editor extends PrimaryView {
         this.tool_button_els[this.current_tool].classList.add('-selected');
 
         // Left button: activate tool
-        this._init_mouse_op(0, this.current_tool && TOOLS[this.current_tool].op1);
         // Right button: activate tool's alt mode
-        this._init_mouse_op(2, this.current_tool && TOOLS[this.current_tool].op2);
+        let op_type1 = this.current_tool && TOOLS[this.current_tool].op1;
+        let op_type2 = this.current_tool && TOOLS[this.current_tool].op2;
+        // Destroy the old operations.  Be careful since they might be the same object
+        if (this.mouse_ops[0]) {
+            this.mouse_ops[0].do_destroy();
+        }
+        if (this.mouse_ops[2] && this.mouse_ops[2] !== this.mouse_ops[0]) {
+            this.mouse_ops[2].do_destroy();
+        }
+        // Create new ones
+        if (op_type1) {
+            this.mouse_ops[0] = new op_type1(this);
+        }
+        else {
+            this.mouse_ops[0] = null;
+        }
+        if (op_type2) {
+            if (op_type1 === op_type2) {
+                // Use the same operation for both buttons, to simplify handling of hovering
+                this.mouse_ops[2] = this.mouse_ops[0];
+            }
+            else {
+                this.mouse_ops[2] = new op_type2(this);
+            }
+        }
+        else {
+            this.mouse_ops[2] = null;
+        }
 
         this.set_mouse_button(0);
-    }
-    _init_mouse_op(button, op_type) {
-        if (this.mouse_ops[button] && op_type && this.mouse_ops[button] instanceof op_type)
-            // Don't recreate the same type of mouse operation
-            return;
-
-        if (this.mouse_ops[button]) {
-            this.mouse_ops[button].do_destroy();
-            this.mouse_ops[button] = null;
-        }
-
-        if (op_type) {
-            this.mouse_ops[button] = new op_type(this, button);
-        }
     }
 
     set_mouse_button(button) {
@@ -1396,7 +1416,7 @@ export class Editor extends PrimaryView {
         ctx.clearRect(0, 0, this.fg_tile_el.width, this.fg_tile_el.height);
         this.renderer.draw_single_tile_type(
             this.fg_tile.type.name, this.fg_tile, this.fg_tile_el);
-        for (let mouse_op of this.mouse_ops) {
+        for (let mouse_op of new Set(this.mouse_ops)) {
             if (mouse_op) {
                 mouse_op.handle_tile_updated();
             }
@@ -1408,7 +1428,7 @@ export class Editor extends PrimaryView {
         ctx.clearRect(0, 0, this.bg_tile_el.width, this.bg_tile_el.height);
         this.renderer.draw_single_tile_type(
             this.bg_tile.type.name, this.bg_tile, this.bg_tile_el);
-        for (let mouse_op of this.mouse_ops) {
+        for (let mouse_op of new Set(this.mouse_ops)) {
             if (mouse_op) {
                 mouse_op.handle_tile_updated(true);
             }
@@ -1871,6 +1891,7 @@ export class Editor extends PrimaryView {
         }
     }
 
+    // TODO handle old_tile or new_tile being null (won't connect anyway)
     // TODO explicit connection stuff left:
     // - adding an explicit connection should delete all the implicit ones from the source
     // - deleting an explicit connection should add an auto implicit connection
@@ -1882,6 +1903,7 @@ export class Editor extends PrimaryView {
     //   - if only src, copy original dest
     //   - if only dest, then stamping should only do it if it doesn't already exist?
     //     also arrow should follow the selection
+    // TODO all this stuff needs to apply to transforms as well, oopsie
     _update_connections(cell, old_tile, new_tile) {
         if (! (old_tile && ! this.connectable_types.has(old_tile.type.name)) &&
             ! (new_tile && ! this.connectable_types.has(new_tile.type.name)))
@@ -1889,7 +1911,7 @@ export class Editor extends PrimaryView {
             // Nothing to do
             return;
         }
-        if (old_tile.type.name === new_tile.type.name)
+        if (old_tile && new_tile && old_tile.type.name === new_tile.type.name)
             return;
 
         // TODO actually this should also update explicit ones, if the source/dest types are changed
@@ -1898,11 +1920,11 @@ export class Editor extends PrimaryView {
         let n = this.cell_to_scalar(cell);
 
         // Remove an old outgoing connection
-        if (old_tile.type.connects_to) {
+        if (old_tile && old_tile.type.connects_to) {
             this.__delete_implicit_connection(n);
         }
         // Remove an old incoming connection
-        if (old_tile.type.connects_from) {
+        if (old_tile && old_tile.type.connects_from) {
             let sources = this.reverse_implicit_connections.get(n);
             if (sources) {
                 // All the buttons pointing at us are now dangling.  We could be a little clever
@@ -1917,11 +1939,11 @@ export class Editor extends PrimaryView {
         }
 
         // Add a new outgoing connection
-        if (new_tile.type.connects_to) {
+        if (new_tile && new_tile.type.connects_to) {
             this._implicit_connect_tile(new_tile, cell, n);
         }
         // Add a new incoming connection, which is a bit more complicated
-        if (new_tile.type.connects_from) {
+        if (new_tile && new_tile.type.connects_from) {
             for (let source_type_name of new_tile.type.connects_from) {
                 let source_type = TILE_TYPES[source_type_name];
                 // For a trap or cloner, we can search backwards until we see another trap or
@@ -1944,7 +1966,7 @@ export class Editor extends PrimaryView {
                 // every orange button in the level!
                 else if (source_type.connect_order === 'diamond') {
                     for (let source_cell of this.stored_level.linear_cells) {
-                        let terrain = source_cell.get_terrain();
+                        let terrain = source_cell[LAYERS.terrain];
                         if (terrain.type !== source_type)
                             continue;
 
@@ -1988,6 +2010,9 @@ export class Editor extends PrimaryView {
             this.implicit_connections.delete(src);
             this.reverse_implicit_connections.get(cxn.index).delete(src);
         }
+    }
+
+    update_circuits() {
     }
 
     // ------------------------------------------------------------------------------------------------

@@ -1511,10 +1511,10 @@ body.--debug .player-overlay-message {
 }
 .player-overlay-message[data-reason=failure] {
     background: hsla(330, 20%, 10%, 0.5);
-    background: radial-gradient(#0004, hsla(330, 10%, 10%, 0.5) 40%, hsl(330, 20%, 10%));
+    background: radial-gradient(hsla(330, 10%, 10%, 0.75) 40%, hsl(330, 20%, 10%));
 }
 .player-overlay-message[data-reason=success] {
-    background: radial-gradient(hsla(30, 80%, 10%, 0.75), 60%, hsla(40, 100%, 30%, 0.75));
+    background: radial-gradient(hsla(40, 80%, 10%, 0.75), hsla(40, 80%, 20%, 0.875) 80%, hsla(40, 80%, 30%, 0.875));
 }
 .player-overlay-message[data-reason=ended] {
     /* Rearrange this entirely, to fit the ending image in */
@@ -2198,7 +2198,7 @@ body.--debug #player-debug {
     width: -moz-fit-content;
     width: fit-content;
 }
-#editor .editor-canvas canvas {
+#editor .editor-canvas canvas.editor-renderer-canvas {
     display: block;
     width: calc(var(--viewport-width) * var(--tile-width) * var(--scale));
     --viewport-width: 9;
@@ -2208,10 +2208,7 @@ body.--debug #player-debug {
 /* SVG overlays */
 svg.level-editor-overlay {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    inset: calc(-1 * var(--tile-width) * var(--scale)) calc(-1 * var(--tile-height) * var(--scale));
     /* allow clicks to go through us! */
     pointer-events: none;
 
@@ -2279,7 +2276,7 @@ svg.level-editor-overlay g.overlay-connection[data-source=button_red] {
     stroke: hsl(0, 90%, 60%);
 }
 svg.level-editor-overlay g.overlay-connection[data-source=button_brown] {
-    stroke: hsl(20, 60%, 60%);
+    stroke: hsl(50, 90%, 50%);
 }
 svg.level-editor-overlay g.overlay-connection[data-source=button_orange] {
     stroke: hsl(30, 90%, 60%);
@@ -2289,6 +2286,27 @@ svg.level-editor-overlay g.overlay-connection.--implicit line.-arrow {
 }
 svg.level-editor-overlay g.overlay-connection line.-arrow {
     marker-end: url(#overlay-arrowhead);
+}
+svg.level-editor-overlay .overlay-adjust-cursor {
+    /* shared between rotate+adjust tools, though they use different elements/shapes */
+    stroke: #444;
+    fill: #fff4;
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=terrain] {
+    stroke: hsl(150deg, 80%, 20%, 0.8);
+    fill: hsl(150deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=item] {
+    stroke: hsl(50deg, 80%, 20%, 0.8);
+    fill: hsl(50deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=actor] {
+    stroke: hsl(215deg, 80%, 20%, 0.8);
+    fill: hsl(215deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=thin-wall] {
+    stroke: hsl(330deg, 80%, 20%, 0.8);
+    fill: hsl(330deg, 80%, 60%, 0.4);
 }
 svg.level-editor-overlay .overlay-adjust-gray-button-radius {
     stroke: #f4f4f4;
@@ -2313,6 +2331,15 @@ svg.level-editor-overlay text.overlay-edit-tip {
     fill: hsl(var(--selected-hue), 80%, 30%);
     text-anchor: middle;
     dominant-baseline: middle;
+}
+svg.level-editor-overlay text.overlay-adjust-hint {
+    font-size: calc(0.5px / var(--scale));
+    font-weight: bold;
+    stroke: black;
+    fill: white;
+    paint-order: stroke;
+    text-anchor: middle;
+    dominant-baseline: auto;
 }
 
 .editor-big-tooltip {

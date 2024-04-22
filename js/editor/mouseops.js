@@ -5,6 +5,7 @@ import { DIRECTIONS, LAYERS } from '../defs.js';
 import TILE_TYPES from '../tiletypes.js';
 import { mk, mk_svg, walk_grid } from '../util.js';
 
+import { SPECIAL_TILE_BEHAVIOR } from './editordefs.js';
 import { SVGConnection } from './helpers.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
 
@@ -20,11 +21,10 @@ import { TILES_WITH_PROPS } from './tile-overlays.js';
 // - set trap as initially open?  feels like a weird hack.  but it does appear in cc2lp1
 const MOUSE_BUTTON_MASKS = [1, 4, 2];  // MouseEvent.button/buttons are ordered differently
 export class MouseOperation {
-    constructor(editor, physical_button) {
+    constructor(editor) {
         this.editor = editor;
-        this.is_held = false;
-        this.physical_button = physical_button;
-        this.alt_mode = physical_button !== 0;
+        this.held_button = null;
+        this.alt_mode = false;
         this.ctrl = false;
         this.shift = false;
 
@@ -81,8 +81,30 @@ export class MouseOperation {
         return this.editor.cell(Math.floor(x), Math.floor(y));
     }
 
+    get_tile_edge() {
+        let frac_x = this.prev_frac_cell_x - this.prev_cell_x;
+        let frac_y = this.prev_frac_cell_y - this.prev_cell_y;
+        if (frac_x >= frac_y) {
+            if (frac_x >= 1 - frac_y) {
+                return 'east';
+            }
+            else {
+                return 'north';
+            }
+        }
+        else {
+            if (frac_x <= 1 - frac_y) {
+                return 'west';
+            }
+            else {
+                return 'south';
+            }
+        }
+    }
+
     do_press(ev) {
-        this.is_held = true;
+        this.held_button = ev.button;
+        this.alt_mode = (ev.button === 2);
         this._update_modifiers(ev);
 
         this.client_x = ev.clientX;
@@ -107,7 +129,7 @@ export class MouseOperation {
         let cell_x = Math.floor(frac_cell_x);
         let cell_y = Math.floor(frac_cell_y);
 
-        if (this.is_held && (ev.buttons & MOUSE_BUTTON_MASKS[this.physical_button]) === 0) {
+        if (this.held_button !== null && (ev.buttons & MOUSE_BUTTON_MASKS[this.held_button]) === 0) {
             this.do_abort();
         }
 
@@ -115,7 +137,7 @@ export class MouseOperation {
             this.cursor_element.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
         }
 
-        if (this.is_held) {
+        if (this.held_button !== null) {
             // Continue a drag even if the mouse goes outside the viewport
             this.handle_drag(ev.clientX, ev.clientY, frac_cell_x, frac_cell_y, cell_x, cell_y);
         }
@@ -191,21 +213,23 @@ export class MouseOperation {
     }
 
     do_commit() {
-        if (! this.is_held)
+        if (this.held_button === null)
             return;
 
         this.commit_press();
         this.cleanup_press();
-        this.is_held = false;
+        this.alt_mode = false;
+        this.held_button = null;
     }
 
     do_abort() {
-        if (! this.is_held)
+        if (this.held_button === null)
             return;
 
         this.abort_press();
         this.cleanup_press();
-        this.is_held = false;
+        this.alt_mode = false;
+        this.held_button = null;
     }
 
     do_destroy() {
@@ -568,6 +592,7 @@ export class FillOperation extends MouseOperation {
 // TODO also, delete?  there's no delete??
 // FIXME don't show the overlay text until has_moved
 // TODO cursor: 'cell' by default...?
+// FIXME possible to start dragging from outside the level bounds, augh
 export class SelectOperation extends MouseOperation {
     handle_press() {
         if (this.shift) {
@@ -631,7 +656,11 @@ export class SelectOperation extends MouseOperation {
     }
 
     update_pending_selection() {
-        this.pending_selection.set_extrema(this.click_cell_x, this.click_cell_y, this.prev_cell_x, this.prev_cell_y);
+        this.pending_selection.set_extrema(
+            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.click_cell_x)),
+            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.click_cell_y)),
+            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.prev_cell_x)),
+            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.prev_cell_y)));
     }
 
     commit_press() {
@@ -1164,40 +1193,189 @@ export class WireOperation extends MouseOperation {
     }
 }
 
+// TODO hmm there's no way to rotate the wires on a circuit block without rotating the block itself
+// TODO this highlights blocks even though they don't usually show their direction...
+// maybe put a pencil-like preview tile on here that highlights the tile being targeted, and also
+// forces showing the arrow on blocks?
+export class RotateOperation extends MouseOperation {
+    constructor(...args) {
+        super(...args);
+        this.hovered_layer = null;
+
+        this.set_cursor_element(mk_svg('circle.overlay-transient.overlay-adjust-cursor', {
+            cx: 0.5,
+            cy: 0.5,
+            r: 0.75,
+        }));
+    }
+
+    _find_target_tile(cell) {
+        let top_layer = LAYERS.MAX - 1;
+        let bottom_layer = 0;
+        if (this.ctrl) {
+            // ctrl: explicitly target terrain
+            top_layer = LAYERS.terrain;
+            bottom_layer = LAYERS.terrain;
+        }
+        else if (this.shift) {
+            // shift: explicitly target actor
+            top_layer = LAYERS.actor;
+            bottom_layer = LAYERS.actor;
+        }
+        for (let layer = top_layer; layer >= bottom_layer; layer--) {
+            let tile = cell[layer];
+            if (! tile)
+                continue;
+
+            // Detecting if a tile is rotatable is, uhh, a little, complicated
+            if (tile.type.is_actor) {
+                return layer;
+            }
+            // The counter doesn't actually rotate
+            if (tile.type.name === 'logic_gate' && tile.gate_type === 'counter') {
+                continue;
+            }
+            let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
+            if (behavior && behavior.rotate_left) {
+                return layer;
+            }
+
+            if (tile.wire_directions || tile.wire_tunnel_directions) {
+                return layer;
+            }
+        }
+
+        return null;
+    }
+
+    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        // TODO hrmm if we undo without moving the mouse then this becomes wrong (even without the
+        // stuff here)
+        // TODO uhhh that's true for all kinds of kb shortcuts actually, even for pressing/releasing
+        // ctrl or shift to change the target.  dang
+
+        let cell = this.cell(cell_x, cell_y);
+        let layer = this._find_target_tile(cell);
+        this.hovered_layer = layer;
+
+        if (layer === null) {
+            this.cursor_element.classList.remove('--visible');
+            return;
+        }
+
+        this.cursor_element.classList.add('--visible');
+        if (layer === LAYERS.terrain) {
+            this.cursor_element.setAttribute('data-layer', 'terrain');
+        }
+        else if (layer === LAYERS.item) {
+            this.cursor_element.setAttribute('data-layer', 'item');
+        }
+        else if (layer === LAYERS.actor) {
+            this.cursor_element.setAttribute('data-layer', 'actor');
+        }
+        else if (layer === LAYERS.thin_wall) {
+            this.cursor_element.setAttribute('data-layer', 'thin-wall');
+        }
+    }
+
+    handle_press() {
+        let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
+        if (this.hovered_layer === null)
+            return;
+        let tile = cell[this.hovered_layer];
+        if (! tile)
+            return;
+
+        let rotated;
+        tile = {...tile}; // TODO little inefficient
+        if (this.alt_mode) {
+            // Reverse, go counterclockwise
+            rotated = this.editor.rotate_tile_left(tile);
+        }
+        else {
+            rotated = this.editor.rotate_tile_right(tile);
+        }
+        if (rotated) {
+            this.editor.place_in_cell(cell, tile);
+            this.editor.commit_undo();
+            return;
+        }
+    }
+
+    // Rotate tool doesn't support dragging
+    // TODO should it?
+}
+
 // Tiles the "adjust" tool will turn into each other
-const ADJUST_TOGGLES_CW = {};
-const ADJUST_TOGGLES_CCW = {};
+const ADJUST_TILE_TYPES = {};
+const ADJUST_GATE_TYPES = {};
 {
-    for (let cycle of [
-        ['chip', 'chip_extra'],
-        // TODO shouldn't this convert regular walls into regular floors then?
-        ['floor_custom_green', 'wall_custom_green'],
-        ['floor_custom_pink', 'wall_custom_pink'],
-        ['floor_custom_yellow', 'wall_custom_yellow'],
-        ['floor_custom_blue', 'wall_custom_blue'],
-        ['fake_floor', 'fake_wall'],
-        ['popdown_floor', 'popdown_wall'],
-        ['wall_invisible', 'wall_appearing'],
-        ['green_floor', 'green_wall'],
-        ['green_bomb', 'green_chip'],
-        ['purple_floor', 'purple_wall'],
-        ['thief_keys', 'thief_tools'],
+    // Try to make these intuitive, the kind of things someone would naturally want to alter in a
+    // very small way.  The "other one".
+    for (let [verb, ...cycle] of [
+        ["Swap",    'player', 'player2'],
+        ["Swap",    'chip', 'chip_extra'],
+        // TODO shouldn't this convert regular walls into regular floors then?  or...  steel, if it
+        // has wires in it...?
+        // TODO annoying that there are two obvious kinds of change to make here
+        ["Recolor", 'floor_custom_pink', 'floor_custom_blue', 'floor_custom_yellow', 'floor_custom_green'],
+        ["Recolor", 'wall_custom_pink', 'wall_custom_blue', 'wall_custom_yellow', 'wall_custom_green'],
+        ["Recolor", 'door_red', 'door_blue', 'door_yellow', 'door_green'],
+        ["Recolor", 'key_red', 'key_blue', 'key_yellow', 'key_green'],
+        ["Recolor", 'teleport_red', 'teleport_blue', 'teleport_yellow', 'teleport_green'],
+        ["Recolor", 'gate_red', 'gate_blue', 'gate_yellow', 'gate_green'],
+        ["Toggle",  'green_floor', 'green_wall'],
+        ["Toggle",  'green_bomb', 'green_chip'],
+        ["Toggle",  'purple_floor', 'purple_wall'],
+        ["Swap",    'fake_floor', 'fake_wall'],
+        ["Swap",    'popdown_floor', 'popdown_wall'],
+        ["Swap",    'wall_invisible', 'wall_appearing'],
+        ["Swap",    'thief_keys', 'thief_tools'],
+        /*
         ['swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw'],
         ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
         ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
-        ['ice', 'force_floor_all'],
-        ['water', 'turtle'],
-        ['no_player1_sign', 'no_player2_sign'],
-        ['flame_jet_off', 'flame_jet_on'],
-        ['light_switch_off', 'light_switch_on'],
-        ['stopwatch_bonus', 'stopwatch_penalty'],
-        ['turntable_cw', 'turntable_ccw'],
+        */
+        ["Flip",    'force_floor_n', 'force_floor_s'],
+        ["Flip",    'force_floor_e', 'force_floor_w'],
+        ["Swap",    'ice', 'force_floor_all'],
+        ["Swap",    'water', 'turtle'],
+        ["Swap",    'no_player1_sign', 'no_player2_sign'],
+        ["Toggle",  'flame_jet_off', 'flame_jet_on'],
+        ["Flip",    'light_switch_off', 'light_switch_on'],
+        ["Swap",    'stopwatch_bonus', 'stopwatch_penalty'],
+        ["Swap",    'turntable_cw', 'turntable_ccw'],
+        ["Swap",    'score_10', 'score_100', 'score_1000'],
+        ["Swap",    'dirt_block', 'ice_block'],
+
+        ["Swap",    'doppelganger1', 'doppelganger2'],
+        ["Swap",    'ball', 'tank_blue'],
+        ["Swap",    'fireball', 'glider'],
+        ["Swap",    'bug', 'paramecium'],
+        ["Swap",    'walker', 'blob'],
+        ["Swap",    'teeth', 'teeth_timid'],
     ])
     {
-        for (let [i, tile] of cycle.entries()) {
-            let other = cycle[(i + 1) % cycle.length];
-            ADJUST_TOGGLES_CW[tile] = other;
-            ADJUST_TOGGLES_CCW[other] = tile;
+        for (let [i, type] of cycle.entries()) {
+            ADJUST_TILE_TYPES[type] = {
+                verb,
+                next: cycle[(i + 1) % cycle.length],
+                prev: cycle[(i - 1 + cycle.length) % cycle.length],
+            };
+        }
+    }
+
+    for (let cycle of [
+        ['not', 'diode'],
+        ['and', 'or', 'xor', 'nand'],
+        ['latch-cw', 'latch-ccw'],
+    ])
+    {
+        for (let [i, type] of cycle.entries()) {
+            ADJUST_GATE_TYPES[type] = {
+                next: cycle[(i + 1) % cycle.length],
+                prev: cycle[(i - 1 + cycle.length) % cycle.length],
+            };
         }
     }
 }
@@ -1259,6 +1437,7 @@ const ADJUST_SPECIAL = {
     },
     button_gray(editor, tile, cell) {
         // Toggle gray objects...  er...  objects affected by gray buttons
+        // TODO right-click should allow toggling backwards!
         for (let dy = -2; dy <= 2; dy++) {
             for (let dx = -2; dx <= 2; dx++) {
                 if (dx === 0 && dy === 0)
@@ -1276,57 +1455,223 @@ const ADJUST_SPECIAL = {
         }
     },
 };
-// TODO maybe better visual feedback of what will happen when you click?
-// - rotate terrain (cw, ccw)
-// - change terrain
-// - rotate actor (cw, ccw)
-// - press button
+// FIXME the preview is not very good because the hover effect becomes stale, pressing ctrl/shift
+// leaves it stale, etc
+// FIXME it might be nice to actually preview what we intend to do, which would require just, uh,
+// doing it to a temporary tile, but actually that does sound a lot better than all this
 export class AdjustOperation extends MouseOperation {
     constructor(...args) {
         super(...args);
 
         this.gray_button_preview = mk_svg('g.overlay-transient', {'data-source': 'AdjustOperation'});
-        this.gray_button_preview.append(mk_svg('rect.overlay-adjust-gray-button-radius', {
+        this.gray_button_bounds_rect = mk_svg('rect.overlay-adjust-gray-button-radius', {
             x: -2,
             y: -2,
             width: 5,
             height: 5,
-        }));
+        });
+        this.gray_button_preview.append(this.gray_button_bounds_rect);
         this.editor.svg_overlay.append(this.gray_button_preview);
 
+        // Cool octagon
+        /*
+        this.set_cursor_element(mk_svg('path.overlay-transient.overlay-adjust-cursor', {
+            //d: 'M -0.25,-0.25 L 0.5,-0.5 L 1.25,-0.25 L 1.5,0.5' +
+            //    'L 1.25,1.25 L 0.5,1.5 L -0.25,1.25 L -0.5,0.5 z',
+            //d: 'M 0.5,0.5 m 0.75,-0.75 l 0.75,-0.25 l 0.75,0.25 l 0.25,0.75' +
+            //    'l -0.25,0.75 l -0.75,0.25 l -0.75,-0.25 l -0.25,-0.75 z',
+            d: 'M 0.5,0.5 m -0.5,-0.5 l 0.5,-0.125 l 0.5,0.125 l 0.125,0.5' +
+                'l -0.125,0.5 l -0.5,0.125 l -0.5,-0.125 l -0.125,-0.5 z',
+        }));
+        */
+        // The cursor is the tile being targeted, drawn with high opacity atop the rest of the cell,
+        // to hopefully make it clear which layer we're looking at
+        let renderer = this.editor.renderer;
+        this.canvas = mk('canvas', {
+            width: renderer.tileset.size_x,
+            height: renderer.tileset.size_y,
+        });
+        // Need an extra <g> here so the translate transform doesn't clobber the scale on the
+        // foreignObject
+        this.set_cursor_element(mk_svg('g.overlay-transient',
+            mk_svg('foreignObject', {
+                x: 0,
+                y: 0,
+                width: this.canvas.width,
+                height: this.canvas.height,
+                transform: `scale(${1/renderer.tileset.size_x} ${1/renderer.tileset.size_y})`,
+                opacity: 0.75,
+            }, this.canvas),
+        ));
+
+        this.click_hint = mk_svg('text.overlay-adjust-hint.overlay-transient');
+        this.editor.svg_overlay.append(this.click_hint);
+
+        this.hovered_layer = null;
+    }
+
+    _find_target_tile(cell) {
+        let top_layer = LAYERS.MAX - 1;
+        let bottom_layer = 0;
+        if (this.ctrl) {
+            // ctrl: explicitly target terrain
+            top_layer = LAYERS.terrain;
+            bottom_layer = LAYERS.terrain;
+        }
+        else if (this.shift) {
+            // shift: explicitly target actor
+            top_layer = LAYERS.actor;
+            bottom_layer = LAYERS.actor;
+        }
+        for (let layer = top_layer; layer >= bottom_layer; layer--) {
+            let tile = cell[layer];
+            if (! tile)
+                continue;
+
+            // This is kind of like documentation for everything the adjust tool can do I guess
+            if (TILE_TYPES['transmogrifier']._mogrifications[tile.type.name]) {
+                // Toggle between related tile types
+                return [layer, "Mogrify"];
+            }
+            if (ADJUST_TILE_TYPES[tile.type.name]) {
+                // Toggle between related tile types
+                return [layer, ADJUST_TILE_TYPES[tile.type.name].verb];
+            }
+            if (tile.type.name === 'logic_gate' && ADJUST_GATE_TYPES[tile.gate_type]) {
+                // Also toggle between related logic gate types
+                return [layer, "Change"];
+            }
+            if (tile.type.name === 'logic_gate' && tile.gate_type === 'counter') {
+                // Adjust the starting number on a logic gate
+                return [layer, "Count"];
+            }
+            if (layer === LAYERS.thin_wall) {
+                // Place or delete individual thin walls
+                return [layer, "Place"];
+            }
+            if (tile.type.name === 'frame block') {
+                // Place or delete individual frame block arrows
+                return [layer, "Place"];
+            }
+
+            // These are
+            // TODO need a single-click thing to do for 
+            let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
+            if (behavior && behavior.adjust_forward) {
+                // 
+                return [layer, "Adjust"];
+            }
+
+            if (TILES_WITH_PROPS[tile.type.name]) {
+                // Open special tile editors
+                return [layer, "Edit"];
+            }
+
+            if (ADJUST_SPECIAL[tile.type.name]) {
+                return [layer, "Press"];
+            }
+        }
+
+        return [null, null];
     }
 
     handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        // TODO hrmm if we undo without moving the mouse then this becomes wrong (even without the
+        // stuff here)
+        // TODO uhhh that's true for all kinds of kb shortcuts actually, even for pressing/releasing
+        // ctrl or shift to change the target.  dang
+        if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y)
+            return;
+
         let cell = this.cell(cell_x, cell_y);
-        let terrain = cell[LAYERS.terrain];
-        if (terrain.type.name === 'button_gray') {
+        let [layer, hint] = this._find_target_tile(cell);
+        this.hovered_layer = layer;
+        if (hint === null) {
+            this.click_hint.classList.remove('--visible');
+        }
+        else {
+            this.click_hint.classList.add('--visible');
+            this.click_hint.setAttribute('x', cell_x + 0.5);
+            this.click_hint.setAttribute('y', cell_y - 0.125);
+            this.click_hint.textContent = hint;
+        }
+
+        if (layer === null) {
+            this.cursor_element.classList.remove('--visible');
+            this.gray_button_preview.classList.remove('--visible');
+            return;
+        }
+        let tile = cell[layer];
+
+        /*
+        this.cursor_element.classList.add('--visible');
+        if (layer === LAYERS.terrain) {
+            this.cursor_element.setAttribute('data-layer', 'terrain');
+        }
+        else if (layer === LAYERS.item) {
+            this.cursor_element.setAttribute('data-layer', 'item');
+        }
+        else if (layer === LAYERS.actor) {
+            this.cursor_element.setAttribute('data-layer', 'actor');
+        }
+        else if (layer === LAYERS.thin_wall) {
+            this.cursor_element.setAttribute('data-layer', 'thin-wall');
+        }
+        */
+
+        if (cell.filter(t => t).length <= 1) {
+            // Only one tile, so the canvas is pointless
+            this.cursor_element.classList.remove('--visible');
+        }
+        else {
+            // Draw the targeted tile on top of everything else
+            this.cursor_element.classList.add('--visible');
+            let ctx = this.canvas.getContext('2d');
+            ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            if (layer !== LAYERS.terrain) {
+                this.editor.renderer.draw_single_tile_type('floor', null, this.canvas);
+            }
+            this.editor.renderer.draw_single_tile_type(tile.type.name, tile, this.canvas);
+        }
+
+        // Special previewing behavior
+        if (tile.type.name === 'button_gray') {
+            this.cursor_element.classList.remove('--visible');
             this.gray_button_preview.classList.add('--visible');
-            this.gray_button_preview.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
+            let gx0 = Math.max(0, cell_x - 2);
+            let gy0 = Math.max(0, cell_y - 2);
+            let gx1 = Math.min(this.editor.stored_level.size_x - 1, cell_x + 2);
+            let gy1 = Math.min(this.editor.stored_level.size_y - 1, cell_y + 2);
+
+            this.gray_button_bounds_rect.setAttribute('x', gx0);
+            this.gray_button_bounds_rect.setAttribute('y', gy0);
+            this.gray_button_bounds_rect.setAttribute('width', gx1 - gx0 + 1);
+            this.gray_button_bounds_rect.setAttribute('height', gy1 - gy0 + 1);
             for (let el of this.gray_button_preview.querySelectorAll('rect.overlay-adjust-gray-button-shroud')) {
                 el.remove();
             }
             // The easiest way I can find to preview this is to slap an overlay on everything NOT
             // affected by the button.  Try to consolidate some of the resulting rectangles though
-            for (let dy = -2; dy <= 2; dy++) {
-                let last_rect, last_dx;
-                for (let dx = -2; dx <= 2; dx++) {
-                    let target = this.cell(cell_x + dx, cell_y + dy);
+            for (let y = gy0; y <= gy1; y++) {
+                let last_rect, last_x;
+                for (let x = gx0; x <= gx1; x++) {
+                    let target = this.cell(x, y);
                     if (target && target !== cell && target[LAYERS.terrain].type.on_gray_button)
                         continue;
 
-                    if (last_rect && last_dx === dx - 1) {
+                    if (last_rect && last_x === x - 1) {
                         last_rect.setAttribute('width', 1 + parseInt(last_rect.getAttribute('width'), 10));
                     }
                     else {
                         last_rect = mk_svg('rect.overlay-adjust-gray-button-shroud', {
-                            x: dx,
-                            y: dy,
+                            x: x,
+                            y: y,
                             width: 1,
                             height: 1,
                         });
                         this.gray_button_preview.append(last_rect);
                     }
-                    last_dx = dx;
+                    last_x = x;
                 }
             }
         }
@@ -1337,53 +1682,72 @@ export class AdjustOperation extends MouseOperation {
 
     handle_press() {
         let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
-        if (this.ctrl) {
-            for (let tile of cell) {
-                if (tile && TILES_WITH_PROPS[tile.type.name] !== undefined) {
-                    this.editor.open_tile_prop_overlay(
-                        tile, cell, this.editor.renderer.get_cell_rect(cell.x, cell.y));
-                    break;
-                }
-            }
+        let tile = cell[this.hovered_layer];
+        if (! tile)
             return;
-        }
-        let start_layer = this.shift ? 0 : LAYERS.MAX - 1;
-        for (let layer = start_layer; layer >= 0; layer--) {
-            let tile = cell[layer];
-            if (! tile)
-                continue;
+        let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
 
-            let rotated;
-            tile = {...tile}; // TODO little inefficient
-            if (this.alt_mode) {
-                // Reverse, go counterclockwise
-                rotated = this.editor.rotate_tile_left(tile);
+        // Same order as _find_target_tile
+        if (TILE_TYPES['transmogrifier']._mogrifications[tile.type.name]) {
+            // Toggle between related tile types
+            tile.type = TILE_TYPES[TILE_TYPES['transmogrifier']._mogrifications[tile.type.name]];
+            this.editor.place_in_cell(cell, tile);
+            this.editor.commit_undo();
+        }
+        else if (ADJUST_TILE_TYPES[tile.type.name]) {
+            // Toggle between related tile types
+            // TODO can you go backwards any more, or no?
+            let toggled = ADJUST_TILE_TYPES[tile.type.name].next;
+            tile.type = TILE_TYPES[toggled];
+            this.editor.place_in_cell(cell, tile);
+            this.editor.commit_undo();
+        }
+        else if (tile.type.name === 'logic_gate' && ADJUST_GATE_TYPES[tile.gate_type]) {
+            // Also toggle between related logic gate types
+            let toggled = ADJUST_GATE_TYPES[tile.gate_type].next;
+            tile.gate_type = toggled;
+            this.editor.place_in_cell(cell, tile);
+            this.editor.commit_undo();
+        }
+        else if (tile.type.name === 'logic_gate' && tile.gate_type === 'counter') {
+            // Adjust the starting number on a logic gate
+            // TODO is this in adjust_forward or...?
+        }
+        else if (this.hovered_layer === LAYERS.thin_wall) {
+            // Place or delete individual thin walls
+            // XXX don't allow deleting ALL the thin walls...??
+            let bit = DIRECTIONS[this.get_tile_edge()].bit;
+            tile.edges ^= bit;
+            this.editor.place_in_cell(cell, tile);
+            this.editor.commit_undo();
+        }
+        else if (tile.type.name === 'frame_block') {
+            // Place or delete individual frame block arrows
+            let edge = this.get_tile_edge();
+            tile.arrows = new Set(tile.arrows);
+            if (tile.arrows.has(edge)) {
+                tile.arrows.delete(edge);
             }
             else {
-                rotated = this.editor.rotate_tile_right(tile);
+                tile.arrows.add(edge);
             }
-            if (rotated) {
-                this.editor.place_in_cell(cell, tile);
-                this.editor.commit_undo();
-                break;
-            }
-
-            // Toggle tiles that go in obvious pairs
-            let toggled = (this.alt_mode ? ADJUST_TOGGLES_CCW : ADJUST_TOGGLES_CW)[tile.type.name];
-            if (toggled) {
-                tile.type = TILE_TYPES[toggled];
-                this.editor.place_in_cell(cell, tile);
-                this.editor.commit_undo();
-                break;
-            }
-
-            // Other special tile behavior
-            let special = ADJUST_SPECIAL[tile.type.name];
-            if (special) {
-                special(this.editor, tile, cell);
-                this.editor.commit_undo();
-                break;
-            }
+            this.editor.place_in_cell(cell, tile);
+            this.editor.commit_undo();
+        }
+        else if (behavior && behavior.adjust_forward) {
+            behavior.adjust_forward(tile);
+            this.editor.place_in_cell(cell, tile);
+            this.editor.commit_undo();
+        }
+        else if (ADJUST_SPECIAL[tile.type.name]) {
+            ADJUST_SPECIAL[tile.type.name](this.editor, tile, cell);
+            this.editor.commit_undo();
+        }
+        else if (TILES_WITH_PROPS[tile.type.name]) {
+            // Open special tile editors -- this is a last resort, which is why right-click does it
+            // explicitly
+            this.editor.open_tile_prop_overlay(
+                tile, cell, this.editor.renderer.get_cell_rect(cell.x, cell.y));
         }
     }
     // Adjust tool doesn't support dragging
@@ -1391,6 +1755,7 @@ export class AdjustOperation extends MouseOperation {
     // TODO if it does then it should end as soon as you spawn a popup
     do_destroy() {
         this.gray_button_preview.remove();
+        this.click_hint.remove();
         super.do_destroy();
     }
 }
