@@ -1138,7 +1138,7 @@ export class Editor extends PrimaryView {
         if (this.zoom) {
             if (origin_x === null) {
                 // Default to zooming around the center of the viewport
-                let bbox = this.viewport_el.getBoundingClientRect();
+                let bbox = this.actual_viewport_el.getBoundingClientRect();
                 origin_x = bbox.left + bbox.width / 2;
                 origin_y = bbox.top + bbox.height / 2;
             }
