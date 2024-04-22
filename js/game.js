@@ -492,10 +492,9 @@ export class Level extends LevelInterface {
                     }
                 }
             }
-
-            if (this.stored_level.only_custom_connections)
-                return;
         }
+        if (this.stored_level.only_custom_connections)
+            return;
 
         // Orange buttons do a really weird diamond search
         if (connectable.type.connect_order === 'diamond') {
