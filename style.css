@@ -17,7 +17,7 @@ body {
     background-size: 12em;
     color: #ececec;
 
-    --main-hue: 345;
+    --main-hue: 340;
     --hover-hue: 8;
     --selected-hue: 320;
     --panel-bg-color: hsl(var(--main-hue), 20%, 10%);
