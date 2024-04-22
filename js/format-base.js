@@ -5,6 +5,14 @@ export class StoredCell extends Array {
     constructor() {
         super(LAYERS.MAX);
     }
+
+    get_terrain() {
+        return this[LAYERS.terrain] ?? null;
+    }
+
+    get_actor() {
+        return this[LAYERS.actor] ?? null;
+    }
 }
 
 export class Replay {
