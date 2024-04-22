@@ -1,6 +1,7 @@
 // Types that handle mouse activity for a given tool, whether the mouse button is current held or
 // not.  (When the mouse button is /not/ held, then only the operation bound to the left mouse
 // button gets events.)
+import * as algorithms from '../algorithms.js';
 import { DIRECTIONS, LAYERS } from '../defs.js';
 import TILE_TYPES from '../tiletypes.js';
 import { mk, mk_svg, walk_grid } from '../util.js';
@@ -718,6 +719,11 @@ export class SelectOperation extends MouseOperation {
     }
 }
 
+
+// -------------------------------------------------------------------------------------------------
+// FORCE FLOORS
+// TODO ice would be kind of nice, could reasonably go with this as an alt mode
+
 export class ForceFloorOperation extends MouseOperation {
     handle_press(x, y) {
         // Begin by placing an all-way force floor under the mouse
@@ -784,6 +790,10 @@ export class ForceFloorOperation extends MouseOperation {
         this.editor.commit_undo();
     }
 }
+
+
+// -------------------------------------------------------------------------------------------------
+// TRACKS
 
 // TODO entered cell should get blank railroad?
 // TODO maybe place a straight track in the new cell so it looks like we're doing something, then
@@ -877,6 +887,10 @@ export class TrackOperation extends MouseOperation {
         this.editor.commit_undo();
     }
 }
+
+
+// -------------------------------------------------------------------------------------------------
+// CONNECT
 
 export class ConnectOperation extends MouseOperation {
     constructor(...args) {
@@ -1017,7 +1031,91 @@ export class ConnectOperation extends MouseOperation {
         super.do_destroy();
     }
 }
+
+
+// -------------------------------------------------------------------------------------------------
+// WIRE
+
 export class WireOperation extends MouseOperation {
+    constructor(...args) {
+        super(...args);
+
+        this.circuitry_g = mk_svg('g.overlay-circuitry', {'data-source': 'WireOperation'});
+        this.editor.svg_overlay.append(this.circuitry_g);
+    }
+
+    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        // TODO doesn't this read the /previous/ edge
+        let edge = this.get_tile_edge();
+        let edgebit = DIRECTIONS[edge].bit;
+        let cell = this.cell(cell_x, cell_y);
+        // Wire can only be in terrain or the circuit block, and this tool ignores circuit
+        // blocks for circuit-tracing purposes
+        let terrain = cell[LAYERS.terrain];
+        // If this cell has no wire where we're aiming, do nothing, which includes leaving any
+        // existing circuit alone
+        if (! terrain.wire_directions || ! (terrain.wire_directions & edgebit))
+            return;
+
+        // If we're hovering a wire that's already part of the highlighted circuit, there's
+        // nothing new to do
+        if (this.circuit) {
+            let edges = this.circuit.tiles.get(terrain);
+            if (edges && (edges & DIRECTIONS[edge].bit))
+                return;
+        }
+
+        // Otherwise, clear the current circuit and trace a new one
+        // TODO what do we do when hovering a *cell* that touches multiple circuits?  like a
+        // button?
+        // TODO trace this through logic gates, at least one level?
+        this.circuitry_g.textContent = '';
+
+        let circuit = algorithms.trace_floor_circuit(this.editor.stored_level, 'ignore', cell, edge);
+        // TODO uhoh, this is in terms of tiles and i don't have a way to get those at the moment
+        let tiles_to_cells = new Map;
+        for (let cell of this.editor.stored_level.linear_cells) {
+            tiles_to_cells.set(cell[LAYERS.terrain], cell);
+        }
+        let wire_data = [];
+        let tunnel_data = [];
+        // TODO it would be convenient to reduce the number of wires happening here
+        for (let [tile, edges] of circuit.tiles) {
+            let cell = tiles_to_cells.get(tile);
+            for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
+                if (edges & dirinfo.bit) {
+                    let d = `M ${cell.x + 0.5},${cell.y + 0.5} l ${dirinfo.movement[0] * 0.5},${dirinfo.movement[1] * 0.5}`;
+                    if (tile.wire_tunnel_directions & dirinfo.bit) {
+                        tunnel_data.push(d);
+                    }
+                    else {
+                        wire_data.push(d);
+                    }
+                }
+            }
+            if (! tile.wire_directions) {
+                // This is an output tile, like a trap or flame jet, so mark it
+                this.circuitry_g.append(mk_svg('circle.overlay-circuit-output', {
+                    cx: cell.x + 0.5,
+                    cy: cell.y + 0.5,
+                    r: 0.1875,
+                }));
+            }
+        }
+        this.circuitry_g.append(
+            mk_svg('path.overlay-circuit-wires', {d: wire_data.join(' ')}),
+            mk_svg('path.overlay-circuit-tunnels', {d: tunnel_data.join(' ')}),
+        );
+        for (let [tile, edges] of circuit.inputs) {
+            let cell = tiles_to_cells.get(tile);
+            this.circuitry_g.append(mk_svg('circle.overlay-circuit-input', {
+                cx: cell.x + 0.5,
+                cy: cell.y + 0.5,
+                r: 0.1875,
+            }));
+        }
+    }
+
     handle_press() {
         if (this.alt_mode) {
             // Place or remove wire tunnels
@@ -1191,7 +1289,16 @@ export class WireOperation extends MouseOperation {
     cleanup_press() {
         this.editor.commit_undo();
     }
+
+    do_destroy() {
+        this.circuitry_g.remove();
+        super.do_destroy();
+    }
 }
+
+
+// -------------------------------------------------------------------------------------------------
+// ROTATE
 
 // TODO hmm there's no way to rotate the wires on a circuit block without rotating the block itself
 // TODO this highlights blocks even though they don't usually show their direction...
@@ -1305,6 +1412,10 @@ export class RotateOperation extends MouseOperation {
     // Rotate tool doesn't support dragging
     // TODO should it?
 }
+
+
+// -------------------------------------------------------------------------------------------------
+// ADJUST
 
 // Tiles the "adjust" tool will turn into each other
 const ADJUST_TILE_TYPES = {};
@@ -1759,6 +1870,10 @@ export class AdjustOperation extends MouseOperation {
         super.do_destroy();
     }
 }
+
+
+// -------------------------------------------------------------------------------------------------
+// CAMERA
 
 // FIXME currently allows creating outside the map bounds and moving beyond the right/bottom, sigh
 // FIXME undo

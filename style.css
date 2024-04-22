@@ -2287,6 +2287,26 @@ svg.level-editor-overlay g.overlay-connection.--implicit line.-arrow {
 svg.level-editor-overlay g.overlay-connection line.-arrow {
     marker-end: url(#overlay-arrowhead);
 }
+svg.level-editor-overlay g.overlay-circuitry {
+    filter: url(#overlay-filter-outline);
+    opacity: 0.75;
+}
+svg.level-editor-overlay .overlay-circuit-wires {
+    stroke: hsl(180, 100%, 50%);
+    stroke-linecap: square;  /* so a corner meets nicely in the middle of a tile */
+}
+svg.level-editor-overlay .overlay-circuit-tunnels {
+    stroke: hsl(180, 100%, 50%);
+    stroke-dasharray: 0.0625, 0.0625;
+}
+svg.level-editor-overlay circle.overlay-circuit-input {
+    stroke: hsl(180, 100%, 50%);
+    fill: hsl(180, 100%, 10%);
+}
+svg.level-editor-overlay circle.overlay-circuit-output {
+    stroke: hsl(180, 100%, 50%);
+    fill: hsl(180, 100%, 50%);
+}
 svg.level-editor-overlay .overlay-adjust-cursor {
     /* shared between rotate+adjust tools, though they use different elements/shapes */
     stroke: #444;
