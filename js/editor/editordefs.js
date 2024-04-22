@@ -59,6 +59,9 @@ export const TOOLS = {
         op1: mouseops.TrackOperation,
         op2: mouseops.TrackOperation,
     },
+    // TODO this is so clumsy.  maybe right-click to cycle target, like pencil?  i don't know.  that
+    // seems annoying for piercing through a lot of thin walls
+    // TODO you can't shift-mouse2 in firefox also, it brings up the real context menu
     rotate: {
         icon: 'icons/tool-rotate.png',
         name: "Rotate",
@@ -1388,16 +1391,16 @@ function add_special_tile_cycle(rotation_order, mirror_mapping, flip_mapping) {
         }
 
         if (name in mirror_mapping) {
-            let mirror = mirror_mapping[name];
+            let mirrored = mirror_mapping[name];
             behavior.mirror = function mirror(tile) {
-                tile.type = TILE_TYPES[mirror];
+                tile.type = TILE_TYPES[mirrored];
             };
         }
 
         if (name in flip_mapping) {
-            let flip = flip_mapping[name];
+            let flipped = flip_mapping[name];
             behavior.flip = function flip(tile) {
-                tile.type = TILE_TYPES[flip];
+                tile.type = TILE_TYPES[flipped];
             };
         }
 
