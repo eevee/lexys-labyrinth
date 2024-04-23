@@ -1591,17 +1591,18 @@ export class Level extends LevelInterface {
     // - null: Default.  Do not impact game state.  Treat pushable objects as blocking.
     // - 'bump': Fire bump triggers.  Don't move pushable objects, but do check whether they /could/
     //   be pushed, recursively if necessary.
-    // - 'slap': Like 'bump', but also sets the 'decision' of pushable objects.
+    // - 'slap': Like 'bump', but also sets the 'decision' of pushable objects.  Only used with the
+    //   no_early_push Lynx compat flag.
     // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
     can_actor_enter_cell(actor, cell, direction, push_mode = null) {
         let pushable_tiles = [];
-        let still_blocked = false;
+        let deferred_blocked = false;
         for (let layer of this.layer_collision_order) {
             let tile = cell[layer];
             if (! tile)
                 continue;
 
-            let original_name = tile.type.name;
+            let original_type = tile.type;
             // TODO check ignores here?
             if (tile.type.on_bumped) {
                 tile.type.on_bumped(tile, this, actor, direction);
@@ -1620,6 +1621,14 @@ export class Level extends LevelInterface {
                 this._check_for_player_death(actor, tile);
             }
 
+            if (this.compat.allow_pushing_blocks_off_faux_walls &&
+                original_type.is_flickable_in_lynx)
+            {
+                // Lynx: blocks can be pushed off of certain fake walls, but we check the walls
+                // before we check blocks, so we have to defer the failure until later
+                deferred_blocked = true;
+                continue;
+            }
             if (! tile.blocks(actor, direction, this))
                 continue;
 
@@ -1643,13 +1652,6 @@ export class Level extends LevelInterface {
                     if (actor.type.on_blocked) {
                         actor.type.on_blocked(actor, this, direction, tile);
                     }
-                    // Lynx (or at least TW?) allows pushing blocks off of particular wall types
-                    if (this.compat.allow_pushing_blocks_off_faux_walls &&
-                        ['fake_wall', 'wall_invisible', 'wall_appearing'].includes(original_name))
-                    {
-                        still_blocked = true;
-                        continue;
-                    }
                 }
                 return false;
             }
@@ -1657,7 +1659,7 @@ export class Level extends LevelInterface {
 
         // If we got this far, all that's left is to deal with pushables, if any
         if (pushable_tiles.length === 0) {
-            return ! still_blocked;
+            return ! deferred_blocked;
         }
 
         // This flag (and the try/finally to ensure it's immediately cleared) detects recursive push
@@ -1743,7 +1745,7 @@ export class Level extends LevelInterface {
             return false;
         }
 
-        return ! still_blocked;
+        return ! deferred_blocked;
     }
 
     _check_for_player_death(actor, tile) {

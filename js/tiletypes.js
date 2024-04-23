@@ -327,6 +327,7 @@ const TILE_TYPES = {
     wall_invisible: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
+        is_flickable_in_lynx: true,
         on_bumped(me, level, other) {
             if (can_actually_reveal_walls(other, level)) {
                 level.spawn_animation(me.cell, 'wall_invisible_revealed');
@@ -336,6 +337,7 @@ const TILE_TYPES = {
     wall_appearing: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
+        is_flickable_in_lynx: true,
         on_bumped(me, level, other) {
             if (can_actually_reveal_walls(other, level)) {
                 level.transmute_tile(me, 'wall');
@@ -411,6 +413,7 @@ const TILE_TYPES = {
     fake_wall: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
+        is_flickable_in_lynx: true,
         on_ready(me, level) {
             if (! level.compat.no_auto_convert_ccl_blue_walls &&
                 level.stored_level.format === 'ccl' &&
