@@ -929,6 +929,7 @@ export class Level extends LevelInterface {
                 continue;
 
             this._do_actor_cooldown(actor, cooldown);
+            this._do_actor_trap_ejection(actor);
         }
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
@@ -953,6 +954,7 @@ export class Level extends LevelInterface {
                 continue;
 
             this._do_actor_cooldown(actor, cooldown);
+            this._do_actor_trap_ejection(actor);
             this._do_actor_idle(actor);
         }
     }
@@ -1108,40 +1110,7 @@ export class Level extends LevelInterface {
 
             // Play step sound when the player completes a move
             if (actor === this.player) {
-                let terrain = actor.cell.get_terrain();
-                if (actor.is_sliding && terrain.type.slide_mode === 'ice') {
-                    this.sfx.play_once('slide-ice');
-                }
-                else if (actor.is_sliding && terrain.type.slide_mode === 'force') {
-                    this.sfx.play_once('slide-force');
-                }
-                else if (terrain.type.name === 'popdown_floor') {
-                    this.sfx.play_once('step-popdown');
-                }
-                else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad' ||
-                    terrain.type.name === 'sand' || terrain.type.name === 'grass')
-                {
-                    this.sfx.play_once('step-gravel');
-                }
-                else if (terrain.type.name === 'water') {
-                    if (actor.ignores(terrain.type.name)) {
-                        this.sfx.play_once('step-water');
-                    }
-                }
-                else if (terrain.type.name === 'fire') {
-                    if (actor.has_item('fire_boots')) {
-                        this.sfx.play_once('step-fire');
-                    }
-                }
-                else if (terrain.type.slide_mode === 'force') {
-                    this.sfx.play_once('step-force');
-                }
-                else if (terrain.type.slide_mode === 'ice') {
-                    this.sfx.play_once('step-ice');
-                }
-                else {
-                    this.sfx.play_once('step-floor');
-                }
+                this._play_footstep(actor);
             }
 
             if (! this.compat.actors_move_instantly) {
@@ -1152,6 +1121,61 @@ export class Level extends LevelInterface {
             // move; this should be fine since everything checks for "in motion" by looking at
             // movement_cooldown, which is already zero.  (Also saves some undo budget, since
             // movement_speed is never null for an actor in constant motion.)
+        }
+    }
+
+    _play_footstep(actor) {
+        let terrain = actor.cell.get_terrain();
+        if (actor.is_sliding && terrain.type.slide_mode === 'ice') {
+            this.sfx.play_once('slide-ice');
+        }
+        else if (actor.is_sliding && terrain.type.slide_mode === 'force') {
+            this.sfx.play_once('slide-force');
+        }
+        else if (terrain.type.name === 'popdown_floor') {
+            this.sfx.play_once('step-popdown');
+        }
+        else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad' ||
+            terrain.type.name === 'sand' || terrain.type.name === 'grass')
+        {
+            this.sfx.play_once('step-gravel');
+        }
+        else if (terrain.type.name === 'water') {
+            if (actor.ignores(terrain.type.name)) {
+                this.sfx.play_once('step-water');
+            }
+        }
+        else if (terrain.type.name === 'fire') {
+            if (actor.has_item('fire_boots')) {
+                this.sfx.play_once('step-fire');
+            }
+        }
+        else if (terrain.type.slide_mode === 'force') {
+            this.sfx.play_once('step-force');
+        }
+        else if (terrain.type.slide_mode === 'ice') {
+            this.sfx.play_once('step-ice');
+        }
+        else {
+            this.sfx.play_once('step-floor');
+        }
+    }
+
+    // Lynx: Actors standing on brown buttons perform trap ejection immediately after their
+    // cooldown, in actor order.  This causes a lot of double movement and there's not really any
+    // way to simulate it other than to just do this awkward pseudo-phase
+    _do_actor_trap_ejection(actor) {
+        if (! this.compat.traps_like_lynx)
+            return;
+        if (actor.movement_cooldown > 0)
+            return;
+
+        let terrain = actor.cell.get_terrain();
+        if (terrain.type.name === 'button_brown' && terrain.connection) {
+            let trapped = terrain.connection.cell.get_actor();
+            if (trapped) {
+                this.attempt_out_of_turn_step(trapped, trapped.direction);
+            }
         }
     }
 

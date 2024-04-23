@@ -1608,12 +1608,6 @@ const TILE_TYPES = {
                 level._set_tile_prop(me, 'presses', 0);
             }
         },
-        on_stand(me, level, other, just_arrived) {
-            // Lynx: open traps eject their contents at the end of each tic
-            if (level.compat.traps_like_lynx && ! just_arrived) {
-                level.attempt_out_of_turn_step(other, other.direction);
-            }
-        },
         add_press_ready(me, level, other) {
             // Same as below, but without ejection
             level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
