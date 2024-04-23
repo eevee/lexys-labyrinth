@@ -3237,10 +3237,12 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
         ttl: 16,
-        // If anything else even begins to step on an animation, it's erased
-        // FIXME possibly erased too fast; cc2 shows it briefly?  could i get away with on_arrive here?
-        on_approach(me, level, other) {
-            level.remove_tile(me);
+        // If anything but a player even /considers/ stepping on an animation, it's erased, at
+        // decision time!
+        on_bumped(me, level, other) {
+            if (! other.type.is_real_player) {
+                level.remove_tile(me);
+            }
         },
     },
     explosion: {
@@ -3249,8 +3251,10 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
         ttl: 16,
-        on_approach(me, level, other) {
-            level.remove_tile(me);
+        on_bumped(me, level, other) {
+            if (! other.type.is_real_player) {
+                level.remove_tile(me);
+            }
         },
     },
     // Non-blocking explosion used for better handling edge cases with dynamite and bowling balls,
@@ -3277,8 +3281,10 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
         ttl: 16,
-        on_approach(me, level, other) {
-            level.remove_tile(me);
+        on_bumped(me, level, other) {
+            if (! other.type.is_real_player) {
+                level.remove_tile(me);
+            }
         },
     },
     // New VFX (not in CC2, so they don't block to avoid altering gameplay)
