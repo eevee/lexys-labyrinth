@@ -357,16 +357,27 @@ const TILE_TYPES = {
                 me.type = TILE_TYPES['popwall2'];
             }
         },
+        activate(me, level, other) {
+            level.spawn_animation(me.cell, 'puff');
+            level.transmute_tile(me, 'wall');
+            if (other === level.player) {
+                level.sfx.play_once('popwall', me.cell);
+            }
+        },
+        on_arrive(me, level, other) {
+            // Lynx/MS: These activate on arrival, not departure
+            if (level.compat.popwalls_pop_on_arrive) {
+                this.activate(me, level, other);
+            }
+        },
         on_depart(me, level, other) {
             // CC2 quirk: nothing happens if there's still an actor on us (i.e. dynamite)
             // FIXME does this imply on_depart isn't called at all if we walk off dynamite?
             if (me.cell.has('dynamite_lit'))
                 return;
 
-            level.spawn_animation(me.cell, 'puff');
-            level.transmute_tile(me, 'wall');
-            if (other === level.player) {
-                level.sfx.play_once('popwall', me.cell);
+            if (! level.compat.popwalls_pop_on_arrive) {
+                this.activate(me, level, other);
             }
         },
     },

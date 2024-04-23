@@ -142,11 +142,11 @@ export const COMPAT_FLAGS = [
 {
     key: 'no_auto_convert_ccl_popwalls',
     label: "Recessed walls under actors in CCL levels are left alone",
-    rulesets: new Set(['steam-strict']),
+    rulesets: new Set(['steam-strict', 'lynx', 'ms']),
 }, {
     key: 'no_auto_convert_ccl_blue_walls',
     label: "Blue walls under blocks in CCL levels are left alone",
-    rulesets: new Set(['steam-strict']),
+    rulesets: new Set(['steam-strict', 'lynx', 'ms']),
 },
 
 // Core
@@ -203,8 +203,12 @@ export const COMPAT_FLAGS = [
     label: "Traps eject faster, and even when already open",
     rulesets: new Set(['lynx']),
 }, {
+    key: 'popwalls_pop_on_arrive',
+    label: "Recessed walls activate when stepped on",
+    rulesets: new Set(['lynx', 'ms']),
+}, {
     key: 'blue_floors_vanish_on_arrive',
-    label: "Fake blue walls vanish on arrival",
+    label: "Fake blue walls vanish when stepped on",
     rulesets: new Set(['lynx']),
 }, {
     key: 'green_teleports_can_fail',
