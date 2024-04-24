@@ -882,30 +882,31 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
             level.sfx.play_once('splash', me.cell);
+            let splash_type = level.compat.block_splashes_dont_block ? 'splash_nb' : 'splash';
             if (other.type.name === 'dirt_block') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'dirt');
             }
             else if (other.type.name === 'frame_block') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'floor');
             }
             else if (other.type.name === 'glass_block') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'floor');
             }
             else if (other.type.name === 'ice_block') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'ice');
             }
             else if (other.type.name === 'boulder') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'gravel');
             }
             else if (other.type.name === 'circuit_block') {
                 level.transmute_tile(me, 'floor');
                 level._set_tile_prop(me, 'wire_directions', other.wire_directions);
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.recalculate_circuitry_next_wire_phase = true;
             }
             else if (other.type.name === 'sokoban_block') {
@@ -915,7 +916,7 @@ const TILE_TYPES = {
                     yellow: 'floor_custom_yellow',
                     green: 'floor_custom_green',
                 })[other.color]);
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
             }
             else {
                 level.kill_actor(other, me, 'splash', null, 'drowned');
@@ -3261,6 +3262,13 @@ const TILE_TYPES = {
                 level.remove_tile(me);
             }
         },
+    },
+    // Non-blocking splash used for visual effect in MS
+    splash_nb: {
+        layer: LAYERS.vfx,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 16,
     },
     // Non-blocking explosion used for better handling edge cases with dynamite and bowling balls,
     // without changing gameplay

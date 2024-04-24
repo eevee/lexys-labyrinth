@@ -261,6 +261,10 @@ export const COMPAT_FLAGS = [
     key: 'emulate_spring_mining',
     label: "Spring mining is possible",
     rulesets: new Set(['steam-strict']),
+}, {
+    key: 'block_splashes_dont_block',
+    label: "Block splashes don't block the player",
+    rulesets: new Set(['ms']),
 /* XXX not implemented
 }, {
     key: 'emulate_flicking',
