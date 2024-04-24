@@ -135,185 +135,193 @@ export const COMPAT_RULESET_LABELS = {
 };
 export const COMPAT_RULESET_ORDER = ['lexy', 'steam', 'steam-strict', 'lynx', 'ms', 'custom'];
 // FIXME some of the names of the flags themselves kinda suck
-export const COMPAT_FLAGS = [
-// Level loading
-// TODO? /strictly/ speaking, these should be turned on for lynx+ms/lynx respectively, but then i'd
-// have to also alter the behavior of the corresponding terrain, which seems kind of silly
-{
-    key: 'no_auto_convert_ccl_popwalls',
-    label: "Recessed walls under actors in CCL levels are left alone",
-    rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+// TODO some ms compat things that wouldn't be too hard to add:
+// - walkers choose a random /unblocked/ direction, not just a random direction
+// - (boosting) player cooldown is /zero/ after ending a slide
+// - cleats allow walking through ice corner walls while standing on them
+// - blocks can be pushed through thin walls + ice corners
+export const COMPAT_FLAG_CATEGORIES = [{
+    title: "Level loading",
+    flags: [{
+        key: 'no_auto_convert_ccl_popwalls',
+        label: "Recessed walls under actors are not auto-converted in CCL levels",
+        rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+    }, {
+        key: 'no_auto_convert_ccl_blue_walls',
+        label: "Blue walls under blocks are not auto-converted in CCL levels",
+        rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+    }],
 }, {
-    key: 'no_auto_convert_ccl_blue_walls',
-    label: "Blue walls under blocks in CCL levels are left alone",
-    rulesets: new Set(['steam-strict', 'lynx', 'ms']),
-},
-
-// Core
-{
-    key: 'allow_double_cooldowns',
-    label: "Actors may cooldown twice in one tic",
-    rulesets: new Set(['steam', 'steam-strict', 'lynx']),
+    title: "Actor behavior",
+    flags: [{
+        key: 'emulate_60fps',
+        label: "Actors update at 60 FPS",
+        rulesets: new Set(['steam', 'steam-strict']),
+    }, {
+        key: 'no_separate_idle_phase',
+        label: "Actors teleport immediately after moving",
+        rulesets: new Set(['steam', 'steam-strict']),
+    }, {
+        key: 'allow_double_cooldowns',
+        label: "Actors may move forwards twice in one tic",
+        rulesets: new Set(['steam', 'steam-strict', 'lynx']),
+    }, {
+        key: 'player_moves_last',
+        label: "Players always update last",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'reuse_actor_slots',
+        label: "New actors reuse slots in the actor list",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'player_protected_by_items',
+        label: "Players can't be trampled while standing on items",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'force_lynx_animation_lengths',
+        label: "Animations play at their slower Lynx duration",
+        rulesets: new Set(['lynx']),
+    }, {
+        // Note that this requires no_early_push as well
+        key: 'player_safe_at_decision_time',
+        label: "Players can't be trampled at decision time",
+        rulesets: new Set(['lynx', 'ms']),
+    }, {
+        key: 'bonking_isnt_instant',
+        label: "Bonking while sliding doesn't apply instantly",
+        rulesets: new Set(['lynx', 'ms']),
+    }, {
+        key: 'actors_move_instantly',
+        label: "Movement is instant",
+        rulesets: new Set(['ms']),
+    }],
 }, {
-    key: 'no_separate_idle_phase',
-    label: "Actors teleport immediately after moving",
-    rulesets: new Set(['steam', 'steam-strict']),
+    title: "Monsters",
+    flags: [{
+    // TODO ms needs "player doesn't block monsters", but tbh that's kind of how it should work
+    // anyway, especially in combination with the ankh
+    // TODO? in lynx they ignore the button while in motion too
+    // TODO what about in a trap, in every game??
+    // TODO what does ms do when a tank is on ice or a ff?  wiki's description is wacky
+    // TODO yellow tanks seem to have memory too??
+        key: 'tanks_always_obey_button',
+        label: "Blue tanks obey blue buttons even on clone machines",
+        rulesets: new Set(['steam-strict']),
+    }, {
+        key: 'tanks_ignore_button_while_moving',
+        label: "Blue tanks ignore blue buttons while moving",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'blobs_use_tw_prng',
+        label: "Blobs use the Lynx RNG",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'teeth_target_internal_position',
+        label: "Teeth pursue the cell the player is moving into",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'rff_blocks_monsters',
+        label: "Monsters cannot step on random force floors",
+        rulesets: new Set(['ms']),
+    }, {
+        key: 'fire_allows_most_monsters',
+        label: "Monsters can walk into fire, except for bugs and walkers",
+        rulesets: new Set(['ms']),
+    }],
 }, {
-    key: 'player_moves_last',
-    label: "Players always move last",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'player_protected_by_items',
-    label: "Players can't be trampled when standing on items",
-    rulesets: new Set(['lynx']),
-}, {
-    // Note that this requires no_early_push as well
-    key: 'player_safe_at_decision_time',
-    label: "Players can't be trampled at decision time",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'emulate_60fps',
-    label: "Game runs at 60 FPS",
-    rulesets: new Set(['steam', 'steam-strict']),
-}, {
-    key: 'reuse_actor_slots',
-    label: "Game reuses slots in the actor list",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'force_lynx_animation_lengths',
-    label: "Animations use Lynx duration",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'actors_move_instantly',
-    label: "Movement happens instantly",
-    rulesets: new Set(['ms']),
-},
-
-// Tiles
-{
-    key: 'rff_actually_random',
-    label: "Random force floors are actually random",
-    rulesets: new Set(['ms']),
-}, {
-    key: 'no_backwards_override',
-    label: "Players can't override backwards on a force floor",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'traps_like_lynx',
-    label: "Traps eject faster, and even when already open",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'popwalls_pop_on_arrive',
-    label: "Recessed walls activate when stepped on",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'blue_floors_vanish_on_arrive',
-    label: "Fake blue walls vanish when stepped on",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'green_teleports_can_fail',
-    label: "Green teleporters sometimes fail",
-    rulesets: new Set(['steam-strict']),
-},
-
-// Items
-{
-    key: 'bombs_detonate_on_arrive',
-    label: "Mines detonate only when stepped on",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'bombs_immediately_detonate_under_players',
-    label: "Mines under players detonate at level start",
-    rulesets: new Set(['steam-strict']),
-}, {
-    key: 'cloned_bowling_balls_can_be_lost',
-    label: "Bowling balls on cloners are destroyed when fired at point blank",
-    rulesets: new Set(['steam-strict']),
-}, {
-    key: 'monsters_ignore_keys',
-    label: "Monsters completely ignore keys",
-    rulesets: new Set(['ms']),
-},
-
-// Blocks
-{
-    key: 'no_early_push',
-    label: "Pushing blocks happens at move time (block slapping is disabled)",
-    // XXX wait but the DEFAULT behavior allows block slapping, which lynx has, so why is lynx listed here?
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'use_legacy_hooking',
-    label: "Pulling blocks with the hook happens at decision time",
-    rulesets: new Set(['steam', 'steam-strict']),
-}, {
-    key: 'no_directly_pushing_sliding_blocks',
-    label: "Don't directly push sliding blocks",
-    rulesets: new Set(['steam', 'steam-strict']),
-}, {
-    key: 'use_pgchip_ice_blocks',
-    label: "Ice blocks emulate pgchip rules",
-    rulesets: new Set(['ms']),
-}, {
-    key: 'allow_pushing_blocks_off_faux_walls',
-    label: "Blocks may be pushed off of blue (fake), invisible, and revealing walls",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'emulate_spring_mining',
-    label: "Spring mining is possible",
-    rulesets: new Set(['steam-strict']),
-}, {
-    key: 'block_splashes_dont_block',
-    label: "Block splashes don't block the player",
-    rulesets: new Set(['ms']),
+    title: "Blocks",
+    flags: [{
+        key: 'use_legacy_hooking',
+        label: "Pulling blocks with the hook happens earlier, and may prevent moving",
+        rulesets: new Set(['steam', 'steam-strict']),
+    }, {
+        key: 'no_directly_pushing_sliding_blocks',
+        label: "Pushing sliding blocks queues a move, rather than moving them right away",
+        rulesets: new Set(['steam', 'steam-strict']),
+    }, {
+        key: 'emulate_spring_mining',
+        label: "Pushing a block off a recessed wall may cause you to move into the resulting wall",
+        rulesets: new Set(['steam-strict']),
+    }, {
+        key: 'no_early_push',
+        label: "Pushing blocks happens at move time (block slapping is disabled)",
+        // XXX wait but the DEFAULT behavior allows block slapping, which lynx has, so why is lynx listed here?
+        rulesets: new Set(['lynx', 'ms']),
+    }, {
+        key: 'use_pgchip_ice_blocks',
+        label: "Ice blocks use pgchip rules",
+        rulesets: new Set(['ms']),
+    }, {
+        key: 'allow_pushing_blocks_off_faux_walls',
+        label: "Blocks may be pushed off of blue (fake), invisible, and revealing walls",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'block_splashes_dont_block',
+        label: "Block splashes don't block the player",
+        rulesets: new Set(['ms']),
 /* XXX not implemented
 }, {
     key: 'emulate_flicking',
     label: "Flicking is possible",
     rulesets: new Set(['ms']),
 */
-},
+    }],
+}, {
+    title: "Terrain",
+    flags: [{
+        key: 'green_teleports_can_fail',
+        label: "Green teleporters sometimes fail",
+        rulesets: new Set(['steam-strict']),
+    }, {
+        key: 'no_backwards_override',
+        label: "Players can't override backwards on a force floor",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'traps_like_lynx',
+        label: "Traps eject faster, and eject when already open",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'blue_floors_vanish_on_arrive',
+        label: "Fake blue walls vanish when stepped on",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'popwalls_pop_on_arrive',
+        label: "Recessed walls activate when stepped on",
+        rulesets: new Set(['lynx', 'ms']),
+    }, {
+        key: 'rff_actually_random',
+        label: "Random force floors are actually random",
+        rulesets: new Set(['ms']),
+    }],
+}, {
+    title: "Items",
+    flags: [{
+        key: 'cloned_bowling_balls_can_be_lost',
+        label: "Bowling balls on cloners are destroyed when fired at point blank",
+        rulesets: new Set(['steam-strict']),
+    }, {
+        key: 'bombs_immediately_detonate_under_players',
+        label: "Mines under players detonate when the level starts",
+        rulesets: new Set(['steam-strict']),
+    }, {
+        key: 'bombs_detonate_on_arrive',
+        label: "Mines detonate only when stepped on",
+        rulesets: new Set(['lynx', 'ms']),
+    }, {
+        key: 'monsters_ignore_keys',
+        label: "Monsters completely ignore keys",
+        rulesets: new Set(['ms']),
+    }],
+}];
 
-// Monsters
-{
-    // TODO? in lynx they ignore the button while in motion too
-    // TODO what about in a trap, in every game??
-    // TODO what does ms do when a tank is on ice or a ff?  wiki's description is wacky
-    // TODO yellow tanks seem to have memory too??
-    key: 'tanks_always_obey_button',
-    label: "Blue tanks on cloners obey blue buttons",
-    rulesets: new Set(['steam-strict']),
-}, {
-    key: 'tanks_ignore_button_while_moving',
-    label: "Blue tanks ignore blue buttons while moving",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'blobs_use_tw_prng',
-    label: "Blobs use the Tile World RNG",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'teeth_target_internal_position',
-    label: "Teeth target the player's internal position",
-    rulesets: new Set(['lynx']),
-}, {
-    key: 'rff_blocks_monsters',
-    label: "Random force floors block monsters",
-    rulesets: new Set(['ms']),
-}, {
-    key: 'bonking_isnt_instant',
-    label: "Bonking while sliding doesn't apply instantly",
-    rulesets: new Set(['lynx', 'ms']),
-}, {
-    key: 'fire_allows_most_monsters',
-    label: "Fire doesn't block monsters, except bugs and walkers",
-    rulesets: new Set(['ms']),
-},
-];
 
 export function compat_flags_for_ruleset(ruleset) {
     let compat = {};
-    for (let compatdef of COMPAT_FLAGS) {
-        if (compatdef.rulesets.has(ruleset)) {
-            compat[compatdef.key] = true;
+    for (let category of COMPAT_FLAG_CATEGORIES) {
+        for (let compatdef of category.flags) {
+            if (compatdef.rulesets.has(ruleset)) {
+                compat[compatdef.key] = true;
+            }
         }
     }
     return compat;

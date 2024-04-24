@@ -2,7 +2,7 @@
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
 import * as fflate from './vendor/fflate.js';
 
-import { COMPAT_FLAGS, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
+import { COMPAT_FLAG_CATEGORIES, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
@@ -3301,8 +3301,8 @@ class CompatOverlay extends DialogOverlay {
                 "These are more technical settings, and as such are documented in full on ",
                 mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/wiki/Compatibility'}, "the project wiki"),
                 "."),
-            mk('p', "The short version is: Lexy mode is fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for.  Microsoft mode is best-effort and nothing is guaranteed."),
-            mk('p', "Changes won't take effect until you restart the level or change levels."),
+            mk('p', "Lexy mode should be fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for."),
+            mk('p', "Changes take effect when a level starts."),
         );
 
         let button_set = mk('div.radio-faux-button-set');
@@ -3321,7 +3321,7 @@ class CompatOverlay extends DialogOverlay {
             if (ruleset === 'custom')
                 return;
 
-            for (let compat of COMPAT_FLAGS) {
+            for (let compat of this.all_compat_flags) {
                 this.set(compat.key, compat.rulesets.has(ruleset));
             }
         });
@@ -3329,30 +3329,36 @@ class CompatOverlay extends DialogOverlay {
 
         // TODO include the section dividers, somehow
         let list = mk('ul.compat-flags');
-        for (let compat of COMPAT_FLAGS) {
-            let label = mk('label',
-                mk('input', {type: 'checkbox', name: compat.key}),
-                mk('span.-desc', compat.label),
-            );
-            for (let ruleset of COMPAT_RULESET_ORDER) {
-                if (ruleset === 'lexy' || ruleset === 'custom')
-                    continue;
+        this.all_compat_flags = [];
+        for (let category of COMPAT_FLAG_CATEGORIES) {
+            this.all_compat_flags.push(...category.flags);
+            list.append(mk('h2', category.title));
 
-                if (compat.rulesets.has(ruleset)) {
-                    label.append(mk('img.compat-icon', {src: `icons/compat-${ruleset}.png`}));
+            for (let compat of category.flags) {
+                let label = mk('label',
+                    mk('input', {type: 'checkbox', name: compat.key}),
+                    mk('span.-desc', compat.label),
+                );
+                for (let ruleset of COMPAT_RULESET_ORDER) {
+                    if (ruleset === 'lexy' || ruleset === 'custom')
+                        continue;
+
+                    if (compat.rulesets.has(ruleset)) {
+                        label.append(mk('img.compat-icon', {src: `icons/compat-${ruleset}.png`}));
+                    }
+                    else {
+                        label.append(mk('span.compat-icon-gap'));
+                    }
                 }
-                else {
-                    label.append(mk('span.compat-icon-gap'));
-                }
+                list.append(mk('li', label));
             }
-            list.append(mk('li', label));
         }
         list.addEventListener('change', ev => {
             // If the current set of flags exactly matches one of the presets, highlight that button
             let selected_ruleset = 'custom';
             for (let ruleset of COMPAT_RULESET_ORDER) {
                 let ok = true;
-                for (let compat of COMPAT_FLAGS) {
+                for (let compat of this.all_compat_flags) {
                     if (this.root.elements[compat.key].checked !== compat.rulesets.has(ruleset)) {
                         ok = false;
                         break;
@@ -3372,7 +3378,7 @@ class CompatOverlay extends DialogOverlay {
 
         // Populate everything to match the current settings
         this.root.elements['__ruleset__'].value = this.conductor._compat_ruleset ?? 'custom';
-        for (let compat of COMPAT_FLAGS) {
+        for (let compat of this.all_compat_flags) {
             this.set(compat.key, !! this.conductor.compat[compat.key]);
         }
 
@@ -3397,7 +3403,7 @@ class CompatOverlay extends DialogOverlay {
 
     save(permanent) {
         let flags = {};
-        for (let compat of COMPAT_FLAGS) {
+        for (let compat of this.all_compat_flags) {
             if (this.root.elements[compat.key].checked) {
                 flags[compat.key] = true;
             }
@@ -3915,7 +3921,6 @@ class Conductor {
         document.querySelector('#main-compat').addEventListener('click', () => {
             new CompatOverlay(this).open();
         });
-        document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[this._compat_ruleset ?? 'custom'];
 
         // Bind to the navigation headers, which list the current level pack
         // and level
@@ -4266,6 +4271,7 @@ class Conductor {
             this._compat_ruleset = ruleset;
         }
 
+        document.querySelector('#main-compat img').src = `icons/compat-${ruleset}.png`;
         document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[ruleset];
 
         this.compat = flags;

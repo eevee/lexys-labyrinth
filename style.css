@@ -327,6 +327,16 @@ button.--pressed,
 .dialog a:visited {
     color: hsl(255, 50%, 50%);
 }
+.dialog code {
+    color: hsl(var(--main-hue), 50%, 30%);
+}
+.dialog h2 {
+    color: hsl(var(--main-hue), 75%, 25%);
+    border-bottom: 1px dotted hsl(var(--main-hue), 50%, 40%);
+}
+.dialog h2:nth-child(n+1) {
+    margin-top: 1rem;
+}
 dl.formgrid {
     display: grid;
     grid: auto-flow min-content / 1fr 4fr;
@@ -524,6 +534,9 @@ ul.compat-flags > li > label {
     display: flex;
     align-items: center;
     gap: 0.25em;
+}
+ul.compat-flags > li > label > input[type=check] {
+    margin: 0.25em;
 }
 ul.compat-flags > li > label > span.-desc {
     flex: 1;
@@ -726,6 +739,11 @@ pre.stack-trace {
 #header-icon {
     image-rendering: crisp-edges;
     image-rendering: pixelated;
+}
+#main-compat > img {
+    height: 16px;
+    vertical-align: middle;
+    margin-right: 0.25em;
 }
 
 @media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
