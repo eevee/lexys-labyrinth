@@ -1186,7 +1186,7 @@ export class Level extends LevelInterface {
                 terrain.type.on_stand(terrain, this, actor);
             }
             // You might think a loop would be good here but this is unbelievably faster and the
-            // only tile with an on_stand is the bomb anyway
+            // only non-terrain tile with an on_stand is the bomb anyway
             let item = actor.cell.get_item();
             if (item && item.type.on_stand && ! actor.ignores(item.type.name)) {
                 item.type.on_stand(item, this, actor);
@@ -2103,6 +2103,10 @@ export class Level extends LevelInterface {
         let dest, direction, success;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
+            // Note that Tile World Lynx has a bug allowing other actors to teleport into the same
+            // cell as the player (and possibly other combinations under some circumstances?), but
+            // that is not actually the behavior of the original Lynx game and also is clearly
+            // ludicrous, so I'm making the executive decision to not emulate it
             if (dest !== teleporter && dest.cell.get_actor())
                 continue;
 
@@ -2158,7 +2162,7 @@ export class Level extends LevelInterface {
             }
 
             // Now physically move the actor, but their movement waits until next decision phase
-            this.remove_tile(actor, true);
+            this.remove_tile(actor);
             this.add_tile(actor, dest.cell);
             // Erase this to prevent tail-biting through a teleport
             this._set_tile_prop(actor, 'previous_cell', null);
