@@ -600,7 +600,26 @@ img.compat-icon,
 .option-volume > input[type=range] {
     flex: auto;
 }
-.option-tileset canvas {
+table.option-tilesets th,
+table.option-tilesets td {
+    padding: 0.25rem 0.5rem;
+}
+table.option-tilesets > tr > .-format {
+    font-size: 0.75em;
+    text-align: center;
+}
+table.option-tilesets > tr > .-slot {
+    padding: 0;
+}
+table.option-tilesets > tr > .-slot > label {
+    display: grid;
+    box-sizing: border-box;
+    min-width: 100%;
+    min-height: 100%;
+    padding: 0.5em 1em;
+    place-items: center;
+}
+table.option-tilesets canvas {
     vertical-align: middle;
 }
 label.option {
@@ -622,6 +641,9 @@ label.option .option-label {
 }
 .option-help.--visible {
     /* TODO */
+}
+.dialog-options input[type=file][name=custom-tileset] {
+    display: none;
 }
 
 @media (max-width: 800px) {

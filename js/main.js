@@ -12,7 +12,7 @@ import { PrimaryView, DialogOverlay, ConfirmOverlay, flash_button, svg_icon, loa
 import { Editor } from './editor/main.js';
 import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
-import { Tileset, TILESET_LAYOUTS, parse_tile_world_large_tileset, infer_tileset_from_image } from './tileset.js';
+import { Tileset, TILESET_LAYOUTS, convert_tileset_to_layout, parse_tile_world_large_tileset, infer_tileset_from_image } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, mk_svg } from './util.js';
 import * as util from './util.js';
@@ -53,6 +53,13 @@ function simplify_number(number) {
         return number.toPrecision(2).replace("+","")
     }
 }
+
+function make_button(label, onclick) {
+    let button = mk('button', {type: 'button'}, label);
+    button.addEventListener('click', onclick);
+    return button;
+}
+
 
 // TODO:
 // - level password, if any
@@ -1003,12 +1010,6 @@ class Player extends PrimaryView {
             time_tics_el: this.root.querySelector('#player-debug-time-tics'),
             time_moves_el: this.root.querySelector('#player-debug-time-moves'),
             time_secs_el: this.root.querySelector('#player-debug-time-secs'),
-        };
-
-        let make_button = (label, onclick) => {
-            let button = mk('button', {type: 'button'}, label);
-            button.addEventListener('click', onclick);
-            return button;
         };
 
         // -- Time --
@@ -2946,7 +2947,7 @@ const TILESET_SLOTS = [{
     name: "CC2",
 }, {
     ident: 'll',
-    name: "LL/editor",
+    name: "LL",
 }];
 const CUSTOM_TILESET_BUCKETS = ['Custom 1', 'Custom 2', 'Custom 3'];
 const CUSTOM_TILESET_PREFIX = "Lexy's Labyrinth custom tileset: ";
@@ -3020,8 +3021,9 @@ class OptionsOverlay extends DialogOverlay {
         }
 
         // Tileset options
+        this.main.append(mk('h2', "Tilesets"));
         this.tileset_els = {};
-        this.renderers = {};
+        //this.renderer = new CanvasRenderer(conductor.tilesets[slot.ident], 1);
         this.available_tilesets = {};
         for (let [ident, def] of Object.entries(BUILTIN_TILESETS)) {
             let newdef = { ...def, is_builtin: true };
@@ -3047,41 +3049,32 @@ class OptionsOverlay extends DialogOverlay {
                 };
             }
         }
+
+        let thead = mk('tr', mk('th', "Preview"), mk('th', "Format"));
+        this.tileset_table = mk('table.option-tilesets', thead);
+        this.main.append(this.tileset_table);
         for (let slot of TILESET_SLOTS) {
-            let renderer = new CanvasRenderer(conductor.tilesets[slot.ident], 1);
-            this.renderers[slot.ident] = renderer;
-
-            let select = mk('select', {name: `tileset-${slot.ident}`});
-            for (let [ident, def] of Object.entries(this.available_tilesets)) {
-                if (def.tileset.layout['#supported-versions'].has(slot.ident)) {
-                    select.append(mk('option', {value: ident}, def.name));
-                }
-            }
-            select.value = conductor.options.tilesets[slot.ident] ?? 'lexy';
-            if (! conductor._loaded_tilesets[select.value]) {
-                select.value = 'lexy';
-            }
-            select.addEventListener('change', () => {
-                this.update_selected_tileset(slot.ident);
-            });
-
-            let el = mk('dd.option-tileset', select, " ");
-            this.tileset_els[slot.ident] = el;
-            this.update_selected_tileset(slot.ident);
-
-            dl.append(
-                mk('dt', `${slot.name} tileset`),
-                el,
-            );
+            thead.append(mk('th.-slot', slot.name));
+        }
+        for (let [ident, def] of Object.entries(this.available_tilesets)) {
+            this._add_tileset_row(ident, def);
         }
         this.custom_tileset_counter = 1;
-        dl.append(mk('dd',
-            mk('p', "You can also load a custom tileset, which will be saved in browser storage."),
-            mk('p', "MSCC, Tile World, and Steam layouts are all supported."),
-            mk('p', "(Steam tilesets can be found in ", mk('code', "data/bmp"), " within the game's local files)."),
-            mk('p', mk('input', {type: 'file', name: 'custom-tileset'})),
+        // FIXME allow drag-drop into...  this window?  area?  idk
+        let custom_tileset_button = mk('button', {type: 'button'}, "Load custom tileset");
+        custom_tileset_button.addEventListener('click', () => this.root.elements['custom-tileset'].click());
+        this.main.append(
+            mk('p',
+                mk('input', {type: 'file', name: 'custom-tileset'}),
+                custom_tileset_button,
+                " — Any format: MSCC, Tile World, or Steam.",
+            ),
+            mk('p', "(Steam CC tilesets are in the game files under ", mk('code', "data/bmp"), ".)"),
             mk('div.option-load-tileset'),
-        ));
+        );
+        this.root.elements['custom-tileset'].addEventListener('change', ev => {
+            this._load_custom_tileset(ev.target.files[0]);
+        });
 
         // Load current values
         this.root.elements['music-volume'].value = this.conductor.options.music_volume ?? 1.0;
@@ -3092,80 +3085,25 @@ class OptionsOverlay extends DialogOverlay {
         this.root.elements['show-captions'].checked = this.conductor.options.show_captions ?? false;
         this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
 
-        this.root.elements['custom-tileset'].addEventListener('change', ev => {
-            this._load_custom_tileset(ev.target.files[0]);
-        });
-
-        this.add_button("save", () => {
-            let options = this.conductor.options;
-            options.music_volume = parseFloat(this.root.elements['music-volume'].value);
-            options.music_enabled = this.root.elements['music-enabled'].checked;
-            options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
-            options.sound_enabled = this.root.elements['sound-enabled'].checked;
-            options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
-            options.show_captions = this.root.elements['show-captions'].checked;
-            options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
-
-            // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data
-            // URIs, and /delete/ any custom ones we're not using any more, both of which require
-            // knowing which slots we're already using first
-            let buckets_in_use = new Set;
-            let chosen_tilesets = {};
-            for (let slot of TILESET_SLOTS) {
-                let tileset_ident = this.root.elements[`tileset-${slot.ident}`].value;
-                let tilesetdef = this.available_tilesets[tileset_ident];
-                if (! tilesetdef) {
-                    tilesetdef = this.available_tilesets['lexy'];
-                }
-
-                chosen_tilesets[slot.ident] = tilesetdef;
-                if (tilesetdef.is_already_stored) {
-                    buckets_in_use.add(tilesetdef.ident);
+        for (let slot of TILESET_SLOTS) {
+            let radioset = this.root.elements[`tileset-${slot.ident}`];
+            let value = conductor.options.tilesets[slot.ident] ?? 'lexy';
+            if (! conductor._loaded_tilesets[value]) {
+                value = 'lexy';
+            }
+            if (radioset instanceof Element) {
+                // There's only one radio button so we just got that back
+                if (radioset.value === value) {
+                    radioset.checked = true;
                 }
             }
-            // Clear out _loaded_tilesets first so it no longer refers to any custom tilesets we end
-            // up deleting
-            this.conductor._loaded_tilesets = {};
-            for (let [slot_ident, tilesetdef] of Object.entries(chosen_tilesets)) {
-                if (tilesetdef.is_builtin || tilesetdef.is_already_stored) {
-                    options.tilesets[slot_ident] = tilesetdef.ident;
-                }
-                else {
-                    // This is a newly uploaded one
-                    let data_uri = tilesetdef.data_uri ?? tilesetdef.canvas.toDataURL('image/png');
-                    let storage_bucket = CUSTOM_TILESET_BUCKETS.find(
-                        bucket => ! buckets_in_use.has(bucket));
-                    if (! storage_bucket) {
-                        console.error("Somehow ran out of storage buckets, this should be impossible??");
-                        continue;
-                    }
-                    buckets_in_use.add(storage_bucket);
-                    save_json_to_storage(CUSTOM_TILESET_PREFIX + storage_bucket, {
-                        src: data_uri,
-                        name: storage_bucket,
-                        layout: tilesetdef.layout,
-                        tile_width: tilesetdef.tile_width,
-                        tile_height: tilesetdef.tile_height,
-                    });
-                    options.tilesets[slot_ident] = storage_bucket;
-                }
-
-                // Update the conductor's loaded tilesets
-                this.conductor.tilesets[slot_ident] = tilesetdef.tileset;
-                this.conductor._loaded_tilesets[options.tilesets[slot_ident]] = tilesetdef.tileset;
+            else {
+                // This should be an actual radioset
+                radioset.value = value;
             }
-            // Delete old custom set URIs
-            for (let bucket of CUSTOM_TILESET_BUCKETS) {
-                if (! buckets_in_use.has(bucket)) {
-                    window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + bucket);
-                }
-            }
+        }
 
-            this.conductor.save_stash();
-            this.conductor.reload_all_options();
-
-            this.close();
-        }, true);
+        this.add_button("save", () => this.save(), true);
         this.add_button("forget it", () => {
             // Restore the player's music volume just in case
             if (this.original_music_volume !== undefined) {
@@ -3197,6 +3135,64 @@ class OptionsOverlay extends DialogOverlay {
         sfx.enabled = was_enabled;
     }
 
+    _add_tileset_row(ident, def) {
+        let tr = mk('tr');
+        this.tileset_table.append(tr);
+
+        tr.append(mk('td',
+            // TODO maybe draw these all to a single canvas
+            CanvasRenderer.draw_single_tile(def.tileset, 'player'),
+            CanvasRenderer.draw_single_tile(def.tileset, 'chip'),
+            CanvasRenderer.draw_single_tile(def.tileset, 'exit'),
+        ));
+
+        tr.append(mk('td.-format',
+            def.tileset.layout['#name'],
+            mk('br'),
+            `${def.tileset.size_x}×${def.tileset.size_y}px`,
+        ));
+
+        for (let slot of TILESET_SLOTS) {
+            let td = mk('td.-slot');
+            tr.append(td);
+            if (def.tileset.layout['#supported-versions'].has(slot.ident)) {
+                td.append(mk('label', mk('input', {
+                    type: 'radio',
+                    name: `tileset-${slot.ident}`,
+                    value: ident,
+                })));
+            }
+        }
+
+        // FIXME make buttons work
+        return;
+
+        if (def.is_builtin) {
+            tr.append(mk('td'));
+        }
+        else {
+            // TODO this doesn't do anything yet.  currently we just delete any tilesets not
+            // assigned to a slot
+            tr.append(mk('td', mk('button', {type: 'button'}, "Forget")));
+        }
+
+        tr.append(mk('td',
+            make_button("LL", () => {
+                convert_tileset_to_layout(def.tileset, 'lexy');
+            }),
+            make_button("CC2", () => {
+                let canvas = convert_tileset_to_layout(def.tileset, 'cc2');
+                mk('a', {href: canvas.toDataURL(), target: '_new'}).click();
+            }),
+            make_button("MSCC", () => {
+                convert_tileset_to_layout(def.tileset, 'tw-static');
+            }),
+            make_button("TW", () => {
+                convert_tileset_to_layout(def.tileset, 'tw-animated');
+            }),
+        ));
+    }
+
     async _load_custom_tileset(file) {
         // This is dumb and roundabout, but such is the web
         let reader = new FileReader;
@@ -3212,49 +3208,20 @@ class OptionsOverlay extends DialogOverlay {
         // ratio, hopefully.  Note that the LL layout is currently in progress so we can't
         // really detect that, but there can't really be alternatives to it either
         let result_el = this.root.querySelector('.option-load-tileset');
+        result_el.textContent = '';
         let tileset;
         try {
             tileset = infer_tileset_from_image(img, (w, h) => mk('canvas', {width: w, height: h}));
         }
         catch (e) {
             console.error(e);
-            result_el.textContent = '';
             result_el.append(mk('p', "This doesn't look like a tileset layout I understand, sorry!"));
             return;
         }
 
-        let renderer = new CanvasRenderer(tileset, 1);
-        result_el.textContent = '';
-        let buttons = mk('p');
-        result_el.append(
-            mk('p', `This looks like a ${tileset.layout['#name']} tileset with ${tileset.size_x}×${tileset.size_y} tiles.`),
-            mk('p',
-                renderer.draw_single_tile_type('player'),
-                renderer.draw_single_tile_type('chip'),
-                renderer.draw_single_tile_type('exit'),
-            ),
-            buttons,
-        );
-
         let tileset_ident = `new-custom-${this.custom_tileset_counter}`;
         let tileset_name = `New custom ${this.custom_tileset_counter}`;
-        this.custom_tileset_counter += 1;
-        for (let slot of TILESET_SLOTS) {
-            if (! tileset.layout['#supported-versions'].has(slot.ident))
-                continue;
-
-            let dd = this.tileset_els[slot.ident];
-            let select = dd.querySelector('select');
-            select.append(mk('option', {value: tileset_ident}, tileset_name));
-
-            let button = util.mk_button(`Use for ${slot.name}`, () => {
-                select.value = tileset_ident;
-                this.update_selected_tileset(slot.ident);
-            });
-            buttons.append(button);
-        }
-
-        this.available_tilesets[tileset_ident] = {
+        let tilesetdef = {
             ident: tileset_ident,
             name: tileset_name,
             canvas: tileset.image,
@@ -3263,6 +3230,10 @@ class OptionsOverlay extends DialogOverlay {
             tile_width: tileset.size_x,
             tile_height: tileset.size_y,
         };
+        this.available_tilesets[tileset_ident] = tilesetdef;
+
+        this.custom_tileset_counter += 1;
+        this._add_tileset_row(tileset_ident, tilesetdef);
     }
 
     update_selected_tileset(slot_ident) {
@@ -3281,6 +3252,77 @@ class OptionsOverlay extends DialogOverlay {
             renderer.draw_single_tile_type('chip'),
             renderer.draw_single_tile_type('exit'),
         );
+    }
+
+    save() {
+        let options = this.conductor.options;
+        options.music_volume = parseFloat(this.root.elements['music-volume'].value);
+        options.music_enabled = this.root.elements['music-enabled'].checked;
+        options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
+        options.sound_enabled = this.root.elements['sound-enabled'].checked;
+        options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
+        options.show_captions = this.root.elements['show-captions'].checked;
+        options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
+
+        // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data URIs,
+        // and /delete/ any custom ones we're not using any more, both of which require knowing
+        // which slots we're already using first
+        let buckets_in_use = new Set;
+        let chosen_tilesets = {};
+        for (let slot of TILESET_SLOTS) {
+            let tileset_ident = this.root.elements[`tileset-${slot.ident}`].value;
+            let tilesetdef = this.available_tilesets[tileset_ident];
+            if (! tilesetdef) {
+                tilesetdef = this.available_tilesets['lexy'];
+            }
+
+            chosen_tilesets[slot.ident] = tilesetdef;
+            if (tilesetdef.is_already_stored) {
+                buckets_in_use.add(tilesetdef.ident);
+            }
+        }
+        // Clear out _loaded_tilesets first so it no longer refers to any custom tilesets we end
+        // up deleting
+        this.conductor._loaded_tilesets = {};
+        for (let [slot_ident, tilesetdef] of Object.entries(chosen_tilesets)) {
+            if (tilesetdef.is_builtin || tilesetdef.is_already_stored) {
+                options.tilesets[slot_ident] = tilesetdef.ident;
+            }
+            else {
+                // This is a newly uploaded one
+                let data_uri = tilesetdef.data_uri ?? tilesetdef.canvas.toDataURL('image/png');
+                let storage_bucket = CUSTOM_TILESET_BUCKETS.find(
+                    bucket => ! buckets_in_use.has(bucket));
+                if (! storage_bucket) {
+                    console.error("Somehow ran out of storage buckets, this should be impossible??");
+                    continue;
+                }
+                buckets_in_use.add(storage_bucket);
+                save_json_to_storage(CUSTOM_TILESET_PREFIX + storage_bucket, {
+                    src: data_uri,
+                    name: storage_bucket,
+                    layout: tilesetdef.layout,
+                    tile_width: tilesetdef.tile_width,
+                    tile_height: tilesetdef.tile_height,
+                });
+                options.tilesets[slot_ident] = storage_bucket;
+            }
+
+            // Update the conductor's loaded tilesets
+            this.conductor.tilesets[slot_ident] = tilesetdef.tileset;
+            this.conductor._loaded_tilesets[options.tilesets[slot_ident]] = tilesetdef.tileset;
+        }
+        // Delete old custom set URIs
+        for (let bucket of CUSTOM_TILESET_BUCKETS) {
+            if (! buckets_in_use.has(bucket)) {
+                window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + bucket);
+            }
+        }
+
+        this.conductor.save_stash();
+        this.conductor.reload_all_options();
+
+        this.close();
     }
 
     close() {
