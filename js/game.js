@@ -575,7 +575,7 @@ export class Level extends LevelInterface {
 
                 // At last, a wired cell edge we have not yet handled.  Floodfill from here
                 let circuit = algorithms.trace_floor_circuit(
-                    this, this.compat.tiles_react_instantly ? 'always' : 'still',
+                    this, this.compat.actors_move_instantly ? 'always' : 'still',
                     terrain.cell, direction,
                 );
                 this.circuits.push(circuit);
@@ -2259,9 +2259,6 @@ export class Level extends LevelInterface {
                 }
                 if (tile.cell) {
                     this.add_actor(tile);
-                    if (this.compat.actors_move_instantly) {
-                        tile.moves_instantly = true;
-                    }
                 }
                 this.add_tile(dropping_actor, cell);
             }
@@ -2735,9 +2732,13 @@ export class Level extends LevelInterface {
     }
 
     add_actor(actor) {
+        if (this.compat.actors_move_instantly) {
+            actor.moves_instantly = true;
+        }
+
         if (this.compat.reuse_actor_slots && actor.type.layer !== LAYERS.vfx) {
-            // Place the new actor in the first slot taken up by a nonexistent one, but not VFX
-            // which aren't supposed to impact gameplay
+            // Lynx: New actors go in the first available "dead" slot.  VFX are exempt, since those
+            // are LL additions and shouldn't affect gameplay
             for (let i = 0, l = this.actors.length; i < l; i++) {
                 let old_actor = this.actors[i];
                 if (old_actor !== this.player && ! old_actor.cell) {
