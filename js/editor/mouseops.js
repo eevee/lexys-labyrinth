@@ -8,6 +8,7 @@ import { mk, mk_svg, walk_grid } from '../util.js';
 
 import { SPECIAL_TILE_BEHAVIOR } from './editordefs.js';
 import { SVGConnection } from './helpers.js';
+import { isCtrlKey } from './keyboard.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
 
 // TODO some minor grievances
@@ -202,7 +203,7 @@ export class MouseOperation {
     }
 
     _update_modifiers(ev) {
-        this.ctrl = ev.ctrlKey;
+        this.ctrl = isCtrlKey(ev);
         this.shift = ev.shiftKey;
         this.alt = ev.altKey;
     }

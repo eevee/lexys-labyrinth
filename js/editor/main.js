@@ -14,6 +14,7 @@ import * as util from '../util.js';
 import * as dialogs from './dialogs.js';
 import { TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, PALETTE, SPECIAL_PALETTE_ENTRIES, SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask } from './editordefs.js';
 import { SVGConnection, Selection } from './helpers.js';
+import { isCtrlKey, isMac } from './keyboard.js';
 import * as mouseops from './mouseops.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
 
@@ -147,8 +148,23 @@ export class Editor extends PrimaryView {
             if (! this.active)
                 return;
 
-            if (ev.ctrlKey) {
-                if (ev.key === 'a') {
+            if (isCtrlKey(ev)) {
+                // macOS is really weird:
+                //
+                // | Keys pressed | `ev.key` |
+                // |--------------|----------|
+                // | A            | "a"      |
+                // | shift+A      | "A"      |
+                // | cmd+A        | "a"      |
+                // | cmd+shift+A  | "a" !!!  |
+                // | ctrl+shift+A | "A"      |
+                //
+                // For some reason, with cmd the key is always lowercase.
+                // So we have to check the letter key case insensitively,
+                // and then manually check if shift is pressed.
+                const key = ev.key.toLowerCase();
+
+                if (key === 'a' && !ev.shiftKey) {
                     // Select all
                     if (TOOLS[this.current_tool].affects_selection) {
                         // If we're in the middle of using a selection tool, cancel it
@@ -161,7 +177,7 @@ export class Editor extends PrimaryView {
                         this.commit_undo();
                     }
                 }
-                else if (ev.key === 'A') {
+                else if (ev.key === 'a' && ev.shiftKey) {
                     // Deselect
                     if (TOOLS[this.current_tool].affects_selection) {
                         // If we're in the middle of using a selection tool, cancel it
@@ -173,10 +189,10 @@ export class Editor extends PrimaryView {
                         this.commit_undo();
                     }
                 }
-                else if (ev.key === 'z') {
+                else if (key === 'z' && !ev.shiftKey) {
                     this.undo();
                 }
-                else if (ev.key === 'Z' || ev.key === 'y') {
+                else if ((key === 'z' && ev.shiftKey) || (key === 'y' && !ev.shiftKey)) {
                     this.redo();
                 }
                 else {
@@ -317,7 +333,7 @@ export class Editor extends PrimaryView {
         // Mouse wheel to zoom
         this.set_canvas_zoom(1);
         this.viewport_el.addEventListener('wheel', ev => {
-            if (!ev.ctrlKey)
+            if (!isCtrlKey(ev))
                 return;
             // The delta is platform and hardware dependent and ultimately kind of useless, so just
             // treat each event as a click and hope for the best
@@ -410,7 +426,7 @@ export class Editor extends PrimaryView {
                     tooltip.append(this.svg_icon('svg-icon-mouse2'));
                 }
                 else if (key) {
-                    tooltip.append(mk('kbd', key));
+                    tooltip.append(mk('kbd', key === 'ctrl' && isMac ? 'cmd' : key));
                 }
             }
 
