@@ -309,6 +309,8 @@ export class Editor extends PrimaryView {
         // Mouse wheel to zoom
         this.set_canvas_zoom(1);
         this.viewport_el.addEventListener('wheel', ev => {
+            if (!ev.ctrlKey)
+                return;
             // The delta is platform and hardware dependent and ultimately kind of useless, so just
             // treat each event as a click and hope for the best
             if (ev.deltaY === 0)
