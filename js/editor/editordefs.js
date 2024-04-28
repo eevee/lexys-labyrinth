@@ -183,8 +183,8 @@ export const PALETTE = [{
         'walker',
         'fireball',
         'glider',
-        'bug',
         'paramecium',
+        'bug',
 
         'doppelganger1',
         'doppelganger2',
@@ -305,8 +305,8 @@ export const PALETTE = [{
 export const SPECIAL_PALETTE_ENTRIES = {
     'thin_walls/south':     { name: 'thin_walls', edges: DIRECTIONS['south'].bit },
     'frame_block/0':        { name: 'frame_block', direction: 'south', arrows: new Set },
-    'frame_block/1':        { name: 'frame_block', direction: 'north', arrows: new Set(['north']) },
-    'frame_block/2a':       { name: 'frame_block', direction: 'north', arrows: new Set(['north', 'east']) },
+    'frame_block/1':        { name: 'frame_block', direction: 'south', arrows: new Set(['south']) },
+    'frame_block/2a':       { name: 'frame_block', direction: 'south', arrows: new Set(['south', 'west']) },
     'frame_block/2o':       { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'south']) },
     'frame_block/3':        { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south']) },
     'frame_block/4':        { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south', 'west']) },
