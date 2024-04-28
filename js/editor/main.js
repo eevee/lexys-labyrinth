@@ -210,7 +210,9 @@ export class Editor extends PrimaryView {
                 else if (ev.key === '-') {
                     this.zoom_by(-1);
                 }
-                else if (ev.key === '=') {
+                // `=` because US keyboards have `+` on the same key as `=`, and `+` is shift-`=`
+                // `+` because many other keyboards have `+` on its own key, un-shifted, while `=` is shifted
+                else if (ev.key === '=' || ev.key === '+') {
                     this.zoom_by(+1);
                 }
                 else if (ev.key === '1') {
