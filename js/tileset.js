@@ -142,6 +142,7 @@ export const CC2_TILESET_LAYOUT = {
         bomb: [5, 4],
         fuse: [7, 4],
     },
+    dormant_bomb: [5, 4],  // compat tile, so needs a fallback
     green_bomb: {
         __special__: 'bomb-fuse',
         bomb: [6, 4],
@@ -309,7 +310,7 @@ export const CC2_TILESET_LAYOUT = {
         },
     },
     popwall: [8, 10],
-    popwall2: [8, 10],
+    popwall2: [8, 10],  // compat tile, so needs a fallback
     gravel: [9, 10],
     ball: {
         __special__: 'animated',
@@ -897,6 +898,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     button_blue: [2, 8],
     teleport_blue: [2, 9],
     bomb: [2, 10],
+    dormant_bomb: [2, 10],  // compat tile, so needs a fallback
     trap: {
         __special__: 'visual-state',
         closed: [2, 11],
@@ -905,7 +907,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     wall_appearing: [2, 12],
     gravel: [2, 13],
     popwall: [2, 14],
-    popwall2: [2, 14],
+    popwall2: [2, 14],  // compat tile, so needs a fallback
     hint: [2, 15],
 
     cloner: [3, 1],
@@ -1335,9 +1337,13 @@ export const LL_TILESET_LAYOUT = {
     foil: [2, 17],
     xray_eye: [3, 17],
     helmet: [4, 17],
+    phantom_ring: [5, 17],
+    feather: [6, 17],
+    dormant_bomb: [7, 17],
     skeleton_key: [0, 18],
     ankh: [1, 18],
     floor_ankh: [2, 18],
+    toll_gate: [5, 18],
     no_sign: [6, 18],
     gift_bow: [7, 18],
     score_10: [0, 19],
@@ -3069,6 +3075,10 @@ export function parse_tile_world_large_tileset(canvas) {
         }
     }
     ctx.putImageData(image_data, 0, 0);
+
+    // These are compat tiles, which need to have a fallback
+    layout['popwall2'] = layout['popwall'];
+    layout['dormant_bomb'] = layout['bomb'];
 
     return new Tileset(canvas, layout, tw, th);
 }

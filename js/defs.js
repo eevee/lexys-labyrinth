@@ -150,6 +150,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         key: 'no_auto_convert_ccl_blue_walls',
         label: "Blue walls under blocks are not auto-converted in CCL levels",
         rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+    }, {
+        key: 'no_auto_convert_ccl_bombs',
+        label: "Mines under actors are not auto-converted in CCL levels",
+        rulesets: new Set(['steam-strict', 'lynx', 'ms']),
     }],
 }, {
     title: "Actor behavior",
@@ -300,6 +304,7 @@ export const COMPAT_FLAG_CATEGORIES = [{
         label: "Bowling balls on cloners are destroyed when fired at point blank",
         rulesets: new Set(['steam-strict']),
     }, {
+        // XXX is this necessary, with the addition of the dormant bomb?
         key: 'bombs_immediately_detonate_under_players',
         label: "Mines under players detonate when the level starts",
         rulesets: new Set(['steam-strict']),

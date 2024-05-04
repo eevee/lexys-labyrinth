@@ -352,8 +352,8 @@ const TILE_TYPES = {
                 level.stored_level.format === 'ccl' &&
                 me.cell.get_actor())
             {
-                // Fix blocks and other actors on top of popwalls by turning them into double
-                // popwalls, which preserves CC2 popwall behavior
+                // CCL: Actors who start on popwalls are not intended to activate them when they
+                // leave, so preserve CC2 behavior by changing them to double popwalls
                 me.type = TILE_TYPES['popwall2'];
             }
         },
@@ -430,8 +430,8 @@ const TILE_TYPES = {
                 level.stored_level.format === 'ccl' &&
                 me.cell.get_actor())
             {
-                // Blocks can be pushed off of blue walls in TW Lynx, which only works due to a tiny
-                // quirk of the engine that I don't want to replicate, so replace them with popwalls
+                // CCL: Blocks can be pushed off of blue walls in TW Lynx, but we can replicate the
+                // behavior with CC2 rules by replacing them with popwalls
                 // TODO this also works with invis walls apparently.  maybe only for blocks?
                 me.type = TILE_TYPES['popwall'];
             }
@@ -1062,6 +1062,17 @@ const TILE_TYPES = {
     },
     bomb: {
         layer: LAYERS.item,
+        on_ready(me, level) {
+            if (! level.compat.no_auto_convert_ccl_bombs &&
+                level.stored_level.format === 'ccl' &&
+                me.cell.get_actor())
+            {
+                // CCL: A number of custom levels start an actor on top of a bomb (I guess to
+                // conserve space), relying on the CC1 behavior that bombs only detonate when
+                // stepped onto.  Replace those with the custom "dormant bomb" tile.
+                me.type = TILE_TYPES['dormant_bomb'];
+            }
+        },
         on_arrive(me, level, other) {
             if (level.compat.bombs_detonate_on_arrive) {
                 me.type._detonate(me, level, other);
@@ -1081,6 +1092,18 @@ const TILE_TYPES = {
         _detonate(me, level, other) {
             level.remove_tile(me);
             level.kill_actor(other, me, 'explosion', 'bomb', 'exploded');
+        },
+    },
+    // Bomb variant originally added as a CC1 autofix, but which doubles as an experimental item --
+    // it's dormant until you drop it and move off of it, at which point it becomes a normal bomb
+    dormant_bomb: {
+        ...COMMON_TOOL,
+        on_depart(me, level, other) {
+            // Unlike dynamite, anyone can activate this (important to make it work as CCL compat)
+            if (me.cell.get_item_mod())
+                return;
+
+            level.transmute_tile(me, 'bomb');
         },
     },
     hole: {
@@ -2800,24 +2823,28 @@ const TILE_TYPES = {
     dynamite: {
         ...COMMON_TOOL,
         on_depart(me, level, other) {
-            if (other.type.is_real_player && ! me.cell.get_item_mod()) {
-                // FIXME wiki just says about 4.3 seconds; more likely this is exactly 255 frames
-                level._set_tile_prop(me, 'timer', 85);
-                level.transmute_tile(me, 'dynamite_lit');
-                // Actors are expected to have this, so populate it
-                level._set_tile_prop(me, 'movement_cooldown', 0);
-                level.add_actor(me);
-                // Dynamite inherits a copy of the player's inventory, which largely doesn't matter
-                // except for suction boots, helmet, or lightning bolt; keys can't matter because
-                // dynamite is blocked by doors
-                if (other.toolbelt) {
-                    level._set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
-                }
-                // Dynamite that lands on a force floor is moved by it, and dynamite that lands on a
-                // button holds it down
-                // TODO is there anything this should NOT activate?
-                level.step_on_cell(me, me.cell);
+            if (! other.type.is_real_player)
+                return;
+            if (me.cell.get_item_mod())
+                return;
+
+            // XXX wiki just says about 4.3 seconds; more likely this is exactly 255 frames (and
+            // there haven't been any compat problems so far...)
+            level._set_tile_prop(me, 'timer', 85);
+            level.transmute_tile(me, 'dynamite_lit');
+            // Actors are expected to have this, so populate it
+            level._set_tile_prop(me, 'movement_cooldown', 0);
+            level.add_actor(me);
+            // Dynamite inherits a copy of the player's inventory, which largely doesn't matter
+            // except for suction boots, helmet, or lightning bolt; keys can't matter because
+            // dynamite is blocked by doors
+            if (other.toolbelt) {
+                level._set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
             }
+            // Dynamite that lands on a force floor is moved by it, and dynamite that lands on a
+            // button holds it down
+            // TODO is there anything this should NOT activate?
+            level.step_on_cell(me, me.cell);
         },
     },
     dynamite_lit: {
