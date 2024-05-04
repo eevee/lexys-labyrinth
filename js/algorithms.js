@@ -33,9 +33,9 @@ export function* find_terrain_linear(levelish, start_cell, type_names, reverse =
 // Only used by orange buttons.
 // Yields [tile, cell].
 export function* find_terrain_diamond(levelish, start_cell, type_names) {
-    let max_search_radius = (
-        Math.max(start_cell.x, levelish.size_x - start_cell.x) +
-        Math.max(start_cell.y, levelish.size_y - start_cell.y));
+    // Note that this won't search the entire level in all cases, but it does match CC2 behavior.
+    // Not worth a compat flag since it only affects level design, and fairly perversely
+    let max_search_radius = Math.max(levelish.size_x, levelish.size_y) + 1;
     for (let dist = 1; dist <= max_search_radius; dist++) {
         // Start east and move counterclockwise
         let sx = start_cell.x + dist;
