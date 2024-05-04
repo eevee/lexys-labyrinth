@@ -839,18 +839,6 @@ export class Level extends LevelInterface {
 
     // Decision phase: all actors decide on their movement "simultaneously"
     _do_decision_phase(forced_only = false) {
-        // Before decisions happen, remember the player's /current/ direction, which may be affected
-        // by sliding.  This will be used by doppelgängers earlier in actor order than the player.
-        if (! forced_only) {
-            // Check whether the player is /attempting/ to move: either they did, or they're blocked
-            if (this.player.movement_cooldown > 0 || this.player.is_blocked) {
-                this.remember_player_move(this.player.direction);
-            }
-            else {
-                this.remember_player_move(null);
-            }
-        }
-
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
 
@@ -924,7 +912,7 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
-            this._do_actor_movement(actor, actor.decision);
+            this._do_actor_movement(actor);
             if (actor.type.ttl)
                 continue;
 
@@ -949,7 +937,7 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
-            this._do_actor_movement(actor, actor.decision);
+            this._do_actor_movement(actor);
             if (actor.type.ttl)
                 continue;
 
@@ -960,11 +948,12 @@ export class Level extends LevelInterface {
     }
 
     // Have an actor attempt to move
-    _do_actor_movement(actor, direction) {
+    _do_actor_movement(actor) {
         // Check this again, since an earlier pass may have caused us to start moving
         if (actor.movement_cooldown > 0)
             return;
 
+        let direction = actor.decision;
         if (! direction)
             return true;
 
@@ -976,15 +965,15 @@ export class Level extends LevelInterface {
             success = this._possibly_bonk(actor, direction);
         }
 
-        // Track whether the player is blocked, both for visual effect and for doppelgangers
+        // Track when the player is blocked for visual effect
         if (actor === this.player && ! success) {
+            this._set_tile_prop(actor, 'is_blocked', true);
             if (actor.last_blocked_direction !== actor.direction) {
                 // This is only used for checking when to play the mmf sound, doesn't need undoing;
                 // it's cleared when we make a successful move or a null decision
                 actor.last_blocked_direction = actor.direction;
                 this.sfx.play_once('blocked', actor.cell);
             }
-            this._set_tile_prop(actor, 'is_blocked', true);
         }
 
         return success;
@@ -1108,9 +1097,11 @@ export class Level extends LevelInterface {
                 return;
             }
 
-            // Play step sound when the player completes a move
             if (actor === this.player) {
+                // Play step sound when the player completes a move
                 this._play_footstep(actor);
+                // And erase any remembered move, until we make a new one
+                this.remember_player_move(null);
             }
 
             if (! this.compat.actors_move_instantly) {
@@ -1363,9 +1354,7 @@ export class Level extends LevelInterface {
     make_player_decision(actor, input, forced_only = false) {
         // Only reset the player's is_pushing between movement, so it lasts for the whole push
         this._set_tile_prop(actor, 'is_pushing', false);
-        // This effect only lasts one tic, after which we can move again.  Note that this one has
-        // gameplay impact -- doppelgangers use it to know if they should copy your facing direction
-        // even if you're not moving
+        // This effect only lasts one tic, after which we can move again
         if (! forced_only) {
             this._set_tile_prop(actor, 'is_blocked', false);
         }
@@ -1424,13 +1413,18 @@ export class Level extends LevelInterface {
         if (actor.is_pending_slide && ! (may_move && dir1)) {
             // This is a forced move and we're not overriding it, so we're done
             actor.decision = actor.direction;
+            this.remember_player_move(actor.decision);
 
             if (terrain.type.slide_mode === 'force') {
                 this._set_tile_prop(actor, 'can_override_slide', true);
             }
         }
-        else if (dir1 === null || forced_only) {
-            // Not attempting to move, so do nothing
+        else if (forced_only) {
+            // Not allowed to move, so do nothing
+        }
+        else if (dir1 === null) {
+            // Not attempting to move, so do nothing, but remember it
+            this.remember_player_move(null);
         }
         else {
             // At this point, we have exactly 1 or 2 directions, and deciding between them requires
@@ -1475,6 +1469,9 @@ export class Level extends LevelInterface {
                 }
             }
 
+            // Doppelgangers copy our /attempted/ move, including a failed override
+            this.remember_player_move(actor.decision);
+
             // If we're overriding a force floor but the direction we're moving in is blocked, we
             // keep our override power (but only under the CC2 behavior of instant bonking).
             // Notably, this happens even if we do end up able to move!
@@ -1493,9 +1490,6 @@ export class Level extends LevelInterface {
         if (actor.decision === null && ! forced_only) {
             actor.last_blocked_direction = null;
         }
-
-        // Remember our decision so doppelgängers can copy it
-        this.remember_player_move(actor.decision);
     }
 
     make_actor_decision(actor, forced_only = false) {
