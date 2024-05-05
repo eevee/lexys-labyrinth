@@ -59,6 +59,11 @@ export class Tile {
         if (this.type.layer === LAYERS.item && this.cell.get_item_mod())
             return false;
 
+        // Extremely niche interaction: monsters can enter cells with items by killing a player
+        // who's revived by an ankh
+        if (this.type.is_item && other.temp_ignore_item_collision)
+            return false;
+
         if (level.compat.monsters_ignore_keys && this.type.is_key)
             // MS: Monsters are never blocked by keys
             return false;
@@ -180,6 +185,9 @@ Object.assign(Tile.prototype, {
     is_pending_slide: false,
     can_override_slide: false,
     pending_push: null,
+    destination_cell: null,
+    is_making_failure_move: false,
+    temp_ignore_item_collision: false,
 });
 
 
@@ -849,6 +857,10 @@ export class Level extends LevelInterface {
             if (actor.destination_cell) {
                 this._set_tile_prop(actor, 'destination_cell', null);
             }
+            // This is only used for killing an ankh'd player on an item
+            if (actor.temp_ignore_item_collision) {
+                this._set_tile_prop(actor, 'temp_ignore_item_collision', false);
+            }
 
             if (! actor.cell)
                 continue;
@@ -966,7 +978,7 @@ export class Level extends LevelInterface {
         }
 
         // Track when the player is blocked for visual effect
-        if (actor === this.player && ! success) {
+        if (actor === this.player && ! success && ! actor.is_making_failure_move) {
             this._set_tile_prop(actor, 'is_blocked', true);
             if (actor.last_blocked_direction !== actor.direction) {
                 // This is only used for checking when to play the mmf sound, doesn't need undoing;
@@ -1082,8 +1094,17 @@ export class Level extends LevelInterface {
     }
 
     _do_actor_cooldown(actor, cooldown = 3) {
-        if (actor.movement_cooldown <= 0)
+        if (actor.movement_cooldown <= 0) {
+            if (actor.is_making_failure_move) {
+                // For actors that are causing the game to end with an attempted move, and which
+                // aren't actually moving, give them a cooldown /as if/ they were moving into the
+                // deadly cell (which should have already been fudged with .destination_cell)
+                let speed = actor.type.movement_speed * 3;
+                this._set_tile_prop(actor, 'movement_cooldown', speed - cooldown);
+                this._set_tile_prop(actor, 'movement_speed', speed);
+            }
             return;
+        }
 
         if (actor.last_extra_cooldown_tic === this.tic_counter)
             return;
@@ -1636,7 +1657,25 @@ export class Level extends LevelInterface {
                 // happen at decision time thanks to no_early_push
                 (! this.compat.player_safe_at_decision_time || push_mode === 'push'))
             {
-                this._check_for_player_death(actor, tile);
+                if (this._check_for_player_death(actor, tile)) {
+                    // Actors can't move into each other's cells, so monsters aren't allowed to
+                    // actually step on the player (or vice versa) -- however, to make it LOOK like
+                    // that's what's happening in the final frame, use the 'destination_cell'
+                    // (originally meant for teleporters) property to pretend this movement happens.
+                    // But first -- this implies that if a player is standing on an item, and a
+                    // monster kills the player, AND the player has an inscribed ankh, then the
+                    // monster should be able to continue on into the cell despite the item!  So
+                    // let's make that happen too.
+                    if (tile.type.is_real_player && tile.cell !== cell) {
+                        this._set_tile_prop(actor, 'temp_ignore_item_collision', true);
+                        return true;
+                    }
+                    else {
+                        this._set_tile_prop(actor, 'previous_cell', actor.cell);
+                        this._set_tile_prop(actor, 'destination_cell', cell);
+                        this._set_tile_prop(actor, 'is_making_failure_move', true);
+                    }
+                }
             }
 
             if (this.compat.allow_pushing_blocks_off_faux_walls &&
