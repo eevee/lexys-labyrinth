@@ -22,6 +22,7 @@ const PAGE_TITLE = "Lexy's Labyrinth";
 // (it's 6 characters so it becomes exactly 8 base64 chars with no leftovers to entangle)
 const REPLAY_PREFIX = "TExERU1P";
 const RESTART_KEY_DELAY = 1.0;
+const REWIND_SPEED = 4;
 
 function format_replay_duration(t) {
     return `${t} tics (${util.format_duration(t / TICS_PER_SECOND)})`;
@@ -1700,7 +1701,7 @@ class Player extends PrimaryView {
         // the framerate
         if (this.state === 'rewinding') {
             // Rewind faster than normal time
-            dt *= 0.5;
+            dt /= REWIND_SPEED;
         }
         this._advance_handle = window.setTimeout(this._advance_bound, dt);
 
@@ -1773,7 +1774,7 @@ class Player extends PrimaryView {
             let elapsed = (performance.now() - this.last_advance) / 1000;
             let speed = this.play_speed;
             if (this.state === 'rewinding') {
-                speed *= 2;
+                speed *= REWIND_SPEED;
             }
             update_progress = elapsed * TICS_PER_SECOND * (3 / this.level.update_rate) * speed;
             update_progress = Math.min(1, update_progress);
