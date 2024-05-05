@@ -2609,15 +2609,21 @@ export class Level extends LevelInterface {
         }
     }
 
+    uncollect_chip(actor) {
+        this.chips_remaining += 1;
+        // TODO sfx
+    }
+
     adjust_bonus(add, mult = 1) {
         this.bonus_points = Math.floor(this.bonus_points * mult) + add;
     }
 
     pause_timer() {
         if (this.time_remaining === null)
-            return;
+            return false;
 
         this.timer_paused = ! this.timer_paused;
+        return true;
     }
 
     adjust_timer(dt) {

@@ -11,6 +11,30 @@ function blocks_leaving_thin_walls(me, level, actor, direction) {
     return me.type.thin_walls.has(direction) && actor.type.name !== 'ghost';
 }
 
+// Score bonuses; they're picked up as normal EXCEPT by ghosts, but only a real player can actually
+// add to the player's bonus
+function _define_bonus(add, mult = 1) {
+    return {
+        layer: LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
+        item_priority: PICKUP_PRIORITIES.normal,
+        check_toll(me, level, other) {
+            return level.bonus_points > 0 && Math.floor(level.bonus_points / mult) >= add;
+        },
+        take_toll(me, level, other) {
+            level.adjust_bonus(-add, 1/mult);
+        },
+        on_pickup(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
+            if (other.type.is_real_player) {
+                level.adjust_bonus(add, mult);
+                level.sfx.play_once('get-bonus', me.cell);
+            }
+            return true;
+        },
+    };
+}
 function _define_door(key) {
     return {
         layer: LAYERS.terrain,
@@ -1202,6 +1226,60 @@ const TILE_TYPES = {
         layer: LAYERS.item_mod,
         item_modifier: 'pickup',
     },
+    toll_gate: {
+        layer: LAYERS.item_mod,
+        item_modifier: 'ignore',
+        // Most non-inventory items have special (but intuitive) behavior.  Bombs are functionally
+        // not items, so although they /can/ be put under here, they'll just block everything.
+        // XXX cc2's editor won't let you place a no sign on a chip, and will count the chip (if
+        // required), and will also let you pick up the chip if you walk over it.  but this
+        // explicitly works with chips, so keep that in mind when fixing that.  also, a chip under
+        // here (or a gift bow i guess) shouldn't animate
+        blocks(me, level, other) {
+            let item = me.cell.get_item();
+            if (! item) {
+                return false;
+            }
+            else if (item.type.check_toll) {
+                return ! item.type.check_toll(item, level, other);
+            }
+            else if (other.has_item(item.type.name)) {
+                return false;
+            }
+            else if (item.type.is_key && other.has_item('skeleton_key')) {
+                // Special case: the skeleton key works here, too
+                return false;
+            }
+            return true;
+        },
+        on_arrive(me, level, other) {
+            let item = me.cell.get_item();
+            if (! item)
+                return;
+
+            if (item.type.take_toll) {
+                item.type.take_toll(item, level, other);
+            }
+            else if (item.type.is_tool) {
+                level.take_tool_from_actor(other, item.type.name);
+            }
+            else if (item.type.is_key) {
+                if (! level.take_key_from_actor(other, item.type.name, true)) {
+                    // Special case: the skeleton key works here, too (but the real key is still
+                    // preferred)
+                    level.take_tool_from_actor(other, 'skeleton_key');
+                }
+            }
+            else {
+                // ???
+                return;
+            }
+
+            if (other === level.player) {
+                level.sfx.play_once('thief', me.cell);
+            }
+        },
+    },
 
     // Mechanisms
     dirt_block: {
@@ -1405,6 +1483,13 @@ const TILE_TYPES = {
         green_toggle_counterpart: 'green_bomb',
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        check_toll(me, level, other) {
+            // Increasing the chips-remaining counter is always fine
+            return true;
+        },
+        take_toll(me, level, other) {
+            level.uncollect_chip(me);
+        },
         on_pickup(me, level, other) {
             level.collect_chip(me);
             return true;
@@ -2516,6 +2601,14 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        // Stopwatch bonus toll functions like a stopwatch penalty, except it doesn't go away and
+        // blocks you if you don't have at least 10 seconds to spare
+        check_toll(me, level, other) {
+            return level.time_remaining >= 10 * 20;
+        },
+        take_toll(me, level, other) {
+            level.adjust_timer(-10);
+        },
         on_pickup(me, level, other) {
             level.sfx.play_once('get-stopwatch-bonus', me.cell);
             level.adjust_timer(+10);
@@ -2526,6 +2619,13 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        // Stopwatch penalty toll just gives you 10 seconds every time??
+        check_toll(me, level, other) {
+            return true;
+        },
+        take_toll(me, level, other) {
+            level.adjust_timer(+10);
+        },
         on_pickup(me, level, other) {
             level.sfx.play_once('get-stopwatch-penalty', me.cell);
             level.adjust_timer(-10);
@@ -2536,9 +2636,18 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.player,
-        on_pickup(me, level, other) {
-            level.sfx.play_once('get-stopwatch-toggle', me.cell);
+        // Stopwatch toggle toll wants to unpause the clock as a cost, so it only lets you through
+        // if the clock is currently paused
+        check_toll(me, level, other) {
+            return level.timer_paused;
+        },
+        take_toll(me, level, other) {
             level.pause_timer();
+        },
+        on_pickup(me, level, other) {
+            if (level.pause_timer()) {
+                level.sfx.play_once('get-stopwatch-toggle', me.cell);
+            }
             return false;
         },
     },
@@ -3136,6 +3245,13 @@ const TILE_TYPES = {
         is_required_chip: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        check_toll(me, level, other) {
+            // Increasing the chips-remaining counter is always fine
+            return true;
+        },
+        take_toll(me, level, other) {
+            level.uncollect_chip(me);
+        },
         on_pickup(me, level, other) {
             level.collect_chip(me);
             return true;
@@ -3146,83 +3262,23 @@ const TILE_TYPES = {
         is_chip: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        check_toll(me, level, other) {
+            // Increasing the chips-remaining counter is always fine
+            return true;
+        },
+        take_toll(me, level, other) {
+            level.uncollect_chip(me);
+        },
         on_pickup(me, level, other) {
             level.collect_chip(me);
             return true;
         },
     },
-    // Score bonuses; they're picked up as normal EXCEPT by ghosts, but only a real player can
-    // actually add to the player's bonus
-    score_10: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(10);
-                level.sfx.play_once('get-bonus', me.cell);
-            }
-            return true;
-        },
-    },
-    score_100: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(100);
-                level.sfx.play_once('get-bonus', me.cell);
-            }
-            return true;
-        },
-    },
-    score_1000: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(1000);
-                level.sfx.play_once('get-bonus', me.cell);
-            }
-            return true;
-        },
-    },
-    score_2x: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(0, 2);
-                level.sfx.play_once('get-bonus2', me.cell);
-            }
-            return true;
-        },
-    },
-    score_5x: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(0, 5);
-                level.sfx.play_once('get-bonus2', me.cell);
-            }
-            return true;
-        },
-    },
+    score_10: _define_bonus(10),
+    score_100: _define_bonus(100),
+    score_1000: _define_bonus(1000),
+    score_2x: _define_bonus(0, 2),
+    score_5x: _define_bonus(0, 5),
 
     hint: {
         layer: LAYERS.terrain,
