@@ -1,5 +1,5 @@
 import { DIRECTIONS, LAYERS } from './defs.js';
-import { mk } from './util.js';
+import * as util from './util.js';
 import { DrawPacket } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 
@@ -73,7 +73,7 @@ export class CanvasRenderer {
 
     // This is here so command-line Node stuff can swap it out for the canvas package
     static make_canvas(w, h) {
-        return mk('canvas', {width: w, height: h});
+        return util.mk('canvas', {width: w, height: h});
     }
 
     // Draw a single tile, or even the name of a tile type.  Either a canvas or a context may be given.
@@ -380,6 +380,8 @@ export class CanvasRenderer {
     draw_rewind_effect(clock) {
         // Shift several rows over in a recurring pattern, like a VHS, whatever that is
         let rewind_start = clock / 20 % 1;
+        // Draw noisy white stripes in there too
+        this.ctx.save();
         for (let chunk = 0; chunk < 4; chunk++) {
             let y = Math.floor(this.canvas.height * (chunk + rewind_start) / 4);
             for (let dy = 1; dy < 5; dy++) {
@@ -387,8 +389,22 @@ export class CanvasRenderer {
                     this.canvas,
                     0, y + dy, this.canvas.width, 1,
                     -dy * dy, y + dy, this.canvas.width, 1);
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, y + dy + 0.5);
+                this.ctx.lineTo(this.canvas.width, y + dy + 0.5);
+                let alpha = (0.9 - y / this.canvas.height * 0.25) * ((dy - 1) / 3);
+                this.ctx.strokeStyle = `rgba(100%, 100%, 100%, ${alpha})`;
+                this.ctx.setLineDash([
+                    util.random_range(4, 20),
+                    util.random_range(2, 6),
+                    util.random_range(4, 20),
+                    util.random_range(2, 6),
+                ]);
+                this.ctx.stroke();
             }
         }
+        this.ctx.restore();
     }
 
     // Used by the editor and map previews.  Draws a region of the level (probably a StoredLevel),
