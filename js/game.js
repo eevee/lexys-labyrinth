@@ -386,11 +386,6 @@ export class Level extends LevelInterface {
         }
         this.undo_buffer_index = 0;
         this.pending_undo = new UndoEntry;
-        // On levels with a lot of cloners pointing directly into water, monsters can be created and
-        // destroyed frequently, and each of them has to be persisted in the undo buffer.  To cut
-        // down on the bloat somewhat, keep around the last handful of destroyed actors, and reuse
-        // them when spawning a new actor.
-        this.destroyed_tile_pool = [];
         // If undo_enabled is false, we won't create any undo entries.  Undo is only disabled during
         // bulk testing, where a) no one will ever undo and b) the overhead is significant.
         this.undo_enabled = true;
@@ -2833,13 +2828,6 @@ export class Level extends LevelInterface {
     remove_tile(tile, destroying = false) {
         tile.cell._remove(tile);
         this._set_tile_prop(tile, 'cell', null);
-
-        if (destroying) {
-            this.destroyed_tile_pool.push(tile);
-            if (this.destroyed_tile_pool.length > 8) {
-                this.destroyed_tile_pool.shift();
-            }
-        }
     }
 
     add_tile(tile, cell) {
@@ -2848,21 +2836,7 @@ export class Level extends LevelInterface {
     }
 
     make_actor(type, direction = 'south') {
-        let actor;
-        if (this.destroyed_tile_pool.length > 0) {
-            actor = this.destroyed_tile_pool.shift();
-            // Clear out anything already set on the tile
-            for (let key of Object.keys(actor)) {
-                this._set_tile_prop(actor, key, Tile.prototype[key]);
-            }
-            this._set_tile_prop(actor, 'type', type);
-            this._set_tile_prop(actor, 'direction', direction);
-        }
-        else {
-            actor = new Tile(type, direction);
-        }
-
-        return actor;
+        return new Tile(type, direction);
     }
 
     add_actor(actor) {
