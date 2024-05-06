@@ -1685,7 +1685,7 @@ const TILE_TYPES = {
                 }
                 if (success) {
                     // FIXME add this underneath, just above the cloner, so the new actor is on top
-                    let new_template = new actor.constructor(type, direction);
+                    let new_template = level.make_actor(type, direction);
                     if (type.on_clone) {
                         type.on_clone(new_template, actor);
                     }
@@ -3148,11 +3148,7 @@ const TILE_TYPES = {
                     level.transmute_tile(level.ankh_tile, 'floor');
                     level.spawn_animation(level.ankh_tile.cell, 'puff');
                 }
-                let old_tile = level.ankh_tile;
                 level.ankh_tile = terrain;
-                level._push_pending_undo(() => {
-                    level.ankh_tile = old_tile;
-                });
                 level.transmute_tile(terrain, 'floor_ankh');
                 // TODO some kinda vfx + sfx
                 level.remove_tile(me);

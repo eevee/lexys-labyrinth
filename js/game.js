@@ -181,7 +181,7 @@ Object.assign(Tile.prototype, {
     wire_tunnel_directions: 0,
     // Actor defaults
     movement_cooldown: 0,
-    movement_speed: 12,
+    movement_speed: null,
     previous_cell: null,
     is_sliding: false,
     is_pending_slide: false,
@@ -263,6 +263,18 @@ export class Cell extends Array {
         return direction;
     }
 }
+
+
+class UndoEntry {
+    constructor() {
+        this.misc_closures = [];
+        this.tile_changes = new Map;
+        this.level_props = {};
+        this.actor_splices = [];
+        this.toggle_green_tiles = false;
+    }
+}
+
 
 // The undo stack is implemented with a ring buffer, and this is its size.  One entry per tic.
 // Based on Chrome measurements made against the pathological level CCLP4 #40 (Periodic Lasers) and
@@ -353,10 +365,14 @@ export class Level extends LevelInterface {
             this.undo_buffer[i] = null;
         }
         this.undo_buffer_index = 0;
-        this.pending_undo = this.create_undo_entry();
-        // If undo_enabled is false, we won't create any undo entries.
-        // Undo is only disabled during bulk testing, where a) there's no
-        // possibility of needing to undo and b) the overhead is noticable.
+        this.pending_undo = new UndoEntry;
+        // On levels with a lot of cloners pointing directly into water, monsters can be created and
+        // destroyed frequently, and each of them has to be persisted in the undo buffer.  To cut
+        // down on the bloat somewhat, keep around the last handful of destroyed actors, and reuse
+        // them when spawning a new actor.
+        this.destroyed_tile_pool = [];
+        // If undo_enabled is false, we won't create any undo entries.  Undo is only disabled during
+        // bulk testing, where a) no one will ever undo and b) the overhead is significant.
         this.undo_enabled = true;
 
         // Order in which actors try to collide with tiles.
@@ -463,7 +479,6 @@ export class Level extends LevelInterface {
         }
 
         this.recalculate_circuitry_next_wire_phase = false;
-        this.undid_past_recalculate_circuitry = false;
         this.recalculate_circuitry(true);
 
         // Finally, let all tiles do custom init behavior...  but backwards, to match actor order
@@ -478,7 +493,7 @@ export class Level extends LevelInterface {
             }
         }
         // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
-        this.pending_undo = this.create_undo_entry();
+        this.pending_undo = new UndoEntry;
     }
 
     connect_button(connectable) {
@@ -525,9 +540,10 @@ export class Level extends LevelInterface {
         }
     }
 
-    recalculate_circuitry(first_time = false, undoing = false) {
+    recalculate_circuitry(first_time = false) {
         // Build circuits out of connected wires
         // TODO document this idea
+        // TODO moving a circuit block should only need to invalidate the circuits it touches
 
         this.circuits = [];
         this.power_sources = [];
@@ -631,13 +647,10 @@ export class Level extends LevelInterface {
                 for (let j = 0; j < this.height; j++) {
                     let terrain = this.cell(i, j).get_terrain();
                     if (terrain.is_wired !== undefined) {
+                        // XXX begin?  if it's NOT the first time??
                         terrain.type.on_begin(terrain, this);
                     }
                 }
-            }
-
-            if (! undoing) {
-                this._push_pending_undo(() => this.undid_past_recalculate_circuitry = true);
             }
         }
     }
@@ -827,7 +840,7 @@ export class Level extends LevelInterface {
             }
             // It's not possible to rewind to before this happened, so clear undo and permanently
             // set a flag
-            this.pending_undo = this.create_undo_entry();
+            this.pending_undo = new UndoEntry;
             this.done_on_begin = true;
         }
 
@@ -1119,7 +1132,7 @@ export class Level extends LevelInterface {
         if (actor.movement_cooldown <= 0) {
             if (actor.type.ttl) {
                 // This is an animation that just finished, so destroy it
-                this.remove_tile(actor);
+                this.remove_tile(actor, true);
                 return;
             }
 
@@ -1273,10 +1286,11 @@ export class Level extends LevelInterface {
         if (this.pending_green_toggle) {
             // Swap green objects
             this.__toggle_green_tiles();
-            this._push_pending_undo(() => {
-                this.__toggle_green_tiles();
-            });
             this.pending_green_toggle = false;
+
+            if (this.undo_enabled) {
+                this.pending_undo.toggle_green_tiles = true;
+            }
         }
     }
 
@@ -1326,9 +1340,8 @@ export class Level extends LevelInterface {
                 }
                 p += 1;
             }
-            else {
-                let local_p = p;
-                this._push_pending_undo(() => this.actors.splice(local_p, 0, actor));
+            else if (this.undo_enabled) {
+                this.pending_undo.actor_splices.push([p, 0, actor]);
             }
         }
         this.actors.length = p;
@@ -2020,7 +2033,7 @@ export class Level extends LevelInterface {
         let original_cell = actor.cell;
         // Physically remove the actor first, so that it won't get in the way of e.g. a splash
         // spawned from stepping off of a lilypad
-        this.remove_tile(actor);
+        this.remove_tile(actor, false);
 
         // Announce we're leaving, for the handful of tiles that care about it.  Do so from the top
         // down, specifically so dynamite becomes lit before a lilypad tries to splash
@@ -2197,7 +2210,7 @@ export class Level extends LevelInterface {
             }
 
             // Now physically move the actor, but their movement waits until next decision phase
-            this.remove_tile(actor);
+            this.remove_tile(actor, false);
             this.add_tile(actor, dest.cell);
             // Erase this to prevent tail-biting through a teleport
             this._set_tile_prop(actor, 'previous_cell', null);
@@ -2309,11 +2322,17 @@ export class Level extends LevelInterface {
 
     _do_wire_phase() {
         let force_next_wire_phase = false;
-        if (this.recalculate_circuitry_next_wire_phase)
-        {
+        if (this.recalculate_circuitry_next_wire_phase) {
             this.recalculate_circuitry();
             this.recalculate_circuitry_next_wire_phase = false;
             force_next_wire_phase = true;
+
+            // This property doesn't tend to last beyond a single tic, but if we recalculate now, we
+            // also need to recalculate if we undo beyond this point.  So set it as a level prop,
+            // which after an undo, will then cause us to recalculate the next time we advance
+            if (this.undo_enabled) {
+                this.pending_undo.level_props.recalculate_circuitry_next_wire_phase = true;
+            }
         }
 
         if (this.circuits.length === 0)
@@ -2490,13 +2509,6 @@ export class Level extends LevelInterface {
 
     // Undo/redo --------------------------------------------------------------------------------------
 
-    create_undo_entry() {
-        let entry = [];
-        entry.tile_changes = new Map;
-        entry.level_props = {};
-        return entry;
-    }
-
     has_undo() {
         let prev_index = this.undo_buffer_index - 1;
         if (prev_index < 0) {
@@ -2511,7 +2523,7 @@ export class Level extends LevelInterface {
             return;
         }
         this.undo_buffer[this.undo_buffer_index] = this.pending_undo;
-        this.pending_undo = this.create_undo_entry();
+        this.pending_undo = new UndoEntry;
 
         this.undo_buffer_index += 1;
         this.undo_buffer_index %= UNDO_BUFFER_SIZE;
@@ -2522,7 +2534,7 @@ export class Level extends LevelInterface {
 
         // In turn-based mode, we might still be in mid-tic with a partial undo stack; do that first
         this._undo_entry(this.pending_undo);
-        this.pending_undo = this.create_undo_entry();
+        this.pending_undo = new UndoEntry;
 
         this.undo_buffer_index -= 1;
         if (this.undo_buffer_index < 0) {
@@ -2530,11 +2542,6 @@ export class Level extends LevelInterface {
         }
         this._undo_entry(this.undo_buffer[this.undo_buffer_index]);
         this.undo_buffer[this.undo_buffer_index] = null;
-
-        if (this.undid_past_recalculate_circuitry) {
-            this.recalculate_circuitry_next_wire_phase = true;
-            this.undid_past_recalculate_circuitry = false;
-        }
     }
 
     // Reverse a single undo entry
@@ -2543,13 +2550,29 @@ export class Level extends LevelInterface {
             return;
         }
 
-        // Undo in reverse order!  There's no redo, so it's okay to destroy this
-        entry.reverse();
-        for (let undo of entry) {
-            undo();
+        console.log(entry);
+
+        // Undo in reverse order!  There's no redo, so it's okay to use the destructive reverse().
+        // Green toggle goes first, since it's the last thing to happen in a tic
+        if (entry.pending_green_toggle) {
+            this.__toggle_green_tiles();
         }
+
+        entry.misc_closures.reverse();
+        for (let closure of entry.misc_closures) {
+            closure();
+        }
+
+        entry.actor_splices.reverse();
+        for (let args of entry.actor_splices) {
+            this.actors.splice(...args);
+        }
+
+        let needs_readding = [];
         for (let [tile, changes] of entry.tile_changes) {
-            // If a tile's cell or layer changed, it needs to be removed and then added
+            // If a tile's cell or layer changed, it needs to be removed and then added -- but to
+            // avoid ordering problems when a tile leaves a cell and a different tile enters that
+            // cell on the same tic, we can't add back any tiles until they've all been removed
             let do_cell_dance = (Object.hasOwn(changes, 'cell') || (
                 Object.hasOwn(changes, 'type') && tile.type.layer !== changes.type.layer));
             if (do_cell_dance && tile.cell) {
@@ -2557,8 +2580,11 @@ export class Level extends LevelInterface {
             }
             Object.assign(tile, changes);
             if (do_cell_dance && tile.cell) {
-                tile.cell._add(tile);
+                needs_readding.push(tile);
             }
+        }
+        for (let tile of needs_readding) {
+            tile.cell._add(tile);
         }
         for (let [key, value] of Object.entries(entry.level_props)) {
             this[key] = value;
@@ -2567,7 +2593,7 @@ export class Level extends LevelInterface {
 
     _push_pending_undo(thunk) {
         if (this.undo_enabled) {
-            this.pending_undo.push(thunk)
+            this.pending_undo.misc_closures.push(thunk);
         }
     }
 
@@ -2684,7 +2710,7 @@ export class Level extends LevelInterface {
             this.transmute_tile(actor, animation_name);
         }
         else {
-            this.remove_tile(actor);
+            this.remove_tile(actor, true);
         }
     }
 
@@ -2761,14 +2787,39 @@ export class Level extends LevelInterface {
 
     // Tile stuff in particular
 
-    remove_tile(tile) {
+    remove_tile(tile, destroying = false) {
         tile.cell._remove(tile);
         this._set_tile_prop(tile, 'cell', null);
+
+        if (destroying) {
+            this.destroyed_tile_pool.push(tile);
+            if (this.destroyed_tile_pool.length > 8) {
+                this.destroyed_tile_pool.shift();
+            }
+        }
     }
 
     add_tile(tile, cell) {
         this._set_tile_prop(tile, 'cell', cell);
         cell._add(tile);
+    }
+
+    make_actor(type, direction = 'south') {
+        let actor;
+        if (this.destroyed_tile_pool.length > 0) {
+            actor = this.destroyed_tile_pool.shift();
+            // Clear out anything already set on the tile
+            for (let key of Object.keys(actor)) {
+                this._set_tile_prop(actor, key, Tile.prototype[key]);
+            }
+            this._set_tile_prop(actor, 'type', type);
+            this._set_tile_prop(actor, 'direction', direction);
+        }
+        else {
+            actor = new Tile(type, direction);
+        }
+
+        return actor;
     }
 
     add_actor(actor) {
@@ -2783,14 +2834,18 @@ export class Level extends LevelInterface {
                 let old_actor = this.actors[i];
                 if (old_actor !== this.player && ! old_actor.cell) {
                     this.actors[i] = actor;
-                    this._push_pending_undo(() => this.actors[i] = old_actor);
+                    if (this.undo_enabled) {
+                        this.pending_undo.actor_splices.push([i, 1, old_actor]);
+                    }
                     return;
                 }
             }
         }
 
         this.actors.push(actor);
-        this._push_pending_undo(() => this.actors.pop());
+        if (this.undo_enabled) {
+            this.pending_undo.actor_splices.push([this.actors.length - 1, 1]);
+        }
     }
 
     _init_animation(tile) {
@@ -2819,7 +2874,7 @@ export class Level extends LevelInterface {
         if (type.layer === LAYERS.vfx) {
             let vfx = cell[type.layer];
             if (vfx) {
-                this.remove_tile(vfx);
+                this.remove_tile(vfx, true);
             }
         }
         let tile = new Tile(type);
