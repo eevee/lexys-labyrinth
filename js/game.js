@@ -267,8 +267,8 @@ export class Cell extends Array {
 
 class UndoEntry {
     constructor() {
-        this.misc_closures = [];
         this.tile_changes = new Map;
+        this.sokoban_changes = null;
         this.level_props = {};
         this.actor_splices = [];
         this.toggle_green_tiles = false;
@@ -282,6 +282,15 @@ class UndoEntry {
             this.tile_changes.set(tile, changes);
         }
         return changes;
+    }
+
+    preserve_sokoban(color, count) {
+        if (! this.sokoban_changes) {
+            this.sokoban_changes = {};
+        }
+        if (! (color in this.sokoban_changes)) {
+            this.sokoban_changes[color] = count;
+        }
     }
 }
 
@@ -417,7 +426,8 @@ export class Level extends LevelInterface {
         let yellow_teleporter_count = 0;
         this.allow_taking_yellow_teleporters = false;
         // Sokoban buttons function as a group
-        this.sokoban_buttons_unpressed = {};
+        this.sokoban_unpressed = { red: 0, blue: 0, yellow: 0, green: 0 };
+        this.sokoban_satisfied = { red: true, blue: true, yellow: true, green: true };
         for (let y = 0; y < this.height; y++) {
             let row = [];
             for (let x = 0; x < this.width; x++) {
@@ -426,7 +436,7 @@ export class Level extends LevelInterface {
                 this.linear_cells.push(cell);
 
                 let stored_cell = this.stored_level.linear_cells[n];
-                n++;
+                n += 1;
                 for (let template_tile of stored_cell) {
                     if (! template_tile)
                         continue;
@@ -444,7 +454,7 @@ export class Level extends LevelInterface {
                         }
                     }
                     if (tile.type.is_required_chip && this.stored_level.chips_required === null) {
-                        this.chips_remaining++;
+                        this.chips_remaining += 1;
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);
@@ -466,8 +476,8 @@ export class Level extends LevelInterface {
                         }
                     }
                     else if (tile.type.name === 'sokoban_button') {
-                        this.sokoban_buttons_unpressed[tile.color] =
-                            (this.sokoban_buttons_unpressed[tile.color] ?? 0) + 1;
+                        this.sokoban_unpressed[tile.color] += 1;
+                        this.sokoban_satisfied[tile.color] = false;
                     }
                 }
             }
@@ -1302,6 +1312,8 @@ export class Level extends LevelInterface {
                 this.pending_undo.toggle_green_tiles = true;
             }
         }
+
+        this.__check_sokoban_buttons();
     }
 
     __toggle_green_tiles() {
@@ -1318,6 +1330,27 @@ export class Level extends LevelInterface {
             let item = cell.get_item();
             if (item && item.type.green_toggle_counterpart) {
                 item.type = TILE_TYPES[item.type.green_toggle_counterpart];
+            }
+        }
+    }
+
+    // Check for changes to sokoban buttons, and swap the appropriate floors/walls if necessary.
+    // NOT undo-safe; this is undone by calling it again after an undo.
+    __check_sokoban_buttons() {
+        for (let [color, was_satisfied] of Object.entries(this.sokoban_satisfied)) {
+            let is_satisfied = this.sokoban_unpressed[color] === 0;
+            if (was_satisfied !== is_satisfied) {
+                this.sokoban_satisfied[color] = is_satisfied;
+                let new_type = TILE_TYPES[is_satisfied ? 'sokoban_floor' : 'sokoban_wall'];
+                console.log(color, this.sokoban_unpressed[color], was_satisfied, is_satisfied, new_type);
+                for (let cell of this.linear_cells) {
+                    let terrain = cell.get_terrain();
+                    if ((terrain.type.name === 'sokoban_wall' || terrain.type.name === 'sokoban_floor') &&
+                        terrain.color === color)
+                    {
+                        terrain.type = new_type;
+                    }
+                }
             }
         }
     }
@@ -2542,14 +2575,13 @@ export class Level extends LevelInterface {
         console.log(entry);
 
         // Undo in reverse order!  There's no redo, so it's okay to use the destructive reverse().
-        // Green toggle goes first, since it's the last thing to happen in a tic
+        // These toggles go first, since they're the last things to happen in a tic
         if (entry.pending_green_toggle) {
             this.__toggle_green_tiles();
         }
-
-        entry.misc_closures.reverse();
-        for (let closure of entry.misc_closures) {
-            closure();
+        if (entry.sokoban_changes) {
+            Object.assign(this.sokoban_unpressed, entry.sokoban_changes);
+            this.__check_sokoban_buttons();
         }
 
         entry.actor_splices.reverse();
@@ -2585,12 +2617,6 @@ export class Level extends LevelInterface {
 
         for (let [key, value] of Object.entries(entry.level_props)) {
             this[key] = value;
-        }
-    }
-
-    _push_pending_undo(thunk) {
-        if (this.undo_enabled) {
-            this.pending_undo.misc_closures.push(thunk);
         }
     }
 
@@ -2681,6 +2707,22 @@ export class Level extends LevelInterface {
             // If the timer isn't paused, this will kill the player at the end of the tic
             this.time_remaining = 1;
         }
+    }
+
+    press_sokoban(color) {
+        if (this.undo_enabled) {
+            this.pending_undo.preserve_sokoban(color, this.sokoban_unpressed[color]);
+        }
+
+        this.sokoban_unpressed[color] -= 1;
+    }
+
+    unpress_sokoban(color) {
+        if (this.undo_enabled) {
+            this.pending_undo.preserve_sokoban(color, this.sokoban_unpressed[color]);
+        }
+
+        this.sokoban_unpressed[color] += 1;
     }
 
     kill_actor(actor, killer, animation_name = null, sfx = null, fail_reason = null) {

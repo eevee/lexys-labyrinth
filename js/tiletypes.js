@@ -1570,54 +1570,26 @@ const TILE_TYPES = {
             if (actor && ! (actor.type.name === 'sokoban_block' && actor.color !== me.color)) {
                 // Already held down, make sure the level knows
                 me.pressed = true;
-                level.sokoban_buttons_unpressed[me.color] -= 1;
-                if (level.sokoban_buttons_unpressed[me.color] === 0) {
-                    for (let cell of level.linear_cells) {
-                        let terrain = cell.get_terrain();
-                        if (terrain.type.name === 'sokoban_wall' && terrain.color === me.color) {
-                            terrain.type = TILE_TYPES['sokoban_floor'];
-                        }
-                    }
-                }
+                level.press_sokoban(me.color);
             }
         },
         on_arrive(me, level, other) {
+            if (me.pressed)
+                return;
             if (other.type.name === 'sokoban_block' && me.color !== other.color)
                 return;
             level._set_tile_prop(me, 'pressed', true);
             level.sfx.play_once('button-press', me.cell);
 
-            level.sokoban_buttons_unpressed[me.color] -= 1;
-            level._push_pending_undo(() => {
-                level.sokoban_buttons_unpressed[me.color] += 1;
-            });
-            if (level.sokoban_buttons_unpressed[me.color] === 0) {
-                for (let cell of level.linear_cells) {
-                    let terrain = cell.get_terrain();
-                    if (terrain.type.name === 'sokoban_wall' && terrain.color === me.color) {
-                        level.transmute_tile(terrain, 'sokoban_floor');
-                    }
-                }
-            }
+            level.press_sokoban(me.color);
         },
         on_depart(me, level, other) {
-            level._set_tile_prop(me, 'pressed', false);
-            if (other.type.name === 'sokoban_block' && me.color !== other.color)
+            if (! me.pressed)
                 return;
+            level._set_tile_prop(me, 'pressed', false);
             level.sfx.play_once('button-release', me.cell);
 
-            level.sokoban_buttons_unpressed[me.color] += 1;
-            level._push_pending_undo(() => {
-                level.sokoban_buttons_unpressed[me.color] -= 1;
-            });
-            if (level.sokoban_buttons_unpressed[me.color] === 1) {
-                for (let cell of level.linear_cells) {
-                    let terrain = cell.get_terrain();
-                    if (terrain.type.name === 'sokoban_floor' && terrain.color === me.color) {
-                        level.transmute_tile(terrain, 'sokoban_wall');
-                    }
-                }
-            }
+            level.unpress_sokoban(me.color);
         },
         visual_state(me) {
             return (me.color ?? 'red') + '_' + (me.pressed ? 'pressed' : 'released');
