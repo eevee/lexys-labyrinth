@@ -2445,13 +2445,11 @@ export class Level extends LevelInterface {
                 }
             }
 
-            let was_powered = circuit.is_powered;
-            if (is_powered === was_powered)
-                continue;
-
-            circuit.is_powered = is_powered;
-            if (this.undo_enabled) {
-                circuit_changes.set(circuit, was_powered);
+            if (is_powered !== circuit.is_powered) {
+                if (this.undo_enabled) {
+                    circuit_changes.set(circuit, circuit.is_powered);
+                }
+                circuit.is_powered = is_powered;
             }
         }
 
@@ -2623,7 +2621,8 @@ export class Level extends LevelInterface {
     // it through one of these for undo/rewind purposes
 
     _set_tile_prop(tile, key, val) {
-        if (Number.isNaN(val)) throw new Error(`got a NaN for ${key} on ${tile.type.name} at ${tile.cell.x}, ${tile.cell.y}`);
+        if (Number.isNaN(val))
+            throw new Error(`got a NaN for ${key} on ${tile.type.name} at ${tile.cell.x}, ${tile.cell.y}`);
         if (! this.undo_enabled) {
             tile[key] = val;
             return;
