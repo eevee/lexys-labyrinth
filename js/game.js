@@ -272,6 +272,7 @@ class UndoEntry {
         this.level_props = {};
         this.actor_splices = [];
         this.toggle_green_tiles = false;
+        this.circuit_power_changes = null;
     }
 
     tile_changes_for(tile) {
@@ -2347,32 +2348,6 @@ export class Level extends LevelInterface {
         if (this.circuits.length === 0)
             return;
 
-        // Prepare a big slab of undo.  The only thing we directly change here (aside from
-        // emitting_edges, a normal tile property) is Tile.powered_edges, which tends to change for
-        // large numbers of tiles at a time, so store it all in one map and undo it in one shot.
-        let powered_edges_changes = new Map;
-        let _set_edges = (tile, new_edges) => {
-            if (this.undo_enabled) {
-                if (powered_edges_changes.has(tile)) {
-                    if (powered_edges_changes.get(tile) === new_edges) {
-                        powered_edges_changes.delete(tile);
-                    }
-                }
-                else {
-                    powered_edges_changes.set(tile, tile.powered_edges);
-                }
-            }
-            tile.powered_edges = new_edges;
-        };
-        let power_edges = (tile, edges) => {
-            let new_edges = tile.powered_edges | edges;
-            _set_edges(tile, new_edges);
-        };
-        let depower_edges = (tile, edges) => {
-            let new_edges = tile.powered_edges & ~edges;
-            _set_edges(tile, new_edges);
-        };
-
         // Update the state of any tiles that can generate power.  If none of them changed since
         // last wiring update, stop here.  First, static power sources.
         let any_changed = false;
@@ -2397,7 +2372,7 @@ export class Level extends LevelInterface {
             let emitting = 0;
             if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
                 let wired_tile = actor.cell.get_wired_tile();
-                if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor' || wired_tile.type.name === 'electrified_floor')) {
+                if (wired_tile && (wired_tile === actor || wired_tile.type.can_be_powered_by_actor)) {
                     emitting = wired_tile.wire_directions;
                     for (let circuit of this.cells_to_circuits.get(this.cell_to_scalar(wired_tile.cell))) {
                         externally_powered_circuits.add(circuit);
@@ -2410,7 +2385,7 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (! any_changed && !force_next_wire_phase) {
+        if (! any_changed && ! force_next_wire_phase) {
             return;
         }
 
@@ -2420,8 +2395,7 @@ export class Level extends LevelInterface {
             tile._prev_powered_edges = tile.powered_edges;
         }
 
-        // Now go through every circuit, compute whether it's powered, and if that changed, inform
-        // its outputs
+        // Go through every circuit and recompute whether it's powered
         let circuit_changes = new Map;
         for (let circuit of this.circuits) {
             let is_powered = false;
@@ -2446,17 +2420,11 @@ export class Level extends LevelInterface {
             if (this.undo_enabled) {
                 circuit_changes.set(circuit, was_powered);
             }
-
-            for (let [tile, edges] of circuit.tiles.entries()) {
-                if (is_powered) {
-                    power_edges(tile, edges);
-                }
-                else {
-                    depower_edges(tile, edges);
-                }
-            }
         }
 
+        this.__apply_circuit_power_to_tiles();
+
+        // Finally, inform every tile of power changes, if any
         for (let tile of this.wired_outputs) {
             if (tile.powered_edges && ! tile._prev_powered_edges && tile.type.on_power) {
                 tile.type.on_power(tile, this);
@@ -2466,14 +2434,26 @@ export class Level extends LevelInterface {
             }
         }
 
-        this._push_pending_undo(() => {
-            for (let [tile, edges] of powered_edges_changes.entries()) {
-                tile.powered_edges = edges;
+        if (this.undo_enabled) {
+            this.pending_undo.circuit_power_changes = circuit_changes;
+        }
+    }
+
+    // Recompute which tiles (across the whole level) are powered, based on the power status of the
+    // circuits.  NOT undo-safe; instead, changes to circuit power are undone, and then this is
+    // called again to make everything consistent.  This also does NOT call on_power or on_depower;
+    // any effects from those are done (and undone) by the caller.
+    __apply_circuit_power_to_tiles() {
+        for (let circuit of this.circuits) {
+            for (let [tile, edges] of circuit.tiles.entries()) {
+                if (circuit.is_powered) {
+                    tile.powered_edges |= edges;
+                }
+                else {
+                    tile.powered_edges &= ~edges;
+                }
             }
-            for (let [circuit, is_powered] of circuit_changes.entries()) {
-                circuit.is_powered = is_powered;
-            }
-        });
+        }
     }
 
     // Level inspection -------------------------------------------------------------------------------
@@ -2595,6 +2575,14 @@ export class Level extends LevelInterface {
         for (let tile of needs_readding) {
             tile.cell._add(tile);
         }
+
+        if (entry.circuit_power_changes) {
+            for (let [circuit, is_powered] of entry.circuit_power_changes.entries()) {
+                circuit.is_powered = is_powered;
+            }
+            this.__apply_circuit_power_to_tiles();
+        }
+
         for (let [key, value] of Object.entries(entry.level_props)) {
             this[key] = value;
         }

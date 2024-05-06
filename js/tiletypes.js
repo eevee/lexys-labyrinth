@@ -278,6 +278,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         contains_wire: true,
         wire_propagation_mode: 'autocross',
+        can_be_powered_by_actor: true,
         on_approach(me, level, other) {
             if (other.type.name === 'blob' || other.type.name === 'boulder') {
                 // Blobs spread slime onto floor
@@ -2147,6 +2148,7 @@ const TILE_TYPES = {
     electrified_floor: {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
+        can_be_powered_by_actor: true,
         on_begin(me, level) {
             level._set_tile_prop(me, 'is_active', false);
             level._set_tile_prop(me, 'wire_directions', 15);
