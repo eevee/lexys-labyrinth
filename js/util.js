@@ -410,6 +410,10 @@ export class FileFileSource extends FileSource {
             return Promise.reject(new Error(`No such file was provided: ${path}`));
         }
     }
+
+    iter_all_files() {
+        return Object.keys(this.files);
+    }
 }
 // Regular HTTP fetch
 export class HTTPFileSource extends FileSource {
