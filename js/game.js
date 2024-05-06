@@ -861,7 +861,7 @@ export class Level extends LevelInterface {
             for (let key of [
                     '_rng1', '_rng2', '_blob_modifier', '_tw_rng', 'force_floor_direction',
                     'tic_counter', 'frame_offset', 'time_remaining', 'timer_paused',
-                    'chips_remaining', 'bonus_points', 'state', 'ankh_tile',
+                    'chips_remaining', 'bonus_points', 'state', 'fail_reason', 'ankh_tile',
                     'player1_move', 'player2_move', 'remaining_players', 'player',
             ]) {
                 if (! previous_record || previous_record.level_props[key] !== this[key]) {
@@ -2742,22 +2742,13 @@ export class Level extends LevelInterface {
             this.sfx.play_once('lose');
         }
 
-        this._push_pending_undo(() => {
-            this.fail_reason = null;
-            if (player) {
-                player.fail_reason = null;
-            }
-            if (killer) {
-                killer.is_killer = false;
-            }
-        });
         this.state = 'failure';
         this.fail_reason = reason;
         if (player) {
-            player.fail_reason = reason;
+            this._set_tile_prop(player, 'fail_reason', reason);
         }
         if (killer) {
-            killer.is_killer = true;
+            this._set_tile_prop(killer, 'is_killer', true);
         }
     }
 
