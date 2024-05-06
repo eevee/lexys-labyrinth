@@ -181,9 +181,13 @@ Object.assign(Tile.prototype, {
     wire_tunnel_directions: 0,
     // Actor defaults
     movement_cooldown: 0,
+    movement_speed: 12,
+    previous_cell: null,
     is_sliding: false,
     is_pending_slide: false,
     can_override_slide: false,
+    is_blocked: false,
+    is_pushing: false,
     pending_push: null,
     destination_cell: null,
     is_making_failure_move: false,
@@ -204,10 +208,8 @@ export class Cell extends Array {
             if (index !== LAYERS.vfx) {
                 console.error("ATTEMPTING TO ADD", tile, "TO CELL", this, "WHICH ERASES EXISTING TILE", this[index]);
             }
-            this[index].cell = null;
         }
         this[index] = tile;
-        tile.cell = this;
     }
 
     // DO NOT use me to remove a tile permanently, only to move it!
@@ -218,7 +220,6 @@ export class Cell extends Array {
             throw new Error("Asked to remove tile that doesn't seem to exist");
 
         this[index] = null;
-        tile.cell = null;
     }
 
     get_wired_tile() {
@@ -426,6 +427,7 @@ export class Level extends LevelInterface {
                         }
                     }
                     cell._add(tile);
+                    tile.cell = cell;
 
                     if (tile.type.connects_to) {
                         connectables.push(tile);
@@ -830,15 +832,18 @@ export class Level extends LevelInterface {
         }
 
         if (this.undo_enabled) {
+            let previous_record = this.undo_buffer[(this.undo_buffer_index - 2 + UNDO_BUFFER_SIZE) % UNDO_BUFFER_SIZE];
             // Store some current level state in the undo entry.  (These will often not be modified, but
             // they only take a few bytes each so that's fine.)
             for (let key of [
                     '_rng1', '_rng2', '_blob_modifier', '_tw_rng', 'force_floor_direction',
                     'tic_counter', 'frame_offset', 'time_remaining', 'timer_paused',
-                    'chips_remaining', 'bonus_points', 'state',
+                    'chips_remaining', 'bonus_points', 'state', 'ankh_tile',
                     'player1_move', 'player2_move', 'remaining_players', 'player',
             ]) {
-                this.pending_undo.level_props[key] = this[key];
+                if (! previous_record || previous_record.level_props[key] !== this[key]) {
+                    this.pending_undo.level_props[key] = this[key];
+                }
             }
         }
 
@@ -2015,7 +2020,7 @@ export class Level extends LevelInterface {
         let original_cell = actor.cell;
         // Physically remove the actor first, so that it won't get in the way of e.g. a splash
         // spawned from stepping off of a lilypad
-        this.remove_tile(actor, true);
+        this.remove_tile(actor);
 
         // Announce we're leaving, for the handful of tiles that care about it.  Do so from the top
         // down, specifically so dynamite becomes lit before a lilypad tries to splash
@@ -2049,9 +2054,6 @@ export class Level extends LevelInterface {
 
         // Now add the actor back; we have to wait this long because e.g. monsters erase splashes
         if (goal_cell.get_actor()) {
-            // FIXME a monster or block killing the player will still move into her cell!!!  i don't
-            // know what to do about this, i feel like i tried making monster/player block each
-            // other before and it did not go well.  maybe it was an ordering issue though?
             this.add_tile(actor, original_cell);
             return;
         }
@@ -2547,8 +2549,15 @@ export class Level extends LevelInterface {
             undo();
         }
         for (let [tile, changes] of entry.tile_changes) {
-            for (let [key, value] of changes) {
-                tile[key] = value;
+            // If a tile's cell or layer changed, it needs to be removed and then added
+            let do_cell_dance = (Object.hasOwn(changes, 'cell') || (
+                Object.hasOwn(changes, 'type') && tile.type.layer !== changes.type.layer));
+            if (do_cell_dance && tile.cell) {
+                tile.cell._remove(tile);
+            }
+            Object.assign(tile, changes);
+            if (do_cell_dance && tile.cell) {
+                tile.cell._add(tile);
             }
         }
         for (let [key, value] of Object.entries(entry.level_props)) {
@@ -2577,18 +2586,18 @@ export class Level extends LevelInterface {
 
         let changes = this.pending_undo.tile_changes.get(tile);
         if (! changes) {
-            changes = new Map;
+            changes = {};
             this.pending_undo.tile_changes.set(tile, changes);
         }
 
         // If we haven't yet done so, log the original value
-        if (! changes.has(key)) {
-            changes.set(key, tile[key]);
+        if (! Object.hasOwn(changes, key)) {
+            changes[key] = tile[key];
         }
         // If there's an original value already logged, and it's the value we're about to change
         // back to, then delete the change
-        else if (changes.get(key) === val) {
-            changes.delete(key);
+        else if (changes[key] === val) {
+            delete changes[key];
         }
 
         tile[key] = val;
@@ -2653,11 +2662,7 @@ export class Level extends LevelInterface {
 
                     this.transmute_tile(this.ankh_tile, 'floor');
                     this.spawn_animation(ankh_cell, 'resurrection');
-                    let old_tile = this.ankh_tile;
                     this.ankh_tile = null;
-                    this._push_pending_undo(() => {
-                        this.ankh_tile = old_tile;
-                    });
                     return;
                 }
             }
@@ -2755,19 +2760,15 @@ export class Level extends LevelInterface {
     }
 
     // Tile stuff in particular
-    // TODO should add in the right layer?  maybe?  hard to say what that is when mscc levels might
-    // have things stacked in a weird order though
-    // TODO would be nice to make these not be closures but order matters much more here
 
     remove_tile(tile) {
-        let cell = tile.cell;
-        cell._remove(tile);
-        this._push_pending_undo(() => cell._add(tile));
+        tile.cell._remove(tile);
+        this._set_tile_prop(tile, 'cell', null);
     }
 
     add_tile(tile, cell) {
+        this._set_tile_prop(tile, 'cell', cell);
         cell._add(tile);
-        this._push_pending_undo(() => cell._remove(tile));
     }
 
     add_actor(actor) {
@@ -2849,15 +2850,11 @@ export class Level extends LevelInterface {
         let new_type = TILE_TYPES[name];
         if (old_type.layer !== new_type.layer) {
             // Move it to the right layer!
-            let cell = tile.cell;
-            cell._remove(tile);
-            tile.type = new_type;
-            cell._add(tile);
-            this._push_pending_undo(() => {
-                cell._remove(tile);
-                tile.type = old_type;
-                cell._add(tile);
-            });
+            // (No need to handle undo specially here; undoing the 'type' prop automatically does
+            // this same remove/add dance)
+            tile.cell._remove(tile);
+            this._set_tile_prop(tile, 'type', new_type);
+            tile.cell._add(tile);
         }
         else {
             this._set_tile_prop(tile, 'type', new_type);
