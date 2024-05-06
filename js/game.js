@@ -1342,7 +1342,6 @@ export class Level extends LevelInterface {
             if (was_satisfied !== is_satisfied) {
                 this.sokoban_satisfied[color] = is_satisfied;
                 let new_type = TILE_TYPES[is_satisfied ? 'sokoban_floor' : 'sokoban_wall'];
-                console.log(color, this.sokoban_unpressed[color], was_satisfied, is_satisfied, new_type);
                 for (let cell of this.linear_cells) {
                     let terrain = cell.get_terrain();
                     if ((terrain.type.name === 'sokoban_wall' || terrain.type.name === 'sokoban_floor') &&
@@ -2571,8 +2570,6 @@ export class Level extends LevelInterface {
         if (! entry) {
             return;
         }
-
-        console.log(entry);
 
         // Undo in reverse order!  There's no redo, so it's okay to use the destructive reverse().
         // These toggles go first, since they're the last things to happen in a tic
