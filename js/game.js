@@ -216,8 +216,9 @@ export class Cell extends Array {
     // Should only be called from Level, which handles some bookkeeping!
     _remove(tile) {
         let index = tile.type.layer;
-        if (this[index] !== tile)
-            throw new Error("Asked to remove tile that doesn't seem to exist");
+        if (this[index] !== tile) {
+            console.error("Asked to remove tile that doesn't seem to exist:", tile, "(actually found:)", this[index]);
+        }
 
         this[index] = null;
     }
@@ -2950,6 +2951,9 @@ export class Level extends LevelInterface {
             // Move it to the right layer!
             // (No need to handle undo specially here; undoing the 'type' prop automatically does
             // this same remove/add dance)
+            if (tile.cell[new_type.layer] && new_type.layer === LAYERS.vfx) {
+                this.remove_tile(tile.cell[new_type.layer]);
+            }
             tile.cell._remove(tile);
             this._set_tile_prop(tile, 'type', new_type);
             tile.cell._add(tile);
