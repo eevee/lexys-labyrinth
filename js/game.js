@@ -273,6 +273,15 @@ class UndoEntry {
         this.actor_splices = [];
         this.toggle_green_tiles = false;
     }
+
+    tile_changes_for(tile) {
+        let changes = this.tile_changes.get(tile);
+        if (! changes) {
+            changes = {};
+            this.tile_changes.set(tile, changes);
+        }
+        return changes;
+    }
 }
 
 
@@ -2238,8 +2247,8 @@ export class Level extends LevelInterface {
 
         // Cycle leftwards, i.e., the oldest item moves to the end of the list
         if (actor.toolbelt && actor.toolbelt.length > 1) {
+            this._stash_toolbelt(actor);
             actor.toolbelt.push(actor.toolbelt.shift());
-            this._push_pending_undo(() => actor.toolbelt.unshift(actor.toolbelt.pop()));
         }
     }
 
@@ -2254,8 +2263,8 @@ export class Level extends LevelInterface {
         // Drop the oldest item, i.e. the first one
         let name = actor.toolbelt[0];
         if (this._place_dropped_item(name, actor.cell, actor)) {
+            this._stash_toolbelt(actor);
             actor.toolbelt.shift();
-            this._push_pending_undo(() => actor.toolbelt.unshift(name));
             return true;
         }
         return false;
@@ -2610,11 +2619,7 @@ export class Level extends LevelInterface {
         if (tile[key] === val)
             return;
 
-        let changes = this.pending_undo.tile_changes.get(tile);
-        if (! changes) {
-            changes = {};
-            this.pending_undo.tile_changes.set(tile, changes);
-        }
+        let changes = this.pending_undo.tile_changes_for(tile);
 
         // If we haven't yet done so, log the original value
         if (! Object.hasOwn(changes, key)) {
@@ -2627,6 +2632,26 @@ export class Level extends LevelInterface {
         }
 
         tile[key] = val;
+    }
+
+    _stash_toolbelt(actor) {
+        if (! this.undo_enabled)
+            return;
+
+        let changes = this.pending_undo.tile_changes_for(actor);
+        if (! ('toolbelt' in changes)) {
+            changes.toolbelt = Array.from(actor.toolbelt);
+        }
+    }
+
+    _stash_keyring(actor) {
+        if (! this.undo_enabled)
+            return;
+
+        let changes = this.pending_undo.tile_changes_for(actor);
+        if (! ('keyring' in changes)) {
+            changes.keyring = {...actor.keyring};
+        }
     }
 
     collect_chip(actor) {
@@ -2969,8 +2994,8 @@ export class Level extends LevelInterface {
             }
             // Otherwise, it's either an item or a yellow teleporter we're allowed to drop, so steal
             // it out of their inventory to be dropped later
+            this._stash_toolbelt(actor);
             dropped_item = actor.toolbelt.shift();
-            this._push_pending_undo(() => actor.toolbelt.unshift(dropped_item));
         }
 
         if (this.give_actor(actor, tile.type.name)) {
@@ -3007,8 +3032,8 @@ export class Level extends LevelInterface {
             if (! actor.keyring) {
                 actor.keyring = {};
             }
+            this._stash_keyring(actor);
             actor.keyring[name] = (actor.keyring[name] ?? 0) + 1;
-            this._push_pending_undo(() => actor.keyring[name] -= 1);
         }
         else {
             // tool, presumably
@@ -3023,9 +3048,7 @@ export class Level extends LevelInterface {
                 if (i < 0)
                     return false;
 
-                if (! actor.toolbelt[i]) {
-                    this._push_pending_undo(() => actor.toolbelt[i] = null);
-                }
+                this._stash_toolbelt(actor);
                 actor.toolbelt[i] = name;
             }
             else {
@@ -3038,8 +3061,8 @@ export class Level extends LevelInterface {
                         return false;
                 }
 
+                this._stash_toolbelt(actor);
                 actor.toolbelt.push(name);
-                this._push_pending_undo(() => actor.toolbelt.pop());
             }
         }
         return true;
@@ -3052,7 +3075,7 @@ export class Level extends LevelInterface {
                 return true;
             }
 
-            this._push_pending_undo(() => actor.keyring[name] += 1);
+            this._stash_keyring(actor);
             actor.keyring[name] -= 1;
             return true;
         }
@@ -3065,8 +3088,8 @@ export class Level extends LevelInterface {
         if (actor.toolbelt) {
             let index = actor.toolbelt.indexOf(name);
             if (index >= 0) {
+                this._stash_toolbelt(actor);
                 actor.toolbelt.splice(index, 1);
-                this._push_pending_undo(() => actor.toolbelt.splice(index, 0, name));
                 return true;
             }
         }
@@ -3076,8 +3099,7 @@ export class Level extends LevelInterface {
 
     take_all_keys_from_actor(actor) {
         if (actor.keyring && Object.values(actor.keyring).some(n => n > 0)) {
-            let keyring = actor.keyring;
-            this._push_pending_undo(() => actor.keyring = keyring);
+            this._stash_keyring(actor);
             actor.keyring = {};
             return true;
         }
@@ -3085,8 +3107,7 @@ export class Level extends LevelInterface {
 
     take_all_tools_from_actor(actor) {
         if (actor.toolbelt && actor.toolbelt.length > 0) {
-            let toolbelt = actor.toolbelt;
-            this._push_pending_undo(() => actor.toolbelt = toolbelt);
+            this._stash_toolbelt(actor);
             actor.toolbelt = [];
             return true;
         }
