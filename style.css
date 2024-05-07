@@ -12,20 +12,20 @@ body {
 
     font-family: Ubuntu, Source Sans Pro, DejaVu Sans, sans-serif;
     line-height: 1.33;
-    background: hsl(var(--main-hue), 5%, 5%);
+    background: hsl(var(--main-hue), 10%, 7.5%);
     background-image: url(background.svg);
     background-size: 12em;
     color: #ececec;
 
     --main-hue: 340;
-    --hover-hue: 8;
+    --hover-hue: 15;
     --selected-hue: 320;
-    --panel-bg-color: hsl(var(--main-hue), 20%, 10%);
-    --button-bg-color: hsl(var(--main-hue), 50%, 20%);
+    --panel-bg-color: hsl(var(--main-hue), 30%, 12.5%);
+    --button-bg-color: hsl(var(--main-hue), 60%, 25%);
     --button-bg-gradient: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
     --button-bg-shadow-color: #fff1;
-    --button-bg-hover-color: hsl(var(--hover-hue), 60%, 35%);
-    --generic-bg-hover-on-white: hsl(var(--hover-hue), 60%, 90%);
+    --button-bg-hover-color: hsl(var(--hover-hue), 70%, 35%);
+    --generic-bg-hover-on-white: hsl(var(--hover-hue), 90%, 85%);
     --generic-bg-selected-on-white: hsl(var(--selected-hue), 50%, 85%);
     --generic-border-selected-on-white: hsl(var(--selected-hue), 60%, 75%);
 }
@@ -75,13 +75,13 @@ button:active,
     z-index: 1;
 }
 button:enabled.button-bright {
-    background-color: hsl(var(--main-hue), 60%, 35%);
+    background-color: hsl(var(--main-hue), 60%, 40%);
 }
 button:enabled.button-bright:hover {
     background-color: hsl(var(--hover-hue), 65%, 50%);
 }
 button:disabled {
-    color: #606060;
+    color: #808080;
     background-color: #202020;
     cursor: auto;
 }
@@ -158,17 +158,17 @@ a:visited {
     text-decoration: underline dotted;
 }
 a:link {
-    color: hsl(var(--main-hue), 50%, 75%);
+    color: hsl(var(--main-hue), 80%, 75%);
 }
 a:visited {
-    color: hsl(255, 50%, 75%);
+    color: hsl(270, 80%, 75%);
 }
 a:link:hover,
 a:visited:hover {
     text-decoration: underline;
 }
 a:active {
-    color: hsl(0, 50%, 60%);
+    color: hsl(0, 90%, 75%);
 }
 
 svg#svg-iconsheet {
@@ -268,8 +268,8 @@ button.--pressed,
     cursor: pointer;
 }
 .popup-menu > li:hover {
-    color: hsl(var(--hover-hue), 90%, 10%);
-    background: hsl(var(--hover-hue), 90%, 85%);
+    color: hsl(var(--hover-hue), 60%, 10%);
+    background: var(--generic-bg-hover-on-white);
 }
 .dialog {
     display: flex;
@@ -1024,6 +1024,8 @@ pre.stack-trace {
     z-index: 1;
     padding: 0.25em;
     border: 1px solid hsl(var(--main-hue), 40%, 40%);
+    background: hsl(var(--main-hue), 30%, 5%);
+    box-shadow: 0 0 1px 1px #0009;
     text-shadow: 0 1px 1px black;
     text-align: center;
 }
@@ -1050,16 +1052,15 @@ pre.stack-trace {
 .played-pack-list .-progress > .-time {
     grid-area: time;
 }
-.played-pack-list .-progress > .-levels {
-    grid-area: levels;
-}
 .played-pack-list .-progress > .-score::before {
     content: "Score: ";
-    color: #909090;
 }
 .played-pack-list .-progress > .-time::before {
     content: "Time: ";
-    color: #909090;
+}
+.played-pack-list .-progress > .-score::before,
+.played-pack-list .-progress > .-time::before {
+    color: hsl(var(--main-hue), 20%, 50%);
 }
 .played-pack-list .-editor-status {
     display: flex;
