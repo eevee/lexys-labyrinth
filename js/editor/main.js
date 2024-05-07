@@ -1632,7 +1632,26 @@ export class Editor extends PrimaryView {
         );
     }
 
-    resize_level(size_x, size_y, x0 = 0, y0 = 0) {
+    crop_level(x0, y0, size_x, size_y) {
+        let original_cells = this.stored_level.linear_cells;
+        let original_size_x = this.stored_level.size_x;
+        let original_size_y = this.stored_level.size_y;
+
+        let old_selection_cells, new_selection_cells;
+        if (this.selection) {
+            this.selection.commit_floating();
+
+            old_selection_cells = this.selection.cells;
+            new_selection_cells = new Set;
+            for (let n of old_selection_cells) {
+                let x = n % original_size_x - x0;
+                let y = Math.floor(n / original_size_x) - y0;
+                if (0 <= x && x < size_x && 0 <= y && y < size_y) {
+                    new_selection_cells.add(x + y * size_x);
+                }
+            }
+        }
+
         let new_cells = [];
         for (let y = y0; y < y0 + size_y; y++) {
             for (let x = x0; x < x0 + size_x; x++) {
@@ -1640,21 +1659,24 @@ export class Editor extends PrimaryView {
             }
         }
 
-        let original_cells = this.stored_level.linear_cells;
-        let original_size_x = this.stored_level.size_x;
-        let original_size_y = this.stored_level.size_y;
-
         this._do(() => {
             this.stored_level.linear_cells = new_cells;
             this.stored_level.size_x = size_x;
             this.stored_level.size_y = size_y;
             this.update_after_size_change();
+            if (this.selection) {
+                this.selection._set_from_set(new_selection_cells);
+            }
         }, () => {
             this.stored_level.linear_cells = original_cells;
             this.stored_level.size_x = original_size_x;
             this.stored_level.size_y = original_size_y;
             this.update_after_size_change();
+            if (this.selection) {
+                this.selection._set_from_set(old_selection_cells);
+            }
         });
+
         this.commit_undo();
     }
 

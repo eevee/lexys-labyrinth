@@ -197,7 +197,7 @@ export class EditorLevelMetaOverlay extends DialogOverlay {
             let size_x = Math.max(1, Math.min(100, parseInt(els.size_x.value, 10)));
             let size_y = Math.max(1, Math.min(100, parseInt(els.size_y.value, 10)));
             if (size_x !== stored_level.size_x || size_y !== stored_level.size_y) {
-                this.conductor.editor.resize_level(size_x, size_y);
+                this.conductor.editor.crop_level(0, 0, size_x, size_y);
             }
 
             stored_level.blob_behavior = parseInt(els.blob_behavior.value, 10);
