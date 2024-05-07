@@ -178,32 +178,27 @@ function test_level(stored_level, compat) {
 }
 
 // Stuff that's related to testing a level, but is not actually testing a level
-function test_level_wrapper(pack, level_index, level_filter, compat) {
+function test_level_wrapper(pack, level_index, compat) {
     let result;
     let stored_level;
-    if (level_filter && ! level_filter.has(level_index + 1)) {
-        result = { type: 'skipped', short_status: "Skipped" };
+    try {
+        stored_level = pack.load_level(level_index);
+        if (! stored_level.has_replay) {
+            result = { type: 'no-replay', short_status: "No replay" };
+        }
+        else {
+            result = test_level(stored_level, compat);
+        }
     }
-    else {
-        try {
-            stored_level = pack.load_level(level_index);
-            if (! stored_level.has_replay) {
-                result = { type: 'no-replay', short_status: "No replay" };
-            }
-            else {
-                result = test_level(stored_level, compat);
-            }
-        }
-        catch (e) {
-            //console.error(e);
-            result = {
-                type: 'error',
-                short_status: "Error",
-                time_simulated: null,
-                tics_simulated: null,
-                exception: e,
-            };
-        }
+    catch (e) {
+        console.error(e);
+        result = {
+            type: 'error',
+            short_status: "Error",
+            time_simulated: null,
+            tics_simulated: null,
+            exception: e,
+        };
     }
     result.level_index = level_index;
     result.time_expected = stored_level && stored_level.has_replay ? stored_level.replay.duration / 20 : null;
@@ -284,13 +279,12 @@ async function main_worker(testdef) {
     // We have to load the pack separately in every thread
     let pack = await load_pack(testdef);
     let ruleset = testdef.ruleset;
-    let level_filter = testdef.level_filter;
     let compat = compat_flags_for_ruleset(ruleset);
 
     let t = performance.now();
     parentPort.on('message', level_index => {
         //console.log("idled for", (performance.now() - t) / 1000);
-        parentPort.postMessage(test_level_wrapper(pack, level_index, level_filter, compat));
+        parentPort.postMessage(test_level_wrapper(pack, level_index, compat));
         t = performance.now();
     });
 }
@@ -342,12 +336,22 @@ async function* run_in_thread_pool(num_workers, worker_data, items) {
     }
 }
 
+// well maybe this is simpler
+async function* dont_run_in_thread_pool(num_workers, testdef, items) {
+    let pack = await load_pack(testdef);
+    let ruleset = testdef.ruleset;
+    let compat = compat_flags_for_ruleset(ruleset);
+
+    for (let level_index of items) {
+        yield test_level_wrapper(pack, level_index, compat);
+    }
+}
+
 
 async function test_pack(testdef) {
     let pack = await load_pack(testdef);
     let ruleset = testdef.ruleset;
     let level_filter = testdef.level_filter;
-    let compat = compat_flags_for_ruleset(ruleset);
 
     let num_levels = pack.level_metadata.length;
     let columns = stdout.columns || 80;
@@ -366,7 +370,7 @@ async function test_pack(testdef) {
             num_dot_lines += 1;
         }
 
-        let type = (level_filter && ! level_filter.has(i)) ? 'skipped' : 'pending';
+        let type = (level_filter && ! level_filter.has(i + 1)) ? 'skipped' : 'pending';
         if (type !== previous_type) {
             stdout.write(RESULT_TYPES[type].color);
         }
@@ -392,9 +396,7 @@ async function test_pack(testdef) {
     let t0 = performance.now();
     let last_pause = t0;
     let failures = [];
-    let promises = [];
     for await (let result of run_in_thread_pool(4, testdef, indices)) {
-        //let result = test_level_wrapper(pack, i, level_filter, compat);
         let result_stuff = RESULT_TYPES[result.type];
         let col = result.level_index % dots_per_row;
         let row = Math.floor(result.level_index / dots_per_row);
@@ -448,7 +450,7 @@ async function test_pack(testdef) {
     return {
         num_passed,
         num_missing,
-        num_failed: num_levels - num_passed - num_missing,
+        num_failed: failures.length,
         // FIXME should maybe count the thread time if we care about actual game speedup
         time_elapsed: total_real_elapsed,
         time_simulated: total_tics / 20,
