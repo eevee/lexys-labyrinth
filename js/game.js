@@ -293,6 +293,19 @@ class UndoEntry {
             this.sokoban_changes[color] = count;
         }
     }
+
+    estimate_size() {
+        // Based very roughly on Chromium's measurements, so, kinda whatever
+        let size = 112;  // base size of an entry
+        size += 16 * Object.keys(this.level_props).length;
+        for (let [_, changes] of this.tile_changes) {
+            size += 64 + 32 * Object.entries(changes).length;
+        }
+        size += 96 + 32 * this.actor_splices.length;
+
+        this.size = size;
+        return size;
+    }
 }
 
 
@@ -2520,6 +2533,7 @@ export class Level extends LevelInterface {
             }
         }
 
+        this.pending_undo.estimate_size();
         this.undo_buffer[this.undo_buffer_index] = this.pending_undo;
 
         this.pending_undo = new UndoEntry;
