@@ -1028,7 +1028,12 @@ export class Level extends LevelInterface {
                 // This is only used for checking when to play the mmf sound, doesn't need undoing;
                 // it's cleared when we make a successful move or a null decision
                 actor.last_blocked_direction = actor.direction;
-                this.sfx.play_once('blocked', actor.cell);
+                if (this.player.type.name === 'player') {
+                    this.sfx.play_once('blocked1', actor.cell);
+                }
+                else {
+                    this.sfx.play_once('blocked2', actor.cell);
+                }
             }
         }
 
@@ -1213,7 +1218,12 @@ export class Level extends LevelInterface {
             this.sfx.play_once('step-ice');
         }
         else {
-            this.sfx.play_once('step-floor');
+            if (actor.type.name === 'player') {
+                this.sfx.play_once('step-floor1');
+            }
+            else {
+                this.sfx.play_once('step-floor2');
+            }
         }
     }
 
@@ -2248,9 +2258,12 @@ export class Level extends LevelInterface {
         this.set_actor_direction(actor, direction);
 
         if (success) {
-            // Sound plays from the origin cell simply because that's where the sfx player thinks
-            // the player is currently; position isn't updated til next turn
+            // The player's position changes while the sound is playing, so play it BOTH from the
+            // origin and the destination (unless they're the same)
             this.sfx.play_once('teleport', teleporter.cell);
+            if (dest.cell !== teleporter.cell) {
+                this.sfx.play_once('teleport', dest.cell);
+            }
 
             this.spawn_animation(actor.cell, 'teleport_flash');
             if (dest.cell !== actor.cell) {

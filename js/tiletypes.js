@@ -759,7 +759,7 @@ const TILE_TYPES = {
                 return;
             level.transmute_tile(me, 'floor');
             if (other === level.player) {
-                level.sfx.play_once('step-gravel', me.cell);
+                level.sfx.play_once('step-dirt', me.cell);
             }
         },
     },

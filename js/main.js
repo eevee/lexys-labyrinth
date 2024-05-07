@@ -303,7 +303,8 @@ class SFXPlayer {
         this.sounds = {};
         this.sound_sources = {
             // handcrafted
-            blocked: 'sfx/mmf.ogg',
+            blocked1: 'sfx/mmf1.ogg',
+            blocked2: 'sfx/mmf2.ogg',
             // https://jummbus.bitbucket.io/#j2N04bombn110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T0v0pL0OD0Ou00q1d1f8y0z2C0w2c0h2T2v0kL0OD0Ou02q1d1f6y1z2C1w1b4gp1b0aCTFucgds0
             bomb: 'sfx/bomb.ogg',
             // https://jummbus.bitbucket.io/#j2N0cbutton-pressn100s0k0l00e00t3Mm1a3g00j07i0r1O_U0o3T0v0pL0OD0Ou00q1d1f3y1z1C2w0c0h0b4p1bJdn51eMUsS0
@@ -334,7 +335,7 @@ class SFXPlayer {
             'get-stopwatch-penalty': 'sfx/get-stopwatch-penalty.ogg',
             // https://jummbus.bitbucket.io/#j3N0kget-stopwatch-togglen100s0k0l00e00t50mca3g00j07i0r1O_U0o5T0v0pL0OaD0Ou00q0d1f7y1z2C1w4c0h8b4p19FyWxq3Bg0
             'get-stopwatch-toggle': 'sfx/get-stopwatch-toggle.ogg',
-            // https://jummbus.bitbucket.io/#j2N08get-tooln100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o2T0v0pL0OD0Ou00q1d1f4y2z9C0w2c0h0b4p1bGqKNW4isVk0
+            // https://jummb.us/#j6N08get-tooln100s0k0l00e00t3Ma3g00j07r1O_U00i0o3T0v0pu00f0000q0B1420Oa2d030w2h0E1c0b9b4p1cGqKNW29eel00
             'get-tool': 'sfx/get-tool.ogg',
             // https://jummbus.bitbucket.io/#j3N07popwalln110s0k0l00e00t3Mm2a3g00j07i0r1O_U00o40T0v0zL0OaD0Ou10q0d0f8y0z1C2w2c0Gc0h0T2v0aL0OaD0Ou02q1d5f1y0z3C1w1h0b4gp190ap6Ker00
             popwall: 'sfx/popwall.ogg',
@@ -351,13 +352,16 @@ class SFXPlayer {
             // https://jummbus.bitbucket.io/#j3N09slide-icen110s0k0l00e00t3Mm3a3g00j07i0r1O_U00o50T0v0fL0OaD0Ou00q2d2f8y0z1C0w9c3h0T2v01L0OaD0Ou02q2d3fay5z5C0w0h0b4gp1jGgKb8er0l5mlg84Ddw0
             // https://jummbus.bitbucket.io/#j3N09slide-icen110s1k0l00e00t4Im3a3g00j07i0r1O_U00o50T1v0aL0OaD0Ou01q3d7f5y0z9C0c0h0A9F3B2VdQ5428Paa74E0019T2v01L0OaD0Ou02q2d7fay5z1C0w0h0b4gp1kLwb2HbEBer0l0l509Po0
             'slide-ice': 'sfx/slide-ice.ogg',
+            // https://jummb.us/#j6N09step-dirtn110s0k0l00e00t3Ma3g00j07r1O_U0000i0o6T0v05u00f0000q0A1740Oad030wih0E1c0b2T2v01u02f142qw400Oad000w1E0c0b4gp1b0ayH4oFqsG0
+            'step-dirt': 'sfx/step-dirt.ogg',
             // https://jummbus.bitbucket.io/#j3N09step-firen110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o10T0v05L0OaD0Ou10q0d0f8y0z1C2w2c0Gc0h0T2v0pL0OaD0Ou02q3d7fay3z1C0w1h0b4gp1b0ayH2w40VI0
             'step-fire': 'sfx/step-fire.ogg',
             // https://jummbus.bitbucket.io/#j3N0astep-forcen110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T0v0aL0OaD0Ou00q1d1fay2z6C1wdc0h3T2v01L0OaD0zu02q0d1f9y2z1C1w8h0b4gp1mJdlagwgQsu0J5mqhK0qsu0
             'step-force': 'sfx/step-force.ogg',
-            // https://jummbus.bitbucket.io/#j2N0astep-floorn100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o1T0v05L0OD0Ou00q0d2f1y1zjC2w0c0h0b4p1aGaKaxqer00
-            'step-floor': 'sfx/step-floor.ogg',
-            // https://jummbus.bitbucket.io/#j3N0bstep-graveln110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o50T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0T2v05L0OaD0Ou02q0d2f2y0z0C1w0h0b4gp1lLp719LjCM5EGOEJ3per00
+            // https://jummb.us/#j6N0bstep-floor1n100s0k0l00e00t3Ma3g00j07r1O_U00i0o2T0v05u00f0000qwA1112c00Oad230w0h0E1c0bjb4p1aGaKaxp3CM0
+            'step-floor1': 'sfx/step-floor1.ogg',
+            // https://jummb.us/#j6N0bstep-floor2n100s0k0l00e00t3Ma3g00j07r1O_U00i0o2T0v05u00f0000q0A1120Oad200w0h0E1c0bjb4p1aGaKayuwVI0
+            'step-floor2': 'sfx/step-floor2.ogg',
             // https://jummbus.bitbucket.io/#j3N0bstep-graveln110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o50T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0T2v01L0OaD0zu02q0d1f9y2z1C2w0Gc0h0b4gp1d0bhlCAmxID7w0
             'step-gravel': 'sfx/step-gravel.ogg',
             // https://jummbus.bitbucket.io/#j3N08step-icen100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o5T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0b4p1aLp719LjCM0
