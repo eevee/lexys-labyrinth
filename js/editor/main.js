@@ -1968,7 +1968,10 @@ export class Editor extends PrimaryView {
                 for (let src of sources) {
                     this.__delete_implicit_connection(src);
                     let source_cell = this.stored_level.linear_cells[src];
-                    this._implicit_connect_tile(source_cell[LAYERS.terrain], source_cell, src);
+                    let terrain = source_cell[LAYERS.terrain];
+                    if (terrain.type.connects_to) {
+                        this._implicit_connect_tile(terrain, source_cell, src);
+                    }
                 }
             }
         }
