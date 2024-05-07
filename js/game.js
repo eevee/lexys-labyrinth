@@ -861,7 +861,6 @@ export class Level extends LevelInterface {
         }
 
         if (this.undo_enabled) {
-            let previous_record = this.undo_buffer[(this.undo_buffer_index - 2 + UNDO_BUFFER_SIZE) % UNDO_BUFFER_SIZE];
             // Store some current level state in the undo entry.  (These will often not be modified, but
             // they only take a few bytes each so that's fine.)
             for (let key of [
@@ -870,9 +869,7 @@ export class Level extends LevelInterface {
                     'chips_remaining', 'bonus_points', 'state', 'fail_reason', 'ankh_tile',
                     'player1_move', 'player2_move', 'remaining_players', 'player',
             ]) {
-                if (! previous_record || previous_record.level_props[key] !== this[key]) {
-                    this.pending_undo.level_props[key] = this[key];
-                }
+                this.pending_undo.level_props[key] = this[key];
             }
         }
 
@@ -2513,10 +2510,18 @@ export class Level extends LevelInterface {
     }
 
     commit() {
-        if (! this.undo_enabled) {
+        if (! this.undo_enabled)
             return;
+
+        // Any level props that haven't changed can be safely deleted
+        for (let [key, prop] of Object.entries(this.pending_undo.level_props)) {
+            if (prop === this[key]) {
+                delete this.pending_undo.level_props[key];
+            }
         }
+
         this.undo_buffer[this.undo_buffer_index] = this.pending_undo;
+
         this.pending_undo = new UndoEntry;
 
         this.undo_buffer_index += 1;
