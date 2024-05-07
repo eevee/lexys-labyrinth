@@ -157,7 +157,7 @@ export function trace_floor_circuit(levelish, actor_mode, start_cell, start_edge
 
             circuit.add_tile_edge(tile, connections);
 
-            if (tile.type.is_power_source) {
+            if (tile.type.update_power_emission) {
                 // TODO could just do this in a pass afterwards?
                 circuit.add_input_edge(tile, connections);
             }

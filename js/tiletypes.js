@@ -2284,17 +2284,13 @@ const TILE_TYPES = {
     button_pink: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        is_power_source: true,
         wire_propagation_mode: 'none',
-        get_emitting_edges(me, level) {
+        is_emitting(me, level) {
             // We emit current as long as there's an actor fully on us
             let actor = me.cell.get_actor();
-            if (actor && actor.movement_cooldown === 0) {
-                return me.wire_directions;
-            }
-            else {
-                return 0;
-            }
+            return (actor && actor.movement_cooldown === 0);
+        },
+        update_power_emission(me, level) {
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
@@ -2307,31 +2303,30 @@ const TILE_TYPES = {
     button_black: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        is_power_source: true,
         wire_propagation_mode: 'cross',
-        get_emitting_edges(me, level) {
-            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
+        on_ready(me, level) {
+            me.emitting = true;
+            me.next_emitting = true;
+        },
+        is_emitting(me, level) {
             // We emit current as long as there's NOT an actor fully on us
+            return me.emitting;
+        },
+        // CC2 has a single frame delay between an actor stepping on/off of the button and the
+        // output changing; it's not clear why, and I can't figure out how this might have happened
+        // on accident, but it might be to compensate for logic gates firing quickly...?
+        // Same applies to light switches, but NOT pink buttons.
+        update_power_emission(me, level) {
             let actor = me.cell.get_actor();
-            let held = (actor && actor.movement_cooldown === 0);
-            if (me.is_first_frame) {
-                held = ! held;
-                level._set_tile_prop(me, 'is_first_frame', false);
-            }
-
-            if (held) {
-                return 0;
-            }
-            else {
-                return me.wire_directions;
-            }
+            let ret = me.emitting;
+            level._set_tile_prop(me, 'emitting', me.next_emitting);
+            level._set_tile_prop(me, 'next_emitting', ! (actor && actor.movement_cooldown === 0));
+            return ret;
         },
         on_arrive(me, level, other) {
-            level._set_tile_prop(me, 'is_first_frame', true);
             level.sfx.play_once('button-press', me.cell);
         },
         on_depart(me, level, other) {
-            level._set_tile_prop(me, 'is_first_frame', true);
             level.sfx.play_once('button-release', me.cell);
         },
         visual_state: button_visual_state,
@@ -2379,7 +2374,6 @@ const TILE_TYPES = {
             counter: ['out1', 'in0', 'in1', 'out0'],
         },
         layer: LAYERS.terrain,
-        is_power_source: true,
         on_ready(me, level) {
             me.gate_def = me.type._gate_types[me.gate_type];
             if (me.gate_type === 'latch-cw' || me.gate_type === 'latch-ccw') {
@@ -2391,6 +2385,27 @@ const TILE_TYPES = {
                 me.decrementing = false;
                 me.underflowing = false;
                 me.direction = 'north';
+            }
+
+            me.in0 = me.in1 = null;
+            me.out0 = me.out1 = null;
+            let dir = me.direction;
+            for (let i = 0; i < 4; i++) {
+                let cxn = me.gate_def[i];
+                let dirinfo = DIRECTIONS[dir];
+                if (cxn === 'in0') {
+                    me.in0 = dir;
+                }
+                else if (cxn === 'in1') {
+                    me.in1 = dir;
+                }
+                else if (cxn === 'out0') {
+                    me.out0 = dir;
+                }
+                else if (cxn === 'out1') {
+                    me.out1 = dir;
+                }
+                dir = dirinfo.right;
             }
         },
         // Returns [in0, in1, out0, out1] as directions
@@ -2417,30 +2432,16 @@ const TILE_TYPES = {
             }
             return ret;
         },
-        get_emitting_edges(me, level) {
+        is_emitting(me, level, edges) {
+            return edges & me._output;
+        },
+        update_power_emission(me, level) {
             // Collect which of our edges are powered, in clockwise order starting from our
             // direction, matching _gate_types
-            let input0 = false, input1 = false;
-            let output0 = false, output1 = false;
-            let outbit0 = 0, outbit1 = 0;
-            let dir = me.direction;
-            for (let i = 0; i < 4; i++) {
-                let cxn = me.gate_def[i];
-                let dirinfo = DIRECTIONS[dir];
-                if (cxn === 'in0') {
-                    input0 = (me.powered_edges & dirinfo.bit) !== 0;
-                }
-                else if (cxn === 'in1') {
-                    input1 = (me.powered_edges & dirinfo.bit) !== 0;
-                }
-                else if (cxn === 'out0') {
-                    outbit0 = dirinfo.bit;
-                }
-                else if (cxn === 'out1') {
-                    outbit1 = dirinfo.bit;
-                }
-                dir = dirinfo.right;
-            }
+            let input0 = !! (me.in0 && (me.powered_edges & DIRECTIONS[me.in0].bit));
+            let input1 = !! (me.in1 && (me.powered_edges & DIRECTIONS[me.in1].bit));
+            let output0 = false;
+            let output1 = false;
 
             if (me.gate_type === 'not') {
                 output0 = ! input0;
@@ -2480,14 +2481,14 @@ const TILE_TYPES = {
                     level._set_tile_prop(me, 'underflowing', false);
                 }
                 if (inc && ! dec) {
-                    mem++;
+                    mem += 1;
                     if (mem > 9) {
                         mem = 0;
                         output0 = true;
                     }
                 }
                 else if (dec && ! inc) {
-                    mem--;
+                    mem -= 1;
                     if (mem < 0) {
                         mem = 9;
                         // Underflow is persistent until the next pulse
@@ -2500,7 +2501,9 @@ const TILE_TYPES = {
                 level._set_tile_prop(me, 'decrementing', input1);
             }
 
-            return (output0 ? outbit0 : 0) | (output1 ? outbit1 : 0);
+            // This should only need to persist for a tic, and can be recomputed during undo, and
+            // also making it undoable would eat a whole lot of undo space
+            me._output = (output0 ? DIRECTIONS[me.out0].bit : 0) | (output1 ? DIRECTIONS[me.out1].bit : 0);
         },
         visual_state(me) {
             return me.gate_type;
@@ -2510,15 +2513,22 @@ const TILE_TYPES = {
     light_switch_off: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        is_power_source: true,
         wire_propagation_mode: 'none',
-        get_emitting_edges(me, level) {
-            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
+        on_ready(me, level) {
+            me.emitting = false;
+        },
+        // See button_black's commentary on the timing here
+        is_emitting(me, level, edge) {
+            return me.emitting;
+        },
+        update_power_emission(me, level) {
             if (me.is_first_frame) {
+                level._set_tile_prop(me, 'emitting', true);
                 level._set_tile_prop(me, 'is_first_frame', false);
-                return me.wire_directions;
             }
-            return 0;
+            else {
+                level._set_tile_prop(me, 'emitting', false);
+            }
         },
         on_arrive(me, level, other) {
             // TODO distinct sfx?  more clicky?
@@ -2530,15 +2540,22 @@ const TILE_TYPES = {
     light_switch_on: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        is_power_source: true,
         wire_propagation_mode: 'none',
-        get_emitting_edges(me, level) {
-            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
+        on_ready(me, level) {
+            me.emitting = true;
+        },
+        // See button_black's commentary on the timing here
+        is_emitting(me, level, edge) {
+            return me.emitting;
+        },
+        update_power_emission(me, level) {
             if (me.is_first_frame) {
+                level._set_tile_prop(me, 'emitting', false);
                 level._set_tile_prop(me, 'is_first_frame', false);
-                return 0;
             }
-            return me.wire_directions;
+            else {
+                level._set_tile_prop(me, 'emitting', true);
+            }
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);

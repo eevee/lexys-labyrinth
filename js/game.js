@@ -416,6 +416,7 @@ export class Level extends LevelInterface {
 
         let n = 0;
         let connectables = [];
+        this.power_sources = [];
         this.remaining_players = 0;
         this.ankh_tile = null;
         // If there's exactly one yellow teleporter when the level loads, it cannot be picked up
@@ -463,6 +464,10 @@ export class Level extends LevelInterface {
 
                     if (tile.type.connects_to) {
                         connectables.push(tile);
+                    }
+
+                    if (tile.type.update_power_emission) {
+                        this.power_sources.push(tile);
                     }
 
                     if (tile.type.name === 'teleport_yellow' && ! this.allow_taking_yellow_teleporters) {
@@ -562,7 +567,6 @@ export class Level extends LevelInterface {
         // TODO moving a circuit block should only need to invalidate the circuits it touches
 
         this.circuits = [];
-        this.power_sources = [];
         let wired_outputs = new Set;
         let seen_edges = new Map;
         for (let cell of this.linear_cells) {
@@ -571,10 +575,6 @@ export class Level extends LevelInterface {
             let terrain = cell.get_terrain();
             if (! terrain)  // ?!
                 continue;
-
-            if (terrain.type.is_power_source) {
-                this.power_sources.push(terrain);
-            }
 
             let actor = cell.get_actor();
             let wire_directions = terrain.wire_directions;
@@ -625,7 +625,7 @@ export class Level extends LevelInterface {
                 // Search the circuit for tiles that act as outputs, so we can check whether to
                 // update them during each wire phase
                 for (let [tile, edges] of circuit.tiles) {
-                    seen_edges.set((seen_edges.get(tile) ?? 0) | edges);
+                    seen_edges.set(tile, (seen_edges.get(tile) ?? 0) | edges);
                     if (tile.type.on_power) {
                         wired_outputs.add(tile);
                     }
@@ -2359,62 +2359,50 @@ export class Level extends LevelInterface {
     // Wiring -----------------------------------------------------------------------------------------
 
     _do_wire_phase() {
-        let force_next_wire_phase = false;
         if (this.recalculate_circuitry_next_wire_phase) {
-            this.recalculate_circuitry();
-            this.recalculate_circuitry_next_wire_phase = false;
-            force_next_wire_phase = true;
-
             // This property doesn't tend to last beyond a single tic, but if we recalculate now, we
             // also need to recalculate if we undo beyond this point.  So set it as a level prop,
             // which after an undo, will then cause us to recalculate the next time we advance
             if (this.undo_enabled) {
                 this.pending_undo.level_props.recalculate_circuitry_next_wire_phase = true;
+                // Since we're about to invalidate a bunch of circuitry, be safe and store ALL the
+                // power states
+                this.pending_undo.circuit_power_changes = new Map(
+                    this.circuits.map(circuit => [circuit, circuit.is_powered]));
             }
+
+            this.recalculate_circuitry();
+            this.recalculate_circuitry_next_wire_phase = false;
         }
 
         if (this.circuits.length === 0)
             return;
 
-        // Update the state of any tiles that can generate power.  If none of them changed since
-        // last wiring update, stop here.  First, static power sources.
-        let any_changed = false;
-        for (let tile of this.power_sources) {
-            if (! tile.cell)
-                continue;
-            let emitting = 0;
-            if (tile.type.get_emitting_edges) {
-                // This method may not exist any more, if the tile was destroyed by e.g. dynamite
-                emitting = tile.type.get_emitting_edges(tile, this);
-            }
-            if (emitting !== tile.emitting_edges) {
-                any_changed = true;
-                this._set_tile_prop(tile, 'emitting_edges', emitting);
-            }
+        for (let circuit of this.circuits) {
+            circuit._was_powered = circuit.is_powered;
+            circuit.is_powered = false;
         }
-        // Next, actors who are standing still, on floor/electrified, and holding a lightning bolt
-        let externally_powered_circuits = new Set;
-        for (let actor of this.actors) {
-            if (! actor.cell)
-                continue;
-            let emitting = 0;
-            if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
-                let wired_tile = actor.cell.get_wired_tile();
-                if (wired_tile && (wired_tile === actor || wired_tile.type.can_be_powered_by_actor)) {
-                    emitting = wired_tile.wire_directions;
-                    for (let circuit of this.cells_to_circuits.get(this.cell_to_scalar(wired_tile.cell))) {
-                        externally_powered_circuits.add(circuit);
-                    }
-                }
-            }
-            if (emitting !== actor.emitting_edges) {
-                any_changed = true;
-                this._set_tile_prop(actor, 'emitting_edges', emitting);
+
+        // Update the state of any tiles that can generate power.  First, static power sources
+        for (let tile of this.power_sources) {
+            if (tile.type.update_power_emission) {
+                tile.type.update_power_emission(tile, this);
             }
         }
 
-        if (! any_changed && ! force_next_wire_phase) {
-            return;
+        // Next, actors who are standing still, on floor/electrified, and holding a lightning bolt
+        for (let actor of this.actors) {
+            if (! actor.cell)
+                continue;
+
+            if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
+                let wired_tile = actor.cell.get_wired_tile();
+                if (wired_tile && (wired_tile === actor || wired_tile.type.can_be_powered_by_actor)) {
+                    for (let circuit of this.cells_to_circuits.get(this.cell_to_scalar(wired_tile.cell))) {
+                        circuit.is_powered = true;
+                    }
+                }
+            }
         }
 
         for (let tile of this.wired_outputs) {
@@ -2426,29 +2414,24 @@ export class Level extends LevelInterface {
         // Go through every circuit and recompute whether it's powered
         let circuit_changes = new Map;
         for (let circuit of this.circuits) {
-            let is_powered = false;
-
-            if (externally_powered_circuits.has(circuit)) {
-                is_powered = true;
-            }
-            else {
+            if (! circuit.is_powered) {
                 for (let [input_tile, edges] of circuit.inputs.entries()) {
-                    if (input_tile.emitting_edges & edges) {
-                        is_powered = true;
+                    if (input_tile.type.is_emitting && input_tile.type.is_emitting(input_tile, this, edges)) {
+                        circuit.is_powered = true;
                         break;
                     }
                 }
             }
 
-            if (is_powered !== circuit.is_powered) {
-                if (this.undo_enabled) {
-                    circuit_changes.set(circuit, circuit.is_powered);
-                }
-                circuit.is_powered = is_powered;
+            if (this.undo_enabled && circuit.is_powered !== circuit._was_powered) {
+                circuit_changes.set(circuit, circuit._was_powered);
             }
         }
 
         this.__apply_circuit_power_to_tiles();
+        if (this.undo_enabled && circuit_changes.size > 0 && ! this.pending_undo.circuit_power_changes) {
+            this.pending_undo.circuit_power_changes = circuit_changes;
+        }
 
         // Finally, inform every tile of power changes, if any
         for (let tile of this.wired_outputs) {
@@ -2458,10 +2441,6 @@ export class Level extends LevelInterface {
             else if (! tile.powered_edges && tile._prev_powered_edges && tile.type.on_depower) {
                 tile.type.on_depower(tile, this);
             }
-        }
-
-        if (this.undo_enabled) {
-            this.pending_undo.circuit_power_changes = circuit_changes;
         }
     }
 
@@ -2507,7 +2486,7 @@ export class Level extends LevelInterface {
                 continue;
 
             if ((wired.wire_propagation_mode ?? wired.type.wire_propagation_mode) === 'none' &&
-                ! wired.type.is_power_source)
+                ! wired.type.update_power_emission)
             {
                 // Being next to e.g. a red teleporter doesn't count (but pink button is ok)
                 continue;
@@ -2603,6 +2582,7 @@ export class Level extends LevelInterface {
             for (let [circuit, is_powered] of entry.circuit_power_changes.entries()) {
                 circuit.is_powered = is_powered;
             }
+            // FIXME ah the power state doesn't undo correctly because the circuits are different
             this.__apply_circuit_power_to_tiles();
         }
 
