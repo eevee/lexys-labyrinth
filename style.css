@@ -2027,7 +2027,7 @@ body.--debug #player-debug {
     display: block;
 }
 #player-debug > .-inventory > button.-wide {
-    grid-column: span 5;
+    grid-column: span 3;
     padding: 0.25em;
 }
 #player-debug .-buttons {
