@@ -4,8 +4,24 @@ import * as fflate from './vendor/fflate.js';
 export class LLError extends Error {}
 
 // Random choice
+export function random_range(a, b = null) {
+    if (b === null) {
+        b = a;
+        a = 0;
+    }
+    return a + Math.floor(Math.random() * (b - a));
+}
+
 export function random_choice(list) {
     return list[Math.floor(Math.random() * list.length)];
+}
+
+export function random_shuffle(list) {
+    // Knuth–Fisher–Yates, of course
+    for (let i = list.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+    }
 }
 
 export function setdefault(map, key, defaulter) {
