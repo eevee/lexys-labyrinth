@@ -1074,22 +1074,29 @@ class Player extends PrimaryView {
         // -- Inventory --
         // Add a button for every kind of inventory item
         let inventory_el = debug_el.querySelector('.-inventory');
+        let tileset = this.conductor.tilesets['ll'];
         for (let name of [
-            'key_blue', 'key_red', 'key_yellow', 'key_green',
-            'xray_eye', 'foil', 'lightning_bolt', 'hook',
-            'flippers', 'fire_boots', 'cleats', 'suction_boots',
-            'hiking_boots', 'speed_boots', 'railroad_sign', 'helmet',
+            // CC1
+            'key_red', 'key_blue', 'key_yellow', 'key_green',
+            'cleats', 'suction_boots', 'fire_boots', 'flippers',
+            // CC2
+            'hiking_boots', 'speed_boots', 'lightning_bolt', 'railroad_sign',
+            'helmet', 'xray_eye', 'foil', 'hook',
             'bribe', 'bowling_ball', 'dynamite',
+            // LL
+            'skeleton_key', 'ankh',
         ]) {
             inventory_el.append(make_button(
-                mk('img', {src: this.render_inventory_tile(name)}),
+                // Render these directly instead of using the inventory system, since there may
+                // not even be tiles for these items in the current tileset
+                CanvasRenderer.draw_single_tile(tileset, name),
                 () => {
                     this.level.give_actor(this.level.player, name);
                     this.update_ui();
                 }));
         }
         // Add a button to clear your inventory
-        let clear_button = mk('button.-wide', {type: 'button'}, "clear inventory");
+        let clear_button = mk('button.-wide', {type: 'button'}, "clear");
         clear_button.addEventListener('click', ev => {
             this.level.take_all_keys_from_actor(this.level.player);
             this.level.take_all_tools_from_actor(this.level.player);
@@ -1280,6 +1287,7 @@ class Player extends PrimaryView {
                 for (let key of [
                     'direction', 'movement_speed', 'movement_cooldown',
                     'is_sliding', 'is_pending_slide', 'can_override_slide',
+                    'pending_push', 'is_blocked',
                 ]) {
                     let dd = mk('dd');
                     props[key] = dd;
