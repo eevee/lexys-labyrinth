@@ -2578,7 +2578,7 @@ export class Level extends LevelInterface {
 
         // Undo in reverse order!  There's no redo, so it's okay to use the destructive reverse().
         // These toggles go first, since they're the last things to happen in a tic
-        if (entry.pending_green_toggle) {
+        if (entry.toggle_green_tiles) {
             this.__toggle_green_tiles();
         }
         if (entry.sokoban_changes) {
