@@ -12,7 +12,7 @@ body {
 
     font-family: Ubuntu, Source Sans Pro, DejaVu Sans, sans-serif;
     line-height: 1.33;
-    background: hsl(var(--main-hue), 10%, 7.5%);
+    background: hsl(var(--main-hue), 5%, 5%);
     background-image: url(background.svg);
     background-size: 12em;
     color: #ececec;
@@ -57,7 +57,7 @@ button,
     background-image: var(--button-bg-gradient);
     border: 1px solid hsl(var(--main-hue), 10%, 2.5%);
     box-shadow:
-        inset 0 0 3px 1px #ffffff18,
+        inset 0 0 0 1px #ffffff18,
         0 1px 1px hsl(var(--main-hue), 10%, 7.5%);
     border-radius: 0.25em;
     text-shadow: 0 1px 0 #0006;
@@ -884,9 +884,11 @@ pre.stack-trace {
     height: auto;
 }
 #splash h2 {
-    border-bottom: 1px solid hsl(var(--main-hue), 10%, 30%);
-    color: hsl(var(--main-hue), 40%, 75%);
+    color: hsl(var(--main-hue), 40%, 90%);
     text-shadow: 0 1px #000c;
+    background: hsl(var(--main-hue), 40%, 25%);
+    margin: -1rem -1rem 1rem;
+    padding: 0.5rem 1rem;
 }
 #splash * + h2 {
     margin-top: 1rem;
