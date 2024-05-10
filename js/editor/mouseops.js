@@ -1362,31 +1362,54 @@ export class ConnectOperation extends MouseOperation {
         super(...args);
 
         // This is the SVGConnection structure but with only the source circle
-        this.connectable_circle = mk_svg('circle.-source', {r: 0.5});
-        this.connectable_cursor = mk_svg('g.overlay-connection', this.connectable_circle);
-        this.connectable_cursor.style.display = 'none';
-        // TODO how do i distinguish from existing ones
-        this.connectable_cursor.style.stroke = 'lime';
-        this.editor.svg_overlay.append(this.connectable_cursor);
+        this.source_circle = mk_svg('circle.-source', {cx: 0.5, cy: 0.5, r: 0.5});
+        this.source_cursor = mk_svg('g.overlay-connection.overlay-transient.--cursor', this.source_circle);
+        this.target_square = mk_svg('rect.-target', {x: 0, y: 0, width: 1, height: 1});
+        this.target_cursor = mk_svg('g.overlay-connection.overlay-transient.--cursor', this.target_square);
+        this.editor.svg_overlay.append(this.source_cursor, this.target_cursor);
     }
 
     handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y && ! this.hover_stale)
+            return;
+
+        this.hover_stale = false;
         let cell = this.cell(cell_x, cell_y);
         let terrain = cell[LAYERS.terrain];
         if (terrain.type.connects_to) {
-            this.connectable_cursor.style.display = '';
-            this.connectable_circle.setAttribute('cx', cell_x + 0.5);
-            this.connectable_circle.setAttribute('cy', cell_y + 0.5);
+            this.source_cursor.classList.add('--visible');
+            this.source_cursor.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
+            this.target_cursor.classList.remove('--visible');
         }
         else {
-            this.connectable_cursor.style.display = 'none';
+            this.pending_sources = [];
+            this.pending_cxns = [];
+            let pt = this.editor.coords_to_scalar(cell_x, cell_y);
+            this.pending_original_target = pt;
+            for (let [src, dest] of this.editor.stored_level.custom_connections) {
+                if (dest === pt) {
+                    // Just take an arbitrary type as pending I guess
+                    this.pending_type = this.editor.stored_level.linear_cells[src][LAYERS.terrain].type.name;
+                    this.pending_sources.push(src);
+                    this.pending_cxns.push(this.editor.connections_arrows.get(src));
+                }
+            }
+
+            this.source_cursor.classList.remove('--visible');
+            if (this.pending_sources.length > 0) {
+                this.target_cursor.classList.add('--visible');
+                this.target_cursor.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
+            }
+            else {
+                this.target_cursor.classList.remove('--visible');
+            }
         }
     }
 
     handle_press(x, y) {
         // TODO restrict to button/cloner unless holding shift
         // TODO what do i do when you erase a button/cloner?  can i detect if you're picking it up?
-        let src = this.editor.coords_to_scalar(x, y);
+        let pt = this.editor.coords_to_scalar(x, y);
         let cell = this.cell(x, y);
         let terrain = cell[LAYERS.terrain];
         if (this.alt_mode) {
@@ -1395,104 +1418,142 @@ export class ConnectOperation extends MouseOperation {
             let other = null;
             let swap = false;
             if (terrain.type.name === 'button_red') {
-                other = this.search_for(src, 'cloner', 1);
+                other = this.search_for(cell, 'cloner', 1);
             }
             else if (terrain.type.name === 'cloner') {
-                other = this.search_for(src, 'button_red', -1);
+                other = this.search_for(cell, 'button_red', -1);
                 swap = true;
             }
             else if (terrain.type.name === 'button_brown') {
-                other = this.search_for(src, 'trap', 1);
+                other = this.search_for(cell, 'trap', 1);
             }
             else if (terrain.type.name === 'trap') {
-                other = this.search_for(src, 'button_brown', -1);
+                other = this.search_for(cell, 'button_brown', -1);
                 swap = true;
             }
 
             if (other !== null) {
                 if (swap) {
-                    this.editor.set_custom_connection(other, src);
+                    this.editor.set_custom_connection(other, pt);
                 }
                 else {
-                    this.editor.set_custom_connection(src, other);
+                    this.editor.set_custom_connection(pt, other);
                 }
                 this.editor.commit_undo();
             }
             return;
         }
 
-        // Otherwise, this is the start of a drag
-        if (! terrain.type.connects_to)
-            return;
-
-        this.pending_cxn = new SVGConnection(x, y, x, y);
-        this.pending_source = src;
-        this.pending_type = terrain.type.name;
-        this.editor.svg_overlay.append(this.pending_cxn.element);
-        // Hide the normal cursor for the duration
-        this.connectable_cursor.style.display = 'none';
-    }
-    // FIXME this is hella the sort of thing that should be on Editor, or in algorithms
-    search_for(i0, name, dir) {
-        let l = this.editor.stored_level.linear_cells.length;
-        let i = i0;
-        while (true) {
-            i += dir;
-            if (i < 0) {
-                i += l;
-            }
-            else if (i >= l) {
-                i -= l;
-            }
-            if (i === i0)
-                return null;
-
-            let cell = this.editor.stored_level.linear_cells[i];
-            let tile = cell[LAYERS.terrain];
-            if (tile.type.name === name) {
-                return i;
-            }
+        // Otherwise, this is the start of a drag, which could be one of two things...
+        if (terrain.type.connects_to) {
+            // This is a source, and we're dragging to a destination
+            let cxn = new SVGConnection(x, y, x, y);
+            this.pending_cxns = [cxn];
+            this.pending_sources = [pt];
+            this.pending_type = terrain.type.name;
+            this.pending_original_target = null;
+            this.editor.svg_overlay.append(cxn.element);
         }
+        else {
+            // This /might/ be a destination (or a stack of them)
+            if (this.pending_sources.length === 0)
+                return;
+        }
+
+        if (this.ctrl) {
+            // Forget the drag, delete whatever was clicked
+            for (let src of this.pending_sources) {
+                this.editor.set_custom_connection(src, null);
+            }
+            this.editor.commit_undo();
+            this.cleanup_press();
+            return;
+        }
+
+        // Hide the normal cursors for the duration
+        this.source_cursor.classList.remove('--visible');
+        this.target_cursor.classList.remove('--visible');
+    }
+    search_for(start_cell, name, dir) {
+        for (let [_, cell] of algorithms.find_terrain_linear(
+            this.editor.stored_level, start_cell, new Set([name]), dir < 0))
+        {
+            return this.editor.coords_to_scalar(cell.x, cell.y);
+        }
+        return null;
     }
     handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        if (! this.pending_cxn)
+        if (this.pending_cxns.length === 0)
             return;
 
-        this.pending_cxn.set_dest(cell_x, cell_y);
+        for (let cxn of this.pending_cxns) {
+            cxn.set_dest(cell_x, cell_y);
+        }
 
         let cell = this.cell(cell_x, cell_y);
-        if (TILE_TYPES[this.pending_type].connects_to.has(cell[LAYERS.terrain].type.name)) {
+        if (this.shift ||
+            TILE_TYPES[this.pending_type].connects_to.has(cell[LAYERS.terrain].type.name))
+        {
             this.pending_target = this.editor.coords_to_scalar(cell_x, cell_y);
-            this.pending_cxn.element.style.opacity = 0.5;
+            for (let cxn of this.pending_cxns) {
+                cxn.element.style.opacity = '';
+            }
         }
         else {
             this.pending_target = null;
-            this.pending_cxn.element.style.opacity = '';
+            for (let cxn of this.pending_cxns) {
+                cxn.element.style.opacity = 0.25;
+            }
         }
     }
     commit_press() {
-        // TODO
-        if (! this.pending_cxn)
+        if (this.pending_cxns.length === 0)
             return;
 
-        if (this.pending_target !== null) {
-            this.editor.set_custom_connection(this.pending_source, this.pending_target);
+        if (this.pending_target === null) {
+            this.abort_press();
+            return;
         }
 
-        this.pending_cxn.element.remove();
-        this.pending_cxn = null;
+        for (let src of this.pending_sources) {
+            this.editor.set_custom_connection(src, this.pending_target);
+        }
+        this.editor.commit_undo();
+        if (this.pending_original_target !== null) {
+            // If we were moving a target, then the connections we were altering were real ones, so
+            // we need to clear them here to avoid having them removed in cleanup
+            this.pending_cxns = [];
+        }
     }
     abort_press() {
-        if (this.pending_cxn) {
-            this.pending_cxn.element.remove();
-            this.pending_cxn = null;
+        if (this.pending_original_target !== null) {
+            // If we were moving a target, then the connections we were altering were real ones, so
+            // set them back to where they were
+            let [x, y] = this.editor.scalar_to_coords(this.pending_original_target);
+            for (let cxn of this.pending_cxns) {
+                cxn.element.style.opacity = '';
+                cxn.set_dest(x, y);
+            }
+            this.pending_cxns = [];
         }
     }
     cleanup_press() {
+        for (let cxn of this.pending_cxns) {
+            cxn.element.remove();
+        }
+        this.pending_cxns = [];
+
+        this.hover_stale = true;
+        this.rehover();
+    }
+
+    handle_refresh() {
+        this.hover_stale = true;
     }
 
     do_destroy() {
-        this.connectable_cursor.remove();
+        this.source_cursor.remove();
+        this.target_cursor.remove();
         super.do_destroy();
     }
 }

@@ -2313,6 +2313,9 @@ svg.level-editor-overlay g.overlay-connection {
     stroke: #e4e4e4;
     filter: url(#overlay-filter-outline);
 }
+svg.level-editor-overlay g.overlay-connection.--cursor {
+    stroke: hsl(90, 90%, 40%);
+}
 svg.level-editor-overlay g.overlay-connection[data-source=button_red] {
     stroke: hsl(0, 90%, 60%);
 }

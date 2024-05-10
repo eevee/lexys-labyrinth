@@ -212,21 +212,16 @@ export const TOOLS = {
     connect: {
         icon: 'icons/tool-connect.png',
         name: "Connect",
-        // XXX shouldn't you be able to drag the destination?
-        // TODO mod + right click for RRO or diamond alg?  ah but we only have ctrl available
-        // ok lemme think then
-        // left drag: create a new connection (supported connections only)
-        // ctrl-click: erase all connections
-        // shift-drag: create a new connection (arbitrary cells)
-        // right drag: move a connection endpoint
-        // ctrl-right drag: move the other endpoint (if a cell is both source and dest)
         desc: [
             "Set up CC1-style clone and trap connections.",
-            "(WIP)",
-            "NOTE: Not supported in the real CC2!",
+            "(Supported in CC1 and LL, but not CC2!)",
             "",
-            "[mouse2] Auto link using Lynx/CC2 rules",
-        //desc: "Set up CC1-style clone and trap connections.\nNOTE: Not supported in CC2!\nLeft drag: link button with valid target\nCtrl-click: erase link\nRight click: auto link using Lynx rules",
+            "[mouse1] Connect a button to a mechanism",
+            "[mouse1] Move existing connections",
+            "[ctrl] [mouse1] Delete connection",
+            "[shift] [mouse1] Allow connecting to any cell",
+            "(not recommended)",
+            "[mouse2] Auto link a button using Lynx/CC2 rules",
         ].join("\n"),
         uses_layers: false,
         op1: mouseops.ConnectOperation,
