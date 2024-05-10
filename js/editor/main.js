@@ -12,7 +12,10 @@ import { mk, mk_svg, string_from_buffer_ascii, bytestring_to_buffer } from '../u
 import * as util from '../util.js';
 
 import * as dialogs from './dialogs.js';
-import { TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, PALETTE, SPECIAL_PALETTE_ENTRIES, SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask } from './editordefs.js';
+import {
+    TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, SELECTABLE_LAYERS, SELECTABLE_LAYER_NAMES, PALETTE, SPECIAL_PALETTE_ENTRIES,
+    SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask
+} from './editordefs.js';
 import { SVGConnection, Selection } from './helpers.js';
 import * as mouseops from './mouseops.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
@@ -147,6 +150,14 @@ export class Editor extends PrimaryView {
             if (! this.active)
                 return;
 
+            if (this.mouse_op && this.redirect_keys_to_tool) {
+                if (this.mouse_op.handle_key(ev.key)) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                }
+                return;
+            }
+
             if (ev.ctrlKey) {
                 if (ev.key === 'a') {
                     // Select all
@@ -187,6 +198,14 @@ export class Editor extends PrimaryView {
                 if (ev.key === 'Escape') {
                     if (this.mouse_op && this.mouse_op.is_held) {
                         this.mouse_op.do_abort();
+                    }
+                }
+                else if (ev.key === 'Tab') {
+                    if (ev.shiftKey) {
+                        this.select_layer((this.selected_layer_index - 1 + SELECTABLE_LAYERS.length) % SELECTABLE_LAYERS.length);
+                    }
+                    else {
+                        this.select_layer((this.selected_layer_index + 1) % SELECTABLE_LAYERS.length);
                     }
                 }
                 else if (ev.key === ',') {
@@ -233,6 +252,7 @@ export class Editor extends PrimaryView {
         this.mouse_coords = null;
         this.mouse_ops = [null, new mouseops.PanOperation(this, 1), null];  // left, middle, right
         this.mouse_op = null;
+        this.redirect_keys_to_tool = false;
         this.viewport_el.addEventListener('mousedown', ev => {
             this.mouse_coords = [ev.clientX, ev.clientY];
             this.cancel_mouse_drag();
@@ -361,7 +381,7 @@ export class Editor extends PrimaryView {
                 rotate_right_button, this.fg_tile_el, rotate_left_button,
                 this.bg_tile_el));
         // Tools themselves
-        let toolbox = mk('div.icon-button-set', {id: 'editor-toolbar'});
+        let toolbox = mk('div.icon-button-set.-toolbar-section', {id: 'editor-toolbar'});
         this.root.querySelector('.controls').append(toolbox);
         this.tool_button_els = {};
         for (let toolname of TOOL_ORDER) {
@@ -415,6 +435,30 @@ export class Editor extends PrimaryView {
                 return;
 
             this.select_tool(button.getAttribute('data-tool'));
+        });
+
+        // Layer selection
+        this.layer_selector = mk('div.-toolbar-section', {id: 'editor-layer-selector'},
+            mk('img', {src: 'icons/layer-all.png'}),
+            mk('h3', "Layer"),
+            mk('output'),
+        );
+        this.root.querySelector('.controls').append(this.layer_selector);
+        this.select_layer(0);
+        this.layer_selector.addEventListener('mousedown', ev => {
+            if (ev.button === 0) {
+                this.select_layer((this.selected_layer_index + 1) % SELECTABLE_LAYERS.length);
+            }
+            else if (ev.button === 2) {
+                this.select_layer((this.selected_layer_index - 1 + SELECTABLE_LAYERS.length) % SELECTABLE_LAYERS.length);
+                ev.preventDefault();
+            }
+        });
+        this.layer_selector.addEventListener('dblclick', ev => {
+            ev.preventDefault;
+        });
+        this.layer_selector.addEventListener('contextmenu', ev => {
+            ev.preventDefault();
         });
 
         // Toolbar buttons for saving, exporting, etc.
@@ -1207,6 +1251,7 @@ export class Editor extends PrimaryView {
 
         if (this.current_tool) {
             this.tool_button_els[this.current_tool].classList.remove('-selected');
+            this.redirect_keys_to_tool = false;
         }
         this.current_tool = tool;
         this.tool_button_els[this.current_tool].classList.add('-selected');
@@ -1247,6 +1292,14 @@ export class Editor extends PrimaryView {
 
     set_mouse_button(button) {
         this.mouse_op = this.mouse_ops[button];
+    }
+
+    select_layer(index) {
+        this.selected_layer_index = index;
+        this.selected_layer = SELECTABLE_LAYERS[index];
+        this.layer_selector.querySelector('img').setAttribute('src',
+            `icons/layer-${SELECTABLE_LAYERS[index] ?? 'all'}.png`);
+        this.layer_selector.querySelector('output').textContent = SELECTABLE_LAYER_NAMES[index];
     }
 
     show_palette_tooltip(key) {

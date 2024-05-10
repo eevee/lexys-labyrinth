@@ -2361,9 +2361,13 @@ svg.level-editor-overlay .overlay-adjust-cursor[data-layer=item] {
     stroke: hsl(50deg, 80%, 20%, 0.8);
     fill: hsl(50deg, 80%, 60%, 0.4);
 }
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=item-mod] {
+}
 svg.level-editor-overlay .overlay-adjust-cursor[data-layer=actor] {
     stroke: hsl(215deg, 80%, 20%, 0.8);
     fill: hsl(215deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=swivel] {
 }
 svg.level-editor-overlay .overlay-adjust-cursor[data-layer=thin-wall] {
     stroke: hsl(330deg, 80%, 20%, 0.8);
@@ -2375,7 +2379,7 @@ svg.level-editor-overlay .overlay-adjust-gray-button-radius {
 }
 svg.level-editor-overlay .overlay-adjust-gray-button-shroud {
     stroke: none;
-    fill: hsla(10, 10%, 60%, 0.75);
+    fill: hsla(10, 10%, 30%, 0.6);
 }
 svg.level-editor-overlay rect.overlay-camera {
     stroke: #808080;
@@ -2401,6 +2405,10 @@ svg.level-editor-overlay text.overlay-adjust-hint {
     paint-order: stroke;
     text-anchor: middle;
     dominant-baseline: auto;
+}
+svg.level-editor-overlay .overlay-text-cursor {
+    stroke: hsla(50, 90%, 60%, 0.75);
+    fill: hsla(50, 90%, 60%, 0.25);
 }
 
 .editor-big-tooltip {
@@ -2490,16 +2498,43 @@ svg.level-editor-overlay text.overlay-adjust-hint {
     transition-delay: 0.5s;
     transition-timing-function: ease-in;
 }
+#editor .controls #editor-layer-selector {
+    display: grid;
+    grid:
+        "icon header" auto
+        "icon name"   1fr
+        / auto 6em
+    ;
+    align-items: center;
+    gap: 0 0.5em;
+    line-height: 1;
+    user-select: none;
+}
+#editor .controls #editor-layer-selector > img {
+    grid-area: icon;
+}
+#editor .controls #editor-layer-selector > h3 {
+    grid-area: header;
+    margin: 0;
+    font-size: 0.75em;
+    font-weight: normal;
+    color: #606060;
+}
+#editor .controls #editor-layer-selector > output {
+    grid-area: name;
+}
 #editor .controls .-buttons {
     grid-area: menu;
 }
-.icon-button-set {
-    display: flex;
-    flex-wrap: wrap;
+#editor .controls .-toolbar-section {
     padding: 2px;
     border-radius: 4px;
     background: hsl(var(--selected-hue), 10%, 10%);
     border: 1px solid hsl(var(--selected-hue), 10%, 20%);
+}
+.icon-button-set {
+    display: flex;
+    flex-wrap: wrap;
 }
 .icon-button-set button {
     width: auto;
@@ -2513,10 +2548,10 @@ svg.level-editor-overlay text.overlay-adjust-hint {
     box-shadow: none;
 }
 .icon-button-set button:hover {
-    background: hsl(var(--hover-hue), 40%, 30%);
+    background: hsl(var(--hover-hue), 50%, 40%);
 }
 .icon-button-set button.-selected {
-    background: hsl(var(--selected-hue), 50%, 75%);
+    background: hsl(var(--selected-hue), 90%, 75%);
 }
 .icon-button-set button img {
     display: block;

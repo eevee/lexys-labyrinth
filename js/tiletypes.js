@@ -181,6 +181,9 @@ function player_visual_state(me) {
 }
 
 function button_visual_state(me) {
+    if (me && me._editor_pressed) {
+        return 'pressed';
+    }
     if (me && me.cell) {
         let actor = me.cell.get_actor();
         if (actor && ! actor.movement_cooldown) {

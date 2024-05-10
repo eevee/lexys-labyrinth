@@ -2,13 +2,103 @@
 // not.  (When the mouse button is /not/ held, then only the operation bound to the left mouse
 // button gets events.)
 import * as algorithms from '../algorithms.js';
-import { DIRECTIONS, LAYERS } from '../defs.js';
+import { DIRECTIONS, LAYERS, COLLISION } from '../defs.js';
 import TILE_TYPES from '../tiletypes.js';
 import { mk, mk_svg, walk_grid } from '../util.js';
 
 import { SPECIAL_TILE_BEHAVIOR } from './editordefs.js';
 import { SVGConnection } from './helpers.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
+
+const FORCE_FLOOR_TILES_BY_DIRECTION = {
+    north: 'force_floor_n',
+    east: 'force_floor_e',
+    south: 'force_floor_s',
+    west: 'force_floor_w',
+};
+const FORCE_FLOOR_TILES = new Set(['force_floor_all', ...Object.values(FORCE_FLOOR_TILES_BY_DIRECTION)]);
+const ICE_TILES = new Set(['ice', 'ice_ne', 'ice_se', 'ice_sw', 'ice_nw']);
+
+function mouse_move_to_direction(prevx, prevy, x, y) {
+    if (x === prevx) {
+        if (y > prevy) {
+            return 'south';
+        }
+        else {
+            return 'north';
+        }
+    }
+    else {
+        if (x > prevx) {
+            return 'east';
+        }
+        else {
+            return 'west';
+        }
+    }
+}
+
+// Return whether this point is closer to the center of the cell than the edges
+function is_cell_center(frac_cell_x, frac_cell_y) {
+    let frac_x = frac_cell_x % 1;
+    let frac_y = frac_cell_y % 1;
+    return (Math.abs(frac_x - 0.5) <= 0.25 && Math.abs(frac_y - 0.5) <= 0.25);
+}
+
+// Returns the edge of the cell that this point is closest to
+function get_cell_edge(frac_cell_x, frac_cell_y) {
+    let frac_x = frac_cell_x % 1;
+    let frac_y = frac_cell_y % 1;
+    if (frac_x >= frac_y) {
+        if (frac_x >= 1 - frac_y) {
+            return 'east';
+        }
+        else {
+            return 'north';
+        }
+    }
+    else {
+        if (frac_x <= 1 - frac_y) {
+            return 'west';
+        }
+        else {
+            return 'south';
+        }
+    }
+}
+
+// Returns the edge of the cell that this point is closest to, or 'null' if the point is closer to
+// the center than the edges
+function get_cell_edge_or_center(frac_cell_x, frac_cell_y) {
+    if (is_cell_center(frac_cell_x, frac_cell_y)) {
+        return null;
+    }
+    else {
+        return get_cell_edge(frac_cell_x, frac_cell_y);
+    }
+}
+
+// Returns the corner of the cell this point is in, as an integer from 0 to 3 (clockwise, starting
+// northeast, matching the order of railroad tracks)
+function get_cell_corner(frac_cell_x, frac_cell_y) {
+    if (frac_cell_x % 1 >= 0.5) {
+        if (frac_cell_y % 1 <= 0.5) {
+            return 0;
+        }
+        else {
+            return 1;
+        }
+    }
+    else {
+        if (frac_cell_y % 1 >= 0.5) {
+            return 2;
+        }
+        else {
+            return 3;
+        }
+    }
+}
+
 
 // TODO some minor grievances
 // - the track overlay doesn't explain "direction" (may not be necessary anyway), allows picking a
@@ -82,27 +172,6 @@ export class MouseOperation {
         return this.editor.cell(Math.floor(x), Math.floor(y));
     }
 
-    get_tile_edge() {
-        let frac_x = this.prev_frac_cell_x - this.prev_cell_x;
-        let frac_y = this.prev_frac_cell_y - this.prev_cell_y;
-        if (frac_x >= frac_y) {
-            if (frac_x >= 1 - frac_y) {
-                return 'east';
-            }
-            else {
-                return 'north';
-            }
-        }
-        else {
-            if (frac_x <= 1 - frac_y) {
-                return 'west';
-            }
-            else {
-                return 'south';
-            }
-        }
-    }
-
     do_press(ev) {
         this.held_button = ev.button;
         this.alt_mode = (ev.button === 2);
@@ -171,6 +240,10 @@ export class MouseOperation {
         this.prev_frac_cell_y = frac_cell_y;
         this.prev_cell_x = cell_x;
         this.prev_cell_y = cell_y;
+    }
+
+    rehover() {
+        this.handle_hover(null, null, this.prev_frac_cell_x, this.prev_frac_cell_y, this.prev_cell_x, this.prev_cell_y);
     }
 
     do_leave() {
@@ -425,6 +498,77 @@ export class PencilOperation extends MouseOperation {
     }
 }
 
+
+export class LineOperation extends MouseOperation {
+    constructor(...args) {
+        super(...args);
+        this.set_cursor_element(mk_svg('image', {
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+            opacity: 0.5,
+        }));
+        this.set_preview_element(mk_svg('g'));
+        this.points = [];
+        this.handle_tile_updated();
+    }
+
+    handle_tile_updated(is_bg = false) {
+        if (is_bg)
+            return;
+        let url = this.editor.fg_tile_el.toDataURL();
+        this.cursor_element.setAttribute('href', url);
+        for (let image of this.preview_element.childNodes) {
+            image.setAttribute('href', url);
+        }
+    }
+    // Technically the cursor should be hidden while dragging, but in practice it highlights the
+    // endpoint of the line (by drawing it twice), which I kind of like
+    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        let existing_nodes = this.preview_element.childNodes;
+        let i = 0;
+        for (let [x, y] of walk_grid(
+            this.click_cell_x + 0.5, this.click_cell_y + 0.5, cell_x + 0.5, cell_y + 0.5,
+            -1, -1, this.editor.stored_level.size_x, this.editor.stored_level.size_y))
+        {
+            if (! this.editor.is_in_bounds(x, y))
+                continue;
+
+            this.points[i] = [x, y];
+            let node = existing_nodes[i];
+            if (! node) {
+                node = mk_svg('image', {
+                    width: 1,
+                    height: 1,
+                    opacity: 0.5,
+                    href: this.editor.fg_tile_el.toDataURL(),
+                });
+                this.preview_element.append(node);
+            }
+            node.setAttribute('x', x);
+            node.setAttribute('y', y);
+            i += 1;
+        }
+
+        this.points.splice(i);
+        for (; i < existing_nodes.length; i++) {
+            existing_nodes[i].remove();
+        }
+    }
+    commit_press() {
+        for (let [x, y] of this.points) {
+            this.editor.place_in_cell(this.cell(x, y), this.editor.fg_tile);
+        }
+        this.editor.commit_undo();
+    }
+    cleanup_press() {
+        this.points = [];
+        this.preview_element.textContent = '';
+    }
+}
+
+
 // FIXME still to do on this:
 // - doesn't know to update canvas size or erase results when a new level is loaded OR when the
 // level size changes (and for that matter the selection tool doesn't either)
@@ -473,7 +617,18 @@ export class FillOperation extends MouseOperation {
 
         let stored_level = this.editor.stored_level;
         let tile = this.editor.fg_tile;
+        // FIXME?  unclear how this oughta work
         let layer = tile.type.layer;
+        // Traversability behavior (even for filling with non-terrain tiles): if we start on a
+        // traversable tile, flood to all neighboring ones; otherwise, flood to the same terrain
+        let is_traversable = terrain_tile => {
+            return ! terrain_tile.type.blocks_collision ||
+                (terrain_tile.type.blocks_collision & COLLISION.real_player) !== COLLISION.real_player;
+        };
+        let terrain0 = stored_level.linear_cells[i0][LAYERS.terrain] ?? null;
+        if (terrain0 && is_traversable(terrain0)) {
+            terrain0 = null;
+        }
         let tile0 = stored_level.linear_cells[i0][layer] ?? null;
         let type0 = tile0 ? tile0.type : null;
 
@@ -493,6 +648,8 @@ export class FillOperation extends MouseOperation {
             pending = [];
             for (let i of old_pending) {
                 let [x, y] = stored_level.scalar_to_coords(i);
+                let from_cell = this.cell(x, y);
+                let blocked_leaving = this._get_blocked_leaving_directions(from_cell);
 
                 // Check neighbors
                 for (let dirinfo of Object.values(DIRECTIONS)) {
@@ -500,25 +657,41 @@ export class FillOperation extends MouseOperation {
                     let nx = x + dx;
                     let ny = y + dy;
                     let j = stored_level.coords_to_scalar(nx, ny)
-                    if (! this.editor.selection.contains(nx, ny)) {
+                    if ((blocked_leaving & dirinfo.bit) || ! this.editor.selection.contains(nx, ny)) {
                         this.fill_state[j] = false;
                         continue;
                     }
 
                     let cell = this.editor.cell(nx, ny);
-                    if (cell) {
-                        if (this.fill_state[j] !== undefined)
-                            continue;
+                    if (! cell)
+                        continue;
+                    if (this.fill_state[j] !== undefined)
+                        continue;
 
-                        let tile = cell[layer] ?? null;
-                        let type = tile ? tile.type : null;
-                        if (type === type0) {
-                            this.fill_state[j] = true;
-                            pending.push(j);
+                    let terrain = cell[LAYERS.terrain];
+                    if (terrain) {
+                        if (terrain0) {
+                            if (terrain.type !== terrain0.type)
+                                continue;
                         }
                         else {
-                            this.fill_state[j] = false;
+                            if (! is_traversable(terrain))
+                                continue;
                         }
+                    }
+
+                    let blocked_entering = this._get_blocked_entering_directions(cell);
+                    if (blocked_entering & DIRECTIONS[dirinfo.opposite].bit)
+                        continue;
+
+                    let tile = cell[layer] ?? null;
+                    let type = tile ? tile.type : null;
+                    if (type === type0) {
+                        this.fill_state[j] = true;
+                        pending.push(j);
+                    }
+                    else {
+                        this.fill_state[j] = false;
                     }
                 }
                 steps += 1;
@@ -530,6 +703,48 @@ export class FillOperation extends MouseOperation {
         }
 
         this._redraw();
+    }
+
+    _get_blocked_leaving_directions(cell) {
+        let blocked = 0;
+
+        for (let tile of cell) {
+            if (! tile)
+                continue;
+
+            if (tile.type.name === 'thin_walls' || tile.type.name === 'one_way_walls') {
+                // Both regular and one-way walls block leaving
+                blocked |= tile.edges;
+            }
+            else if (tile.type.thin_walls) {
+                for (let dir of tile.type.thin_walls) {
+                    blocked |= DIRECTIONS[dir].bit;
+                }
+            }
+        }
+
+        return blocked;
+    }
+
+    _get_blocked_entering_directions(cell) {
+        let blocked = 0;
+
+        for (let tile of cell) {
+            if (! tile)
+                continue;
+
+            if (tile.type.name === 'thin_walls') {
+                // Only regular thin walls block entering
+                blocked |= tile.edges;
+            }
+            else if (tile.type.thin_walls) {
+                for (let dir of tile.type.thin_walls) {
+                    blocked |= DIRECTIONS[dir].bit;
+                }
+            }
+        }
+
+        return blocked;
     }
 
     _redraw() {
@@ -725,7 +940,6 @@ export class SelectOperation extends MouseOperation {
 
 // -------------------------------------------------------------------------------------------------
 // FORCE FLOORS
-// TODO ice would be kind of nice, could reasonably go with this as an alt mode
 
 export class ForceFloorOperation extends MouseOperation {
     handle_press(x, y) {
@@ -748,23 +962,7 @@ export class ForceFloorOperation extends MouseOperation {
                 prevy = y;
                 continue;
             }
-            let name;
-            if (x === prevx) {
-                if (y > prevy) {
-                    name = 'force_floor_s';
-                }
-                else {
-                    name = 'force_floor_n';
-                }
-            }
-            else {
-                if (x > prevx) {
-                    name = 'force_floor_e';
-                }
-                else {
-                    name = 'force_floor_w';
-                }
-            }
+            let name = FORCE_FLOOR_TILES_BY_DIRECTION[mouse_move_to_direction(prevx, prevy, x, y)];
 
             // The second cell tells us the direction to use for the first, assuming it
             // had some kind of force floor
@@ -787,6 +985,76 @@ export class ForceFloorOperation extends MouseOperation {
 
             prevx = x;
             prevy = y;
+        }
+    }
+    cleanup_press() {
+        this.editor.commit_undo();
+    }
+}
+
+
+// -------------------------------------------------------------------------------------------------
+// ICE
+
+// This is sort of like a combination of the force floor tool and track tool
+export class IceOperation extends MouseOperation {
+    handle_press(x, y) {
+        // Begin by placing regular ice
+        this.editor.place_in_cell(this.cell(x, y), {type: TILE_TYPES.ice});
+        this.entry_direction = null;
+    }
+    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
+        // Walk the mouse movement.  For tiles we enter, turn them to ice.  For tiles we leave, if
+        // the mouse crossed two adjacent edges on its way in and out, change it to a corner
+        let prevx = null;
+        let prevy = null;
+        for (let [x, y] of this.iter_touched_cells(frac_cell_x, frac_cell_y)) {
+            let cell = this.cell(x, y);
+            let terrain = cell[LAYERS.terrain];
+            if (terrain && ! ICE_TILES.has(terrain.type.name)) {
+                this.editor.place_in_cell(cell, { type: TILE_TYPES['ice'] });
+            }
+
+            if (prevx === null) {
+                prevx = x;
+                prevy = y;
+                continue;
+            }
+
+            let exit_direction = mouse_move_to_direction(prevx, prevy, x, y);
+
+            if (this.entry_direction !== null) {
+                let leftmost_direction = null;
+                if (DIRECTIONS[this.entry_direction].right === exit_direction) {
+                    leftmost_direction = this.entry_direction;
+                }
+                else if (DIRECTIONS[this.entry_direction].left === exit_direction) {
+                    leftmost_direction = exit_direction;
+                }
+
+                let ice_type;
+                if (leftmost_direction) {
+                    ice_type = {
+                        north: 'ice_sw',
+                        east: 'ice_nw',
+                        south: 'ice_ne',
+                        west: 'ice_se',
+                    }[leftmost_direction];
+                }
+                else {
+                    ice_type = 'ice';
+                }
+
+                let prev_cell = this.cell(prevx, prevy);
+                let prev_terrain = prev_cell[LAYERS.terrain];
+                if (ice_type !== prev_terrain.type.name) {
+                    this.editor.place_in_cell(prev_cell, { type: TILE_TYPES[ice_type] });
+                }
+            }
+
+            prevx = x;
+            prevy = y;
+            this.entry_direction = DIRECTIONS[exit_direction].opposite;
         }
     }
     cleanup_press() {
@@ -828,23 +1096,7 @@ export class TrackOperation extends MouseOperation {
             }
 
             // Figure out which way we're leaving the tile
-            let exit_direction;
-            if (x === prevx) {
-                if (y > prevy) {
-                    exit_direction = 'south';
-                }
-                else {
-                    exit_direction = 'north';
-                }
-            }
-            else {
-                if (x > prevx) {
-                    exit_direction = 'east';
-                }
-                else {
-                    exit_direction = 'west';
-                }
-            }
+            let exit_direction = mouse_move_to_direction(prevx, prevy, x, y);
 
             // If the entry direction is missing or bogus, lay straight track
             if (this.entry_direction === null || this.entry_direction === exit_direction) {
@@ -894,6 +1146,208 @@ export class TrackOperation extends MouseOperation {
             this.entry_direction = DIRECTIONS[exit_direction].opposite;
         }
     }
+    cleanup_press() {
+        this.editor.commit_undo();
+    }
+}
+
+
+// -------------------------------------------------------------------------------------------------
+// TEXT
+
+export class TextOperation extends MouseOperation {
+    constructor(...args) {
+        super(...args);
+        this.initial_cursor_x = null;
+        this.cursor_x = null;
+        this.cursor_y = null;
+
+        this.text_cursor = mk_svg('rect.overlay-text-cursor.overlay-transient', {
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+        });
+        this.editor.svg_overlay.append(this.text_cursor);
+    }
+
+    handle_press(x, y) {
+        this.initial_cursor_x = x;
+        this.place_cursor(x, y);
+    }
+    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        this.initial_cursor_x = cell_x;
+        this.place_cursor(cell_x, cell_y);
+    }
+
+    // TODO handle ctrl-z?
+    handle_key(key) {
+        if (key.length === 1) {
+            key = key.toUpperCase();
+            let code = key.codePointAt(0);
+            if (32 <= code && code < 96) {
+                let cell = this.cell(this.cursor_x, this.cursor_y);
+                this.editor.place_in_cell(cell, {
+                    type: TILE_TYPES['floor_letter'],
+                    overlaid_glyph: key,
+                });
+                this.place_cursor(this.cursor_x + 1, this.cursor_y);
+                return true;
+            }
+        }
+
+        if (key === 'Escape') {
+            this.hide_cursor();
+            return true;
+        }
+        else if (key === 'ArrowUp') {
+            this.place_cursor(this.cursor_x, this.cursor_y - 1);
+        }
+        else if (key === 'ArrowDown') {
+            this.place_cursor(this.cursor_x, this.cursor_y + 1);
+        }
+        else if (key === 'ArrowLeft') {
+            this.place_cursor(this.cursor_x - 1, this.cursor_y);
+        }
+        else if (key === 'ArrowRight') {
+            this.place_cursor(this.cursor_x + 1, this.cursor_y);
+        }
+        else if (key === 'Return' || key === 'Enter') {
+            this.place_cursor(this.initial_cursor_x, this.cursor_y + 1);
+        }
+        else if (key === 'Backspace') {
+            this.place_cursor(this.cursor_x - 1, this.cursor_y);
+            let cell = this.cell(this.cursor_x, this.cursor_y);
+            this.editor.place_in_cell(cell, { type: TILE_TYPES['floor'] });
+        }
+        else if (key === 'Delete') {
+            let cell = this.cell(this.cursor_x, this.cursor_y);
+            this.editor.place_in_cell(cell, { type: TILE_TYPES['floor'] });
+        }
+        else if (key === 'Home') {
+            this.place_cursor(0, this.cursor_y);
+        }
+        else if (key === 'End') {
+            this.place_cursor(this.editor.stored_level.size_x - 1, this.cursor_y);
+        }
+        else if (key === 'PageUp') {
+            this.place_cursor(this.cursor_x, 0);
+        }
+        else if (key === 'PageDown') {
+            this.place_cursor(this.cursor_x, this.editor.stored_level.size_y - 1);
+        }
+    }
+
+    place_cursor(x, y) {
+        this.cursor_x = Math.max(0, Math.min(this.editor.stored_level.size_x - 1, x));
+        this.cursor_y = Math.max(0, Math.min(this.editor.stored_level.size_y - 1, y));
+        this.text_cursor.classList.add('--visible');
+        this.text_cursor.setAttribute('x', this.cursor_x);
+        this.text_cursor.setAttribute('y', this.cursor_y);
+        this.editor.redirect_keys_to_tool = true;
+    }
+    hide_cursor() {
+        this.editor.redirect_keys_to_tool = false;
+        this.editor.commit_undo();
+    }
+
+    do_destroy() {
+        this.editor.redirect_keys_to_tool = false;
+    }
+}
+
+
+// -------------------------------------------------------------------------------------------------
+// THIN WALLS
+
+export class ThinWallOperation extends MouseOperation {
+    handle_press() {
+        // On initial click, place/erase a thin wall on the nearest edge
+        let edge = get_cell_edge(this.click_frac_cell_x, this.click_frac_cell_y);
+        let cell = this.cell(this.click_cell_x, this.click_cell_y);
+        this.affect_cell_edge(cell, edge);
+    }
+    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
+        // Drawing should place a thin wall any time we cross the center line of a cell, either
+        // horizontally or vertically.  Walk a double-size grid to find when this happens
+        let prevhx = null, prevhy = null;
+        for (let [hx, hy] of walk_grid(
+            this.prev_frac_cell_x * 2, this.prev_frac_cell_y * 2, frac_cell_x * 2, frac_cell_y * 2,
+            -1, -1, this.editor.stored_level.size_x * 2, this.editor.stored_level.size_y * 2))
+        {
+            let phx = prevhx;
+            let phy = prevhy;
+            prevhx = hx;
+            prevhy = hy;
+
+            if (phx === null || phy === null)
+                continue;
+
+            // 0 1 2 correspond to real grid lines 0 ½ 1, where only crossing the ½ is interesting
+            let x, y, edge;
+            if (hx === phx) {
+                // Vertical move
+                let crossed_y = Math.max(hy, phy);
+                if (crossed_y % 2 === 0)
+                    continue;
+
+                x = Math.floor(hx / 2);
+                y = Math.floor(crossed_y / 2);
+                if (hx % 2 === 0) {
+                    edge = 'west';
+                }
+                else {
+                    edge = 'east';
+                }
+            }
+            else {
+                // Horizontal move
+                let crossed_x = Math.max(hx, phx);
+                if (crossed_x % 2 === 0)
+                    continue;
+
+                x = Math.floor(crossed_x / 2);
+                y = Math.floor(hy / 2);
+                if (hy % 2 === 0) {
+                    edge = 'north';
+                }
+                else {
+                    edge = 'south';
+                }
+            }
+
+            this.affect_cell_edge(this.cell(x, y), edge);
+        }
+    }
+
+    affect_cell_edge(cell, edge) {
+        let bit = DIRECTIONS[edge].bit;
+        let thin_wall = cell[LAYERS.thin_wall];
+        console.log(cell, edge, thin_wall);
+        if (this.ctrl) {
+            // Erase -- mouse button doesn't matter
+            if (thin_wall) {
+                if (thin_wall.edges === bit) {
+                    // Last edge, so erase it entirely
+                    this.editor.erase_tile(cell, thin_wall);
+                }
+                else {
+                    this.editor.place_in_cell(cell, {...thin_wall, edges: thin_wall.edges & ~bit});
+                }
+            }
+        }
+        else {
+            // Place -- either a thin wall or a one-way wall, depending on mouse button
+            let type = TILE_TYPES[this.alt_mode ? 'one_way_walls' : 'thin_walls'];
+            if (thin_wall) {
+                this.editor.place_in_cell(cell, { ...thin_wall, type, edges: thin_wall.edges | bit });
+            }
+            else {
+                this.editor.place_in_cell(cell, { type, edges: bit });
+            }
+        }
+    }
+
     cleanup_press() {
         this.editor.commit_undo();
     }
@@ -1056,8 +1510,7 @@ export class WireOperation extends MouseOperation {
     }
 
     handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        // TODO doesn't this read the /previous/ edge
-        let edge = this.get_tile_edge();
+        let edge = get_cell_edge(frac_cell_x, frac_cell_y);
         let edgebit = DIRECTIONS[edge].bit;
         let cell = this.cell(cell_x, cell_y);
         // Wire can only be in terrain or the circuit block, and this tool ignores circuit
@@ -1135,26 +1588,7 @@ export class WireOperation extends MouseOperation {
             if (! cell)
                 return;
 
-            let direction;
-            // Use the offset from the center to figure out which edge of the tile to affect
-            let xoff = this.click_frac_cell_x % 1 - 0.5;
-            let yoff = this.click_frac_cell_y % 1 - 0.5;
-            if (Math.abs(xoff) > Math.abs(yoff)) {
-                if (xoff > 0) {
-                    direction = 'east';
-                }
-                else {
-                    direction = 'west';
-                }
-            }
-            else {
-                if (yoff > 0) {
-                    direction = 'south';
-                }
-                else {
-                    direction = 'north';
-                }
-            }
+            let direction = get_cell_edge(this.click_frac_cell_x, this.click_frac_cell_y);
             let bit = DIRECTIONS[direction].bit;
 
             let terrain = cell[LAYERS.terrain];
@@ -1171,6 +1605,11 @@ export class WireOperation extends MouseOperation {
                 this.editor.place_in_cell(cell, terrain);
                 this.editor.commit_undo();
             }
+        }
+        else {
+            // A single click affects the edge of the touched cell
+            this.affect_cell_edge(this.click_cell_x, this.click_cell_y,
+                get_cell_edge(this.click_frac_cell_x, this.click_frac_cell_y));
         }
     }
     handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
@@ -1193,8 +1632,8 @@ export class WireOperation extends MouseOperation {
         // In order to know which of the four wire pieces in a cell (A, B, C, D) someone is trying
         // to draw over, we use a quarter-size grid, indicated by the dots.  Then any mouse movement
         // that crosses the first horizontal grid line means we should draw wire A.
-        // (Note that crossing either a tile boundary or the middle of a cell doesn't mean anything;
-        // for example, dragging the mouse horizontally across the A wire is meaningless.)
+        // Drawing across a cell border fills in the wire on BOTH sides of the border, and drawing
+        // across a wire perpendicularly fills in both parts of the wire in that direction.
         // TODO maybe i should just have a walk_grid variant that yields line crossings, christ
         let prevqx = null, prevqy = null;
         for (let [qx, qy] of walk_grid(
@@ -1202,15 +1641,16 @@ export class WireOperation extends MouseOperation {
             // See comment in iter_touched_cells
             -1, -1, this.editor.stored_level.size_x * 4, this.editor.stored_level.size_y * 4))
         {
-            if (prevqx === null || prevqy === null) {
-                prevqx = qx;
-                prevqy = qy;
+            let pqx = prevqx;
+            let pqy = prevqy;
+            prevqx = qx;
+            prevqy = qy;
+
+            if (pqx === null || pqy === null)
                 continue;
-            }
 
             // Figure out which grid line we've crossed; direction doesn't matter, so we just get
             // the index of the line, which matches the coordinate of the cell to the right/bottom
-            // FIXME 'continue' means we skip the update of prevs, solution is really annoying
             // FIXME if you trace around just the outside of a tile, you'll get absolute nonsense:
             // +---+---+
             // |   |   |
@@ -1221,57 +1661,65 @@ export class WireOperation extends MouseOperation {
             // | +-|   |
             // |   |   |
             // +---+---+
-            let wire_direction;
-            let x, y;
-            if (qx === prevqx) {
+            if (qx === pqx) {
                 // Vertical
-                let line = Math.max(qy, prevqy);
-                // Even crossings don't correspond to a wire
-                if (line % 2 === 0) {
-                    prevqx = qx;
-                    prevqy = qy;
+                let x = Math.floor(qx / 4);
+                let y0 = Math.floor(pqy / 4);
+                let y1 = Math.floor(qy / 4);
+                if (y0 !== y1) {
+                    // We crossed a cell boundary, so draw the wire on both sides
+                    this.affect_cell_edge(x, Math.min(y0, y1), 'south');
+                    this.affect_cell_edge(x, Math.max(y0, y1), 'north');
                     continue;
                 }
 
-                // Convert to real coordinates
-                x = Math.floor(qx / 4);
-                y = Math.floor(line / 4);
+                let line = Math.max(qy, pqy);
+                // Even crossings don't correspond to a wire
+                if (line % 2 === 0)
+                    continue;
 
+                let y = Math.floor(line / 4);
                 if (line % 4 === 1) {
                     // Consult the diagram!
-                    wire_direction = 'north';
+                    this.affect_cell_edge(x, y, 'north');
                 }
                 else {
-                    wire_direction = 'south';
+                    this.affect_cell_edge(x, y, 'south');
                 }
             }
             else {
                 // Horizontal; same as above
-                let line = Math.max(qx, prevqx);
-                if (line % 2 === 0) {
-                    prevqx = qx;
-                    prevqy = qy;
+                let x0 = Math.floor(pqx / 4);
+                let x1 = Math.floor(qx / 4);
+                let y = Math.floor(qy / 4);
+                if (x0 !== x1) {
+                    this.affect_cell_edge(Math.min(x0, x1), y, 'east');
+                    this.affect_cell_edge(Math.max(x0, x1), y, 'west');
                     continue;
                 }
 
-                x = Math.floor(line / 4);
-                y = Math.floor(qy / 4);
+                let line = Math.max(qx, pqx);
+                // Even crossings don't correspond to a wire
+                if (line % 2 === 0)
+                    continue;
 
+                let x = Math.floor(line / 4);
                 if (line % 4 === 1) {
-                    wire_direction = 'west';
+                    // Consult the diagram!
+                    this.affect_cell_edge(x, y, 'west');
                 }
                 else {
-                    wire_direction = 'east';
+                    this.affect_cell_edge(x, y, 'east');
                 }
             }
+        }
+    }
 
-            if (! this.editor.is_in_bounds(x, y)) {
-                prevqx = qx;
-                prevqy = qy;
-                continue;
-            }
+    affect_cell_edge(x, y, edge) {
+        let cell = this.cell(x, y);
+        if (! cell)
+            return;
 
-            let cell = this.cell(x, y);
             for (let tile of Array.from(cell).reverse()) {
                 // TODO probably a better way to do this
                 if (! tile)
@@ -1283,19 +1731,15 @@ export class WireOperation extends MouseOperation {
                 tile.wire_directions = tile.wire_directions ?? 0;
                 if (this.ctrl) {
                     // Erase
-                    tile.wire_directions &= ~DIRECTIONS[wire_direction].bit;
+                    tile.wire_directions &= ~DIRECTIONS[edge].bit;
                 }
                 else {
                     // Draw
-                    tile.wire_directions |= DIRECTIONS[wire_direction].bit;
+                    tile.wire_directions |= DIRECTIONS[edge].bit;
                 }
                 this.editor.place_in_cell(cell, tile);
                 break;
             }
-
-            prevqx = qx;
-            prevqy = qy;
-        }
     }
     cleanup_press() {
         this.editor.commit_undo();
@@ -1350,15 +1794,8 @@ export class RotateOperation extends MouseOperation {
     _find_target_tile(cell) {
         let top_layer = LAYERS.MAX - 1;
         let bottom_layer = 0;
-        if (this.ctrl) {
-            // ctrl: explicitly target terrain
-            top_layer = LAYERS.terrain;
-            bottom_layer = LAYERS.terrain;
-        }
-        else if (this.shift) {
-            // shift: explicitly target actor
-            top_layer = LAYERS.actor;
-            bottom_layer = LAYERS.actor;
+        if (this.editor.selected_layer !== null) {
+            top_layer = bottom_layer = LAYERS[this.editor.selected_layer];
         }
         for (let layer = top_layer; layer >= bottom_layer; layer--) {
             let tile = cell[layer];
@@ -1448,6 +1885,31 @@ export class RotateOperation extends MouseOperation {
 // -------------------------------------------------------------------------------------------------
 // ADJUST
 
+// This tool does a lot of things:
+// Toggles tile types:
+// - Most actors and items get transmogrified
+// - Custom walls/floors get recolored
+// - Force floors get flipped
+// - etc
+// Custom in-map tile editing
+// - Toggles individual edges of thin walls (either kind)
+// - Sets swivel direction
+// - Toggles individual track pieces
+// - Toggles individual frame block arrows
+// Pops open tile overlays
+// - Edit letter tile
+// - Edit hint text
+// - (NOT edit frame block; that's custom)
+// - (NOT edit track; that's custom)
+// Presses buttons:
+// - Gray button (with preview)
+// - Green button
+// Previews things:
+// - Monster pathing
+// - Force floor/ice pathing
+
+
+
 // Tiles the "adjust" tool will turn into each other
 const ADJUST_TILE_TYPES = {};
 const ADJUST_GATE_TYPES = {};
@@ -1478,9 +1940,10 @@ const ADJUST_GATE_TYPES = {};
         ['ice_nw', 'ice_ne', 'ice_se', 'ice_sw'],
         ['force_floor_n', 'force_floor_e', 'force_floor_s', 'force_floor_w'],
         */
+        /*
         ["Flip",    'force_floor_n', 'force_floor_s'],
         ["Flip",    'force_floor_e', 'force_floor_w'],
-        ["Swap",    'ice', 'force_floor_all'],
+        */
         ["Swap",    'water', 'turtle'],
         ["Swap",    'no_player1_sign', 'no_player2_sign'],
         ["Toggle",  'flame_jet_off', 'flame_jet_on'],
@@ -1559,6 +2022,23 @@ class DummyRunningLevel {
 }
 // Tiles with special behavior when clicked
 const ADJUST_SPECIAL = {
+    button_blue(editor) {
+        // Flip blue tanks
+        editor._do(
+            () => ADJUST_SPECIAL._button_blue(editor),
+            () => ADJUST_SPECIAL._button_blue(editor),
+        );
+        // TODO play button sound?
+    },
+    _button_blue(editor) {
+        for (let cell of editor.stored_level.linear_cells) {
+            let actor = cell[LAYERS.actor];
+            if (actor && actor.type.name === 'tank_blue') {
+                actor.direction = DIRECTIONS[actor.direction].opposite;
+                editor.mark_cell_dirty(cell);
+            }
+        }
+    },
     button_green(editor) {
         // Toggle green objects
         editor._do(
@@ -1599,8 +2079,6 @@ const ADJUST_SPECIAL = {
 };
 // FIXME the preview is not very good because the hover effect becomes stale, pressing ctrl/shift
 // leaves it stale, etc
-// FIXME it might be nice to actually preview what we intend to do, which would require just, uh,
-// doing it to a temporary tile, but actually that does sound a lot better than all this
 export class AdjustOperation extends MouseOperation {
     constructor(...args) {
         super(...args);
@@ -1659,12 +2137,15 @@ export class AdjustOperation extends MouseOperation {
         // stuff here)
         // TODO uhhh that's true for all kinds of kb shortcuts actually, even for pressing/releasing
         // ctrl or shift to change the target.  dang
+        /*
+         * XXX this is wrong for e.g. ice corners
         if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y &&
-            (! this.hovered_edge || this.hovered_edge === this.get_tile_edge()) &&
+            (! this.hovered_edge || this.hovered_edge === get_cell_edge(frac_cell_x, frac_cell_y)) &&
             ! this.hover_stale)
         {
             return;
         }
+        */
 
         let cell = this.cell(cell_x, cell_y);
 
@@ -1674,27 +2155,18 @@ export class AdjustOperation extends MouseOperation {
         this.hovered_edge = null;
         let top_layer = LAYERS.MAX - 1;
         let bottom_layer = 0;
-        if (this.ctrl && this.shift) {
-            // ctrl-shift: explicitly target item
-            top_layer = LAYERS.item;
-            bottom_layer = LAYERS.item;
-        }
-        else if (this.ctrl) {
-            // ctrl: explicitly target terrain
-            top_layer = LAYERS.terrain;
-            bottom_layer = LAYERS.terrain;
-        }
-        else if (this.shift) {
-            // shift: explicitly target actor
-            top_layer = LAYERS.actor;
-            bottom_layer = LAYERS.actor;
+        if (this.editor.selected_layer !== null) {
+            top_layer = bottom_layer = LAYERS[this.editor.selected_layer];
         }
         for (let layer = top_layer; layer >= bottom_layer; layer--) {
             let tile = cell[layer];
             if (! tile)
                 continue;
 
-            // This is kind of like documentation for everything the adjust tool can do I guess
+            // This is where the real work happens, and thus it's a list of everything the adjust
+            // tool can possibly do
+
+            // Transmogrify tiles
             if (ADJUST_TILE_TYPES[tile.type.name]) {
                 // Toggle between related tile types
                 let adjustment = ADJUST_TILE_TYPES[tile.type.name];
@@ -1702,33 +2174,135 @@ export class AdjustOperation extends MouseOperation {
                 this.adjusted_tile = {...tile, type: TILE_TYPES[adjustment.next]};
                 break;
             }
+            // Transmogrify logic gates
             if (tile.type.name === 'logic_gate' && ADJUST_GATE_TYPES[tile.gate_type]) {
                 // Also toggle between related logic gate types
                 //verb = "Change";
                 this.adjusted_tile = {...tile, gate_type: ADJUST_GATE_TYPES[tile.gate_type].next};
                 break;
             }
-            let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
-            if (behavior && behavior.adjust_forward) {
-                // Do faux-rotation, which includes incrementing counter gates
-                //verb = "Adjust";
-                this.adjusted_tile = {...tile};
-                behavior.adjust_forward(this.adjusted_tile);
+
+            // Set swivel corner
+            if (layer === LAYERS.swivel) {
+                let corner = get_cell_corner(frac_cell_x, frac_cell_y);
+                let swivel_type = ['swivel_ne', 'swivel_se', 'swivel_sw', 'swivel_nw'][corner];
+                this.adjusted_tile = {...tile, type: TILE_TYPES[swivel_type]};
                 break;
             }
+
+            // Place or delete individual thin walls
             if (layer === LAYERS.thin_wall) {
-                // Place or delete individual thin walls
-                let edge = this.get_tile_edge();
+                let edge = get_cell_edge(frac_cell_x, frac_cell_y);
                 this.hovered_edge = edge;
                 this.adjusted_tile = {...tile};
                 this.adjusted_tile.edges ^= DIRECTIONS[edge].bit;
                 break;
             }
+
+            // Change the direction of force floors
+            if (FORCE_FLOOR_TILES.has(tile.type.name)) {
+                let edge = get_cell_edge_or_center(frac_cell_x, frac_cell_y);
+                if (edge === null) {
+                    this.adjusted_tile = {...tile, type: TILE_TYPES['force_floor_all']};
+                }
+                else {
+                    this.adjusted_tile = {...tile, type: TILE_TYPES[FORCE_FLOOR_TILES_BY_DIRECTION[edge]]};
+                }
+                break;
+            }
+
+            // Change the direction of ice corners
+            if (ICE_TILES.has(tile.type.name)) {
+                let ice_type;
+                if (is_cell_center(frac_cell_x, frac_cell_y)) {
+                    ice_type = 'ice';
+                }
+                else {
+                    let corner = get_cell_corner(frac_cell_x, frac_cell_y);
+                    ice_type = ['ice_ne', 'ice_se', 'ice_sw', 'ice_nw'][corner];
+                }
+
+                this.adjusted_tile = {...tile, type: TILE_TYPES[ice_type]};
+                break;
+            }
+
+            // Edit railroad tiles
+            if (tile.type.name === 'railroad') {
+                // Locate the cursor on a 3×3 grid
+                let tri_x = Math.floor(frac_cell_x % 1 * 3);
+                let tri_y = Math.floor(frac_cell_y % 1 * 3);
+                let tri = tri_x + 3 * tri_y;
+                let segment = [3, 5, 0, 4, null, 4, 2, 5, 1][tri];
+                this.adjusted_tile = {...tile};
+                if (segment === null) {
+                    // Toggle track switch
+                    if (tile.track_switch === null) {
+                        // Add it.  Select the first extant track switch, or default to 0
+                        this.adjusted_tile.track_switch = 0;
+                        for (let i = 0; i < tile.type.track_order.length; i++) {
+                            if (tile.tracks & (1 << i)) {
+                                this.adjusted_tile.track_switch = i;
+                                break;
+                            }
+                        }
+                    }
+                    else {
+                        // Remove it
+                        this.adjusted_tile.track_switch = null;
+                    }
+                }
+                else {
+                    let bit = 1 << segment;
+                    // Toggle the presence of a track segment
+                    if (tile.track_switch === null) {
+                        if (tile.tracks & bit) {
+                            this.adjusted_tile.tracks &= ~bit;
+                        }
+                        else {
+                            this.adjusted_tile.tracks |= bit;
+                        }
+                    }
+                    else {
+                        // If there's a track switch...
+                        if (tile.track_switch === segment) {
+                            // Clicking an active segment removes it and cycles the switch
+                            this.adjusted_tile.tracks &= ~(1 << segment);
+                            for (let i = 0; i < tile.type.track_order.length; i++) {
+                                let s = (segment + i) % tile.type.track_order.length;
+                                if (tile.tracks & (1 << s)) {
+                                    this.adjusted_tile.track_switch = s;
+                                    break;
+                                }
+                            }
+                        }
+                        else if (tile.tracks & bit) {
+                            // Clicking a present but inactive segment makes it active
+                            this.adjusted_tile.track_switch = segment;
+                        }
+                        else {
+                            // Clicking a missing segment adds it
+                            this.adjusted_tile.tracks |= bit;
+                        }
+                    }
+                }
+                break;
+            }
+
+            // Do faux-rotation: alter letter tiles, counter gates
+            // TODO can i do this backwards?
+            let behavior = SPECIAL_TILE_BEHAVIOR[tile.type.name];
+            if (behavior && behavior.adjust_forward) {
+                //verb = "Adjust";
+                this.adjusted_tile = {...tile};
+                behavior.adjust_forward(this.adjusted_tile);
+                break;
+            }
+
+            // Place or delete individual frame block arrows
             if (tile.type.name === 'frame_block') {
-                // Place or delete individual frame block arrows
                 // TODO this kinda obviates the need for a frame block editor
                 this.adjusted_tile = {...tile, arrows: new Set(tile.arrows)};
-                let edge = this.get_tile_edge();
+                let edge = get_cell_edge(frac_cell_x, frac_cell_y);
                 this.hovered_edge = edge;
                 if (this.adjusted_tile.arrows.has(edge)) {
                     this.adjusted_tile.arrows.delete(edge);
@@ -1736,6 +2310,12 @@ export class AdjustOperation extends MouseOperation {
                 else {
                     this.adjusted_tile.arrows.add(edge);
                 }
+                break;
+            }
+
+            // Press certain buttons
+            if (tile.type.name === 'button_gray' || tile.type.name === 'button_green' || tile.type.name === 'button_blue') {
+                this.adjusted_tile = {...tile, _editor_pressed: true};
                 break;
             }
 
@@ -1784,7 +2364,6 @@ export class AdjustOperation extends MouseOperation {
 
         // Special previewing behavior
         if (this.adjusted_tile.type.name === 'button_gray') {
-            this.cursor_element.classList.remove('--visible');
             this.gray_button_preview.classList.add('--visible');
             let gx0 = Math.max(0, cell_x - 2);
             let gy0 = Math.max(0, cell_y - 2);
@@ -1804,7 +2383,7 @@ export class AdjustOperation extends MouseOperation {
                 let last_rect, last_x;
                 for (let x = gx0; x <= gx1; x++) {
                     let target = this.cell(x, y);
-                    if (target && target !== cell && target[LAYERS.terrain].type.on_gray_button)
+                    if (target && (target === cell || target[LAYERS.terrain].type.on_gray_button))
                         continue;
 
                     if (last_rect && last_x === x - 1) {
@@ -1829,21 +2408,25 @@ export class AdjustOperation extends MouseOperation {
     }
 
     handle_press() {
+        if (! this.adjusted_tile)
+            return;
+
         let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
 
-        if (this.adjusted_tile) {
+        if (ADJUST_SPECIAL[this.adjusted_tile.type.name]) {
+            ADJUST_SPECIAL[this.adjusted_tile.type.name](this.editor, this.adjusted_tile, cell);
+            this.editor.commit_undo();
+        }
+        // Don't actually press buttons!
+        else if (this.adjusted_tile && ! this.adjusted_tile._editor_pressed) {
             this.editor.place_in_cell(cell, this.adjusted_tile);
             this.editor.commit_undo();
             // The tile has changed, so invalidate our hover
             // TODO should the editor do this automatically, since the cell changed?
             this.handle_refresh();
-            this.handle_hover(null, null, null, null, this.prev_cell_x, this.prev_cell_y);
+            this.rehover();
         }
         /*
-        else if (ADJUST_SPECIAL[tile.type.name]) {
-            ADJUST_SPECIAL[tile.type.name](this.editor, tile, cell);
-            this.editor.commit_undo();
-        }
         else if (TILES_WITH_PROPS[tile.type.name]) {
             // Open special tile editors -- this is a last resort, which is why right-click does it
             // explicitly
