@@ -285,42 +285,39 @@ export function* walk_grid(x0, y0, x1, y1, min_a, min_b, max_a, max_b) {
     let goal_x = Math.floor(x1);
     let goal_y = Math.floor(y1);
 
-    // Use a modified Bresenham.  Use mirroring to move everything into the
-    // first quadrant, then split it into two octants depending on whether dx
-    // or dy increases faster, and call that the main axis.  Track an "error"
-    // value, which is the (negative) distance between the ray and the next
-    // grid line parallel to the main axis, but scaled up by dx.  Every
-    // iteration, we move one cell along the main axis and increase the error
-    // value by dy (the ray's slope, scaled up by dx); when it becomes
-    // positive, we can subtract dx (1) and move one cell along the minor axis
-    // as well.  Since the main axis is the faster one, we'll never traverse
-    // more than one cell on the minor axis for one cell on the main axis, and
-    // this readily provides every cell the ray hits in order.
+    // Use a modified Bresenham.  Use mirroring to move everything into the first quadrant, then
+    // split it into two octants depending on whether dx or dy increases faster, and call that the
+    // main axis.  Track an "error" value, which is the (negative) distance between the ray and the
+    // next grid line parallel to the main axis, but scaled up by dx.  Every iteration, we move one
+    // cell along the main axis and increase the error value by dy (the ray's slope, scaled up by
+    // dx); when it becomes positive, we can subtract dx (1) and move one cell along the minor axis
+    // as well.  Since the main axis is the faster one, we'll never traverse more than one cell on
+    // the minor axis for one cell on the main axis, and this readily provides every cell the ray
+    // hits in order.
     // Based on: http://www.idav.ucdavis.edu/education/GraphicsNotes/Bresenhams-Algorithm/Bresenhams-Algorithm.html
 
-    // Setup: map to the first quadrant.  The "offsets" are the distance
-    // between the starting point and the next grid point.
+    // Setup: map to the first quadrant.  The "offsets" are the distance between the starting point
+    // and the next grid point.
     let step_a = 1;
     let offset_x = 1 - (x0 - a);
+    if (offset_x === 0) {
+        // Zero offset means we're on a grid line, so we're a full cell away from the next grid line
+        offset_x = 1;
+    }
     if (dx < 0) {
         dx = -dx;
         step_a = -step_a;
         offset_x = 1 - offset_x;
     }
-    else if (offset_x === 0) {
-        // Zero offset means we're on a grid line, so we're a full cell away from the next grid line
-        // (if we're moving forward; if we're moving backward, the next cell really is 0 away)
-        offset_x = 1;
-    }
     let step_b = 1;
     let offset_y = 1 - (y0 - b);
+    if (offset_y === 0) {
+        offset_y = 1;
+    }
     if (dy < 0) {
         dy = -dy;
         step_b = -step_b;
         offset_y = 1 - offset_y;
-    }
-    else if (offset_y === 0) {
-        offset_y = 1;
     }
 
     let err = dy * offset_x - dx * offset_y;
@@ -328,9 +325,16 @@ export function* walk_grid(x0, y0, x1, y1, min_a, min_b, max_a, max_b) {
     if (dx > dy) {
         // Main axis is x/a
         while (min_a <= a && a <= max_a && min_b <= b && b <= max_b) {
-            yield [a, b];
-            if (a === goal_x && b === goal_y)
+            if (a === goal_x && b === goal_y) {
+                yield [a, b];
                 return;
+            }
+            // When we go exactly through a corner, we cross two grid lines, but between them we
+            // enter a cell the line doesn't actually pass through.  That happens here, when err ===
+            // dx, because it was 0 last loop
+            if (err !== dy) {
+                yield [a, b];
+            }
 
             if (err > 0) {
                 err -= dx;
@@ -347,9 +351,13 @@ export function* walk_grid(x0, y0, x1, y1, min_a, min_b, max_a, max_b) {
         err = -err;
         // Main axis is y/b
         while (min_a <= a && a <= max_a && min_b <= b && b <= max_b) {
-            yield [a, b];
-            if (a === goal_x && b === goal_y)
+            if (a === goal_x && b === goal_y) {
+                yield [a, b];
                 return;
+            }
+            if (err !== dx) {
+                yield [a, b];
+            }
 
             if (err > 0) {
                 err -= dy;
