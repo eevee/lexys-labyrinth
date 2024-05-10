@@ -2469,9 +2469,6 @@ export class AdjustOperation extends MouseOperation {
     }
 
     handle_press() {
-        if (! this.adjusted_tile)
-            return;
-
         let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
 
         // Right-click: open an overlay showing every tile in the cell
@@ -2481,6 +2478,9 @@ export class AdjustOperation extends MouseOperation {
             overlay.open_balloon(this.editor.renderer.get_cell_rect(cell.x, cell.y));
             return;
         }
+
+        if (! this.adjusted_tile)
+            return;
 
         if (ADJUST_SPECIAL[this.adjusted_tile.type.name]) {
             ADJUST_SPECIAL[this.adjusted_tile.type.name](this.editor, this.adjusted_tile, cell);

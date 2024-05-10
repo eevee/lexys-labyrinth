@@ -2,6 +2,9 @@ import { LAYERS } from '../defs.js';
 import { TransientOverlay } from '../main-base.js';
 import { mk, mk_svg } from '../util.js';
 
+import { SELECTABLE_LAYERS } from './editordefs.js';
+
+
 // FIXME could very much stand to have a little animation when appearing
 class TileEditorOverlay extends TransientOverlay {
     constructor(conductor) {
@@ -293,11 +296,19 @@ export const TILES_WITH_PROPS = {
 
 export class CellEditorOverlay extends TransientOverlay {
     constructor(conductor) {
-        let ul = mk('ul.editor-popup-cell-contents');
-        let root = mk('form.editor-popup-tile-editor', ul);
+        let root = mk('form.editor-popup-tile-editor');
         super(conductor, root);
         this.editor = conductor.editor;
         this.tile = null;
+        this.needs_undo_entry = false;
+
+        root.append(mk('div.-instructions',
+            mk('p', this.editor.svg_icon('svg-icon-mouse1'), " edit complex tile"),
+            mk('p', this.editor.svg_icon('svg-icon-mouse2'), " delete tile"),
+        ));
+
+        let ul = mk('ul.editor-popup-cell-contents');
+        root.append(ul);
 
         this.layer_stuff = {};
         for (let layer_info of SELECTABLE_LAYERS) {
@@ -314,7 +325,7 @@ export class CellEditorOverlay extends TransientOverlay {
             };
         }
 
-        root.addEventListener('click', ev => {
+        root.addEventListener('mouseup', ev => {
             let li = ev.target.closest('form.editor-popup-tile-editor li');
             if (! li)
                 return;
@@ -322,17 +333,36 @@ export class CellEditorOverlay extends TransientOverlay {
             if (! this.cell)
                 return;
 
-            let tile = this.cell[LAYERS[li.getAttribute('data-layer')]];
+            let layer_ident = li.getAttribute('data-layer');
+            let tile = this.cell[LAYERS[layer_ident]];
             if (! tile)
                 return;
 
-            let overlay_class = TILES_WITH_PROPS[tile.type.name];
-            if (! overlay_class)
-                return;
+            if (ev.button === 0) {
+                // Single click: open tile editor, if any
+                let overlay_class = TILES_WITH_PROPS[tile.type.name];
+                if (! overlay_class)
+                    return;
 
-            let overlay = new overlay_class(this.editor.conductor);
-            overlay.edit_tile(tile, this.cell);
-            overlay.open_balloon(li.getBoundingClientRect());
+                let overlay = new overlay_class(this.editor.conductor);
+                overlay.edit_tile(tile, this.cell);
+                overlay.open_balloon(li.getBoundingClientRect());
+            }
+            else if (ev.button === 2) {
+                // Right click: delete tile
+                this.editor.erase_tile(this.cell, tile);
+                this.needs_undo_entry = true;
+
+                let new_tile = this.cell[LAYERS[layer_ident]];
+                let canvas = this.layer_stuff[layer_ident].canvas;
+                if (new_tile) {
+                    this.editor.renderer.draw_single_tile_type(new_tile.type.name, new_tile, canvas);
+                }
+                else {
+                    let ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
         });
     }
 
@@ -342,11 +372,21 @@ export class CellEditorOverlay extends TransientOverlay {
 
         for (let layer_info of SELECTABLE_LAYERS) {
             let tile = this.cell[LAYERS[layer_info.ident]];
+            let stuff = this.layer_stuff[layer_info.ident];
+            stuff.li.classList.toggle('--editable', !! (tile && TILES_WITH_PROPS[tile.type.name]));
+
             if (! tile)
                 continue;
 
-            let stuff = this.layer_stuff[layer_info.ident];
             this.editor.renderer.draw_single_tile_type(tile.type.name, tile, stuff.canvas);
         }
+    }
+
+    close() {
+        if (this.needs_undo_entry) {
+            this.needs_undo_entry = false;
+            this.editor.commit_undo();
+        }
+        super.close();
     }
 }

@@ -66,7 +66,9 @@ export class Overlay {
         document.body.append(overlay);
 
         // Remove the overlay when clicking outside the element
-        overlay.addEventListener('click', ev => {
+        // FIXME would like mouseup here so right click dismisses too, but then opening a popup with
+        // right mouse button is impossible oops
+        overlay.addEventListener('click', () => {
             this.close();
         });
 
@@ -135,6 +137,12 @@ export class Overlay {
             ev.stopPropagation();
         });
 
+        // Disable context menu -- this fixes using mouse2 to open a popup, because the shield is
+        // under the mouse by the time mouseup happens
+        overlay.addEventListener('contextmenu', ev => {
+            ev.preventDefault();
+        });
+
         return overlay;
     }
 
@@ -162,6 +170,57 @@ export class TransientOverlay extends Overlay {
         overlay.classList.add('--transient');
         return overlay;
     }
+
+    // Open relative to an arbitrary rectangle.  Used by the editor's TileEditorOverlay classes.
+    open_balloon(rect) {
+        this.open();
+
+        // Fixed-size balloon positioning
+        let root = this.root;
+        root.classList.add('--balloon');
+        let spacing = 2;
+        // Vertical position: either above or below, preferring the side that has more space
+        if (rect.top - 0 > document.body.clientHeight - rect.bottom) {
+            // Above
+            root.classList.add('--above');
+            root.style.top = `${rect.top - root.offsetHeight - spacing}px`;
+        }
+        else {
+            // Below
+            root.classList.remove('--above');
+            root.style.top = `${rect.bottom + spacing}px`;
+        }
+        // Horizontal position: centered, but kept within the screen
+        let left;
+        let margin = 8;  // prefer to not quite touch the edges
+        if (document.body.clientWidth < root.offsetWidth + margin * 2) {
+            // It doesn't fit on the screen at all, so there's nothing we can do; just center it
+            left = (document.body.clientWidth - root.offsetWidth) / 2;
+        }
+        else {
+            left = Math.max(margin, Math.min(document.body.clientWidth - root.offsetWidth - margin,
+                (rect.left + rect.right - root.offsetWidth) / 2));
+        }
+        root.style.left = `${left}px`;
+        root.style.setProperty('--chevron-offset', `${(rect.left + rect.right) / 2 - left}px`);
+    }
+
+    close() {
+        if (this.root.classList.contains('--balloon')) {
+            this.root.classList.add('--vanishing');
+            // Force the animation to play again
+            this.root.style.animation = 'none';
+            this.root.offsetHeight;  // force reflow
+            this.root.style.animation = null;
+
+            window.setTimeout(() => {
+                super.close();
+            }, 100);
+        }
+        else {
+            super.close();
+        }
+    }
 }
 
 export class MenuOverlay extends TransientOverlay {
@@ -183,8 +242,8 @@ export class MenuOverlay extends TransientOverlay {
         });
     }
 
-    open(relto) {
-        super.open();
+    open_relative_to(relto) {
+        this.open();
 
         let anchor = relto.getBoundingClientRect();
         let rect = this.root.getBoundingClientRect();
