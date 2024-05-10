@@ -277,8 +277,35 @@ for (let [tool, tooldef] of Object.entries(TOOLS)) {
     }
 }
 
-export const SELECTABLE_LAYERS = [null, 'terrain', 'item', 'item_mod', 'actor', 'swivel', 'thin_wall', 'canopy'];
-export const SELECTABLE_LAYER_NAMES = ["auto", "terrain", "items", "item mods", "actors", "swivels", "thin walls", "canopies"];
+export const SELECTABLE_LAYERS = [{
+    ident: 'terrain',
+    name: "terrain",
+    desc: "This layer contains all kinds of floors, walls, and doors.\nIncludes buttons, traps, cloners, logic gates, etc.",
+}, {
+    ident: 'item',
+    name: "items",
+    desc: "This layer contains keys, tools, hearts, bonus candy,\ntime bonuses, the stopwatch, and mines.",
+}, {
+    ident: 'item_mod',
+    name: "item modifiers",
+    desc: "This layer contains item modifiers: the 'no' sign,\nthe gift bow, and the toll gate.",
+}, {
+    ident: 'actor',
+    name: "actors",
+    desc: "This layer contains players, blocks, and monsters.",
+}, {
+    ident: 'swivel',
+    name: "swivel doors",
+    desc: "This layer contains the rotating part of swivel doors.\n(The floor part goes on the terrain layer.)",
+}, {
+    ident: 'thin_wall',
+    name: "thin walls",
+    desc: "This layer contains thin walls.",
+}, {
+    ident: 'canopy',
+    name: "canopies",
+    desc: "This layer contains canopies.",
+}];
 
 // TODO this MUST use a LL tileset!
 export const PALETTE = [{

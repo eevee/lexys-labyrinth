@@ -1,3 +1,4 @@
+import { LAYERS } from '../defs.js';
 import { TransientOverlay } from '../main-base.js';
 import { mk, mk_svg } from '../util.js';
 
@@ -288,3 +289,64 @@ export const TILES_WITH_PROPS = {
     // TODO cloner arrows (should this be automatic unless you set them explicitly?)
     // TODO later, custom floor/wall selection
 };
+
+
+export class CellEditorOverlay extends TransientOverlay {
+    constructor(conductor) {
+        let ul = mk('ul.editor-popup-cell-contents');
+        let root = mk('form.editor-popup-tile-editor', ul);
+        super(conductor, root);
+        this.editor = conductor.editor;
+        this.tile = null;
+
+        this.layer_stuff = {};
+        for (let layer_info of SELECTABLE_LAYERS) {
+            let canvas = mk('canvas', {
+                width: this.editor.renderer.tileset.size_x,
+                height: this.editor.renderer.tileset.size_y,
+            });
+            let li = mk('li', {'data-layer': layer_info.ident}, canvas);
+            ul.append(li);
+
+            this.layer_stuff[layer_info.ident] = {
+                li,
+                canvas,
+            };
+        }
+
+        root.addEventListener('click', ev => {
+            let li = ev.target.closest('form.editor-popup-tile-editor li');
+            if (! li)
+                return;
+
+            if (! this.cell)
+                return;
+
+            let tile = this.cell[LAYERS[li.getAttribute('data-layer')]];
+            if (! tile)
+                return;
+
+            let overlay_class = TILES_WITH_PROPS[tile.type.name];
+            if (! overlay_class)
+                return;
+
+            let overlay = new overlay_class(this.editor.conductor);
+            overlay.edit_tile(tile, this.cell);
+            overlay.open_balloon(li.getBoundingClientRect());
+        });
+    }
+
+    edit_cell(cell) {
+        this.cell = cell;
+        this.needs_undo_entry = false;
+
+        for (let layer_info of SELECTABLE_LAYERS) {
+            let tile = this.cell[LAYERS[layer_info.ident]];
+            if (! tile)
+                continue;
+
+            let stuff = this.layer_stuff[layer_info.ident];
+            this.editor.renderer.draw_single_tile_type(tile.type.name, tile, stuff.canvas);
+        }
+    }
+}

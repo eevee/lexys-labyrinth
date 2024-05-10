@@ -13,7 +13,7 @@ import * as util from '../util.js';
 
 import * as dialogs from './dialogs.js';
 import {
-    TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, SELECTABLE_LAYERS, SELECTABLE_LAYER_NAMES, PALETTE, SPECIAL_PALETTE_ENTRIES,
+    TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, SELECTABLE_LAYERS, PALETTE, SPECIAL_PALETTE_ENTRIES,
     SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask
 } from './editordefs.js';
 import { SVGConnection, Selection } from './helpers.js';
@@ -195,18 +195,12 @@ export class Editor extends PrimaryView {
                 }
             }
             else {
+                let number = parseInt(ev.key, 10);
                 if (ev.key === 'Escape') {
-                    if (this.mouse_op && this.mouse_op.is_held) {
-                        this.mouse_op.do_abort();
-                    }
+                    this.cancel_mouse_drag();
                 }
-                else if (ev.key === 'Tab') {
-                    if (ev.shiftKey) {
-                        this.select_layer((this.selected_layer_index - 1 + SELECTABLE_LAYERS.length) % SELECTABLE_LAYERS.length);
-                    }
-                    else {
-                        this.select_layer((this.selected_layer_index + 1) % SELECTABLE_LAYERS.length);
-                    }
+                else if (! Number.isNaN(number) && 1 <= number && number <= SELECTABLE_LAYERS.length) {
+                    this.toggle_layer(number - 1);
                 }
                 else if (ev.key === ',') {
                     if (ev.shiftKey) {
@@ -438,28 +432,34 @@ export class Editor extends PrimaryView {
         });
 
         // Layer selection
-        this.layer_selector = mk('div.-toolbar-section', {id: 'editor-layer-selector'},
-            mk('img', {src: 'icons/layer-all.png'}),
-            mk('h3', "Layer"),
-            mk('output'),
-        );
+        this.selectable_layers = [];
+        this.layer_selector = mk('div.icon-button-set.-toolbar-section', {id: 'editor-layer-selector'});
+        for (let info of SELECTABLE_LAYERS) {
+            let button = mk('button', {type: 'button', 'data-layer': info.ident},
+                mk('img', {src: `icons/layer-${info.ident}.png`}),
+                mk('div.-help.editor-big-tooltip',
+                    mk('h3', `Layer selector: ${info.name}`),
+                    `${info.desc}\n\n`,
+                    "Disable a layer to make it intangible to tools that\n",
+                    "normally affect all layers (eyedrop, rotate, adjust),\n",
+                    "as well as selection tools.\n",
+                    "(Drawing to the layer is unaffected.)",
+                ),
+            );
+            this.layer_selector.append(button);
+            this.selectable_layers[LAYERS[info.ident]] = {
+                enabled: true,
+                button,
+            };
+        }
+        this.layer_selector.addEventListener('click', ev => {
+            let button = ev.target.closest('[data-layer]');
+            if (! button)
+                return;
+
+            this.toggle_layer(LAYERS[button.getAttribute('data-layer')]);
+        });
         this.root.querySelector('.controls').append(this.layer_selector);
-        this.select_layer(0);
-        this.layer_selector.addEventListener('mousedown', ev => {
-            if (ev.button === 0) {
-                this.select_layer((this.selected_layer_index + 1) % SELECTABLE_LAYERS.length);
-            }
-            else if (ev.button === 2) {
-                this.select_layer((this.selected_layer_index - 1 + SELECTABLE_LAYERS.length) % SELECTABLE_LAYERS.length);
-                ev.preventDefault();
-            }
-        });
-        this.layer_selector.addEventListener('dblclick', ev => {
-            ev.preventDefault;
-        });
-        this.layer_selector.addEventListener('contextmenu', ev => {
-            ev.preventDefault();
-        });
 
         // Toolbar buttons for saving, exporting, etc.
         let button_container = mk('div.-buttons');
@@ -506,7 +506,7 @@ export class Editor extends PrimaryView {
             item => item[1](),
         );
         let edit_menu_button = _make_button("Edit ", ev => {
-            this.edit_menu.open(ev.currentTarget);
+            this.edit_menu.open_relative_to(ev.currentTarget);
         });
         edit_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
         _make_button("Pack properties...", () => {
@@ -606,7 +606,7 @@ export class Editor extends PrimaryView {
             item => item[1](),
         );
         let export_menu_button = _make_button("Export ", ev => {
-            this.export_menu.open(ev.currentTarget);
+            this.export_menu.open_relative_to(ev.currentTarget);
         });
         export_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
         //_make_button("Toggle green objects");
@@ -1294,12 +1294,14 @@ export class Editor extends PrimaryView {
         this.mouse_op = this.mouse_ops[button];
     }
 
-    select_layer(index) {
-        this.selected_layer_index = index;
-        this.selected_layer = SELECTABLE_LAYERS[index];
-        this.layer_selector.querySelector('img').setAttribute('src',
-            `icons/layer-${SELECTABLE_LAYERS[index] ?? 'all'}.png`);
-        this.layer_selector.querySelector('output').textContent = SELECTABLE_LAYER_NAMES[index];
+    is_layer_selected(index) {
+        return this.selectable_layers[index]?.enabled;
+    }
+
+    toggle_layer(index) {
+        let layer_state = this.selectable_layers[index];
+        layer_state.enabled = ! layer_state.enabled;
+        layer_state.button.classList.toggle('--disabled', ! layer_state.enabled);
     }
 
     show_palette_tooltip(key) {
@@ -2274,36 +2276,7 @@ export class Editor extends PrimaryView {
         let overlay_class = TILES_WITH_PROPS[tile.type.name];
         let overlay = new overlay_class(this.conductor);
         overlay.edit_tile(tile, cell);
-        overlay.open();
-
-        // Fixed-size balloon positioning
-        // FIXME move this into TransientOverlay or some other base class
-        let root = overlay.root;
-        let spacing = 2;
-        // Vertical position: either above or below, preferring the side that has more space
-        if (rect.top - 0 > document.body.clientHeight - rect.bottom) {
-            // Above
-            root.classList.add('--above');
-            root.style.top = `${rect.top - root.offsetHeight - spacing}px`;
-        }
-        else {
-            // Below
-            root.classList.remove('--above');
-            root.style.top = `${rect.bottom + spacing}px`;
-        }
-        // Horizontal position: centered, but kept within the screen
-        let left;
-        let margin = 8;  // prefer to not quite touch the edges
-        if (document.body.clientWidth < root.offsetWidth + margin * 2) {
-            // It doesn't fit on the screen at all, so there's nothing we can do; just center it
-            left = (document.body.clientWidth - root.offsetWidth) / 2;
-        }
-        else {
-            left = Math.max(margin, Math.min(document.body.clientWidth - root.offsetWidth - margin,
-                (rect.left + rect.right - root.offsetWidth) / 2));
-        }
-        root.style.left = `${left}px`;
-        root.style.setProperty('--chevron-offset', `${(rect.left + rect.right) / 2 - left}px`);
+        overlay.open_balloon(rect);
     }
 
     cancel_mouse_drag() {

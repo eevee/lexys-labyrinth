@@ -8,7 +8,7 @@ import { mk, mk_svg, walk_grid } from '../util.js';
 
 import { SPECIAL_TILE_BEHAVIOR } from './editordefs.js';
 import { SVGConnection } from './helpers.js';
-import { TILES_WITH_PROPS } from './tile-overlays.js';
+import { TILES_WITH_PROPS, CellEditorOverlay } from './tile-overlays.js';
 
 const FORCE_FLOOR_TILES_BY_DIRECTION = {
     north: 'force_floor_n',
@@ -404,6 +404,10 @@ export class EyedropOperation extends MouseOperation {
         for (let l = LAYERS.MAX - 1; l >= 0; l--) {
             // This scheme means we'll cycle back around after hitting the bottom
             let layer = (l + layer_offset) % LAYERS.MAX;
+
+            if (! this.editor.is_layer_selected(layer))
+                continue;
+
             let tile = cell[layer];
             if (! tile)
                 continue;
@@ -1853,12 +1857,10 @@ export class RotateOperation extends MouseOperation {
     }
 
     _find_target_tile(cell) {
-        let top_layer = LAYERS.MAX - 1;
-        let bottom_layer = 0;
-        if (this.editor.selected_layer !== null) {
-            top_layer = bottom_layer = LAYERS[this.editor.selected_layer];
-        }
-        for (let layer = top_layer; layer >= bottom_layer; layer--) {
+        for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
+            if (! this.editor.is_layer_selected(layer))
+                continue;
+
             let tile = cell[layer];
             if (! tile)
                 continue;
@@ -2214,12 +2216,10 @@ export class AdjustOperation extends MouseOperation {
         this.hover_stale = false;
         this.adjusted_tile = null;
         this.hovered_edge = null;
-        let top_layer = LAYERS.MAX - 1;
-        let bottom_layer = 0;
-        if (this.editor.selected_layer !== null) {
-            top_layer = bottom_layer = LAYERS[this.editor.selected_layer];
-        }
-        for (let layer = top_layer; layer >= bottom_layer; layer--) {
+        for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
+            if (! this.editor.is_layer_selected(layer))
+                continue;
+
             let tile = cell[layer];
             if (! tile)
                 continue;
@@ -2473,6 +2473,14 @@ export class AdjustOperation extends MouseOperation {
             return;
 
         let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
+
+        // Right-click: open an overlay showing every tile in the cell
+        if (this.alt_mode) {
+            let overlay = new CellEditorOverlay(this.editor.conductor);
+            overlay.edit_cell(cell);
+            overlay.open_balloon(this.editor.renderer.get_cell_rect(cell.x, cell.y));
+            return;
+        }
 
         if (ADJUST_SPECIAL[this.adjusted_tile.type.name]) {
             ADJUST_SPECIAL[this.adjusted_tile.type.name](this.editor, this.adjusted_tile, cell);

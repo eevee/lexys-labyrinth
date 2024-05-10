@@ -2490,12 +2490,12 @@ svg.level-editor-overlay .overlay-text-cursor {
 #editor .controls #editor-toolbar {
     grid-area: toolbar;
 }
-#editor-toolbar .-help {
+#editor .controls .-help {
     width: max-content;
     margin-top: -0.25em;
     margin-left: -0.5em;
 }
-#editor-toolbar button:hover .-help {
+#editor .controls button:hover .-help {
     opacity: 1;
     z-index: 2;  /* show above any that are in mid-fade */
     visibility: visible;
@@ -2504,29 +2504,13 @@ svg.level-editor-overlay .overlay-text-cursor {
     transition-timing-function: ease-in;
 }
 #editor .controls #editor-layer-selector {
-    display: grid;
-    grid:
-        "icon header" auto
-        "icon name"   1fr
-        / auto 6em
-    ;
-    align-items: center;
-    gap: 0 0.5em;
-    line-height: 1;
-    user-select: none;
+    display: flex;
+    padding-left: 4px;
+    padding-right: 4px;
 }
-#editor .controls #editor-layer-selector > img {
-    grid-area: icon;
-}
-#editor .controls #editor-layer-selector > h3 {
-    grid-area: header;
-    margin: 0;
-    font-size: 0.75em;
-    font-weight: normal;
-    color: #606060;
-}
-#editor .controls #editor-layer-selector > output {
-    grid-area: name;
+#editor .controls #editor-layer-selector .--disabled {
+    filter: grayscale(100%);
+    opacity: 0.333;
 }
 #editor .controls .-buttons {
     grid-area: menu;
