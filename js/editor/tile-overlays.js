@@ -1,11 +1,10 @@
-import { LAYERS } from '../defs.js';
+import { DIRECTIONS, LAYERS } from '../defs.js';
 import { TransientOverlay } from '../main-base.js';
 import { mk, mk_svg } from '../util.js';
 
 import { SELECTABLE_LAYERS } from './editordefs.js';
 
 
-// FIXME could very much stand to have a little animation when appearing
 class TileEditorOverlay extends TransientOverlay {
     constructor(conductor) {
         let root = mk('form.editor-popup-tile-editor');
@@ -14,9 +13,10 @@ class TileEditorOverlay extends TransientOverlay {
         this.tile = null;
     }
 
-    edit_tile(tile, cell) {
+    edit_tile(tile, cell, on_edit = null) {
         this.tile = tile;
         this.cell = cell;
+        this.on_edit = on_edit;
 
         this.needs_undo_entry = false;
     }
@@ -34,12 +34,11 @@ class TileEditorOverlay extends TransientOverlay {
             }
             this.editor.mark_cell_dirty(this.cell);
         }
-        else if (this.tile === this.editor.fg_tile) {
-            // The change hasn't happened yet!  Don't redraw until we return to the event loop
-            setTimeout(() => this.editor.redraw_foreground_tile(), 0);
-        }
-        else if (this.tile === this.editor.bg_tile) {
-            setTimeout(() => this.editor.redraw_background_tile(), 0);
+
+        if (this.on_edit) {
+            // The change hasn't actually happened yet; don't call this until we return to the event
+            // loop, which should mean the change is done
+            setTimeout(() => this.on_edit(this.tile, this.cell), 0);
         }
     }
 
@@ -55,6 +54,7 @@ class TileEditorOverlay extends TransientOverlay {
 
     static configure_tile_defaults(tile) {
         // FIXME maybe this should be on the tile type, so it functions as documentation there?
+        // FIXME wait it IS on the tile type
     }
 }
 
@@ -90,9 +90,9 @@ class LetterTileEditor extends TileEditorOverlay {
         });
     }
 
-    edit_tile(tile, cell) {
-        super.edit_tile(tile, cell);
-        this.root.elements['glyph'].value = tile.overlaid_glyph;
+    edit_tile(...args) {
+        super.edit_tile(...args);
+        this.root.elements['glyph'].value = this.tile.overlaid_glyph;
     }
 
     static configure_tile_defaults(tile) {
@@ -115,9 +115,9 @@ class HintTileEditor extends TileEditorOverlay {
         });
     }
 
-    edit_tile(tile, cell) {
-        super.edit_tile(tile, cell);
-        this.text.value = tile.hint_text ?? "";
+    edit_tile(...args) {
+        super.edit_tile(...args);
+        this.text.value = this.tile.hint_text ?? "";
     }
 
     static configure_tile_defaults(tile) {
@@ -128,21 +128,6 @@ class HintTileEditor extends TileEditorOverlay {
 class FrameBlockTileEditor extends TileEditorOverlay {
     constructor(conductor) {
         super(conductor);
-
-        let svg_icons = [];
-        for (let center of [[16, 0], [16, 16], [0, 16], [0, 0]]) {
-            let symbol = mk_svg('svg', {viewBox: '0 0 16 16'},
-                mk_svg('circle', {cx: center[0], cy: center[1], r: 3}),
-                mk_svg('circle', {cx: center[0], cy: center[1], r: 13}),
-            );
-            svg_icons.push(symbol);
-        }
-        svg_icons.push(mk_svg('svg', {viewBox: '0 0 16 16'},
-            mk_svg('rect', {x: -2, y: 3, width: 20, height: 10}),
-        ));
-        svg_icons.push(mk_svg('svg', {viewBox: '0 0 16 16'},
-            mk_svg('rect', {x: 3, y: -2, width: 10, height: 20}),
-        ));
 
         this.root.append(mk('h3', "Arrows"));
         let arrow_list = mk('ol.editor-directional-block-tile-arrows.editor-tile-editor-svg-parts');
@@ -189,12 +174,70 @@ class FrameBlockTileEditor extends TileEditorOverlay {
         this.root.append(arrow_list);
     }
 
-    edit_tile(tile, cell) {
-        super.edit_tile(tile, cell);
+    edit_tile(...args) {
+        super.edit_tile(...args);
 
         for (let input of this.root.elements['direction']) {
-            input.checked = tile.arrows.has(input.value);
+            input.checked = this.tile.arrows.has(input.value);
         }
+    }
+
+    static configure_tile_defaults(tile) {
+    }
+}
+
+class ThinWallTileEditor extends TileEditorOverlay {
+    constructor(conductor) {
+        super(conductor);
+
+        this.root.append(mk('h3', "Edges"));
+        let edge_list = mk('ol.editor-thin-wall-edges');
+        // The edges are just CSS using border shenanigans
+        for (let direction of Object.keys(DIRECTIONS)) {
+            let li = mk('li');
+            li.append(mk('label', {'data-edge': direction},
+                mk('input', {type: 'checkbox', name: 'direction', value: direction}),
+                mk('div.-edge'),
+            ));
+            edge_list.append(li);
+        }
+        edge_list.addEventListener('change', ev => {
+            if (! this.tile)
+                return;
+
+            this.mark_dirty();
+            let bit = DIRECTIONS[ev.target.value].bit;
+            if (ev.target.checked) {
+                this.tile.edges |= bit;
+            }
+            else {
+                // If this is the foreground tile, don't allow having no edges
+                if (! this.cell && this.tile.edges === bit) {
+                    ev.target.checked = true;
+                    return;
+                }
+                this.tile.edges &= ~bit;
+            }
+        });
+        this.root.append(edge_list);
+    }
+
+    edit_tile(...args) {
+        super.edit_tile(...args);
+
+        for (let input of this.root.elements['direction']) {
+            input.checked = !! (this.tile.edges & DIRECTIONS[input.value].bit);
+        }
+    }
+
+    close() {
+        // Don't let an empty thin walls tile linger; erase it if it has no edges
+        if (this.cell && this.tile.edges === 0) {
+            this.editor._assign_tile(this.cell, this.tile.type.layer, null, this.pristine_tile);
+            this.editor.commit_undo();
+            this.needs_undo_entry = false;
+        }
+        super.close();
     }
 
     static configure_tile_defaults(tile) {
@@ -263,18 +306,18 @@ class RailroadTileEditor extends TileEditorOverlay {
         // TODO initial actor facing (maybe only if there's an actor in the cell)
     }
 
-    edit_tile(tile, cell) {
-        super.edit_tile(tile, cell);
+    edit_tile(...args) {
+        super.edit_tile(...args);
 
         for (let input of this.root.elements['track']) {
-            input.checked = !! (tile.tracks & (1 << input.value));
+            input.checked = !! (this.tile.tracks & (1 << input.value));
         }
 
-        if (tile.track_switch === null) {
+        if (this.tile.track_switch === null) {
             this.root.elements['switch'].value = '';
         }
         else {
-            this.root.elements['switch'].value = tile.track_switch;
+            this.root.elements['switch'].value = this.tile.track_switch;
         }
     }
 
@@ -285,12 +328,18 @@ class RailroadTileEditor extends TileEditorOverlay {
 export const TILES_WITH_PROPS = {
     floor_letter: LetterTileEditor,
     hint: HintTileEditor,
+    // TODO frame block -- allow setting direction without affecting the arrows
     frame_block: FrameBlockTileEditor,
+    thin_walls: ThinWallTileEditor,
+    one_way_walls: ThinWallTileEditor,
+    // TODO railroad -- initial actor direction, or some special value for 'auto' (how?  can't save
+    // that.  i guess i might want to always do whatever allows it to move in its facing direction?
+    // if i can do that then maybe disallow this entirely)
     railroad: RailroadTileEditor,
     // TODO various wireable tiles (hmm not sure how that ui works)
     // TODO initial value of counter
     // TODO cloner arrows (should this be automatic unless you set them explicitly?)
-    // TODO later, custom floor/wall selection
+    // TODO later, custom floor/wall selection?
 };
 
 
@@ -300,15 +349,13 @@ export class CellEditorOverlay extends TransientOverlay {
         super(conductor, root);
         this.editor = conductor.editor;
         this.tile = null;
-        this.needs_undo_entry = false;
 
+        let ul = mk('ul.editor-popup-cell-contents');
+        root.append(ul);
         root.append(mk('div.-instructions',
             mk('p', this.editor.svg_icon('svg-icon-mouse1'), " edit complex tile"),
             mk('p', this.editor.svg_icon('svg-icon-mouse2'), " delete tile"),
         ));
-
-        let ul = mk('ul.editor-popup-cell-contents');
-        root.append(ul);
 
         this.layer_stuff = {};
         for (let layer_info of SELECTABLE_LAYERS) {
@@ -344,14 +391,23 @@ export class CellEditorOverlay extends TransientOverlay {
                 if (! overlay_class)
                     return;
 
-                let overlay = new overlay_class(this.editor.conductor);
-                overlay.edit_tile(tile, this.cell);
-                overlay.open_balloon(li.getBoundingClientRect());
+                this.editor.open_tile_prop_overlay(
+                    tile, this.cell, li.getBoundingClientRect(),
+                    new_tile => {
+                        let stuff = this.layer_stuff[layer_ident];
+                        this.editor.renderer.draw_single_tile_type(
+                            new_tile.type.name, new_tile, stuff.canvas);
+                        // Edge case: a thin walls tile with no edges will be erased, so it will no
+                        // longer be editable
+                        if (new_tile && TILES_WITH_PROPS[new_tile.type.name] === ThinWallTileEditor) {
+                            stuff.li.classList.toggle('--editable', new_tile.edges !== 0);
+                        }
+                    });
             }
             else if (ev.button === 2) {
                 // Right click: delete tile
                 this.editor.erase_tile(this.cell, tile);
-                this.needs_undo_entry = true;
+                this.editor.commit_undo();
 
                 let new_tile = this.cell[LAYERS[layer_ident]];
                 let canvas = this.layer_stuff[layer_ident].canvas;
@@ -368,7 +424,6 @@ export class CellEditorOverlay extends TransientOverlay {
 
     edit_cell(cell) {
         this.cell = cell;
-        this.needs_undo_entry = false;
 
         for (let layer_info of SELECTABLE_LAYERS) {
             let tile = this.cell[LAYERS[layer_info.ident]];
@@ -380,13 +435,5 @@ export class CellEditorOverlay extends TransientOverlay {
 
             this.editor.renderer.draw_single_tile_type(tile.type.name, tile, stuff.canvas);
         }
-    }
-
-    close() {
-        if (this.needs_undo_entry) {
-            this.needs_undo_entry = false;
-            this.editor.commit_undo();
-        }
-        super.close();
     }
 }

@@ -347,14 +347,16 @@ export class Editor extends PrimaryView {
         this.fg_tile_el.addEventListener('click', () => {
             if (this.fg_tile && TILES_WITH_PROPS[this.fg_tile.type.name]) {
                 this.open_tile_prop_overlay(
-                    this.fg_tile, null, this.fg_tile_el.getBoundingClientRect());
+                    this.fg_tile, null, this.fg_tile_el.getBoundingClientRect(),
+                    () => this.redraw_foreground_tile());
             }
         });
         this.bg_tile_el = this.renderer.draw_single_tile_type('floor');
         this.bg_tile_el.addEventListener('click', () => {
             if (this.bg_tile && TILES_WITH_PROPS[this.bg_tile.type.name]) {
                 this.open_tile_prop_overlay(
-                    this.bg_tile, null, this.bg_tile_el.getBoundingClientRect());
+                    this.bg_tile, null, this.bg_tile_el.getBoundingClientRect(),
+                    () => this.redraw_background_tile());
             }
         });
         // TODO ones for the palette too??
@@ -621,7 +623,7 @@ export class Editor extends PrimaryView {
                 let entry;
                 if (SPECIAL_PALETTE_ENTRIES[key]) {
                     let tile = SPECIAL_PALETTE_ENTRIES[key];
-                    entry = this.renderer.draw_single_tile_type(tile.name, tile);
+                    entry = this.renderer.draw_single_tile_type(tile.type.name, tile);
                 }
                 else {
                     entry = this.renderer.draw_single_tile_type(key);
@@ -653,9 +655,7 @@ export class Editor extends PrimaryView {
             let key = entry.getAttribute('data-palette-key');
             if (SPECIAL_PALETTE_ENTRIES[key]) {
                 // Tile with preconfigured stuff on it
-                let tile = Object.assign({}, SPECIAL_PALETTE_ENTRIES[key]);
-                tile.type = TILE_TYPES[tile.name];
-                delete tile.name;
+                let tile = {...SPECIAL_PALETTE_ENTRIES[key]};
                 if (fg) {
                     this.select_foreground_tile(tile, 'palette');
                 }
@@ -2270,12 +2270,12 @@ export class Editor extends PrimaryView {
             mk_svg('use', {href: `#${id}`}));
     }
 
-    open_tile_prop_overlay(tile, cell, rect) {
+    open_tile_prop_overlay(tile, cell, rect, on_edit) {
         this.cancel_mouse_drag();
         // FIXME keep these around, don't recreate them constantly
         let overlay_class = TILES_WITH_PROPS[tile.type.name];
         let overlay = new overlay_class(this.conductor);
-        overlay.edit_tile(tile, cell);
+        overlay.edit_tile(tile, cell, on_edit);
         overlay.open_balloon(rect);
     }
 

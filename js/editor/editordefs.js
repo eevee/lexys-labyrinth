@@ -525,6 +525,10 @@ export const SPECIAL_PALETTE_ENTRIES = {
     'sokoban_wall/green':   { name: 'sokoban_wall', color: 'green' },
     'one_way_walls/south':  { name: 'one_way_walls', edges: DIRECTIONS['south'].bit },
 };
+for (let entry of Object.values(SPECIAL_PALETTE_ENTRIES)) {
+    entry.type = TILE_TYPES[entry.name];
+    delete entry.name;
+}
 
 // Editor-specific tile properties.  Every tile has a help entry, but some complex tiles have extra
 // editor behavior as well

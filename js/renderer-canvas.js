@@ -87,9 +87,11 @@ export class CanvasRenderer {
         else if (canvas instanceof CanvasRenderingContext2D) {
             ctx = canvas;
             canvas = ctx.canvas;
+            ctx.clearRect(x, y, tileset.size_x, tileset.size_y);
         }
         else {
             ctx = canvas.getContext('2d');
+            ctx.clearRect(x, y, tileset.size_x, tileset.size_y);
         }
 
         let name, tile;
@@ -477,18 +479,7 @@ export class CanvasRenderer {
     // TODO one wonders why this operates on a separate canvas and we don't just make new renderers
     // or something, or maybe make this a tileset method
     draw_single_tile_type(name, tile = null, canvas = null, x = 0, y = 0) {
-        if (! canvas) {
-            canvas = this.constructor.make_canvas(this.tileset.size_x, this.tileset.size_y);
-        }
-        let ctx = canvas.getContext('2d');
-
-        // Individual tile types always reveal what they are
-        let packet = new CanvasDrawPacket(this.tileset, ctx, 'palette');
-        packet.show_facing = this.show_facing;
-        packet.x = x;
-        packet.y = y;
-        this.tileset.draw_type(name, tile, packet);
-        return canvas;
+        return this.constructor.draw_single_tile(this.tileset, tile ?? name, canvas, x, y);
     }
 }
 
