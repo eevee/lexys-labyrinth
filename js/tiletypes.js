@@ -3169,6 +3169,24 @@ const TILE_TYPES = {
         infinite_items: {
             key_green: true,
         },
+        on_ready(me, level) {
+            if (! level.compat.no_auto_convert_ccl_items_under_players &&
+                level.stored_level.format === 'ccl')
+            {
+                // CCL: If the player starts out on an item and normal floor, change the floor to
+                // dirt so they're protected from monsters.  This preserves the CC1 behavior (items
+                // block monsters) in a way that's compatible with CC2 rules.
+                // This fixes CCLP4 #142 Stratagem.
+                let item = me.cell.get_item();
+                let terrain = me.cell.get_terrain();
+                if (terrain && terrain.type.name === 'floor' && ! terrain.wire_directions &&
+                    item && ((item.type.blocks_collision ?? 0) & COLLISION.monster_typical) &&
+                    ! (level.compat.monsters_ignore_keys && item.type.is_key))
+                {
+                    terrain.type = TILE_TYPES['dirt'];
+                }
+            }
+        },
         visual_state: player_visual_state,
     },
     player2: {

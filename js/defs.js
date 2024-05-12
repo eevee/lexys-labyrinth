@@ -154,6 +154,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         key: 'no_auto_convert_ccl_bombs',
         label: "Mines under actors are not auto-converted in CCL levels",
         rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+    }, {
+        key: 'no_auto_convert_ccl_items_under_players',
+        label: "Players starting on items are not auto-converted in CCL levels",
+        rulesets: new Set(['steam-strict', 'lynx', 'ms']),
     }],
 }, {
     title: "Actor behavior",
