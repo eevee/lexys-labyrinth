@@ -100,6 +100,144 @@ function get_cell_corner(frac_cell_x, frac_cell_y) {
 }
 
 
+function _get_blocked_leaving_directions(cell) {
+    let blocked = 0;
+
+    for (let tile of cell) {
+        if (! tile)
+            continue;
+
+        if (tile.type.name === 'thin_walls' || tile.type.name === 'one_way_walls') {
+            // Both regular and one-way walls block leaving
+            blocked |= tile.edges;
+        }
+        else if (tile.type.thin_walls) {
+            for (let dir of tile.type.thin_walls) {
+                blocked |= DIRECTIONS[dir].bit;
+            }
+        }
+    }
+
+    return blocked;
+}
+
+function _get_blocked_entering_directions(cell) {
+    let blocked = 0;
+
+    for (let tile of cell) {
+        if (! tile)
+            continue;
+
+        if (tile.type.name === 'thin_walls') {
+            // Only regular thin walls block entering
+            blocked |= tile.edges;
+        }
+        else if (tile.type.thin_walls) {
+            for (let dir of tile.type.thin_walls) {
+                blocked |= DIRECTIONS[dir].bit;
+            }
+        }
+    }
+
+    return blocked;
+}
+
+// FIXME both wand and floodfill want to be able to fill on their actual layer, for different reasons
+function floodfill_from(x0, y0, editor, respect_selection) {
+    let i0 = editor.coords_to_scalar(x0, y0);
+    let stored_level = editor.stored_level;
+    let tile = editor.fg_tile;
+    // FIXME?  unclear how this oughta work
+    let layer = tile.type.layer;
+    // Traversability behavior (even for filling with non-terrain tiles): if we start on a
+    // traversable tile, flood to all neighboring ones; otherwise, flood to the same terrain
+    let is_traversable = terrain_tile => {
+        if (terrain_tile.type.name.startsWith('door_'))
+            return false;
+        return ! terrain_tile.type.blocks_collision ||
+            (terrain_tile.type.blocks_collision & COLLISION.real_player) !== COLLISION.real_player;
+    };
+    let terrain0 = stored_level.linear_cells[i0][LAYERS.terrain] ?? null;
+    if (terrain0 && is_traversable(terrain0)) {
+        terrain0 = null;
+    }
+    let tile0 = stored_level.linear_cells[i0][layer] ?? null;
+    let type0 = tile0 ? tile0.type : null;
+
+    if (respect_selection && ! editor.selection.contains(x0, y0)) {
+        return null;
+    }
+
+    // Aaand, floodfill
+    let fill_state = new Array(stored_level.linear_cells.length);
+    fill_state[i0] = true;
+    let pending = [i0];
+    let steps = 0;
+    while (pending.length > 0) {
+        let old_pending = pending;
+        pending = [];
+        for (let i of old_pending) {
+            let [x, y] = stored_level.scalar_to_coords(i);
+            let from_cell = stored_level.cell(x, y);
+            let blocked_leaving = _get_blocked_leaving_directions(from_cell);
+
+            // Check neighbors
+            for (let dirinfo of Object.values(DIRECTIONS)) {
+                let [dx, dy] = dirinfo.movement;
+                let nx = x + dx;
+                let ny = y + dy;
+                let j = stored_level.coords_to_scalar(nx, ny)
+                if ((blocked_leaving & dirinfo.bit) ||
+                    (respect_selection && ! editor.selection.contains(nx, ny)))
+                {
+                    fill_state[j] = false;
+                    continue;
+                }
+
+                let cell = editor.cell(nx, ny);
+                if (! cell)
+                    continue;
+                if (fill_state[j] !== undefined)
+                    continue;
+
+                let terrain = cell[LAYERS.terrain];
+                if (terrain) {
+                    if (terrain0) {
+                        if (terrain.type !== terrain0.type)
+                            continue;
+                    }
+                    else {
+                        if (! is_traversable(terrain))
+                            continue;
+                    }
+                }
+
+                let blocked_entering = _get_blocked_entering_directions(cell);
+                if (blocked_entering & DIRECTIONS[dirinfo.opposite].bit)
+                    continue;
+
+                let tile = cell[layer] ?? null;
+                let type = tile ? tile.type : null;
+                if (type === type0) {
+                    fill_state[j] = true;
+                    pending.push(j);
+                }
+                else {
+                    fill_state[j] = false;
+                }
+            }
+            steps += 1;
+            if (steps > 10000) {
+                console.error("more steps than should be possible");
+                return fill_state;
+            }
+        }
+    }
+
+    return fill_state;
+}
+
+
 // TODO some minor grievances
 // - the track overlay doesn't explain "direction" (may not be necessary anyway), allows picking a
 // bad initial switch direction
@@ -619,136 +757,9 @@ export class FillOperation extends MouseOperation {
             return;
         }
 
-        let stored_level = this.editor.stored_level;
-        let tile = this.editor.fg_tile;
-        // FIXME?  unclear how this oughta work
-        let layer = tile.type.layer;
-        // Traversability behavior (even for filling with non-terrain tiles): if we start on a
-        // traversable tile, flood to all neighboring ones; otherwise, flood to the same terrain
-        let is_traversable = terrain_tile => {
-            return ! terrain_tile.type.blocks_collision ||
-                (terrain_tile.type.blocks_collision & COLLISION.real_player) !== COLLISION.real_player;
-        };
-        let terrain0 = stored_level.linear_cells[i0][LAYERS.terrain] ?? null;
-        if (terrain0 && is_traversable(terrain0)) {
-            terrain0 = null;
-        }
-        let tile0 = stored_level.linear_cells[i0][layer] ?? null;
-        let type0 = tile0 ? tile0.type : null;
-
-        if (! this.editor.selection.contains(x0, y0)) {
-            this.fill_state = null;
-            this._redraw();
-            return;
-        }
-
-        // Aaand, floodfill
-        this.fill_state = new Array(stored_level.linear_cells.length);
-        this.fill_state[i0] = true;
-        let pending = [i0];
-        let steps = 0;
-        while (pending.length > 0) {
-            let old_pending = pending;
-            pending = [];
-            for (let i of old_pending) {
-                let [x, y] = stored_level.scalar_to_coords(i);
-                let from_cell = this.cell(x, y);
-                let blocked_leaving = this._get_blocked_leaving_directions(from_cell);
-
-                // Check neighbors
-                for (let dirinfo of Object.values(DIRECTIONS)) {
-                    let [dx, dy] = dirinfo.movement;
-                    let nx = x + dx;
-                    let ny = y + dy;
-                    let j = stored_level.coords_to_scalar(nx, ny)
-                    if ((blocked_leaving & dirinfo.bit) || ! this.editor.selection.contains(nx, ny)) {
-                        this.fill_state[j] = false;
-                        continue;
-                    }
-
-                    let cell = this.editor.cell(nx, ny);
-                    if (! cell)
-                        continue;
-                    if (this.fill_state[j] !== undefined)
-                        continue;
-
-                    let terrain = cell[LAYERS.terrain];
-                    if (terrain) {
-                        if (terrain0) {
-                            if (terrain.type !== terrain0.type)
-                                continue;
-                        }
-                        else {
-                            if (! is_traversable(terrain))
-                                continue;
-                        }
-                    }
-
-                    let blocked_entering = this._get_blocked_entering_directions(cell);
-                    if (blocked_entering & DIRECTIONS[dirinfo.opposite].bit)
-                        continue;
-
-                    let tile = cell[layer] ?? null;
-                    let type = tile ? tile.type : null;
-                    if (type === type0) {
-                        this.fill_state[j] = true;
-                        pending.push(j);
-                    }
-                    else {
-                        this.fill_state[j] = false;
-                    }
-                }
-                steps += 1;
-                if (steps > 10000) {
-                    console.error("more steps than should be possible");
-                    return;
-                }
-            }
-        }
+        this.fill_state = floodfill_from(x0, y0, this.editor, true);
 
         this._redraw();
-    }
-
-    _get_blocked_leaving_directions(cell) {
-        let blocked = 0;
-
-        for (let tile of cell) {
-            if (! tile)
-                continue;
-
-            if (tile.type.name === 'thin_walls' || tile.type.name === 'one_way_walls') {
-                // Both regular and one-way walls block leaving
-                blocked |= tile.edges;
-            }
-            else if (tile.type.thin_walls) {
-                for (let dir of tile.type.thin_walls) {
-                    blocked |= DIRECTIONS[dir].bit;
-                }
-            }
-        }
-
-        return blocked;
-    }
-
-    _get_blocked_entering_directions(cell) {
-        let blocked = 0;
-
-        for (let tile of cell) {
-            if (! tile)
-                continue;
-
-            if (tile.type.name === 'thin_walls') {
-                // Only regular thin walls block entering
-                blocked |= tile.edges;
-            }
-            else if (tile.type.thin_walls) {
-                for (let dir of tile.type.thin_walls) {
-                    blocked |= DIRECTIONS[dir].bit;
-                }
-            }
-        }
-
-        return blocked;
     }
 
     _redraw() {
@@ -813,25 +824,13 @@ export class FillOperation extends MouseOperation {
 
 
 // TODO also, delete?  there's no delete??
-// FIXME don't show the overlay text until has_moved
+// FIXME don't show the box or overlay text until has_moved
 // TODO cursor: 'cell' by default...?
 // FIXME possible to start dragging from outside the level bounds, augh
-export class SelectOperation extends MouseOperation {
+class BaseSelectOperation extends MouseOperation {
     handle_press() {
-        if (this.shift) {
-            this.mode = 'select';
-            if (this.ctrl) {
-                // Subtract from selection (the normal way is ctrl, but ctrl-shift works even to
-                // start dragging inside an existing selection)
-                this.pending_selection = this.editor.selection.create_pending('subtract');
-            }
-            else {
-                // Extend selection
-                this.pending_selection = this.editor.selection.create_pending('add');
-            }
-            this.update_pending_selection();
-        }
-        else if (! this.editor.selection.is_empty &&
+        this.has_moved = false;
+        if (! this.shift && ! this.editor.selection.is_empty &&
             this.editor.selection.contains(this.click_cell_x, this.click_cell_y))
         {
             // Move existing selection
@@ -839,51 +838,38 @@ export class SelectOperation extends MouseOperation {
             this.make_copy = this.ctrl;
         }
         else {
-            this.mode = 'select';
-            if (this.ctrl) {
-                // Subtract from selection (must initiate click outside selection, or it'll float)
-                this.pending_selection = this.editor.selection.create_pending('subtract');
+            this.start_selection();
+        }
+    }
+
+    drag_floating_selection(cell_x, cell_y) {
+        if (this.has_moved) {
+            this.editor.selection.move_by(Math.floor(cell_x - this.prev_cell_x), Math.floor(cell_y - this.prev_cell_y));
+            return;
+        }
+
+        if (this.make_copy) {
+            if (this.editor.selection.is_floating) {
+                // Stamp the floating selection but keep it floating
+                this.editor.selection.stamp_float(true);
             }
             else {
-                // Create new selection
-                this.pending_selection = this.editor.selection.create_pending('new');
+                this.editor.selection.enfloat(true);
             }
-            this.update_pending_selection();
         }
-        this.has_moved = false;
+        else if (! this.editor.selection.is_floating) {
+            this.editor.selection.enfloat();
+        }
     }
+
     handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
         if (this.mode === 'float') {
-            if (this.has_moved) {
-                this.editor.selection.move_by(Math.floor(cell_x - this.prev_cell_x), Math.floor(cell_y - this.prev_cell_y));
-                return;
-            }
-
-            if (this.make_copy) {
-                if (this.editor.selection.is_floating) {
-                    // Stamp the floating selection but keep it floating
-                    this.editor.selection.stamp_float(true);
-                }
-                else {
-                    this.editor.selection.enfloat(true);
-                }
-            }
-            else if (! this.editor.selection.is_floating) {
-                this.editor.selection.enfloat();
-            }
+            this.drag_floating_selection(cell_x, cell_y);
         }
         else {
-            this.update_pending_selection();
+            this.continue_selection();
         }
         this.has_moved = true;
-    }
-
-    update_pending_selection() {
-        this.pending_selection.set_extrema(
-            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.click_cell_x)),
-            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.click_cell_y)),
-            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.prev_cell_x)),
-            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.prev_cell_y)));
     }
 
     commit_press() {
@@ -899,28 +885,7 @@ export class SelectOperation extends MouseOperation {
             }
         }
         else {  // create/extend
-            if (this.has_moved) {
-                // Drag either creates or extends the selection
-                // If there's an existing floating selection (which isn't what we're operating on),
-                // commit it before doing anything else
-                this.editor.selection.commit_floating();
-
-                this.pending_selection.commit();
-            }
-            else {
-                // Plain click clears selection.  But first, if there's a floating selection and
-                // it's moved, commit that movement as a separate undo entry
-                if (this.editor.selection.is_floating) {
-                    let float_moved = this.editor.selection.has_moved;
-                    if (float_moved) {
-                        this.editor.commit_undo();
-                    }
-                    this.editor.selection.commit_floating();
-                }
-
-                this.pending_selection.discard();
-                this.editor.selection.clear();
-            }
+            this.finish_selection();
         }
         this.editor.commit_undo();
     }
@@ -938,6 +903,119 @@ export class SelectOperation extends MouseOperation {
         this.editor.selection.commit_floating();
         this.editor.commit_undo();
         super.do_destroy();
+    }
+}
+
+export class BoxSelectOperation extends BaseSelectOperation {
+    start_selection() {
+        if (this.shift) {
+            this.mode = 'select';
+            if (this.ctrl) {
+                // Subtract from selection (the normal way is ctrl, but ctrl-shift works even to
+                // start dragging inside an existing selection)
+                this.pending_selection = this.editor.selection.create_pending('subtract');
+            }
+            else {
+                // Extend selection
+                this.pending_selection = this.editor.selection.create_pending('add');
+            }
+            this._update_pending_selection();
+        }
+        else {
+            this.mode = 'select';
+            if (this.ctrl) {
+                // Subtract from selection (must initiate click outside selection, or it'll float)
+                this.pending_selection = this.editor.selection.create_pending('subtract');
+            }
+            else {
+                // Create new selection
+                this.pending_selection = this.editor.selection.create_pending('new');
+            }
+            this._update_pending_selection();
+        }
+    }
+
+    continue_selection() {
+        this._update_pending_selection();
+    }
+
+    finish_selection() {
+        if (this.has_moved) {
+            // Drag either creates or extends the selection
+            // If there's an existing floating selection (which isn't what we're operating on),
+            // commit it before doing anything else
+            this.editor.selection.commit_floating();
+
+            this.pending_selection.commit();
+        }
+        else {
+            // Plain click clears selection.  But first, if there's a floating selection and
+            // it's moved, commit that movement as a separate undo entry
+            if (this.editor.selection.is_floating) {
+                let float_moved = this.editor.selection.has_moved;
+                if (float_moved) {
+                    this.editor.commit_undo();
+                }
+                this.editor.selection.commit_floating();
+            }
+
+            this.pending_selection.discard();
+            this.editor.selection.clear();
+        }
+    }
+
+    _update_pending_selection() {
+        this.pending_selection.set_extrema(
+            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.click_cell_x)),
+            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.click_cell_y)),
+            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.prev_cell_x)),
+            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.prev_cell_y)));
+    }
+}
+
+export class WandSelectOperation extends BaseSelectOperation {
+    start_selection() {
+        let filled_cells = floodfill_from(this.click_cell_x, this.click_cell_y, this.editor, false);
+        let cells = new Set;
+        if (filled_cells) {
+            for (let [i, filled] of filled_cells.entries()) {
+                if (filled) {
+                    cells.add(i);
+                }
+            }
+        }
+
+        if (this.shift) {
+            this.mode = 'select';
+            if (this.ctrl) {
+                // Subtract from selection
+                this.editor.selection.remove_points(cells);
+            }
+            else {
+                // Add to selection
+                this.editor.selection.add_points(cells);
+            }
+        }
+        else {
+            this.mode = 'select';
+            if (this.ctrl) {
+                // Subtract from selection
+                this.editor.selection.remove_points(cells);
+            }
+            else {
+                // Replace selection
+                this.editor.selection.clear();
+                this.editor.selection.add_points(cells);
+            }
+        }
+    }
+
+    continue_selection() {
+        // Nothing to do here; moving the mouse doesn't affect the floodfill
+    }
+
+    finish_selection() {
+        // uhhhhh
     }
 }
 

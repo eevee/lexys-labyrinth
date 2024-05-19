@@ -83,7 +83,7 @@ export const TOOLS = {
         ].join("\n"),
         affects_selection: true,
         uses_layers: undefined,
-        op1: mouseops.SelectOperation,
+        op1: mouseops.BoxSelectOperation,
         shortcut: 'm',
     },
     select_wand: {

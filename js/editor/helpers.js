@@ -227,6 +227,24 @@ export class Selection {
         this._update_outline();
     }
 
+    add_points(cells) {
+        // this._set_from_set(this.cells.union(cells));
+        let new_cells = new Set(this.cells);
+        for (let i of cells) {
+            new_cells.add(i);
+        }
+        this._set_from_set(new_cells);
+    }
+
+    remove_points(cells) {
+        // this._set_from_set(this.cells.difference(cells));
+        let new_cells = new Set(this.cells);
+        for (let i of cells) {
+            new_cells.delete(i);
+        }
+        this._set_from_set(new_cells);
+    }
+
     _set_from_set(cells) {
         this.cells = cells;
 
