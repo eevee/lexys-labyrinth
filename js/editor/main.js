@@ -116,6 +116,16 @@ export class Editor extends PrimaryView {
     }
 
     setup() {
+        this.connectable_types = new Set;
+        for (let [name, type] of Object.entries(TILE_TYPES)) {
+            if (type.connects_to) {
+                this.connectable_types.add(name);
+                for (let to_name of type.connects_to) {
+                    this.connectable_types.add(to_name);
+                }
+            }
+        }
+
         // Populate status bar (needs doing before the mouse stuff, which tries to update it)
         let statusbar = this.root.querySelector('#editor-statusbar');
         this.statusbar_zoom = mk('output');
@@ -1075,22 +1085,17 @@ export class Editor extends PrimaryView {
             this.level_changed_while_inactive = true;
         }
 
+        // Clear state
+        this.selection.clear();
+        // Re-select the current tool to force its state to clear
+        this.select_tool(this.current_tool, true);
+
         // Remember current level for an editor level
         if (this.conductor.stored_game.editor_metadata) {
             let pack_key = this.conductor.stored_game.editor_metadata.key;
             let pack_stash = load_json_from_storage(pack_key);
             pack_stash.current_level_index = this.conductor.level_index;
             save_json_to_storage(pack_key, pack_stash);
-        }
-
-        this.connectable_types = new Set;
-        for (let [name, type] of Object.entries(TILE_TYPES)) {
-            if (type.connects_to) {
-                this.connectable_types.add(name);
-                for (let to_name of type.connects_to) {
-                    this.connectable_types.add(to_name);
-                }
-            }
         }
 
         // Load connections
@@ -1124,10 +1129,8 @@ export class Editor extends PrimaryView {
         }
         this.reset_viewport_scroll();
 
-        if (this._done_setup) {
-            // XXX this doesn't work yet if setup hasn't run because the undo button won't exist
-            this.reset_undo();
-        }
+        // Do this last just in case any of the setup stuff logged an undo entry
+        this.reset_undo();
     }
 
     update_cell_coordinates() {
@@ -1243,8 +1246,8 @@ export class Editor extends PrimaryView {
         this._level_browser.open();
     }
 
-    select_tool(tool) {
-        if (tool === this.current_tool)
+    select_tool(tool, force = false) {
+        if (tool === this.current_tool && ! force)
             return;
         if (! this.tool_button_els[tool])
             return;

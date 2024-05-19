@@ -4151,13 +4151,14 @@ class Conductor {
         if (this.current) {
             this.current.deactivate();
         }
+        this.current = this.editor;
+        document.body.setAttribute('data-mode', 'editor');
+        this.editor.activate();
+
         if (! this.loaded_in_editor) {
             this.editor.load_level(this.stored_level);
             this.loaded_in_editor = true;
         }
-        this.current = this.editor;
-        document.body.setAttribute('data-mode', 'editor');
-        this.editor.activate();
     }
 
     switch_to_player() {
