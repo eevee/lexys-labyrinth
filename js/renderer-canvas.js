@@ -78,7 +78,7 @@ export class CanvasRenderer {
 
     // Draw a single tile, or even the name of a tile type.  Either a canvas or a context may be given.
     // If neither is given, a new canvas is returned.
-    static draw_single_tile(tileset, name_or_tile, canvas = null, x = 0, y = 0) {
+    static draw_single_tile(tileset, name_or_tile, canvas = null, x = 0, y = 0, packet_props = null) {
         let ctx;
         if (! canvas) {
             canvas = this.make_canvas(tileset.size_x, tileset.size_y);
@@ -108,6 +108,9 @@ export class CanvasRenderer {
         let packet = new CanvasDrawPacket(tileset, ctx, 'palette');
         packet.x = x;
         packet.y = y;
+        if (packet_props) {
+            packet.show_facing = packet_props.show_facing;
+        }
         tileset.draw_type(name, tile, packet);
 
         return canvas;
@@ -479,7 +482,8 @@ export class CanvasRenderer {
     // TODO one wonders why this operates on a separate canvas and we don't just make new renderers
     // or something, or maybe make this a tileset method
     draw_single_tile_type(name, tile = null, canvas = null, x = 0, y = 0) {
-        return this.constructor.draw_single_tile(this.tileset, tile ?? name, canvas, x, y);
+        return this.constructor.draw_single_tile(
+            this.tileset, tile ?? name, canvas, x, y, {show_facing: true});
     }
 }
 
