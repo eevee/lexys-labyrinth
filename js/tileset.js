@@ -2364,10 +2364,10 @@ export class Tileset {
     _draw_fourway_tile_power(tile, wires, packet) {
         // Draw the unpowered tile underneath, if any edge is unpowered (and in fact if /none/ of it
         // is powered then we're done here)
-        let powered = (tile.cell ? tile.powered_edges : 0) & wires;
-        if (! tile.cell || powered !== tile.wire_directions) {
+        let powered = (tile.powered_edges ?? 0) & wires;
+        if (powered !== tile.wire_directions) {
             this._draw_fourway_power_underlay(this.layout['#unpowered'], wires, packet);
-            if (! tile.cell || powered === 0)
+            if (powered === 0)
                 return;
         }
 
