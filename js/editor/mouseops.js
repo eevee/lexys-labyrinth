@@ -2217,6 +2217,9 @@ const ADJUST_SPECIAL = {
             }
         }
     },
+
+    button_pink(editor, tile, cell) {
+    },
 };
 // FIXME the preview is not very good because the hover effect becomes stale, pressing ctrl/shift
 // leaves it stale, etc
@@ -2330,6 +2333,7 @@ export class AdjustOperation extends MouseOperation {
             }
 
             // Place or delete individual thin walls
+            // FIXME uhhh need to erase the tile on mouse move or on right-click
             if (layer === LAYERS.thin_wall) {
                 let edge = get_cell_edge(frac_cell_x, frac_cell_y);
                 this.hovered_edge = edge;
@@ -2453,8 +2457,10 @@ export class AdjustOperation extends MouseOperation {
             }
 
             // Press certain buttons
-            if (tile.type.name === 'button_gray' || tile.type.name === 'button_green' || tile.type.name === 'button_blue') {
-                this.adjusted_tile = {...tile, _editor_pressed: true};
+            if (tile.type.name === 'button_gray' || tile.type.name === 'button_green' || tile.type.name === 'button_blue' ||
+                tile.type.name === 'button_pink' || tile.type.name === 'button_black')
+            {
+                this.adjusted_tile = {...tile, _editor_pressed: ! tile._editor_pressed};
                 break;
             }
 
@@ -2560,7 +2566,26 @@ export class AdjustOperation extends MouseOperation {
         if (! this.adjusted_tile)
             return;
 
-        if (ADJUST_SPECIAL[this.adjusted_tile.type.name]) {
+        if (this.adjusted_tile && this.adjusted_tile.type.name === 'button_pink') {
+            // FIXME this is just a rough first attempt it's not very good
+            this.editor.place_in_cell(cell, this.adjusted_tile);
+            for (let [direction, dirinfo] of Object.entries(DIRECTIONS)) {
+                if (! (this.adjusted_tile.wire_directions & dirinfo.bit))
+                    continue;
+                let circuit = algorithms.trace_floor_circuit(
+                    this.editor.stored_level, 'ignore', cell, direction);
+                for (let [tile, edges] of circuit.tiles) {
+                    //this.editor.mark_cell_dirty(tile.cell);
+                    tile.powered_edges |= edges;
+                    console.log(tile, tile.powered_edges);
+                }
+            }
+            this.editor.redraw_entire_level();
+            this.editor.commit_undo();
+            this.handle_refresh();
+            this.rehover();
+        }
+        else if (ADJUST_SPECIAL[this.adjusted_tile.type.name]) {
             ADJUST_SPECIAL[this.adjusted_tile.type.name](this.editor, this.adjusted_tile, cell);
             this.editor.commit_undo();
         }
