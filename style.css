@@ -2508,7 +2508,7 @@ svg.level-editor-overlay .overlay-text-cursor {
     padding-left: 4px;
     padding-right: 4px;
 }
-#editor .controls #editor-layer-selector .--disabled {
+#editor .controls #editor-layer-selector .--disabled img {
     filter: grayscale(100%);
     opacity: 0.333;
 }
