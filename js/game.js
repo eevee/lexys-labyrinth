@@ -1723,34 +1723,35 @@ export class Level extends LevelInterface {
                 tile.type.on_bumped(tile, this, actor, direction);
             }
 
+            if (this.compat.player_safe_at_decision_time &&
+                tile.type.is_real_player && push_mode !== 'push')
+            {
+                // Lynx + MS: At decision time, pretend the player isn't there; we'll collide
+                // with them later, at movement time
+                continue;
+            }
+
             // Death happens here: if a monster or block even thinks about moving into a player, or
             // a player thinks about moving into a monster, the player dies.  A player standing on a
             // wall is only saved by the wall being checked first.  This is also why standing on an
             // item won't save you: actors are checked before items!
             // TODO merge this with player_protected_by_items?  seems like they don't make sense independently
-            if (layer === LAYERS.actor &&
-                // Lynx: Touching a monster at decision time doesn't kill you, and pushing doesn't
-                // happen at decision time thanks to no_early_push
-                (! this.compat.player_safe_at_decision_time || push_mode === 'push'))
-            {
-                if (this._check_for_player_death(actor, tile)) {
-                    // Actors can't move into each other's cells, so monsters aren't allowed to
-                    // actually step on the player (or vice versa) -- however, to make it LOOK like
-                    // that's what's happening in the final frame, use the 'destination_cell'
-                    // (originally meant for teleporters) property to pretend this movement happens.
-                    // But first -- this implies that if a player is standing on an item, and a
-                    // monster kills the player, AND the player has an inscribed ankh, then the
-                    // monster should be able to continue on into the cell despite the item!  So
-                    // let's make that happen too.
-                    if (tile.type.is_real_player && tile.cell !== cell) {
-                        this._set_tile_prop(actor, 'temp_ignore_item_collision', true);
-                        return true;
-                    }
-                    else {
-                        this._set_tile_prop(actor, 'previous_cell', actor.cell);
-                        this._set_tile_prop(actor, 'destination_cell', cell);
-                        this._set_tile_prop(actor, 'is_making_failure_move', true);
-                    }
+            if (layer === LAYERS.actor && this._check_for_player_death(actor, tile)) {
+                // Actors can't move into each other's cells, so monsters aren't allowed to actually
+                // step on the player (or vice versa) -- however, to make it LOOK like that's what's
+                // happening in the final frame, use the 'destination_cell' (originally meant for
+                // teleporters) property to pretend this movement happens.
+                // But first -- this implies that if a player is standing on an item, and a monster
+                // kills the player, AND the player has an inscribed ankh, then the monster should
+                // be able to continue on into the cell despite the item!  So make that happen too.
+                if (tile.type.is_real_player && tile.cell !== cell) {
+                    this._set_tile_prop(actor, 'temp_ignore_item_collision', true);
+                    return true;
+                }
+                else {
+                    this._set_tile_prop(actor, 'previous_cell', actor.cell);
+                    this._set_tile_prop(actor, 'destination_cell', cell);
+                    this._set_tile_prop(actor, 'is_making_failure_move', true);
                 }
             }
 
