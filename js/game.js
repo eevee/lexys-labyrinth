@@ -1754,17 +1754,25 @@ export class Level extends LevelInterface {
                 }
             }
 
-            if (this.compat.allow_pushing_blocks_off_faux_walls &&
-                original_type.is_flickable_in_lynx)
-            {
-                // Lynx: blocks can be pushed off of certain fake walls, but we check the walls
-                // before we check blocks, so we have to defer the failure until later
-                deferred_blocked = true;
+            if (tile.blocks(actor, direction, this)) {
+                if (layer !== LAYERS.actor && (
+                    this.compat.allow_pushing_blocks_off_all_walls ||
+                    (this.compat.allow_pushing_blocks_off_faux_walls &&
+                        original_type.is_flickable_in_lynx)))
+                {
+                    // MS: blocks can be pushed off of *anything*, so defer being stopped until
+                    // after we check for pushable tiles
+                    // Lynx: blocks can be pushed off of blue walls and reveal walls
+                    deferred_blocked = true;
+                    continue;
+                }
+            }
+            else {
+                // Not blocking, move on
                 continue;
             }
-            if (! tile.blocks(actor, direction, this))
-                continue;
 
+            // If we reach this point, we're blocked, but we may still need to do our push behavior
             if (tile.type.on_after_bumped) {
                 tile.type.on_after_bumped(tile, this, actor);
             }

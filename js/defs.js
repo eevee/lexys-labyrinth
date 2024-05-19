@@ -256,13 +256,17 @@ export const COMPAT_FLAG_CATEGORIES = [{
         // XXX wait but the DEFAULT behavior allows block slapping, which lynx has, so why is lynx listed here?
         rulesets: new Set(['lynx', 'ms']),
     }, {
+        key: 'allow_pushing_blocks_off_faux_walls',
+        label: "Blocks may be pushed off of blue (fake) and revealing walls",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'allow_pushing_blocks_off_all_walls',
+        label: "Blocks may be pushed off of anything, even walls",
+        rulesets: new Set(['ms']),
+    }, {
         key: 'use_pgchip_ice_blocks',
         label: "Ice blocks use pgchip rules",
         rulesets: new Set(['ms']),
-    }, {
-        key: 'allow_pushing_blocks_off_faux_walls',
-        label: "Blocks may be pushed off of blue (fake), invisible, and revealing walls",
-        rulesets: new Set(['lynx']),
     }, {
         key: 'block_splashes_dont_block',
         label: "Block splashes don't block the player",

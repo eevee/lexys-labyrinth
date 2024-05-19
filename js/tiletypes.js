@@ -355,7 +355,6 @@ const TILE_TYPES = {
     wall_invisible: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
-        is_flickable_in_lynx: true,
         on_bumped(me, level, other) {
             if (can_actually_reveal_walls(other, level)) {
                 level.spawn_animation(me.cell, 'wall_invisible_revealed');
