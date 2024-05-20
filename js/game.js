@@ -1736,7 +1736,12 @@ export class Level extends LevelInterface {
             // wall is only saved by the wall being checked first.  This is also why standing on an
             // item won't save you: actors are checked before items!
             // TODO merge this with player_protected_by_items?  seems like they don't make sense independently
-            if (layer === LAYERS.actor && this._check_for_player_death(actor, tile)) {
+            if (layer === LAYERS.actor &&
+                // If we've already given up on this cell and are just waiting to see if we can do a
+                // flick, definitely don't try to kill a player
+                ! deferred_blocked &&
+                this._check_for_player_death(actor, tile))
+            {
                 // Actors can't move into each other's cells, so monsters aren't allowed to actually
                 // step on the player (or vice versa) -- however, to make it LOOK like that's what's
                 // happening in the final frame, use the 'destination_cell' (originally meant for
