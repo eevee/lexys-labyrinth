@@ -587,29 +587,24 @@ class Player extends PrimaryView {
 
         this.turn_based_mode = false;
         this.turn_based_mode_waiting = false;
-        this.turn_based_checkbox = this.root.querySelector('.control-turn-based');
-        this.turn_based_checkbox.checked = false;
-        this.turn_based_checkbox.addEventListener('change', ev => {
-            this.turn_based_mode = this.turn_based_checkbox.checked;
-        });
 
         // Bind buttons
         this.pause_button = this.root.querySelector('.control-pause');
         this.pause_button.addEventListener('click', ev => {
             this.toggle_pause();
-            ev.target.blur();
+            ev.currentTarget.blur();
         });
         this.restart_button = this.root.querySelector('.control-restart');
         this.restart_button.addEventListener('click', ev => {
             new ConfirmOverlay(this.conductor, "Abandon this attempt and try again?", () => {
                 this.restart_level();
             }).open();
-            ev.target.blur();
+            ev.currentTarget.blur();
         });
         this.undo_button = this.root.querySelector('.control-undo');
         this.undo_button.addEventListener('click', ev => {
             this.undo_last_move();
-            ev.target.blur();
+            ev.currentTarget.blur();
         });
         this.rewind_button = this.root.querySelector('.control-rewind');
         this.rewind_button.addEventListener('click', ev => {
@@ -620,23 +615,29 @@ class Player extends PrimaryView {
                 this.set_state('rewinding');
             }
         });
+        this.turn_based_button = this.root.querySelector('.control-turn-based');
+        this.turn_based_button.addEventListener('click', ev => {
+            this.turn_based_mode = ! this.turn_based_mode;
+            this.turn_based_button.classList.toggle('--pressed', this.turn_based_mode);
+            ev.currentTarget.blur();
+        });
         // Game actions
         this.drop_button = this.root.querySelector('#player-actions .action-drop');
         this.drop_button.addEventListener('click', ev => {
             // Use the set of "buttons pressed between tics" because it's cleared automatically;
             // otherwise these will stick around forever
             this.current_keys_new.add('q');
-            ev.target.blur();
+            ev.currentTarget.blur();
         });
         this.cycle_button = this.root.querySelector('#player-actions .action-cycle');
         this.cycle_button.addEventListener('click', ev => {
             this.current_keys_new.add('e');
-            ev.target.blur();
+            ev.currentTarget.blur();
         });
         this.swap_button = this.root.querySelector('#player-actions .action-swap');
         this.swap_button.addEventListener('click', ev => {
             this.current_keys_new.add('c');
-            ev.target.blur();
+            ev.currentTarget.blur();
         });
 
         // Create the mobile pause menu, which consolidates buttons from around the desktop UI

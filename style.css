@@ -1,6 +1,6 @@
 html {
     font-size: 16px;
-    height: 100%;
+    height: 100dvh;
 }
 body {
     height: 100%;
@@ -374,6 +374,9 @@ dl.formgrid > dd.-with-buttons {
     display: flex;
     justify-content: space-between;
 }
+dl.formgrid > dd > label {
+    display: block;
+}
 
 /* Individual overlays */
 table.level-browser {
@@ -561,7 +564,7 @@ img.compat-icon,
     .dialog dl.formgrid > dt:first-child {
         margin-top: 0;
     }
-    .dialog dl.formgrid > * + dt {
+    .dialog dl.formgrid > :is(dd, dt) + dt {
         border-top: 1px solid #ccc;
         padding-top: 0.5em;
     }
@@ -1241,6 +1244,7 @@ ol.packtest-summary > li {
     flex-direction: column;
     align-items: stretch;
     gap: 0.25em;
+    line-height: 1;
 }
 #player-controls {
     grid-area: buttons;
@@ -1249,16 +1253,12 @@ ol.packtest-summary > li {
 #player-controls button,
 #player-actions button {
     padding: 0.5em;
-    line-height: 1;
 }
 #player-controls button svg,
 #player-actions button svg {
     font-size: 1.5em;
     display: block;
     margin: 0.125em auto;
-}
-#player-controls .radio-faux-button-set {
-    margin: 0;
 }
 #player-actions {
     grid-area: actions;
@@ -1310,6 +1310,7 @@ ol.packtest-summary > li {
     #player-actions {
         flex-direction: row;
         white-space: nowrap;
+        line-height: 1.33;
     }
     #player-controls button svg,
     #player-actions button svg {
@@ -1317,7 +1318,6 @@ ol.packtest-summary > li {
     }
     #player-controls button {
         padding: 0.25em 0.5em;
-        line-height: 1.33;
     }
     #player-actions {
         justify-content: end;
@@ -1356,10 +1356,6 @@ ol.packtest-summary > li {
         /* Hide key hints; there's nowhere to put them and they take up surprisingly a lot of space */
         display: none;
     }
-    #player-controls .radio-faux-button-set span {
-        /* "step mode" is real big */
-        font-size: 0.75em;
-    }
 }
 @media (orientation: landscape) and (max-height: 600px) {
     /* On a small landscape screen, remove the music row (it matters!) */
@@ -1372,7 +1368,8 @@ ol.packtest-summary > li {
     }
 }
 @media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
-    #player-controls .-optional-label {
+    #player-controls .-optional-label,
+    #player-actions .-optional-label {
         display: none;
     }
     #splash-fullscreen {
