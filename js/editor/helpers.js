@@ -227,6 +227,24 @@ export class Selection {
         this._update_outline();
     }
 
+    add_points(cells) {
+        // this._set_from_set(this.cells.union(cells));
+        let new_cells = new Set(this.cells);
+        for (let i of cells) {
+            new_cells.add(i);
+        }
+        this._set_from_set(new_cells);
+    }
+
+    remove_points(cells) {
+        // this._set_from_set(this.cells.difference(cells));
+        let new_cells = new Set(this.cells);
+        for (let i of cells) {
+            new_cells.delete(i);
+        }
+        this._set_from_set(new_cells);
+    }
+
     _set_from_set(cells) {
         this.cells = cells;
 
@@ -324,7 +342,7 @@ export class Selection {
                 let segment = [];
                 segments.push(segment);
                 segment.push([gx, gy]);
-                while (segment.length < 100) {
+                while (segment.length < 1000) {
                     // At this point we know that d is a valid direction and we've just traced it
                     if (dx === 1) {
                         seen_tops.set((gx - this.bbox.left) + this.bbox.width * (gy - this.bbox.top));
@@ -338,9 +356,10 @@ export class Selection {
                     if (gx === x && gy === y)
                         break;
 
-                    // Now we're at a new point, so search for the next direction, starting from the left
-                    // Again, this is clockwise order (tr, br, bl, tl), arranged so that direction D goes
-                    // between cells D and D + 1
+                    // Now we're at a new point, so search for the next direction, preferring to
+                    // turn right since that's the side the interior is on.  Again, this is
+                    // clockwise order (tr, br, bl, tl), arranged so that direction D goes between
+                    // cells D and D + 1
                     let neighbors = [
                         this._contains(gx, gy - 1),
                         this._contains(gx, gy),
@@ -348,8 +367,9 @@ export class Selection {
                         this._contains(gx - 1, gy - 1),
                     ];
                     let new_d = (d + 1) % 4;
-                    for (let i = 3; i <= 4; i++) {
-                        let sd = (d + i) % 4;
+                    // 1 right, 0 straight, -1 left -- do NOT turn backwards!
+                    for (let dd = 1; dd >= -1; dd--) {
+                        let sd = (d + dd + 4) % 4;
                         if (neighbors[sd] !== neighbors[(sd + 1) % 4]) {
                             new_d = sd;
                             break;

@@ -12,7 +12,10 @@ import { mk, mk_svg, string_from_buffer_ascii, bytestring_to_buffer } from '../u
 import * as util from '../util.js';
 
 import * as dialogs from './dialogs.js';
-import { TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, PALETTE, SPECIAL_PALETTE_ENTRIES, SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask } from './editordefs.js';
+import {
+    TOOLS, TOOL_ORDER, TOOL_SHORTCUTS, SELECTABLE_LAYERS, PALETTE, SPECIAL_PALETTE_ENTRIES,
+    SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask
+} from './editordefs.js';
 import { SVGConnection, Selection } from './helpers.js';
 import { isCtrlKey, isMac } from './keyboard.js';
 import * as mouseops from './mouseops.js';
@@ -114,6 +117,16 @@ export class Editor extends PrimaryView {
     }
 
     setup() {
+        this.connectable_types = new Set;
+        for (let [name, type] of Object.entries(TILE_TYPES)) {
+            if (type.connects_to) {
+                this.connectable_types.add(name);
+                for (let to_name of type.connects_to) {
+                    this.connectable_types.add(to_name);
+                }
+            }
+        }
+
         // Populate status bar (needs doing before the mouse stuff, which tries to update it)
         let statusbar = this.root.querySelector('#editor-statusbar');
         this.statusbar_zoom = mk('output');
@@ -147,6 +160,14 @@ export class Editor extends PrimaryView {
         window.addEventListener('keydown', ev => {
             if (! this.active)
                 return;
+
+            if (this.mouse_op && this.redirect_keys_to_tool) {
+                if (this.mouse_op.handle_key(ev.key)) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                }
+                return;
+            }
 
             if (isCtrlKey(ev)) {
                 // macOS is really weird:
@@ -200,10 +221,12 @@ export class Editor extends PrimaryView {
                 }
             }
             else {
+                let number = parseInt(ev.key, 10);
                 if (ev.key === 'Escape') {
-                    if (this.mouse_op && this.mouse_op.is_held) {
-                        this.mouse_op.do_abort();
-                    }
+                    this.cancel_mouse_drag();
+                }
+                else if (! Number.isNaN(number) && 1 <= number && number <= SELECTABLE_LAYERS.length) {
+                    this.toggle_layer(number - 1);
                 }
                 else if (ev.key === ',') {
                     if (ev.shiftKey) {
@@ -257,6 +280,7 @@ export class Editor extends PrimaryView {
         this.mouse_coords = null;
         this.mouse_ops = [null, new mouseops.PanOperation(this, 1), null];  // left, middle, right
         this.mouse_op = null;
+        this.redirect_keys_to_tool = false;
         this.viewport_el.addEventListener('mousedown', ev => {
             this.mouse_coords = [ev.clientX, ev.clientY];
             this.cancel_mouse_drag();
@@ -359,14 +383,16 @@ export class Editor extends PrimaryView {
         this.fg_tile_el.addEventListener('click', () => {
             if (this.fg_tile && TILES_WITH_PROPS[this.fg_tile.type.name]) {
                 this.open_tile_prop_overlay(
-                    this.fg_tile, null, this.fg_tile_el.getBoundingClientRect());
+                    this.fg_tile, null, this.fg_tile_el.getBoundingClientRect(),
+                    () => this.redraw_foreground_tile());
             }
         });
         this.bg_tile_el = this.renderer.draw_single_tile_type('floor');
         this.bg_tile_el.addEventListener('click', () => {
             if (this.bg_tile && TILES_WITH_PROPS[this.bg_tile.type.name]) {
                 this.open_tile_prop_overlay(
-                    this.bg_tile, null, this.bg_tile_el.getBoundingClientRect());
+                    this.bg_tile, null, this.bg_tile_el.getBoundingClientRect(),
+                    () => this.redraw_background_tile());
             }
         });
         // TODO ones for the palette too??
@@ -387,7 +413,7 @@ export class Editor extends PrimaryView {
                 rotate_right_button, this.fg_tile_el, rotate_left_button,
                 this.bg_tile_el));
         // Tools themselves
-        let toolbox = mk('div.icon-button-set', {id: 'editor-toolbar'});
+        let toolbox = mk('div.icon-button-set.-toolbar-section', {id: 'editor-toolbar'});
         this.root.querySelector('.controls').append(toolbox);
         this.tool_button_els = {};
         for (let toolname of TOOL_ORDER) {
@@ -443,6 +469,36 @@ export class Editor extends PrimaryView {
             this.select_tool(button.getAttribute('data-tool'));
         });
 
+        // Layer selection
+        this.selectable_layers = [];
+        this.layer_selector = mk('div.icon-button-set.-toolbar-section', {id: 'editor-layer-selector'});
+        for (let info of SELECTABLE_LAYERS) {
+            let button = mk('button', {type: 'button', 'data-layer': info.ident},
+                mk('img', {src: `icons/layer-${info.ident}.png`}),
+                mk('div.-help.editor-big-tooltip',
+                    mk('h3', `Layer selector: ${info.name}`),
+                    `${info.desc}\n\n`,
+                    "Disable a layer to make it intangible to tools that\n",
+                    "normally affect all layers (eyedrop, rotate, adjust),\n",
+                    "as well as selection tools.\n",
+                    "(Drawing to the layer is unaffected.)",
+                ),
+            );
+            this.layer_selector.append(button);
+            this.selectable_layers[LAYERS[info.ident]] = {
+                enabled: true,
+                button,
+            };
+        }
+        this.layer_selector.addEventListener('click', ev => {
+            let button = ev.target.closest('[data-layer]');
+            if (! button)
+                return;
+
+            this.toggle_layer(LAYERS[button.getAttribute('data-layer')]);
+        });
+        this.root.querySelector('.controls').append(this.layer_selector);
+
         // Toolbar buttons for saving, exporting, etc.
         let button_container = mk('div.-buttons');
         this.root.querySelector('.controls').append(button_container);
@@ -488,7 +544,7 @@ export class Editor extends PrimaryView {
             item => item[1](),
         );
         let edit_menu_button = _make_button("Edit ", ev => {
-            this.edit_menu.open(ev.currentTarget);
+            this.edit_menu.open_relative_to(ev.currentTarget);
         });
         edit_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
         _make_button("Pack properties...", () => {
@@ -588,7 +644,7 @@ export class Editor extends PrimaryView {
             item => item[1](),
         );
         let export_menu_button = _make_button("Export ", ev => {
-            this.export_menu.open(ev.currentTarget);
+            this.export_menu.open_relative_to(ev.currentTarget);
         });
         export_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
         //_make_button("Toggle green objects");
@@ -603,7 +659,7 @@ export class Editor extends PrimaryView {
                 let entry;
                 if (SPECIAL_PALETTE_ENTRIES[key]) {
                     let tile = SPECIAL_PALETTE_ENTRIES[key];
-                    entry = this.renderer.draw_single_tile_type(tile.name, tile);
+                    entry = this.renderer.draw_single_tile_type(tile.type.name, tile);
                 }
                 else {
                     entry = this.renderer.draw_single_tile_type(key);
@@ -635,9 +691,7 @@ export class Editor extends PrimaryView {
             let key = entry.getAttribute('data-palette-key');
             if (SPECIAL_PALETTE_ENTRIES[key]) {
                 // Tile with preconfigured stuff on it
-                let tile = Object.assign({}, SPECIAL_PALETTE_ENTRIES[key]);
-                tile.type = TILE_TYPES[tile.name];
-                delete tile.name;
+                let tile = {...SPECIAL_PALETTE_ENTRIES[key]};
                 if (fg) {
                     this.select_foreground_tile(tile, 'palette');
                 }
@@ -1057,22 +1111,17 @@ export class Editor extends PrimaryView {
             this.level_changed_while_inactive = true;
         }
 
+        // Clear state
+        this.selection.clear();
+        // Re-select the current tool to force its state to clear
+        this.select_tool(this.current_tool, true);
+
         // Remember current level for an editor level
         if (this.conductor.stored_game.editor_metadata) {
             let pack_key = this.conductor.stored_game.editor_metadata.key;
             let pack_stash = load_json_from_storage(pack_key);
             pack_stash.current_level_index = this.conductor.level_index;
             save_json_to_storage(pack_key, pack_stash);
-        }
-
-        this.connectable_types = new Set;
-        for (let [name, type] of Object.entries(TILE_TYPES)) {
-            if (type.connects_to) {
-                this.connectable_types.add(name);
-                for (let to_name of type.connects_to) {
-                    this.connectable_types.add(to_name);
-                }
-            }
         }
 
         // Load connections
@@ -1106,10 +1155,8 @@ export class Editor extends PrimaryView {
         }
         this.reset_viewport_scroll();
 
-        if (this._done_setup) {
-            // XXX this doesn't work yet if setup hasn't run because the undo button won't exist
-            this.reset_undo();
-        }
+        // Do this last just in case any of the setup stuff logged an undo entry
+        this.reset_undo();
     }
 
     update_cell_coordinates() {
@@ -1225,14 +1272,15 @@ export class Editor extends PrimaryView {
         this._level_browser.open();
     }
 
-    select_tool(tool) {
-        if (tool === this.current_tool)
+    select_tool(tool, force = false) {
+        if (tool === this.current_tool && ! force)
             return;
         if (! this.tool_button_els[tool])
             return;
 
         if (this.current_tool) {
             this.tool_button_els[this.current_tool].classList.remove('-selected');
+            this.redirect_keys_to_tool = false;
         }
         this.current_tool = tool;
         this.tool_button_els[this.current_tool].classList.add('-selected');
@@ -1273,6 +1321,16 @@ export class Editor extends PrimaryView {
 
     set_mouse_button(button) {
         this.mouse_op = this.mouse_ops[button];
+    }
+
+    is_layer_selected(index) {
+        return this.selectable_layers[index]?.enabled;
+    }
+
+    toggle_layer(index) {
+        let layer_state = this.selectable_layers[index];
+        layer_state.enabled = ! layer_state.enabled;
+        layer_state.button.classList.toggle('--disabled', ! layer_state.enabled);
     }
 
     show_palette_tooltip(key) {
@@ -1658,7 +1716,26 @@ export class Editor extends PrimaryView {
         );
     }
 
-    resize_level(size_x, size_y, x0 = 0, y0 = 0) {
+    crop_level(x0, y0, size_x, size_y) {
+        let original_cells = this.stored_level.linear_cells;
+        let original_size_x = this.stored_level.size_x;
+        let original_size_y = this.stored_level.size_y;
+
+        let old_selection_cells, new_selection_cells;
+        if (this.selection) {
+            this.selection.commit_floating();
+
+            old_selection_cells = this.selection.cells;
+            new_selection_cells = new Set;
+            for (let n of old_selection_cells) {
+                let x = n % original_size_x - x0;
+                let y = Math.floor(n / original_size_x) - y0;
+                if (0 <= x && x < size_x && 0 <= y && y < size_y) {
+                    new_selection_cells.add(x + y * size_x);
+                }
+            }
+        }
+
         let new_cells = [];
         for (let y = y0; y < y0 + size_y; y++) {
             for (let x = x0; x < x0 + size_x; x++) {
@@ -1666,21 +1743,24 @@ export class Editor extends PrimaryView {
             }
         }
 
-        let original_cells = this.stored_level.linear_cells;
-        let original_size_x = this.stored_level.size_x;
-        let original_size_y = this.stored_level.size_y;
-
         this._do(() => {
             this.stored_level.linear_cells = new_cells;
             this.stored_level.size_x = size_x;
             this.stored_level.size_y = size_y;
             this.update_after_size_change();
+            if (this.selection) {
+                this.selection._set_from_set(new_selection_cells);
+            }
         }, () => {
             this.stored_level.linear_cells = original_cells;
             this.stored_level.size_x = original_size_x;
             this.stored_level.size_y = original_size_y;
             this.update_after_size_change();
+            if (this.selection) {
+                this.selection._set_from_set(old_selection_cells);
+            }
         });
+
         this.commit_undo();
     }
 
@@ -1994,7 +2074,10 @@ export class Editor extends PrimaryView {
                 for (let src of sources) {
                     this.__delete_implicit_connection(src);
                     let source_cell = this.stored_level.linear_cells[src];
-                    this._implicit_connect_tile(source_cell[LAYERS.terrain], source_cell, src);
+                    let terrain = source_cell[LAYERS.terrain];
+                    if (terrain.type.connects_to) {
+                        this._implicit_connect_tile(terrain, source_cell, src);
+                    }
                 }
             }
         }
@@ -2216,42 +2299,13 @@ export class Editor extends PrimaryView {
             mk_svg('use', {href: `#${id}`}));
     }
 
-    open_tile_prop_overlay(tile, cell, rect) {
+    open_tile_prop_overlay(tile, cell, rect, on_edit) {
         this.cancel_mouse_drag();
         // FIXME keep these around, don't recreate them constantly
         let overlay_class = TILES_WITH_PROPS[tile.type.name];
         let overlay = new overlay_class(this.conductor);
-        overlay.edit_tile(tile, cell);
-        overlay.open();
-
-        // Fixed-size balloon positioning
-        // FIXME move this into TransientOverlay or some other base class
-        let root = overlay.root;
-        let spacing = 2;
-        // Vertical position: either above or below, preferring the side that has more space
-        if (rect.top - 0 > document.body.clientHeight - rect.bottom) {
-            // Above
-            root.classList.add('--above');
-            root.style.top = `${rect.top - root.offsetHeight - spacing}px`;
-        }
-        else {
-            // Below
-            root.classList.remove('--above');
-            root.style.top = `${rect.bottom + spacing}px`;
-        }
-        // Horizontal position: centered, but kept within the screen
-        let left;
-        let margin = 8;  // prefer to not quite touch the edges
-        if (document.body.clientWidth < root.offsetWidth + margin * 2) {
-            // It doesn't fit on the screen at all, so there's nothing we can do; just center it
-            left = (document.body.clientWidth - root.offsetWidth) / 2;
-        }
-        else {
-            left = Math.max(margin, Math.min(document.body.clientWidth - root.offsetWidth - margin,
-                (rect.left + rect.right - root.offsetWidth) / 2));
-        }
-        root.style.left = `${left}px`;
-        root.style.setProperty('--chevron-offset', `${(rect.left + rect.right) / 2 - left}px`);
+        overlay.edit_tile(tile, cell, on_edit);
+        overlay.open_balloon(rect);
     }
 
     cancel_mouse_drag() {

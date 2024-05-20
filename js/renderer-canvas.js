@@ -1,12 +1,12 @@
 import { DIRECTIONS, LAYERS } from './defs.js';
-import { mk } from './util.js';
+import * as util from './util.js';
 import { DrawPacket } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 
-class CanvasRendererDrawPacket extends DrawPacket {
-    constructor(renderer, ctx, perception, clock, update_progress, update_rate) {
-        super(perception, renderer.hide_logic, clock, update_progress, update_rate);
-        this.renderer = renderer;
+export class CanvasDrawPacket extends DrawPacket {
+    constructor(tileset, ctx, perception, hide_logic, clock, update_progress, update_rate) {
+        super(perception, hide_logic, clock, update_progress, update_rate);
+        this.tileset = tileset;
         this.ctx = ctx;
         // Canvas position of the cell being drawn
         this.x = 0;
@@ -14,20 +14,17 @@ class CanvasRendererDrawPacket extends DrawPacket {
         // Offset within the cell, for actors in motion
         this.offsetx = 0;
         this.offsety = 0;
-        // Compatibility settings
-        this.use_cc2_anim_speed = renderer.use_cc2_anim_speed;
-        this.show_facing = renderer.show_facing;
     }
 
     blit(tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) {
-        this.renderer.blit(this.ctx,
+        this.tileset.blit_to_canvas(this.ctx,
             tx + mx, ty + my,
             this.x + this.offsetx + mdx, this.y + this.offsety + mdy,
             mw, mh);
     }
 
     blit_aligned(tx, ty, mx = 0, my = 0, mw = 1, mh = mw, mdx = mx, mdy = my) {
-        this.renderer.blit(this.ctx,
+        this.tileset.blit_to_canvas(this.ctx,
             tx + mx, ty + my,
             this.x + mdx, this.y + mdy,
             mw, mh);
@@ -76,7 +73,47 @@ export class CanvasRenderer {
 
     // This is here so command-line Node stuff can swap it out for the canvas package
     static make_canvas(w, h) {
-        return mk('canvas', {width: w, height: h});
+        return util.mk('canvas', {width: w, height: h});
+    }
+
+    // Draw a single tile, or even the name of a tile type.  Either a canvas or a context may be given.
+    // If neither is given, a new canvas is returned.
+    static draw_single_tile(tileset, name_or_tile, canvas = null, x = 0, y = 0, packet_props = null) {
+        let ctx;
+        if (! canvas) {
+            canvas = this.make_canvas(tileset.size_x, tileset.size_y);
+            ctx = canvas.getContext('2d');
+        }
+        else if (canvas instanceof CanvasRenderingContext2D) {
+            ctx = canvas;
+            canvas = ctx.canvas;
+            ctx.clearRect(x, y, tileset.size_x, tileset.size_y);
+        }
+        else {
+            ctx = canvas.getContext('2d');
+            ctx.clearRect(x, y, tileset.size_x, tileset.size_y);
+        }
+
+        let name, tile;
+        if (typeof name_or_tile === 'string' || name_or_tile instanceof String) {
+            name = name_or_tile;
+            tile = null;
+        }
+        else {
+            tile = name_or_tile;
+            name = tile.type.name;
+        }
+
+        // Individual tile types always reveal what they are
+        let packet = new CanvasDrawPacket(tileset, ctx, 'palette');
+        packet.x = x;
+        packet.y = y;
+        if (packet_props) {
+            packet.show_facing = packet_props.show_facing;
+        }
+        tileset.draw_type(name, tile, packet);
+
+        return canvas;
     }
 
     set_level(level) {
@@ -148,16 +185,6 @@ export class CanvasRenderer {
         return [x, y];
     }
 
-    // Draw to a canvas using tile coordinates
-    blit(ctx, sx, sy, dx, dy, w = 1, h = w) {
-        let tw = this.tileset.size_x;
-        let th = this.tileset.size_y;
-        ctx.drawImage(
-            this.tileset.image,
-            sx * tw, sy * th, w * tw, h * th,
-            dx * tw, dy * th, w * tw, h * th);
-    }
-
     _adjust_viewport_if_dirty() {
         if (! this.viewport_dirty)
             return;
@@ -185,8 +212,11 @@ export class CanvasRenderer {
         // game starts, because we're trying to interpolate backwards from 0, hence the Math.max()
         let clock = (this.level.tic_counter ?? 0) + (
             (this.level.frame_offset ?? 0) + (update_progress - 1) * this.update_rate) / 3;
-        let packet = new CanvasRendererDrawPacket(
-            this, this.ctx, this.perception, Math.max(0, clock), update_progress, this.update_rate);
+        let packet = new CanvasDrawPacket(
+            this.tileset, this.ctx, this.perception, this.hide_logic,
+            Math.max(0, clock), update_progress, this.update_rate);
+        packet.use_cc2_anim_speed = this.use_cc2_anim_speed;
+        packet.show_facing = this.show_facing;
 
         let tw = this.tileset.size_x;
         let th = this.tileset.size_y;
@@ -355,6 +385,8 @@ export class CanvasRenderer {
     draw_rewind_effect(clock) {
         // Shift several rows over in a recurring pattern, like a VHS, whatever that is
         let rewind_start = clock / 20 % 1;
+        // Draw noisy white stripes in there too
+        this.ctx.save();
         for (let chunk = 0; chunk < 4; chunk++) {
             let y = Math.floor(this.canvas.height * (chunk + rewind_start) / 4);
             for (let dy = 1; dy < 5; dy++) {
@@ -362,8 +394,22 @@ export class CanvasRenderer {
                     this.canvas,
                     0, y + dy, this.canvas.width, 1,
                     -dy * dy, y + dy, this.canvas.width, 1);
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, y + dy + 0.5);
+                this.ctx.lineTo(this.canvas.width, y + dy + 0.5);
+                let alpha = (0.9 - y / this.canvas.height * 0.25) * ((dy - 1) / 3);
+                this.ctx.strokeStyle = `rgba(100%, 100%, 100%, ${alpha})`;
+                this.ctx.setLineDash([
+                    util.random_range(4, 20),
+                    util.random_range(2, 6),
+                    util.random_range(4, 20),
+                    util.random_range(2, 6),
+                ]);
+                this.ctx.stroke();
             }
         }
+        this.ctx.restore();
     }
 
     // Used by the editor and map previews.  Draws a region of the level (probably a StoredLevel),
@@ -386,7 +432,8 @@ export class CanvasRenderer {
         width = width ?? this.level.size_x;
         cells = cells ?? this.level.linear_cells;
 
-        let packet = new CanvasRendererDrawPacket(this, ctx, perception);
+        let packet = new CanvasDrawPacket(this.tileset, ctx, perception);
+        packet.show_facing = show_facing;
         for (let x = x0; x <= x1; x++) {
             for (let y = y0; y <= y1; y++) {
                 let cell = cells[y * width + x];
@@ -435,17 +482,8 @@ export class CanvasRenderer {
     // TODO one wonders why this operates on a separate canvas and we don't just make new renderers
     // or something, or maybe make this a tileset method
     draw_single_tile_type(name, tile = null, canvas = null, x = 0, y = 0) {
-        if (! canvas) {
-            canvas = this.constructor.make_canvas(this.tileset.size_x, this.tileset.size_y);
-        }
-        let ctx = canvas.getContext('2d');
-
-        // Individual tile types always reveal what they are
-        let packet = new CanvasRendererDrawPacket(this, ctx, 'palette');
-        packet.x = x;
-        packet.y = y;
-        this.tileset.draw_type(name, tile, packet);
-        return canvas;
+        return this.constructor.draw_single_tile(
+            this.tileset, tile ?? name, canvas, x, y, {show_facing: true});
     }
 }
 

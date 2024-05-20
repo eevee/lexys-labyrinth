@@ -2,7 +2,7 @@
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
 import * as fflate from './vendor/fflate.js';
 
-import { COMPAT_FLAGS, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
+import { COMPAT_FLAG_CATEGORIES, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
@@ -12,7 +12,7 @@ import { PrimaryView, DialogOverlay, ConfirmOverlay, flash_button, svg_icon, loa
 import { Editor } from './editor/main.js';
 import CanvasRenderer from './renderer-canvas.js';
 import SOUNDTRACK from './soundtrack.js';
-import { Tileset, TILESET_LAYOUTS, parse_tile_world_large_tileset, infer_tileset_from_image } from './tileset.js';
+import { Tileset, TILESET_LAYOUTS, convert_tileset_to_layout, parse_tile_world_large_tileset, infer_tileset_from_image } from './tileset.js';
 import TILE_TYPES from './tiletypes.js';
 import { random_choice, mk, mk_svg } from './util.js';
 import * as util from './util.js';
@@ -22,6 +22,7 @@ const PAGE_TITLE = "Lexy's Labyrinth";
 // (it's 6 characters so it becomes exactly 8 base64 chars with no leftovers to entangle)
 const REPLAY_PREFIX = "TExERU1P";
 const RESTART_KEY_DELAY = 1.0;
+const REWIND_SPEED = 4;
 
 function format_replay_duration(t) {
     return `${t} tics (${util.format_duration(t / TICS_PER_SECOND)})`;
@@ -53,6 +54,13 @@ function simplify_number(number) {
         return number.toPrecision(2).replace("+","")
     }
 }
+
+function make_button(label, onclick) {
+    let button = mk('button', {type: 'button'}, label);
+    button.addEventListener('click', onclick);
+    return button;
+}
+
 
 // TODO:
 // - level password, if any
@@ -295,7 +303,8 @@ class SFXPlayer {
         this.sounds = {};
         this.sound_sources = {
             // handcrafted
-            blocked: 'sfx/mmf.ogg',
+            blocked1: 'sfx/mmf1.ogg',
+            blocked2: 'sfx/mmf2.ogg',
             // https://jummbus.bitbucket.io/#j2N04bombn110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T0v0pL0OD0Ou00q1d1f8y0z2C0w2c0h2T2v0kL0OD0Ou02q1d1f6y1z2C1w1b4gp1b0aCTFucgds0
             bomb: 'sfx/bomb.ogg',
             // https://jummbus.bitbucket.io/#j2N0cbutton-pressn100s0k0l00e00t3Mm1a3g00j07i0r1O_U0o3T0v0pL0OD0Ou00q1d1f3y1z1C2w0c0h0b4p1bJdn51eMUsS0
@@ -326,7 +335,7 @@ class SFXPlayer {
             'get-stopwatch-penalty': 'sfx/get-stopwatch-penalty.ogg',
             // https://jummbus.bitbucket.io/#j3N0kget-stopwatch-togglen100s0k0l00e00t50mca3g00j07i0r1O_U0o5T0v0pL0OaD0Ou00q0d1f7y1z2C1w4c0h8b4p19FyWxq3Bg0
             'get-stopwatch-toggle': 'sfx/get-stopwatch-toggle.ogg',
-            // https://jummbus.bitbucket.io/#j2N08get-tooln100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o2T0v0pL0OD0Ou00q1d1f4y2z9C0w2c0h0b4p1bGqKNW4isVk0
+            // https://jummb.us/#j6N08get-tooln100s0k0l00e00t3Ma3g00j07r1O_U00i0o3T0v0pu00f0000q0B1420Oa2d030w2h0E1c0b9b4p1cGqKNW29eel00
             'get-tool': 'sfx/get-tool.ogg',
             // https://jummbus.bitbucket.io/#j3N07popwalln110s0k0l00e00t3Mm2a3g00j07i0r1O_U00o40T0v0zL0OaD0Ou10q0d0f8y0z1C2w2c0Gc0h0T2v0aL0OaD0Ou02q1d5f1y0z3C1w1h0b4gp190ap6Ker00
             popwall: 'sfx/popwall.ogg',
@@ -343,13 +352,16 @@ class SFXPlayer {
             // https://jummbus.bitbucket.io/#j3N09slide-icen110s0k0l00e00t3Mm3a3g00j07i0r1O_U00o50T0v0fL0OaD0Ou00q2d2f8y0z1C0w9c3h0T2v01L0OaD0Ou02q2d3fay5z5C0w0h0b4gp1jGgKb8er0l5mlg84Ddw0
             // https://jummbus.bitbucket.io/#j3N09slide-icen110s1k0l00e00t4Im3a3g00j07i0r1O_U00o50T1v0aL0OaD0Ou01q3d7f5y0z9C0c0h0A9F3B2VdQ5428Paa74E0019T2v01L0OaD0Ou02q2d7fay5z1C0w0h0b4gp1kLwb2HbEBer0l0l509Po0
             'slide-ice': 'sfx/slide-ice.ogg',
+            // https://jummb.us/#j6N09step-dirtn110s0k0l00e00t3Ma3g00j07r1O_U0000i0o6T0v05u00f0000q0A1740Oad030wih0E1c0b2T2v01u02f142qw400Oad000w1E0c0b4gp1b0ayH4oFqsG0
+            'step-dirt': 'sfx/step-dirt.ogg',
             // https://jummbus.bitbucket.io/#j3N09step-firen110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o10T0v05L0OaD0Ou10q0d0f8y0z1C2w2c0Gc0h0T2v0pL0OaD0Ou02q3d7fay3z1C0w1h0b4gp1b0ayH2w40VI0
             'step-fire': 'sfx/step-fire.ogg',
             // https://jummbus.bitbucket.io/#j3N0astep-forcen110s0k0l00e00t3Mm4a3g00j07i0r1O_U00o30T0v0aL0OaD0Ou00q1d1fay2z6C1wdc0h3T2v01L0OaD0zu02q0d1f9y2z1C1w8h0b4gp1mJdlagwgQsu0J5mqhK0qsu0
             'step-force': 'sfx/step-force.ogg',
-            // https://jummbus.bitbucket.io/#j2N0astep-floorn100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o1T0v05L0OD0Ou00q0d2f1y1zjC2w0c0h0b4p1aGaKaxqer00
-            'step-floor': 'sfx/step-floor.ogg',
-            // https://jummbus.bitbucket.io/#j3N0bstep-graveln110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o50T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0T2v05L0OaD0Ou02q0d2f2y0z0C1w0h0b4gp1lLp719LjCM5EGOEJ3per00
+            // https://jummb.us/#j6N0bstep-floor1n100s0k0l00e00t3Ma3g00j07r1O_U00i0o2T0v05u00f0000qwA1112c00Oad230w0h0E1c0bjb4p1aGaKaxp3CM0
+            'step-floor1': 'sfx/step-floor1.ogg',
+            // https://jummb.us/#j6N0bstep-floor2n100s0k0l00e00t3Ma3g00j07r1O_U00i0o2T0v05u00f0000q0A1120Oad200w0h0E1c0bjb4p1aGaKayuwVI0
+            'step-floor2': 'sfx/step-floor2.ogg',
             // https://jummbus.bitbucket.io/#j3N0bstep-graveln110s0k0l00e00t3Mm6a3g00j07i0r1O_U00o50T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0T2v01L0OaD0zu02q0d1f9y2z1C2w0Gc0h0b4gp1d0bhlCAmxID7w0
             'step-gravel': 'sfx/step-gravel.ogg',
             // https://jummbus.bitbucket.io/#j3N08step-icen100s0k0l00e00t3Mm6a3g00j07i0r1O_U0o5T0v05L0OaD0Ou00q0d1f7y4z2C0wic0h0b4p1aLp719LjCM0
@@ -1005,12 +1017,6 @@ class Player extends PrimaryView {
             time_secs_el: this.root.querySelector('#player-debug-time-secs'),
         };
 
-        let make_button = (label, onclick) => {
-            let button = mk('button', {type: 'button'}, label);
-            button.addEventListener('click', onclick);
-            return button;
-        };
-
         // -- Time --
         // Hook up back/forward buttons
         debug_el.querySelector('.-time-controls').addEventListener('click', ev => {
@@ -1072,22 +1078,29 @@ class Player extends PrimaryView {
         // -- Inventory --
         // Add a button for every kind of inventory item
         let inventory_el = debug_el.querySelector('.-inventory');
+        let tileset = this.conductor.tilesets['ll'];
         for (let name of [
-            'key_blue', 'key_red', 'key_yellow', 'key_green',
-            'xray_eye', 'foil', 'lightning_bolt', 'hook',
-            'flippers', 'fire_boots', 'cleats', 'suction_boots',
-            'hiking_boots', 'speed_boots', 'railroad_sign', 'helmet',
+            // CC1
+            'key_red', 'key_blue', 'key_yellow', 'key_green',
+            'cleats', 'suction_boots', 'fire_boots', 'flippers',
+            // CC2
+            'hiking_boots', 'speed_boots', 'lightning_bolt', 'railroad_sign',
+            'helmet', 'xray_eye', 'foil', 'hook',
             'bribe', 'bowling_ball', 'dynamite',
+            // LL
+            'skeleton_key', 'ankh',
         ]) {
             inventory_el.append(make_button(
-                mk('img', {src: this.render_inventory_tile(name)}),
+                // Render these directly instead of using the inventory system, since there may
+                // not even be tiles for these items in the current tileset
+                CanvasRenderer.draw_single_tile(tileset, name),
                 () => {
                     this.level.give_actor(this.level.player, name);
                     this.update_ui();
                 }));
         }
         // Add a button to clear your inventory
-        let clear_button = mk('button.-wide', {type: 'button'}, "clear inventory");
+        let clear_button = mk('button.-wide', {type: 'button'}, "clear");
         clear_button.addEventListener('click', ev => {
             this.level.take_all_keys_from_actor(this.level.player);
             this.level.take_all_tools_from_actor(this.level.player);
@@ -1278,6 +1291,7 @@ class Player extends PrimaryView {
                 for (let key of [
                     'direction', 'movement_speed', 'movement_cooldown',
                     'is_sliding', 'is_pending_slide', 'can_override_slide',
+                    'pending_push', 'is_blocked',
                 ]) {
                     let dd = mk('dd');
                     props[key] = dd;
@@ -1524,6 +1538,7 @@ class Player extends PrimaryView {
 
         this.turn_based_mode_waiting = false;
         this.last_advance = 0;
+        this.last_input = 0;
         this.current_keyring = {};
         this.current_toolbelt = [];
         this.previous_hint_tile = null;
@@ -1613,12 +1628,6 @@ class Player extends PrimaryView {
             }
         }
 
-        if (this.debug.enabled) {
-            for (let [action, el] of Object.entries(this.debug.input_els)) {
-                el.classList.toggle('--held', (input & INPUT_BITS[action]) !== 0);
-            }
-        }
-
         return input;
     }
 
@@ -1627,6 +1636,7 @@ class Player extends PrimaryView {
         for (let i = 0; i < tics; i++) {
             // FIXME turn-based mode should be disabled during a replay
             let input = this.get_input();
+            this.last_input = input;
             // Extract the fake 'wait' bit, if any
             let wait = input & INPUT_BITS['wait'];
             input &= ~wait;
@@ -1703,7 +1713,7 @@ class Player extends PrimaryView {
         // the framerate
         if (this.state === 'rewinding') {
             // Rewind faster than normal time
-            dt *= 0.5;
+            dt /= REWIND_SPEED;
         }
         this._advance_handle = window.setTimeout(this._advance_bound, dt);
 
@@ -1727,6 +1737,15 @@ class Player extends PrimaryView {
 
     undo() {
         this.level.undo();
+
+        if (this.debug.enabled && this.debug.replay) {
+            // Forward, we show the input from tic N and the result from tic N + 1.
+            // So backward, we just rewound to the result from tic N; show the input from tic N - 1.
+            this.last_input = this.debug.replay.get(this.level.tic_counter - 1);
+        }
+        else {
+            this.last_input = 0;
+        }
     }
 
     undo_last_move() {
@@ -1767,7 +1786,7 @@ class Player extends PrimaryView {
             let elapsed = (performance.now() - this.last_advance) / 1000;
             let speed = this.play_speed;
             if (this.state === 'rewinding') {
-                speed *= 2;
+                speed *= REWIND_SPEED;
             }
             update_progress = elapsed * TICS_PER_SECOND * (3 / this.level.update_rate) * speed;
             update_progress = Math.min(1, update_progress);
@@ -1935,6 +1954,10 @@ class Player extends PrimaryView {
             this.debug.time_tics_el.textContent = current_tic;
             this.debug.time_moves_el.textContent = `${Math.floor(t/4)}`;
             this.debug.time_secs_el.textContent = (t / 20).toFixed(2);
+
+            for (let [action, el] of Object.entries(this.debug.input_els)) {
+                el.classList.toggle('--held', (this.last_input & INPUT_BITS[action]) !== 0);
+            }
 
             if (this.debug.replay) {
                 this.debug.replay_progress_el.setAttribute('value', t);
@@ -2937,7 +2960,7 @@ const TILESET_SLOTS = [{
     name: "CC2",
 }, {
     ident: 'll',
-    name: "LL/editor",
+    name: "LL",
 }];
 const CUSTOM_TILESET_BUCKETS = ['Custom 1', 'Custom 2', 'Custom 3'];
 const CUSTOM_TILESET_PREFIX = "Lexy's Labyrinth custom tileset: ";
@@ -3011,8 +3034,9 @@ class OptionsOverlay extends DialogOverlay {
         }
 
         // Tileset options
+        this.main.append(mk('h2', "Tilesets"));
         this.tileset_els = {};
-        this.renderers = {};
+        //this.renderer = new CanvasRenderer(conductor.tilesets[slot.ident], 1);
         this.available_tilesets = {};
         for (let [ident, def] of Object.entries(BUILTIN_TILESETS)) {
             let newdef = { ...def, is_builtin: true };
@@ -3038,41 +3062,32 @@ class OptionsOverlay extends DialogOverlay {
                 };
             }
         }
+
+        let thead = mk('tr', mk('th', "Preview"), mk('th', "Format"));
+        this.tileset_table = mk('table.option-tilesets', thead);
+        this.main.append(this.tileset_table);
         for (let slot of TILESET_SLOTS) {
-            let renderer = new CanvasRenderer(conductor.tilesets[slot.ident], 1);
-            this.renderers[slot.ident] = renderer;
-
-            let select = mk('select', {name: `tileset-${slot.ident}`});
-            for (let [ident, def] of Object.entries(this.available_tilesets)) {
-                if (def.tileset.layout['#supported-versions'].has(slot.ident)) {
-                    select.append(mk('option', {value: ident}, def.name));
-                }
-            }
-            select.value = conductor.options.tilesets[slot.ident] ?? 'lexy';
-            if (! conductor._loaded_tilesets[select.value]) {
-                select.value = 'lexy';
-            }
-            select.addEventListener('change', () => {
-                this.update_selected_tileset(slot.ident);
-            });
-
-            let el = mk('dd.option-tileset', select, " ");
-            this.tileset_els[slot.ident] = el;
-            this.update_selected_tileset(slot.ident);
-
-            dl.append(
-                mk('dt', `${slot.name} tileset`),
-                el,
-            );
+            thead.append(mk('th.-slot', slot.name));
+        }
+        for (let [ident, def] of Object.entries(this.available_tilesets)) {
+            this._add_tileset_row(ident, def);
         }
         this.custom_tileset_counter = 1;
-        dl.append(mk('dd',
-            mk('p', "You can also load a custom tileset, which will be saved in browser storage."),
-            mk('p', "MSCC, Tile World, and Steam layouts are all supported."),
-            mk('p', "(Steam tilesets can be found in ", mk('code', "data/bmp"), " within the game's local files)."),
-            mk('p', mk('input', {type: 'file', name: 'custom-tileset'})),
+        // FIXME allow drag-drop into...  this window?  area?  idk
+        let custom_tileset_button = mk('button', {type: 'button'}, "Load custom tileset");
+        custom_tileset_button.addEventListener('click', () => this.root.elements['custom-tileset'].click());
+        this.main.append(
+            mk('p',
+                mk('input', {type: 'file', name: 'custom-tileset'}),
+                custom_tileset_button,
+                " — Any format: MSCC, Tile World, or Steam.",
+            ),
+            mk('p', "(Steam CC tilesets are in the game files under ", mk('code', "data/bmp"), ".)"),
             mk('div.option-load-tileset'),
-        ));
+        );
+        this.root.elements['custom-tileset'].addEventListener('change', ev => {
+            this._load_custom_tileset(ev.target.files[0]);
+        });
 
         // Load current values
         this.root.elements['music-volume'].value = this.conductor.options.music_volume ?? 1.0;
@@ -3083,80 +3098,25 @@ class OptionsOverlay extends DialogOverlay {
         this.root.elements['show-captions'].checked = this.conductor.options.show_captions ?? false;
         this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
 
-        this.root.elements['custom-tileset'].addEventListener('change', ev => {
-            this._load_custom_tileset(ev.target.files[0]);
-        });
-
-        this.add_button("save", () => {
-            let options = this.conductor.options;
-            options.music_volume = parseFloat(this.root.elements['music-volume'].value);
-            options.music_enabled = this.root.elements['music-enabled'].checked;
-            options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
-            options.sound_enabled = this.root.elements['sound-enabled'].checked;
-            options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
-            options.show_captions = this.root.elements['show-captions'].checked;
-            options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
-
-            // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data
-            // URIs, and /delete/ any custom ones we're not using any more, both of which require
-            // knowing which slots we're already using first
-            let buckets_in_use = new Set;
-            let chosen_tilesets = {};
-            for (let slot of TILESET_SLOTS) {
-                let tileset_ident = this.root.elements[`tileset-${slot.ident}`].value;
-                let tilesetdef = this.available_tilesets[tileset_ident];
-                if (! tilesetdef) {
-                    tilesetdef = this.available_tilesets['lexy'];
-                }
-
-                chosen_tilesets[slot.ident] = tilesetdef;
-                if (tilesetdef.is_already_stored) {
-                    buckets_in_use.add(tilesetdef.ident);
+        for (let slot of TILESET_SLOTS) {
+            let radioset = this.root.elements[`tileset-${slot.ident}`];
+            let value = conductor.options.tilesets[slot.ident] ?? 'lexy';
+            if (! conductor._loaded_tilesets[value]) {
+                value = 'lexy';
+            }
+            if (radioset instanceof Element) {
+                // There's only one radio button so we just got that back
+                if (radioset.value === value) {
+                    radioset.checked = true;
                 }
             }
-            // Clear out _loaded_tilesets first so it no longer refers to any custom tilesets we end
-            // up deleting
-            this.conductor._loaded_tilesets = {};
-            for (let [slot_ident, tilesetdef] of Object.entries(chosen_tilesets)) {
-                if (tilesetdef.is_builtin || tilesetdef.is_already_stored) {
-                    options.tilesets[slot_ident] = tilesetdef.ident;
-                }
-                else {
-                    // This is a newly uploaded one
-                    let data_uri = tilesetdef.data_uri ?? tilesetdef.canvas.toDataURL('image/png');
-                    let storage_bucket = CUSTOM_TILESET_BUCKETS.find(
-                        bucket => ! buckets_in_use.has(bucket));
-                    if (! storage_bucket) {
-                        console.error("Somehow ran out of storage buckets, this should be impossible??");
-                        continue;
-                    }
-                    buckets_in_use.add(storage_bucket);
-                    save_json_to_storage(CUSTOM_TILESET_PREFIX + storage_bucket, {
-                        src: data_uri,
-                        name: storage_bucket,
-                        layout: tilesetdef.layout,
-                        tile_width: tilesetdef.tile_width,
-                        tile_height: tilesetdef.tile_height,
-                    });
-                    options.tilesets[slot_ident] = storage_bucket;
-                }
-
-                // Update the conductor's loaded tilesets
-                this.conductor.tilesets[slot_ident] = tilesetdef.tileset;
-                this.conductor._loaded_tilesets[options.tilesets[slot_ident]] = tilesetdef.tileset;
+            else {
+                // This should be an actual radioset
+                radioset.value = value;
             }
-            // Delete old custom set URIs
-            for (let bucket of CUSTOM_TILESET_BUCKETS) {
-                if (! buckets_in_use.has(bucket)) {
-                    window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + bucket);
-                }
-            }
+        }
 
-            this.conductor.save_stash();
-            this.conductor.reload_all_options();
-
-            this.close();
-        }, true);
+        this.add_button("save", () => this.save(), true);
         this.add_button("forget it", () => {
             // Restore the player's music volume just in case
             if (this.original_music_volume !== undefined) {
@@ -3188,6 +3148,64 @@ class OptionsOverlay extends DialogOverlay {
         sfx.enabled = was_enabled;
     }
 
+    _add_tileset_row(ident, def) {
+        let tr = mk('tr');
+        this.tileset_table.append(tr);
+
+        tr.append(mk('td',
+            // TODO maybe draw these all to a single canvas
+            CanvasRenderer.draw_single_tile(def.tileset, 'player'),
+            CanvasRenderer.draw_single_tile(def.tileset, 'chip'),
+            CanvasRenderer.draw_single_tile(def.tileset, 'exit'),
+        ));
+
+        tr.append(mk('td.-format',
+            def.tileset.layout['#name'],
+            mk('br'),
+            `${def.tileset.size_x}×${def.tileset.size_y}px`,
+        ));
+
+        for (let slot of TILESET_SLOTS) {
+            let td = mk('td.-slot');
+            tr.append(td);
+            if (def.tileset.layout['#supported-versions'].has(slot.ident)) {
+                td.append(mk('label', mk('input', {
+                    type: 'radio',
+                    name: `tileset-${slot.ident}`,
+                    value: ident,
+                })));
+            }
+        }
+
+        // FIXME make buttons work
+        return;
+
+        if (def.is_builtin) {
+            tr.append(mk('td'));
+        }
+        else {
+            // TODO this doesn't do anything yet.  currently we just delete any tilesets not
+            // assigned to a slot
+            tr.append(mk('td', mk('button', {type: 'button'}, "Forget")));
+        }
+
+        tr.append(mk('td',
+            make_button("LL", () => {
+                convert_tileset_to_layout(def.tileset, 'lexy');
+            }),
+            make_button("CC2", () => {
+                let canvas = convert_tileset_to_layout(def.tileset, 'cc2');
+                mk('a', {href: canvas.toDataURL(), target: '_new'}).click();
+            }),
+            make_button("MSCC", () => {
+                convert_tileset_to_layout(def.tileset, 'tw-static');
+            }),
+            make_button("TW", () => {
+                convert_tileset_to_layout(def.tileset, 'tw-animated');
+            }),
+        ));
+    }
+
     async _load_custom_tileset(file) {
         // This is dumb and roundabout, but such is the web
         let reader = new FileReader;
@@ -3203,49 +3221,20 @@ class OptionsOverlay extends DialogOverlay {
         // ratio, hopefully.  Note that the LL layout is currently in progress so we can't
         // really detect that, but there can't really be alternatives to it either
         let result_el = this.root.querySelector('.option-load-tileset');
+        result_el.textContent = '';
         let tileset;
         try {
             tileset = infer_tileset_from_image(img, (w, h) => mk('canvas', {width: w, height: h}));
         }
         catch (e) {
             console.error(e);
-            result_el.textContent = '';
             result_el.append(mk('p', "This doesn't look like a tileset layout I understand, sorry!"));
             return;
         }
 
-        let renderer = new CanvasRenderer(tileset, 1);
-        result_el.textContent = '';
-        let buttons = mk('p');
-        result_el.append(
-            mk('p', `This looks like a ${tileset.layout['#name']} tileset with ${tileset.size_x}×${tileset.size_y} tiles.`),
-            mk('p',
-                renderer.draw_single_tile_type('player'),
-                renderer.draw_single_tile_type('chip'),
-                renderer.draw_single_tile_type('exit'),
-            ),
-            buttons,
-        );
-
         let tileset_ident = `new-custom-${this.custom_tileset_counter}`;
         let tileset_name = `New custom ${this.custom_tileset_counter}`;
-        this.custom_tileset_counter += 1;
-        for (let slot of TILESET_SLOTS) {
-            if (! tileset.layout['#supported-versions'].has(slot.ident))
-                continue;
-
-            let dd = this.tileset_els[slot.ident];
-            let select = dd.querySelector('select');
-            select.append(mk('option', {value: tileset_ident}, tileset_name));
-
-            let button = util.mk_button(`Use for ${slot.name}`, () => {
-                select.value = tileset_ident;
-                this.update_selected_tileset(slot.ident);
-            });
-            buttons.append(button);
-        }
-
-        this.available_tilesets[tileset_ident] = {
+        let tilesetdef = {
             ident: tileset_ident,
             name: tileset_name,
             canvas: tileset.image,
@@ -3254,6 +3243,10 @@ class OptionsOverlay extends DialogOverlay {
             tile_width: tileset.size_x,
             tile_height: tileset.size_y,
         };
+        this.available_tilesets[tileset_ident] = tilesetdef;
+
+        this.custom_tileset_counter += 1;
+        this._add_tileset_row(tileset_ident, tilesetdef);
     }
 
     update_selected_tileset(slot_ident) {
@@ -3274,6 +3267,77 @@ class OptionsOverlay extends DialogOverlay {
         );
     }
 
+    save() {
+        let options = this.conductor.options;
+        options.music_volume = parseFloat(this.root.elements['music-volume'].value);
+        options.music_enabled = this.root.elements['music-enabled'].checked;
+        options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
+        options.sound_enabled = this.root.elements['sound-enabled'].checked;
+        options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
+        options.show_captions = this.root.elements['show-captions'].checked;
+        options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
+
+        // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data URIs,
+        // and /delete/ any custom ones we're not using any more, both of which require knowing
+        // which slots we're already using first
+        let buckets_in_use = new Set;
+        let chosen_tilesets = {};
+        for (let slot of TILESET_SLOTS) {
+            let tileset_ident = this.root.elements[`tileset-${slot.ident}`].value;
+            let tilesetdef = this.available_tilesets[tileset_ident];
+            if (! tilesetdef) {
+                tilesetdef = this.available_tilesets['lexy'];
+            }
+
+            chosen_tilesets[slot.ident] = tilesetdef;
+            if (tilesetdef.is_already_stored) {
+                buckets_in_use.add(tilesetdef.ident);
+            }
+        }
+        // Clear out _loaded_tilesets first so it no longer refers to any custom tilesets we end
+        // up deleting
+        this.conductor._loaded_tilesets = {};
+        for (let [slot_ident, tilesetdef] of Object.entries(chosen_tilesets)) {
+            if (tilesetdef.is_builtin || tilesetdef.is_already_stored) {
+                options.tilesets[slot_ident] = tilesetdef.ident;
+            }
+            else {
+                // This is a newly uploaded one
+                let data_uri = tilesetdef.data_uri ?? tilesetdef.canvas.toDataURL('image/png');
+                let storage_bucket = CUSTOM_TILESET_BUCKETS.find(
+                    bucket => ! buckets_in_use.has(bucket));
+                if (! storage_bucket) {
+                    console.error("Somehow ran out of storage buckets, this should be impossible??");
+                    continue;
+                }
+                buckets_in_use.add(storage_bucket);
+                save_json_to_storage(CUSTOM_TILESET_PREFIX + storage_bucket, {
+                    src: data_uri,
+                    name: storage_bucket,
+                    layout: tilesetdef.layout,
+                    tile_width: tilesetdef.tile_width,
+                    tile_height: tilesetdef.tile_height,
+                });
+                options.tilesets[slot_ident] = storage_bucket;
+            }
+
+            // Update the conductor's loaded tilesets
+            this.conductor.tilesets[slot_ident] = tilesetdef.tileset;
+            this.conductor._loaded_tilesets[options.tilesets[slot_ident]] = tilesetdef.tileset;
+        }
+        // Delete old custom set URIs
+        for (let bucket of CUSTOM_TILESET_BUCKETS) {
+            if (! buckets_in_use.has(bucket)) {
+                window.localStorage.removeItem(CUSTOM_TILESET_PREFIX + bucket);
+            }
+        }
+
+        this.conductor.save_stash();
+        this.conductor.reload_all_options();
+
+        this.close();
+    }
+
     close() {
         // Ensure the player's music is set back how we left it
         this.conductor.player.update_music_playback_state();
@@ -3292,8 +3356,8 @@ class CompatOverlay extends DialogOverlay {
                 "These are more technical settings, and as such are documented in full on ",
                 mk('a', {href: 'https://github.com/eevee/lexys-labyrinth/wiki/Compatibility'}, "the project wiki"),
                 "."),
-            mk('p', "The short version is: Lexy mode is fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for.  Microsoft mode is best-effort and nothing is guaranteed."),
-            mk('p', "Changes won't take effect until you restart the level or change levels."),
+            mk('p', "Lexy mode should be fine 99% of the time.  If a level doesn't seem to work, try the mode for the game it's designed for."),
+            mk('p', "Changes take effect when a level starts."),
         );
 
         let button_set = mk('div.radio-faux-button-set');
@@ -3312,7 +3376,7 @@ class CompatOverlay extends DialogOverlay {
             if (ruleset === 'custom')
                 return;
 
-            for (let compat of COMPAT_FLAGS) {
+            for (let compat of this.all_compat_flags) {
                 this.set(compat.key, compat.rulesets.has(ruleset));
             }
         });
@@ -3320,30 +3384,36 @@ class CompatOverlay extends DialogOverlay {
 
         // TODO include the section dividers, somehow
         let list = mk('ul.compat-flags');
-        for (let compat of COMPAT_FLAGS) {
-            let label = mk('label',
-                mk('input', {type: 'checkbox', name: compat.key}),
-                mk('span.-desc', compat.label),
-            );
-            for (let ruleset of COMPAT_RULESET_ORDER) {
-                if (ruleset === 'lexy' || ruleset === 'custom')
-                    continue;
+        this.all_compat_flags = [];
+        for (let category of COMPAT_FLAG_CATEGORIES) {
+            this.all_compat_flags.push(...category.flags);
+            list.append(mk('h2', category.title));
 
-                if (compat.rulesets.has(ruleset)) {
-                    label.append(mk('img.compat-icon', {src: `icons/compat-${ruleset}.png`}));
+            for (let compat of category.flags) {
+                let label = mk('label',
+                    mk('input', {type: 'checkbox', name: compat.key}),
+                    mk('span.-desc', compat.label),
+                );
+                for (let ruleset of COMPAT_RULESET_ORDER) {
+                    if (ruleset === 'lexy' || ruleset === 'custom')
+                        continue;
+
+                    if (compat.rulesets.has(ruleset)) {
+                        label.append(mk('img.compat-icon', {src: `icons/compat-${ruleset}.png`}));
+                    }
+                    else {
+                        label.append(mk('span.compat-icon-gap'));
+                    }
                 }
-                else {
-                    label.append(mk('span.compat-icon-gap'));
-                }
+                list.append(mk('li', label));
             }
-            list.append(mk('li', label));
         }
         list.addEventListener('change', ev => {
             // If the current set of flags exactly matches one of the presets, highlight that button
             let selected_ruleset = 'custom';
             for (let ruleset of COMPAT_RULESET_ORDER) {
                 let ok = true;
-                for (let compat of COMPAT_FLAGS) {
+                for (let compat of this.all_compat_flags) {
                     if (this.root.elements[compat.key].checked !== compat.rulesets.has(ruleset)) {
                         ok = false;
                         break;
@@ -3363,7 +3433,7 @@ class CompatOverlay extends DialogOverlay {
 
         // Populate everything to match the current settings
         this.root.elements['__ruleset__'].value = this.conductor._compat_ruleset ?? 'custom';
-        for (let compat of COMPAT_FLAGS) {
+        for (let compat of this.all_compat_flags) {
             this.set(compat.key, !! this.conductor.compat[compat.key]);
         }
 
@@ -3388,7 +3458,7 @@ class CompatOverlay extends DialogOverlay {
 
     save(permanent) {
         let flags = {};
-        for (let compat of COMPAT_FLAGS) {
+        for (let compat of this.all_compat_flags) {
             if (this.root.elements[compat.key].checked) {
                 flags[compat.key] = true;
             }
@@ -3906,7 +3976,6 @@ class Conductor {
         document.querySelector('#main-compat').addEventListener('click', () => {
             new CompatOverlay(this).open();
         });
-        document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[this._compat_ruleset ?? 'custom'];
 
         // Bind to the navigation headers, which list the current level pack
         // and level
@@ -4082,13 +4151,14 @@ class Conductor {
         if (this.current) {
             this.current.deactivate();
         }
+        this.current = this.editor;
+        document.body.setAttribute('data-mode', 'editor');
+        this.editor.activate();
+
         if (! this.loaded_in_editor) {
             this.editor.load_level(this.stored_level);
             this.loaded_in_editor = true;
         }
-        this.current = this.editor;
-        document.body.setAttribute('data-mode', 'editor');
-        this.editor.activate();
     }
 
     switch_to_player() {
@@ -4257,6 +4327,7 @@ class Conductor {
             this._compat_ruleset = ruleset;
         }
 
+        document.querySelector('#main-compat img').src = `icons/compat-${ruleset}.png`;
         document.querySelector('#main-compat output').textContent = COMPAT_RULESET_LABELS[ruleset];
 
         this.compat = flags;

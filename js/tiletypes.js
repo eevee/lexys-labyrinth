@@ -11,6 +11,30 @@ function blocks_leaving_thin_walls(me, level, actor, direction) {
     return me.type.thin_walls.has(direction) && actor.type.name !== 'ghost';
 }
 
+// Score bonuses; they're picked up as normal EXCEPT by ghosts, but only a real player can actually
+// add to the player's bonus
+function _define_bonus(add, mult = 1) {
+    return {
+        layer: LAYERS.item,
+        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
+        item_priority: PICKUP_PRIORITIES.normal,
+        check_toll(me, level, other) {
+            return level.bonus_points > 0 && Math.floor(level.bonus_points / mult) >= add;
+        },
+        take_toll(me, level, other) {
+            level.adjust_bonus(-add, 1/mult);
+        },
+        on_pickup(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
+            if (other.type.is_real_player) {
+                level.adjust_bonus(add, mult);
+                level.sfx.play_once('get-bonus', me.cell);
+            }
+            return true;
+        },
+    };
+}
 function _define_door(key) {
     return {
         layer: LAYERS.terrain,
@@ -157,6 +181,9 @@ function player_visual_state(me) {
 }
 
 function button_visual_state(me) {
+    if (me && me._editor_pressed) {
+        return 'pressed';
+    }
     if (me && me.cell) {
         let actor = me.cell.get_actor();
         if (actor && ! actor.movement_cooldown) {
@@ -254,6 +281,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         contains_wire: true,
         wire_propagation_mode: 'autocross',
+        can_be_powered_by_actor: true,
         on_approach(me, level, other) {
             if (other.type.name === 'blob' || other.type.name === 'boulder') {
                 // Blobs spread slime onto floor
@@ -336,6 +364,7 @@ const TILE_TYPES = {
     wall_appearing: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
+        is_flickable_in_lynx: true,
         on_bumped(me, level, other) {
             if (can_actually_reveal_walls(other, level)) {
                 level.transmute_tile(me, 'wall');
@@ -350,9 +379,22 @@ const TILE_TYPES = {
                 level.stored_level.format === 'ccl' &&
                 me.cell.get_actor())
             {
-                // Fix blocks and other actors on top of popwalls by turning them into double
-                // popwalls, which preserves CC2 popwall behavior
+                // CCL: Actors who start on popwalls are not intended to activate them when they
+                // leave, so preserve CC2 behavior by changing them to double popwalls
                 me.type = TILE_TYPES['popwall2'];
+            }
+        },
+        activate(me, level, other) {
+            level.spawn_animation(me.cell, 'puff');
+            level.transmute_tile(me, 'wall');
+            if (other === level.player) {
+                level.sfx.play_once('popwall', me.cell);
+            }
+        },
+        on_arrive(me, level, other) {
+            // Lynx/MS: These activate on arrival, not departure
+            if (level.compat.popwalls_pop_on_arrive) {
+                this.activate(me, level, other);
             }
         },
         on_depart(me, level, other) {
@@ -361,10 +403,8 @@ const TILE_TYPES = {
             if (me.cell.has('dynamite_lit'))
                 return;
 
-            level.spawn_animation(me.cell, 'puff');
-            level.transmute_tile(me, 'wall');
-            if (other === level.player) {
-                level.sfx.play_once('popwall', me.cell);
+            if (! level.compat.popwalls_pop_on_arrive) {
+                this.activate(me, level, other);
             }
         },
     },
@@ -411,13 +451,14 @@ const TILE_TYPES = {
     fake_wall: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
+        is_flickable_in_lynx: true,
         on_ready(me, level) {
             if (! level.compat.no_auto_convert_ccl_blue_walls &&
                 level.stored_level.format === 'ccl' &&
                 me.cell.get_actor())
             {
-                // Blocks can be pushed off of blue walls in TW Lynx, which only works due to a tiny
-                // quirk of the engine that I don't want to replicate, so replace them with popwalls
+                // CCL: Blocks can be pushed off of blue walls in TW Lynx, but we can replicate the
+                // behavior with CC2 rules by replacing them with popwalls
                 // TODO this also works with invis walls apparently.  maybe only for blocks?
                 me.type = TILE_TYPES['popwall'];
             }
@@ -720,7 +761,7 @@ const TILE_TYPES = {
                 return;
             level.transmute_tile(me, 'floor');
             if (other === level.player) {
-                level.sfx.play_once('step-gravel', me.cell);
+                level.sfx.play_once('step-dirt', me.cell);
             }
         },
     },
@@ -868,30 +909,31 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             // TODO cc1 allows items under water, i think; water was on the upper layer
             level.sfx.play_once('splash', me.cell);
+            let splash_type = level.compat.block_splashes_dont_block ? 'splash_nb' : 'splash';
             if (other.type.name === 'dirt_block') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'dirt');
             }
             else if (other.type.name === 'frame_block') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'floor');
             }
             else if (other.type.name === 'glass_block') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'floor');
             }
             else if (other.type.name === 'ice_block') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'ice');
             }
             else if (other.type.name === 'boulder') {
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.transmute_tile(me, 'gravel');
             }
             else if (other.type.name === 'circuit_block') {
                 level.transmute_tile(me, 'floor');
                 level._set_tile_prop(me, 'wire_directions', other.wire_directions);
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
                 level.recalculate_circuitry_next_wire_phase = true;
             }
             else if (other.type.name === 'sokoban_block') {
@@ -901,7 +943,7 @@ const TILE_TYPES = {
                     yellow: 'floor_custom_yellow',
                     green: 'floor_custom_green',
                 })[other.color]);
-                level.transmute_tile(other, 'splash');
+                level.transmute_tile(other, splash_type);
             }
             else {
                 level.kill_actor(other, me, 'splash', null, 'drowned');
@@ -1047,6 +1089,17 @@ const TILE_TYPES = {
     },
     bomb: {
         layer: LAYERS.item,
+        on_ready(me, level) {
+            if (! level.compat.no_auto_convert_ccl_bombs &&
+                level.stored_level.format === 'ccl' &&
+                me.cell.get_actor())
+            {
+                // CCL: A number of custom levels start an actor on top of a bomb (I guess to
+                // conserve space), relying on the CC1 behavior that bombs only detonate when
+                // stepped onto.  Replace those with the custom "dormant bomb" tile.
+                me.type = TILE_TYPES['dormant_bomb'];
+            }
+        },
         on_arrive(me, level, other) {
             if (level.compat.bombs_detonate_on_arrive) {
                 me.type._detonate(me, level, other);
@@ -1066,6 +1119,18 @@ const TILE_TYPES = {
         _detonate(me, level, other) {
             level.remove_tile(me);
             level.kill_actor(other, me, 'explosion', 'bomb', 'exploded');
+        },
+    },
+    // Bomb variant originally added as a CC1 autofix, but which doubles as an experimental item --
+    // it's dormant until you drop it and move off of it, at which point it becomes a normal bomb
+    dormant_bomb: {
+        ...COMMON_TOOL,
+        on_depart(me, level, other) {
+            // Unlike dynamite, anyone can activate this (important to make it work as CCL compat)
+            if (me.cell.get_item_mod())
+                return;
+
+            level.transmute_tile(me, 'bomb');
         },
     },
     hole: {
@@ -1163,6 +1228,60 @@ const TILE_TYPES = {
     gift_bow: {
         layer: LAYERS.item_mod,
         item_modifier: 'pickup',
+    },
+    toll_gate: {
+        layer: LAYERS.item_mod,
+        item_modifier: 'ignore',
+        // Most non-inventory items have special (but intuitive) behavior.  Bombs are functionally
+        // not items, so although they /can/ be put under here, they'll just block everything.
+        // XXX cc2's editor won't let you place a no sign on a chip, and will count the chip (if
+        // required), and will also let you pick up the chip if you walk over it.  but this
+        // explicitly works with chips, so keep that in mind when fixing that.  also, a chip under
+        // here (or a gift bow i guess) shouldn't animate
+        blocks(me, level, other) {
+            let item = me.cell.get_item();
+            if (! item) {
+                return false;
+            }
+            else if (item.type.check_toll) {
+                return ! item.type.check_toll(item, level, other);
+            }
+            else if (other.has_item(item.type.name)) {
+                return false;
+            }
+            else if (item.type.is_key && other.has_item('skeleton_key')) {
+                // Special case: the skeleton key works here, too
+                return false;
+            }
+            return true;
+        },
+        on_arrive(me, level, other) {
+            let item = me.cell.get_item();
+            if (! item)
+                return;
+
+            if (item.type.take_toll) {
+                item.type.take_toll(item, level, other);
+            }
+            else if (item.type.is_tool) {
+                level.take_tool_from_actor(other, item.type.name);
+            }
+            else if (item.type.is_key) {
+                if (! level.take_key_from_actor(other, item.type.name, true)) {
+                    // Special case: the skeleton key works here, too (but the real key is still
+                    // preferred)
+                    level.take_tool_from_actor(other, 'skeleton_key');
+                }
+            }
+            else {
+                // ???
+                return;
+            }
+
+            if (other === level.player) {
+                level.sfx.play_once('thief', me.cell);
+            }
+        },
     },
 
     // Mechanisms
@@ -1367,6 +1486,13 @@ const TILE_TYPES = {
         green_toggle_counterpart: 'green_bomb',
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        check_toll(me, level, other) {
+            // Increasing the chips-remaining counter is always fine
+            return true;
+        },
+        take_toll(me, level, other) {
+            level.uncollect_chip(me);
+        },
         on_pickup(me, level, other) {
             level.collect_chip(me);
             return true;
@@ -1446,54 +1572,26 @@ const TILE_TYPES = {
             if (actor && ! (actor.type.name === 'sokoban_block' && actor.color !== me.color)) {
                 // Already held down, make sure the level knows
                 me.pressed = true;
-                level.sokoban_buttons_unpressed[me.color] -= 1;
-                if (level.sokoban_buttons_unpressed[me.color] === 0) {
-                    for (let cell of level.linear_cells) {
-                        let terrain = cell.get_terrain();
-                        if (terrain.type.name === 'sokoban_wall' && terrain.color === me.color) {
-                            terrain.type = TILE_TYPES['sokoban_floor'];
-                        }
-                    }
-                }
+                level.press_sokoban(me.color);
             }
         },
         on_arrive(me, level, other) {
+            if (me.pressed)
+                return;
             if (other.type.name === 'sokoban_block' && me.color !== other.color)
                 return;
             level._set_tile_prop(me, 'pressed', true);
             level.sfx.play_once('button-press', me.cell);
 
-            level.sokoban_buttons_unpressed[me.color] -= 1;
-            level._push_pending_undo(() => {
-                level.sokoban_buttons_unpressed[me.color] += 1;
-            });
-            if (level.sokoban_buttons_unpressed[me.color] === 0) {
-                for (let cell of level.linear_cells) {
-                    let terrain = cell.get_terrain();
-                    if (terrain.type.name === 'sokoban_wall' && terrain.color === me.color) {
-                        level.transmute_tile(terrain, 'sokoban_floor');
-                    }
-                }
-            }
+            level.press_sokoban(me.color);
         },
         on_depart(me, level, other) {
-            level._set_tile_prop(me, 'pressed', false);
-            if (other.type.name === 'sokoban_block' && me.color !== other.color)
+            if (! me.pressed)
                 return;
+            level._set_tile_prop(me, 'pressed', false);
             level.sfx.play_once('button-release', me.cell);
 
-            level.sokoban_buttons_unpressed[me.color] += 1;
-            level._push_pending_undo(() => {
-                level.sokoban_buttons_unpressed[me.color] -= 1;
-            });
-            if (level.sokoban_buttons_unpressed[me.color] === 1) {
-                for (let cell of level.linear_cells) {
-                    let terrain = cell.get_terrain();
-                    if (terrain.type.name === 'sokoban_floor' && terrain.color === me.color) {
-                        level.transmute_tile(terrain, 'sokoban_wall');
-                    }
-                }
-            }
+            level.unpress_sokoban(me.color);
         },
         visual_state(me) {
             return (me.color ?? 'red') + '_' + (me.pressed ? 'pressed' : 'released');
@@ -1562,7 +1660,7 @@ const TILE_TYPES = {
                 }
                 if (success) {
                     // FIXME add this underneath, just above the cloner, so the new actor is on top
-                    let new_template = new actor.constructor(type, direction);
+                    let new_template = level.make_actor(type, direction);
                     if (type.on_clone) {
                         type.on_clone(new_template, actor);
                     }
@@ -1592,12 +1690,6 @@ const TILE_TYPES = {
             // This may run before or after any pressed buttons, but, that's fine
             if (me.presses === undefined) {
                 level._set_tile_prop(me, 'presses', 0);
-            }
-        },
-        on_stand(me, level, other, just_arrived) {
-            // Lynx: open traps eject their contents at the end of each tic
-            if (level.compat.traps_like_lynx && ! just_arrived) {
-                level.attempt_out_of_turn_step(other, other.direction);
             }
         },
         add_press_ready(me, level, other) {
@@ -2030,6 +2122,7 @@ const TILE_TYPES = {
     electrified_floor: {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
+        can_be_powered_by_actor: true,
         on_begin(me, level) {
             level._set_tile_prop(me, 'is_active', false);
             level._set_tile_prop(me, 'wire_directions', 15);
@@ -2193,17 +2286,13 @@ const TILE_TYPES = {
     button_pink: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        is_power_source: true,
         wire_propagation_mode: 'none',
-        get_emitting_edges(me, level) {
+        is_emitting(me, level) {
             // We emit current as long as there's an actor fully on us
             let actor = me.cell.get_actor();
-            if (actor && actor.movement_cooldown === 0) {
-                return me.wire_directions;
-            }
-            else {
-                return 0;
-            }
+            return (actor && actor.movement_cooldown === 0);
+        },
+        update_power_emission(me, level) {
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
@@ -2216,31 +2305,30 @@ const TILE_TYPES = {
     button_black: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        is_power_source: true,
         wire_propagation_mode: 'cross',
-        get_emitting_edges(me, level) {
-            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
+        on_ready(me, level) {
+            me.emitting = true;
+            me.next_emitting = true;
+        },
+        is_emitting(me, level) {
             // We emit current as long as there's NOT an actor fully on us
+            return me.emitting;
+        },
+        // CC2 has a single frame delay between an actor stepping on/off of the button and the
+        // output changing; it's not clear why, and I can't figure out how this might have happened
+        // on accident, but it might be to compensate for logic gates firing quickly...?
+        // Same applies to light switches, but NOT pink buttons.
+        update_power_emission(me, level) {
             let actor = me.cell.get_actor();
-            let held = (actor && actor.movement_cooldown === 0);
-            if (me.is_first_frame) {
-                held = ! held;
-                level._set_tile_prop(me, 'is_first_frame', false);
-            }
-
-            if (held) {
-                return 0;
-            }
-            else {
-                return me.wire_directions;
-            }
+            let ret = me.emitting;
+            level._set_tile_prop(me, 'emitting', me.next_emitting);
+            level._set_tile_prop(me, 'next_emitting', ! (actor && actor.movement_cooldown === 0));
+            return ret;
         },
         on_arrive(me, level, other) {
-            level._set_tile_prop(me, 'is_first_frame', true);
             level.sfx.play_once('button-press', me.cell);
         },
         on_depart(me, level, other) {
-            level._set_tile_prop(me, 'is_first_frame', true);
             level.sfx.play_once('button-release', me.cell);
         },
         visual_state: button_visual_state,
@@ -2288,7 +2376,6 @@ const TILE_TYPES = {
             counter: ['out1', 'in0', 'in1', 'out0'],
         },
         layer: LAYERS.terrain,
-        is_power_source: true,
         on_ready(me, level) {
             me.gate_def = me.type._gate_types[me.gate_type];
             if (me.gate_type === 'latch-cw' || me.gate_type === 'latch-ccw') {
@@ -2300,6 +2387,27 @@ const TILE_TYPES = {
                 me.decrementing = false;
                 me.underflowing = false;
                 me.direction = 'north';
+            }
+
+            me.in0 = me.in1 = null;
+            me.out0 = me.out1 = null;
+            let dir = me.direction;
+            for (let i = 0; i < 4; i++) {
+                let cxn = me.gate_def[i];
+                let dirinfo = DIRECTIONS[dir];
+                if (cxn === 'in0') {
+                    me.in0 = dir;
+                }
+                else if (cxn === 'in1') {
+                    me.in1 = dir;
+                }
+                else if (cxn === 'out0') {
+                    me.out0 = dir;
+                }
+                else if (cxn === 'out1') {
+                    me.out1 = dir;
+                }
+                dir = dirinfo.right;
             }
         },
         // Returns [in0, in1, out0, out1] as directions
@@ -2326,30 +2434,16 @@ const TILE_TYPES = {
             }
             return ret;
         },
-        get_emitting_edges(me, level) {
+        is_emitting(me, level, edges) {
+            return edges & me._output;
+        },
+        update_power_emission(me, level) {
             // Collect which of our edges are powered, in clockwise order starting from our
             // direction, matching _gate_types
-            let input0 = false, input1 = false;
-            let output0 = false, output1 = false;
-            let outbit0 = 0, outbit1 = 0;
-            let dir = me.direction;
-            for (let i = 0; i < 4; i++) {
-                let cxn = me.gate_def[i];
-                let dirinfo = DIRECTIONS[dir];
-                if (cxn === 'in0') {
-                    input0 = (me.powered_edges & dirinfo.bit) !== 0;
-                }
-                else if (cxn === 'in1') {
-                    input1 = (me.powered_edges & dirinfo.bit) !== 0;
-                }
-                else if (cxn === 'out0') {
-                    outbit0 = dirinfo.bit;
-                }
-                else if (cxn === 'out1') {
-                    outbit1 = dirinfo.bit;
-                }
-                dir = dirinfo.right;
-            }
+            let input0 = !! (me.in0 && (me.powered_edges & DIRECTIONS[me.in0].bit));
+            let input1 = !! (me.in1 && (me.powered_edges & DIRECTIONS[me.in1].bit));
+            let output0 = false;
+            let output1 = false;
 
             if (me.gate_type === 'not') {
                 output0 = ! input0;
@@ -2389,14 +2483,14 @@ const TILE_TYPES = {
                     level._set_tile_prop(me, 'underflowing', false);
                 }
                 if (inc && ! dec) {
-                    mem++;
+                    mem += 1;
                     if (mem > 9) {
                         mem = 0;
                         output0 = true;
                     }
                 }
                 else if (dec && ! inc) {
-                    mem--;
+                    mem -= 1;
                     if (mem < 0) {
                         mem = 9;
                         // Underflow is persistent until the next pulse
@@ -2409,7 +2503,9 @@ const TILE_TYPES = {
                 level._set_tile_prop(me, 'decrementing', input1);
             }
 
-            return (output0 ? outbit0 : 0) | (output1 ? outbit1 : 0);
+            // This should only need to persist for a tic, and can be recomputed during undo, and
+            // also making it undoable would eat a whole lot of undo space
+            me._output = (output0 ? DIRECTIONS[me.out0].bit : 0) | (output1 ? DIRECTIONS[me.out1].bit : 0);
         },
         visual_state(me) {
             return me.gate_type;
@@ -2419,15 +2515,22 @@ const TILE_TYPES = {
     light_switch_off: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        is_power_source: true,
         wire_propagation_mode: 'none',
-        get_emitting_edges(me, level) {
-            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
+        on_ready(me, level) {
+            me.emitting = false;
+        },
+        // See button_black's commentary on the timing here
+        is_emitting(me, level, edge) {
+            return me.emitting;
+        },
+        update_power_emission(me, level) {
             if (me.is_first_frame) {
+                level._set_tile_prop(me, 'emitting', true);
                 level._set_tile_prop(me, 'is_first_frame', false);
-                return me.wire_directions;
             }
-            return 0;
+            else {
+                level._set_tile_prop(me, 'emitting', false);
+            }
         },
         on_arrive(me, level, other) {
             // TODO distinct sfx?  more clicky?
@@ -2439,15 +2542,22 @@ const TILE_TYPES = {
     light_switch_on: {
         layer: LAYERS.terrain,
         contains_wire: true,
-        is_power_source: true,
         wire_propagation_mode: 'none',
-        get_emitting_edges(me, level) {
-            // TODO weird and inconsistent with pink buttons, but cc2 has a single-frame delay here!
+        on_ready(me, level) {
+            me.emitting = true;
+        },
+        // See button_black's commentary on the timing here
+        is_emitting(me, level, edge) {
+            return me.emitting;
+        },
+        update_power_emission(me, level) {
             if (me.is_first_frame) {
+                level._set_tile_prop(me, 'emitting', false);
                 level._set_tile_prop(me, 'is_first_frame', false);
-                return 0;
             }
-            return me.wire_directions;
+            else {
+                level._set_tile_prop(me, 'emitting', true);
+            }
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
@@ -2484,6 +2594,14 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        // Stopwatch bonus toll functions like a stopwatch penalty, except it doesn't go away and
+        // blocks you if you don't have at least 10 seconds to spare
+        check_toll(me, level, other) {
+            return level.time_remaining >= 10 * 20;
+        },
+        take_toll(me, level, other) {
+            level.adjust_timer(-10);
+        },
         on_pickup(me, level, other) {
             level.sfx.play_once('get-stopwatch-bonus', me.cell);
             level.adjust_timer(+10);
@@ -2494,6 +2612,13 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        // Stopwatch penalty toll just gives you 10 seconds every time??
+        check_toll(me, level, other) {
+            return true;
+        },
+        take_toll(me, level, other) {
+            level.adjust_timer(+10);
+        },
         on_pickup(me, level, other) {
             level.sfx.play_once('get-stopwatch-penalty', me.cell);
             level.adjust_timer(-10);
@@ -2504,9 +2629,18 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.player,
-        on_pickup(me, level, other) {
-            level.sfx.play_once('get-stopwatch-toggle', me.cell);
+        // Stopwatch toggle toll wants to unpause the clock as a cost, so it only lets you through
+        // if the clock is currently paused
+        check_toll(me, level, other) {
+            return level.timer_paused;
+        },
+        take_toll(me, level, other) {
             level.pause_timer();
+        },
+        on_pickup(me, level, other) {
+            if (level.pause_timer()) {
+                level.sfx.play_once('get-stopwatch-toggle', me.cell);
+            }
             return false;
         },
     },
@@ -2791,24 +2925,28 @@ const TILE_TYPES = {
     dynamite: {
         ...COMMON_TOOL,
         on_depart(me, level, other) {
-            if (other.type.is_real_player && ! me.cell.get_item_mod()) {
-                // FIXME wiki just says about 4.3 seconds; more likely this is exactly 255 frames
-                level._set_tile_prop(me, 'timer', 85);
-                level.transmute_tile(me, 'dynamite_lit');
-                // Actors are expected to have this, so populate it
-                level._set_tile_prop(me, 'movement_cooldown', 0);
-                level.add_actor(me);
-                // Dynamite inherits a copy of the player's inventory, which largely doesn't matter
-                // except for suction boots, helmet, or lightning bolt; keys can't matter because
-                // dynamite is blocked by doors
-                if (other.toolbelt) {
-                    level._set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
-                }
-                // Dynamite that lands on a force floor is moved by it, and dynamite that lands on a
-                // button holds it down
-                // TODO is there anything this should NOT activate?
-                level.step_on_cell(me, me.cell);
+            if (! other.type.is_real_player)
+                return;
+            if (me.cell.get_item_mod())
+                return;
+
+            // XXX wiki just says about 4.3 seconds; more likely this is exactly 255 frames (and
+            // there haven't been any compat problems so far...)
+            level._set_tile_prop(me, 'timer', 85);
+            level.transmute_tile(me, 'dynamite_lit');
+            // Actors are expected to have this, so populate it
+            level._set_tile_prop(me, 'movement_cooldown', 0);
+            level.add_actor(me);
+            // Dynamite inherits a copy of the player's inventory, which largely doesn't matter
+            // except for suction boots, helmet, or lightning bolt; keys can't matter because
+            // dynamite is blocked by doors
+            if (other.toolbelt) {
+                level._set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
             }
+            // Dynamite that lands on a force floor is moved by it, and dynamite that lands on a
+            // button holds it down
+            // TODO is there anything this should NOT activate?
+            level.step_on_cell(me, me.cell);
         },
     },
     dynamite_lit: {
@@ -3003,11 +3141,7 @@ const TILE_TYPES = {
                     level.transmute_tile(level.ankh_tile, 'floor');
                     level.spawn_animation(level.ankh_tile.cell, 'puff');
                 }
-                let old_tile = level.ankh_tile;
                 level.ankh_tile = terrain;
-                level._push_pending_undo(() => {
-                    level.ankh_tile = old_tile;
-                });
                 level.transmute_tile(terrain, 'floor_ankh');
                 // TODO some kinda vfx + sfx
                 level.remove_tile(me);
@@ -3033,6 +3167,24 @@ const TILE_TYPES = {
         pushes: COMMON_PUSHES,
         infinite_items: {
             key_green: true,
+        },
+        on_ready(me, level) {
+            if (! level.compat.no_auto_convert_ccl_items_under_players &&
+                level.stored_level.format === 'ccl')
+            {
+                // CCL: If the player starts out on an item and normal floor, change the floor to
+                // dirt so they're protected from monsters.  This preserves the CC1 behavior (items
+                // block monsters) in a way that's compatible with CC2 rules.
+                // This fixes CCLP4 #142 Stratagem.
+                let item = me.cell.get_item();
+                let terrain = me.cell.get_terrain();
+                if (terrain && terrain.type.name === 'floor' && ! terrain.wire_directions &&
+                    item && ((item.type.blocks_collision ?? 0) & COLLISION.monster_typical) &&
+                    ! (level.compat.monsters_ignore_keys && item.type.is_key))
+                {
+                    terrain.type = TILE_TYPES['dirt'];
+                }
+            }
         },
         visual_state: player_visual_state,
     },
@@ -3100,6 +3252,13 @@ const TILE_TYPES = {
         is_required_chip: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        check_toll(me, level, other) {
+            // Increasing the chips-remaining counter is always fine
+            return true;
+        },
+        take_toll(me, level, other) {
+            level.uncollect_chip(me);
+        },
         on_pickup(me, level, other) {
             level.collect_chip(me);
             return true;
@@ -3110,83 +3269,23 @@ const TILE_TYPES = {
         is_chip: true,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
+        check_toll(me, level, other) {
+            // Increasing the chips-remaining counter is always fine
+            return true;
+        },
+        take_toll(me, level, other) {
+            level.uncollect_chip(me);
+        },
         on_pickup(me, level, other) {
             level.collect_chip(me);
             return true;
         },
     },
-    // Score bonuses; they're picked up as normal EXCEPT by ghosts, but only a real player can
-    // actually add to the player's bonus
-    score_10: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(10);
-                level.sfx.play_once('get-bonus', me.cell);
-            }
-            return true;
-        },
-    },
-    score_100: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(100);
-                level.sfx.play_once('get-bonus', me.cell);
-            }
-            return true;
-        },
-    },
-    score_1000: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(1000);
-                level.sfx.play_once('get-bonus', me.cell);
-            }
-            return true;
-        },
-    },
-    score_2x: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(0, 2);
-                level.sfx.play_once('get-bonus2', me.cell);
-            }
-            return true;
-        },
-    },
-    score_5x: {
-        layer: LAYERS.item,
-        blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
-        item_priority: PICKUP_PRIORITIES.normal,
-        on_pickup(me, level, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.type.is_real_player) {
-                level.adjust_bonus(0, 5);
-                level.sfx.play_once('get-bonus2', me.cell);
-            }
-            return true;
-        },
-    },
+    score_10: _define_bonus(10),
+    score_100: _define_bonus(100),
+    score_1000: _define_bonus(1000),
+    score_2x: _define_bonus(0, 2),
+    score_5x: _define_bonus(0, 5),
 
     hint: {
         layer: LAYERS.terrain,
@@ -3234,10 +3333,12 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
         ttl: 16,
-        // If anything else even begins to step on an animation, it's erased
-        // FIXME possibly erased too fast; cc2 shows it briefly?  could i get away with on_arrive here?
-        on_approach(me, level, other) {
-            level.remove_tile(me);
+        // If anything but a player even /considers/ stepping on an animation, it's erased, at
+        // decision time!
+        on_bumped(me, level, other) {
+            if (! other.type.is_real_player) {
+                level.remove_tile(me);
+            }
         },
     },
     explosion: {
@@ -3246,9 +3347,18 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
         ttl: 16,
-        on_approach(me, level, other) {
-            level.remove_tile(me);
+        on_bumped(me, level, other) {
+            if (! other.type.is_real_player) {
+                level.remove_tile(me);
+            }
         },
+    },
+    // Non-blocking splash used for visual effect in MS
+    splash_nb: {
+        layer: LAYERS.vfx,
+        is_actor: true,
+        collision_mask: 0,
+        ttl: 16,
     },
     // Non-blocking explosion used for better handling edge cases with dynamite and bowling balls,
     // without changing gameplay
@@ -3274,8 +3384,10 @@ const TILE_TYPES = {
         collision_mask: 0,
         blocks_collision: COLLISION.real_player,
         ttl: 16,
-        on_approach(me, level, other) {
-            level.remove_tile(me);
+        on_bumped(me, level, other) {
+            if (! other.type.is_real_player) {
+                level.remove_tile(me);
+            }
         },
     },
     // New VFX (not in CC2, so they don't block to avoid altering gameplay)

@@ -59,6 +59,11 @@ export class Tile {
         if (this.type.layer === LAYERS.item && this.cell.get_item_mod())
             return false;
 
+        // Extremely niche interaction: monsters can enter cells with items by killing a player
+        // who's revived by an ankh
+        if (this.type.is_item && other.temp_ignore_item_collision)
+            return false;
+
         if (level.compat.monsters_ignore_keys && this.type.is_key)
             // MS: Monsters are never blocked by keys
             return false;
@@ -176,10 +181,17 @@ Object.assign(Tile.prototype, {
     wire_tunnel_directions: 0,
     // Actor defaults
     movement_cooldown: 0,
+    movement_speed: null,
+    previous_cell: null,
     is_sliding: false,
     is_pending_slide: false,
     can_override_slide: false,
+    is_blocked: false,
+    is_pushing: false,
     pending_push: null,
+    destination_cell: null,
+    is_making_failure_move: false,
+    temp_ignore_item_collision: false,
 });
 
 
@@ -196,21 +208,19 @@ export class Cell extends Array {
             if (index !== LAYERS.vfx) {
                 console.error("ATTEMPTING TO ADD", tile, "TO CELL", this, "WHICH ERASES EXISTING TILE", this[index]);
             }
-            this[index].cell = null;
         }
         this[index] = tile;
-        tile.cell = this;
     }
 
     // DO NOT use me to remove a tile permanently, only to move it!
     // Should only be called from Level, which handles some bookkeeping!
     _remove(tile) {
         let index = tile.type.layer;
-        if (this[index] !== tile)
-            throw new Error("Asked to remove tile that doesn't seem to exist");
+        if (this[index] !== tile) {
+            console.error("Asked to remove tile that doesn't seem to exist:", tile, "(actually found:)", this[index]);
+        }
 
         this[index] = null;
-        tile.cell = null;
     }
 
     get_wired_tile() {
@@ -254,6 +264,50 @@ export class Cell extends Array {
         return direction;
     }
 }
+
+
+class UndoEntry {
+    constructor() {
+        this.tile_changes = new Map;
+        this.sokoban_changes = null;
+        this.level_props = {};
+        this.actor_splices = [];
+        this.toggle_green_tiles = false;
+        this.circuit_power_changes = null;
+    }
+
+    tile_changes_for(tile) {
+        let changes = this.tile_changes.get(tile);
+        if (! changes) {
+            changes = {};
+            this.tile_changes.set(tile, changes);
+        }
+        return changes;
+    }
+
+    preserve_sokoban(color, count) {
+        if (! this.sokoban_changes) {
+            this.sokoban_changes = {};
+        }
+        if (! (color in this.sokoban_changes)) {
+            this.sokoban_changes[color] = count;
+        }
+    }
+
+    estimate_size() {
+        // Based very roughly on Chromium's measurements, so, kinda whatever
+        let size = 112;  // base size of an entry
+        size += 16 * Object.keys(this.level_props).length;
+        for (let [_, changes] of this.tile_changes) {
+            size += 64 + 32 * Object.entries(changes).length;
+        }
+        size += 96 + 32 * this.actor_splices.length;
+
+        this.size = size;
+        return size;
+    }
+}
+
 
 // The undo stack is implemented with a ring buffer, and this is its size.  One entry per tic.
 // Based on Chrome measurements made against the pathological level CCLP4 #40 (Periodic Lasers) and
@@ -344,10 +398,9 @@ export class Level extends LevelInterface {
             this.undo_buffer[i] = null;
         }
         this.undo_buffer_index = 0;
-        this.pending_undo = this.create_undo_entry();
-        // If undo_enabled is false, we won't create any undo entries.
-        // Undo is only disabled during bulk testing, where a) there's no
-        // possibility of needing to undo and b) the overhead is noticable.
+        this.pending_undo = new UndoEntry;
+        // If undo_enabled is false, we won't create any undo entries.  Undo is only disabled during
+        // bulk testing, where a) no one will ever undo and b) the overhead is significant.
         this.undo_enabled = true;
 
         // Order in which actors try to collide with tiles.
@@ -376,13 +429,15 @@ export class Level extends LevelInterface {
 
         let n = 0;
         let connectables = [];
+        this.power_sources = [];
         this.remaining_players = 0;
         this.ankh_tile = null;
         // If there's exactly one yellow teleporter when the level loads, it cannot be picked up
         let yellow_teleporter_count = 0;
         this.allow_taking_yellow_teleporters = false;
         // Sokoban buttons function as a group
-        this.sokoban_buttons_unpressed = {};
+        this.sokoban_unpressed = { red: 0, blue: 0, yellow: 0, green: 0 };
+        this.sokoban_satisfied = { red: true, blue: true, yellow: true, green: true };
         for (let y = 0; y < this.height; y++) {
             let row = [];
             for (let x = 0; x < this.width; x++) {
@@ -391,7 +446,7 @@ export class Level extends LevelInterface {
                 this.linear_cells.push(cell);
 
                 let stored_cell = this.stored_level.linear_cells[n];
-                n++;
+                n += 1;
                 for (let template_tile of stored_cell) {
                     if (! template_tile)
                         continue;
@@ -409,7 +464,7 @@ export class Level extends LevelInterface {
                         }
                     }
                     if (tile.type.is_required_chip && this.stored_level.chips_required === null) {
-                        this.chips_remaining++;
+                        this.chips_remaining += 1;
                     }
                     if (tile.type.is_actor) {
                         this.actors.push(tile);
@@ -418,9 +473,14 @@ export class Level extends LevelInterface {
                         }
                     }
                     cell._add(tile);
+                    tile.cell = cell;
 
                     if (tile.type.connects_to) {
                         connectables.push(tile);
+                    }
+
+                    if (tile.type.update_power_emission) {
+                        this.power_sources.push(tile);
                     }
 
                     if (tile.type.name === 'teleport_yellow' && ! this.allow_taking_yellow_teleporters) {
@@ -430,8 +490,8 @@ export class Level extends LevelInterface {
                         }
                     }
                     else if (tile.type.name === 'sokoban_button') {
-                        this.sokoban_buttons_unpressed[tile.color] =
-                            (this.sokoban_buttons_unpressed[tile.color] ?? 0) + 1;
+                        this.sokoban_unpressed[tile.color] += 1;
+                        this.sokoban_satisfied[tile.color] = false;
                     }
                 }
             }
@@ -453,7 +513,6 @@ export class Level extends LevelInterface {
         }
 
         this.recalculate_circuitry_next_wire_phase = false;
-        this.undid_past_recalculate_circuitry = false;
         this.recalculate_circuitry(true);
 
         // Finally, let all tiles do custom init behavior...  but backwards, to match actor order
@@ -468,7 +527,7 @@ export class Level extends LevelInterface {
             }
         }
         // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
-        this.pending_undo = this.create_undo_entry();
+        this.pending_undo = new UndoEntry;
     }
 
     connect_button(connectable) {
@@ -492,10 +551,9 @@ export class Level extends LevelInterface {
                     }
                 }
             }
-
-            if (this.stored_level.only_custom_connections)
-                return;
         }
+        if (this.stored_level.only_custom_connections)
+            return;
 
         // Orange buttons do a really weird diamond search
         if (connectable.type.connect_order === 'diamond') {
@@ -516,12 +574,12 @@ export class Level extends LevelInterface {
         }
     }
 
-    recalculate_circuitry(first_time = false, undoing = false) {
+    recalculate_circuitry(first_time = false) {
         // Build circuits out of connected wires
         // TODO document this idea
+        // TODO moving a circuit block should only need to invalidate the circuits it touches
 
         this.circuits = [];
-        this.power_sources = [];
         let wired_outputs = new Set;
         let seen_edges = new Map;
         for (let cell of this.linear_cells) {
@@ -530,10 +588,6 @@ export class Level extends LevelInterface {
             let terrain = cell.get_terrain();
             if (! terrain)  // ?!
                 continue;
-
-            if (terrain.type.is_power_source) {
-                this.power_sources.push(terrain);
-            }
 
             let actor = cell.get_actor();
             let wire_directions = terrain.wire_directions;
@@ -576,7 +630,7 @@ export class Level extends LevelInterface {
 
                 // At last, a wired cell edge we have not yet handled.  Floodfill from here
                 let circuit = algorithms.trace_floor_circuit(
-                    this, this.compat.tiles_react_instantly ? 'always' : 'still',
+                    this, this.compat.actors_move_instantly ? 'always' : 'still',
                     terrain.cell, direction,
                 );
                 this.circuits.push(circuit);
@@ -584,7 +638,7 @@ export class Level extends LevelInterface {
                 // Search the circuit for tiles that act as outputs, so we can check whether to
                 // update them during each wire phase
                 for (let [tile, edges] of circuit.tiles) {
-                    seen_edges.set((seen_edges.get(tile) ?? 0) | edges);
+                    seen_edges.set(tile, (seen_edges.get(tile) ?? 0) | edges);
                     if (tile.type.on_power) {
                         wired_outputs.add(tile);
                     }
@@ -622,13 +676,10 @@ export class Level extends LevelInterface {
                 for (let j = 0; j < this.height; j++) {
                     let terrain = this.cell(i, j).get_terrain();
                     if (terrain.is_wired !== undefined) {
+                        // XXX begin?  if it's NOT the first time??
                         terrain.type.on_begin(terrain, this);
                     }
                 }
-            }
-
-            if (! undoing) {
-                this._push_pending_undo(() => this.undid_past_recalculate_circuitry = true);
             }
         }
     }
@@ -818,7 +869,7 @@ export class Level extends LevelInterface {
             }
             // It's not possible to rewind to before this happened, so clear undo and permanently
             // set a flag
-            this.pending_undo = this.create_undo_entry();
+            this.pending_undo = new UndoEntry;
             this.done_on_begin = true;
         }
 
@@ -828,7 +879,7 @@ export class Level extends LevelInterface {
             for (let key of [
                     '_rng1', '_rng2', '_blob_modifier', '_tw_rng', 'force_floor_direction',
                     'tic_counter', 'frame_offset', 'time_remaining', 'timer_paused',
-                    'chips_remaining', 'bonus_points', 'state',
+                    'chips_remaining', 'bonus_points', 'state', 'fail_reason', 'ankh_tile',
                     'player1_move', 'player2_move', 'remaining_players', 'player',
             ]) {
                 this.pending_undo.level_props[key] = this[key];
@@ -840,18 +891,6 @@ export class Level extends LevelInterface {
 
     // Decision phase: all actors decide on their movement "simultaneously"
     _do_decision_phase(forced_only = false) {
-        // Before decisions happen, remember the player's /current/ direction, which may be affected
-        // by sliding.  This will be used by doppelgängers earlier in actor order than the player.
-        if (! forced_only) {
-            // Check whether the player is /attempting/ to move: either they did, or they're blocked
-            if (this.player.movement_cooldown > 0 || this.player.is_blocked) {
-                this.remember_player_move(this.player.direction);
-            }
-            else {
-                this.remember_player_move(null);
-            }
-        }
-
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
 
@@ -861,6 +900,10 @@ export class Level extends LevelInterface {
             // This is a renderer prop and only exists between two loops
             if (actor.destination_cell) {
                 this._set_tile_prop(actor, 'destination_cell', null);
+            }
+            // This is only used for killing an ankh'd player on an item
+            if (actor.temp_ignore_item_collision) {
+                this._set_tile_prop(actor, 'temp_ignore_item_collision', false);
             }
 
             if (! actor.cell)
@@ -925,11 +968,12 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
-            this._do_actor_movement(actor, actor.decision);
+            this._do_actor_movement(actor);
             if (actor.type.ttl)
                 continue;
 
             this._do_actor_cooldown(actor, cooldown);
+            this._do_actor_trap_ejection(actor);
         }
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
@@ -949,21 +993,23 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
-            this._do_actor_movement(actor, actor.decision);
+            this._do_actor_movement(actor);
             if (actor.type.ttl)
                 continue;
 
             this._do_actor_cooldown(actor, cooldown);
+            this._do_actor_trap_ejection(actor);
             this._do_actor_idle(actor);
         }
     }
 
     // Have an actor attempt to move
-    _do_actor_movement(actor, direction) {
+    _do_actor_movement(actor) {
         // Check this again, since an earlier pass may have caused us to start moving
         if (actor.movement_cooldown > 0)
             return;
 
+        let direction = actor.decision;
         if (! direction)
             return true;
 
@@ -975,15 +1021,20 @@ export class Level extends LevelInterface {
             success = this._possibly_bonk(actor, direction);
         }
 
-        // Track whether the player is blocked, both for visual effect and for doppelgangers
-        if (actor === this.player && ! success) {
+        // Track when the player is blocked for visual effect
+        if (actor === this.player && ! success && ! actor.is_making_failure_move) {
+            this._set_tile_prop(actor, 'is_blocked', true);
             if (actor.last_blocked_direction !== actor.direction) {
                 // This is only used for checking when to play the mmf sound, doesn't need undoing;
                 // it's cleared when we make a successful move or a null decision
                 actor.last_blocked_direction = actor.direction;
-                this.sfx.play_once('blocked', actor.cell);
+                if (this.player.type.name === 'player') {
+                    this.sfx.play_once('blocked1', actor.cell);
+                }
+                else {
+                    this.sfx.play_once('blocked2', actor.cell);
+                }
             }
-            this._set_tile_prop(actor, 'is_blocked', true);
         }
 
         return success;
@@ -1092,8 +1143,17 @@ export class Level extends LevelInterface {
     }
 
     _do_actor_cooldown(actor, cooldown = 3) {
-        if (actor.movement_cooldown <= 0)
+        if (actor.movement_cooldown <= 0) {
+            if (actor.is_making_failure_move) {
+                // For actors that are causing the game to end with an attempted move, and which
+                // aren't actually moving, give them a cooldown /as if/ they were moving into the
+                // deadly cell (which should have already been fudged with .destination_cell)
+                let speed = actor.type.movement_speed * 3;
+                this._set_tile_prop(actor, 'movement_cooldown', speed - cooldown);
+                this._set_tile_prop(actor, 'movement_speed', speed);
+            }
             return;
+        }
 
         if (actor.last_extra_cooldown_tic === this.tic_counter)
             return;
@@ -1103,46 +1163,15 @@ export class Level extends LevelInterface {
         if (actor.movement_cooldown <= 0) {
             if (actor.type.ttl) {
                 // This is an animation that just finished, so destroy it
-                this.remove_tile(actor);
+                this.remove_tile(actor, true);
                 return;
             }
 
-            // Play step sound when the player completes a move
             if (actor === this.player) {
-                let terrain = actor.cell.get_terrain();
-                if (actor.is_sliding && terrain.type.slide_mode === 'ice') {
-                    this.sfx.play_once('slide-ice');
-                }
-                else if (actor.is_sliding && terrain.type.slide_mode === 'force') {
-                    this.sfx.play_once('slide-force');
-                }
-                else if (terrain.type.name === 'popdown_floor') {
-                    this.sfx.play_once('step-popdown');
-                }
-                else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad' ||
-                    terrain.type.name === 'sand' || terrain.type.name === 'grass')
-                {
-                    this.sfx.play_once('step-gravel');
-                }
-                else if (terrain.type.name === 'water') {
-                    if (actor.ignores(terrain.type.name)) {
-                        this.sfx.play_once('step-water');
-                    }
-                }
-                else if (terrain.type.name === 'fire') {
-                    if (actor.has_item('fire_boots')) {
-                        this.sfx.play_once('step-fire');
-                    }
-                }
-                else if (terrain.type.slide_mode === 'force') {
-                    this.sfx.play_once('step-force');
-                }
-                else if (terrain.type.slide_mode === 'ice') {
-                    this.sfx.play_once('step-ice');
-                }
-                else {
-                    this.sfx.play_once('step-floor');
-                }
+                // Play step sound when the player completes a move
+                this._play_footstep(actor);
+                // And erase any remembered move, until we make a new one
+                this.remember_player_move(null);
             }
 
             if (! this.compat.actors_move_instantly) {
@@ -1156,6 +1185,66 @@ export class Level extends LevelInterface {
         }
     }
 
+    _play_footstep(actor) {
+        let terrain = actor.cell.get_terrain();
+        if (actor.is_sliding && terrain.type.slide_mode === 'ice') {
+            this.sfx.play_once('slide-ice');
+        }
+        else if (actor.is_sliding && terrain.type.slide_mode === 'force') {
+            this.sfx.play_once('slide-force');
+        }
+        else if (terrain.type.name === 'popdown_floor') {
+            this.sfx.play_once('step-popdown');
+        }
+        else if (terrain.type.name === 'gravel' || terrain.type.name === 'railroad' ||
+            terrain.type.name === 'sand' || terrain.type.name === 'grass')
+        {
+            this.sfx.play_once('step-gravel');
+        }
+        else if (terrain.type.name === 'water') {
+            if (actor.ignores(terrain.type.name)) {
+                this.sfx.play_once('step-water');
+            }
+        }
+        else if (terrain.type.name === 'fire') {
+            if (actor.has_item('fire_boots')) {
+                this.sfx.play_once('step-fire');
+            }
+        }
+        else if (terrain.type.slide_mode === 'force') {
+            this.sfx.play_once('step-force');
+        }
+        else if (terrain.type.slide_mode === 'ice') {
+            this.sfx.play_once('step-ice');
+        }
+        else {
+            if (actor.type.name === 'player') {
+                this.sfx.play_once('step-floor1');
+            }
+            else {
+                this.sfx.play_once('step-floor2');
+            }
+        }
+    }
+
+    // Lynx: Actors standing on brown buttons perform trap ejection immediately after their
+    // cooldown, in actor order.  This causes a lot of double movement and there's not really any
+    // way to simulate it other than to just do this awkward pseudo-phase
+    _do_actor_trap_ejection(actor) {
+        if (! this.compat.traps_like_lynx)
+            return;
+        if (actor.movement_cooldown > 0)
+            return;
+
+        let terrain = actor.cell.get_terrain();
+        if (terrain.type.name === 'button_brown' && terrain.connection) {
+            let trapped = terrain.connection.cell.get_actor();
+            if (trapped) {
+                this.attempt_out_of_turn_step(trapped, trapped.direction);
+            }
+        }
+    }
+
     _do_actor_idle(actor) {
         if (actor.movement_cooldown <= 0) {
             let terrain = actor.cell.get_terrain();
@@ -1163,7 +1252,7 @@ export class Level extends LevelInterface {
                 terrain.type.on_stand(terrain, this, actor);
             }
             // You might think a loop would be good here but this is unbelievably faster and the
-            // only tile with an on_stand is the bomb anyway
+            // only non-terrain tile with an on_stand is the bomb anyway
             let item = actor.cell.get_item();
             if (item && item.type.on_stand && ! actor.ignores(item.type.name)) {
                 item.type.on_stand(item, this, actor);
@@ -1233,11 +1322,14 @@ export class Level extends LevelInterface {
         if (this.pending_green_toggle) {
             // Swap green objects
             this.__toggle_green_tiles();
-            this._push_pending_undo(() => {
-                this.__toggle_green_tiles();
-            });
             this.pending_green_toggle = false;
+
+            if (this.undo_enabled) {
+                this.pending_undo.toggle_green_tiles = true;
+            }
         }
+
+        this.__check_sokoban_buttons();
     }
 
     __toggle_green_tiles() {
@@ -1254,6 +1346,26 @@ export class Level extends LevelInterface {
             let item = cell.get_item();
             if (item && item.type.green_toggle_counterpart) {
                 item.type = TILE_TYPES[item.type.green_toggle_counterpart];
+            }
+        }
+    }
+
+    // Check for changes to sokoban buttons, and swap the appropriate floors/walls if necessary.
+    // NOT undo-safe; this is undone by calling it again after an undo.
+    __check_sokoban_buttons() {
+        for (let [color, was_satisfied] of Object.entries(this.sokoban_satisfied)) {
+            let is_satisfied = this.sokoban_unpressed[color] === 0;
+            if (was_satisfied !== is_satisfied) {
+                this.sokoban_satisfied[color] = is_satisfied;
+                let new_type = TILE_TYPES[is_satisfied ? 'sokoban_floor' : 'sokoban_wall'];
+                for (let cell of this.linear_cells) {
+                    let terrain = cell.get_terrain();
+                    if ((terrain.type.name === 'sokoban_wall' || terrain.type.name === 'sokoban_floor') &&
+                        terrain.color === color)
+                    {
+                        terrain.type = new_type;
+                    }
+                }
             }
         }
     }
@@ -1286,9 +1398,8 @@ export class Level extends LevelInterface {
                 }
                 p += 1;
             }
-            else {
-                let local_p = p;
-                this._push_pending_undo(() => this.actors.splice(local_p, 0, actor));
+            else if (this.undo_enabled) {
+                this.pending_undo.actor_splices.push([p, 0, actor]);
             }
         }
         this.actors.length = p;
@@ -1340,9 +1451,7 @@ export class Level extends LevelInterface {
     make_player_decision(actor, input, forced_only = false) {
         // Only reset the player's is_pushing between movement, so it lasts for the whole push
         this._set_tile_prop(actor, 'is_pushing', false);
-        // This effect only lasts one tic, after which we can move again.  Note that this one has
-        // gameplay impact -- doppelgangers use it to know if they should copy your facing direction
-        // even if you're not moving
+        // This effect only lasts one tic, after which we can move again
         if (! forced_only) {
             this._set_tile_prop(actor, 'is_blocked', false);
         }
@@ -1401,13 +1510,18 @@ export class Level extends LevelInterface {
         if (actor.is_pending_slide && ! (may_move && dir1)) {
             // This is a forced move and we're not overriding it, so we're done
             actor.decision = actor.direction;
+            this.remember_player_move(actor.decision);
 
             if (terrain.type.slide_mode === 'force') {
                 this._set_tile_prop(actor, 'can_override_slide', true);
             }
         }
-        else if (dir1 === null || forced_only) {
-            // Not attempting to move, so do nothing
+        else if (forced_only) {
+            // Not allowed to move, so do nothing
+        }
+        else if (dir1 === null) {
+            // Not attempting to move, so do nothing, but remember it
+            this.remember_player_move(null);
         }
         else {
             // At this point, we have exactly 1 or 2 directions, and deciding between them requires
@@ -1452,6 +1566,9 @@ export class Level extends LevelInterface {
                 }
             }
 
+            // Doppelgangers copy our /attempted/ move, including a failed override
+            this.remember_player_move(actor.decision);
+
             // If we're overriding a force floor but the direction we're moving in is blocked, we
             // keep our override power (but only under the CC2 behavior of instant bonking).
             // Notably, this happens even if we do end up able to move!
@@ -1470,9 +1587,6 @@ export class Level extends LevelInterface {
         if (actor.decision === null && ! forced_only) {
             actor.last_blocked_direction = null;
         }
-
-        // Remember our decision so doppelgängers can copy it
-        this.remember_player_move(actor.decision);
     }
 
     make_actor_decision(actor, forced_only = false) {
@@ -1592,20 +1706,29 @@ export class Level extends LevelInterface {
     // - null: Default.  Do not impact game state.  Treat pushable objects as blocking.
     // - 'bump': Fire bump triggers.  Don't move pushable objects, but do check whether they /could/
     //   be pushed, recursively if necessary.
-    // - 'slap': Like 'bump', but also sets the 'decision' of pushable objects.
+    // - 'slap': Like 'bump', but also sets the 'decision' of pushable objects.  Only used with the
+    //   no_early_push Lynx compat flag.
     // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
     can_actor_enter_cell(actor, cell, direction, push_mode = null) {
         let pushable_tiles = [];
-        let still_blocked = false;
+        let deferred_blocked = false;
         for (let layer of this.layer_collision_order) {
             let tile = cell[layer];
             if (! tile)
                 continue;
 
-            let original_name = tile.type.name;
+            let original_type = tile.type;
             // TODO check ignores here?
             if (tile.type.on_bumped) {
                 tile.type.on_bumped(tile, this, actor, direction);
+            }
+
+            if (this.compat.player_safe_at_decision_time &&
+                tile.type.is_real_player && push_mode !== 'push')
+            {
+                // Lynx + MS: At decision time, pretend the player isn't there; we'll collide
+                // with them later, at movement time
+                continue;
             }
 
             // Death happens here: if a monster or block even thinks about moving into a player, or
@@ -1613,17 +1736,44 @@ export class Level extends LevelInterface {
             // wall is only saved by the wall being checked first.  This is also why standing on an
             // item won't save you: actors are checked before items!
             // TODO merge this with player_protected_by_items?  seems like they don't make sense independently
-            if (layer === LAYERS.actor &&
-                // Lynx: Touching a monster at decision time doesn't kill you, and pushing doesn't
-                // happen at decision time thanks to no_early_push
-                (! this.compat.player_safe_at_decision_time || push_mode === 'push'))
-            {
-                this._check_for_player_death(actor, tile);
+            if (layer === LAYERS.actor && this._check_for_player_death(actor, tile)) {
+                // Actors can't move into each other's cells, so monsters aren't allowed to actually
+                // step on the player (or vice versa) -- however, to make it LOOK like that's what's
+                // happening in the final frame, use the 'destination_cell' (originally meant for
+                // teleporters) property to pretend this movement happens.
+                // But first -- this implies that if a player is standing on an item, and a monster
+                // kills the player, AND the player has an inscribed ankh, then the monster should
+                // be able to continue on into the cell despite the item!  So make that happen too.
+                if (tile.type.is_real_player && tile.cell !== cell) {
+                    this._set_tile_prop(actor, 'temp_ignore_item_collision', true);
+                    return true;
+                }
+                else {
+                    this._set_tile_prop(actor, 'previous_cell', actor.cell);
+                    this._set_tile_prop(actor, 'destination_cell', cell);
+                    this._set_tile_prop(actor, 'is_making_failure_move', true);
+                }
             }
 
-            if (! tile.blocks(actor, direction, this))
+            if (tile.blocks(actor, direction, this)) {
+                if (layer !== LAYERS.actor && (
+                    this.compat.allow_pushing_blocks_off_all_walls ||
+                    (this.compat.allow_pushing_blocks_off_faux_walls &&
+                        original_type.is_flickable_in_lynx)))
+                {
+                    // MS: blocks can be pushed off of *anything*, so defer being stopped until
+                    // after we check for pushable tiles
+                    // Lynx: blocks can be pushed off of blue walls and reveal walls
+                    deferred_blocked = true;
+                    continue;
+                }
+            }
+            else {
+                // Not blocking, move on
                 continue;
+            }
 
+            // If we reach this point, we're blocked, but we may still need to do our push behavior
             if (tile.type.on_after_bumped) {
                 tile.type.on_after_bumped(tile, this, actor);
             }
@@ -1644,13 +1794,6 @@ export class Level extends LevelInterface {
                     if (actor.type.on_blocked) {
                         actor.type.on_blocked(actor, this, direction, tile);
                     }
-                    // Lynx (or at least TW?) allows pushing blocks off of particular wall types
-                    if (this.compat.allow_pushing_blocks_off_faux_walls &&
-                        ['fake_wall', 'wall_invisible', 'wall_appearing'].includes(original_name))
-                    {
-                        still_blocked = true;
-                        continue;
-                    }
                 }
                 return false;
             }
@@ -1658,7 +1801,7 @@ export class Level extends LevelInterface {
 
         // If we got this far, all that's left is to deal with pushables, if any
         if (pushable_tiles.length === 0) {
-            return ! still_blocked;
+            return ! deferred_blocked;
         }
 
         // This flag (and the try/finally to ensure it's immediately cleared) detects recursive push
@@ -1744,7 +1887,7 @@ export class Level extends LevelInterface {
             return false;
         }
 
-        return ! still_blocked;
+        return ! deferred_blocked;
     }
 
     _check_for_player_death(actor, tile) {
@@ -1957,7 +2100,7 @@ export class Level extends LevelInterface {
         let original_cell = actor.cell;
         // Physically remove the actor first, so that it won't get in the way of e.g. a splash
         // spawned from stepping off of a lilypad
-        this.remove_tile(actor, true);
+        this.remove_tile(actor, false);
 
         // Announce we're leaving, for the handful of tiles that care about it.  Do so from the top
         // down, specifically so dynamite becomes lit before a lilypad tries to splash
@@ -1991,9 +2134,6 @@ export class Level extends LevelInterface {
 
         // Now add the actor back; we have to wait this long because e.g. monsters erase splashes
         if (goal_cell.get_actor()) {
-            // FIXME a monster or block killing the player will still move into her cell!!!  i don't
-            // know what to do about this, i feel like i tried making monster/player block each
-            // other before and it did not go well.  maybe it was an ordering issue though?
             this.add_tile(actor, original_cell);
             return;
         }
@@ -2078,6 +2218,10 @@ export class Level extends LevelInterface {
         let dest, direction, success;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
+            // Note that Tile World Lynx has a bug allowing other actors to teleport into the same
+            // cell as the player (and possibly other combinations under some circumstances?), but
+            // that is not actually the behavior of the original Lynx game and also is clearly
+            // ludicrous, so I'm making the executive decision to not emulate it
             if (dest !== teleporter && dest.cell.get_actor())
                 continue;
 
@@ -2123,9 +2267,12 @@ export class Level extends LevelInterface {
         this.set_actor_direction(actor, direction);
 
         if (success) {
-            // Sound plays from the origin cell simply because that's where the sfx player thinks
-            // the player is currently; position isn't updated til next turn
+            // The player's position changes while the sound is playing, so play it BOTH from the
+            // origin and the destination (unless they're the same)
             this.sfx.play_once('teleport', teleporter.cell);
+            if (dest.cell !== teleporter.cell) {
+                this.sfx.play_once('teleport', dest.cell);
+            }
 
             this.spawn_animation(actor.cell, 'teleport_flash');
             if (dest.cell !== actor.cell) {
@@ -2133,7 +2280,7 @@ export class Level extends LevelInterface {
             }
 
             // Now physically move the actor, but their movement waits until next decision phase
-            this.remove_tile(actor, true);
+            this.remove_tile(actor, false);
             this.add_tile(actor, dest.cell);
             // Erase this to prevent tail-biting through a teleport
             this._set_tile_prop(actor, 'previous_cell', null);
@@ -2161,8 +2308,8 @@ export class Level extends LevelInterface {
 
         // Cycle leftwards, i.e., the oldest item moves to the end of the list
         if (actor.toolbelt && actor.toolbelt.length > 1) {
+            this._stash_toolbelt(actor);
             actor.toolbelt.push(actor.toolbelt.shift());
-            this._push_pending_undo(() => actor.toolbelt.unshift(actor.toolbelt.pop()));
         }
     }
 
@@ -2177,8 +2324,8 @@ export class Level extends LevelInterface {
         // Drop the oldest item, i.e. the first one
         let name = actor.toolbelt[0];
         if (this._place_dropped_item(name, actor.cell, actor)) {
+            this._stash_toolbelt(actor);
             actor.toolbelt.shift();
-            this._push_pending_undo(() => actor.toolbelt.unshift(name));
             return true;
         }
         return false;
@@ -2230,9 +2377,6 @@ export class Level extends LevelInterface {
                 }
                 if (tile.cell) {
                     this.add_actor(tile);
-                    if (this.compat.actors_move_instantly) {
-                        tile.moves_instantly = true;
-                    }
                 }
                 this.add_tile(dropping_actor, cell);
             }
@@ -2247,82 +2391,50 @@ export class Level extends LevelInterface {
     // Wiring -----------------------------------------------------------------------------------------
 
     _do_wire_phase() {
-        let force_next_wire_phase = false;
-        if (this.recalculate_circuitry_next_wire_phase)
-        {
+        if (this.recalculate_circuitry_next_wire_phase) {
+            // This property doesn't tend to last beyond a single tic, but if we recalculate now, we
+            // also need to recalculate if we undo beyond this point.  So set it as a level prop,
+            // which after an undo, will then cause us to recalculate the next time we advance
+            if (this.undo_enabled) {
+                this.pending_undo.level_props.recalculate_circuitry_next_wire_phase = true;
+                // Since we're about to invalidate a bunch of circuitry, be safe and store ALL the
+                // power states
+                this.pending_undo.circuit_power_changes = new Map(
+                    this.circuits.map(circuit => [circuit, circuit.is_powered]));
+            }
+
             this.recalculate_circuitry();
             this.recalculate_circuitry_next_wire_phase = false;
-            force_next_wire_phase = true;
         }
 
         if (this.circuits.length === 0)
             return;
 
-        // Prepare a big slab of undo.  The only thing we directly change here (aside from
-        // emitting_edges, a normal tile property) is Tile.powered_edges, which tends to change for
-        // large numbers of tiles at a time, so store it all in one map and undo it in one shot.
-        let powered_edges_changes = new Map;
-        let _set_edges = (tile, new_edges) => {
-            if (this.undo_enabled) {
-                if (powered_edges_changes.has(tile)) {
-                    if (powered_edges_changes.get(tile) === new_edges) {
-                        powered_edges_changes.delete(tile);
-                    }
-                }
-                else {
-                    powered_edges_changes.set(tile, tile.powered_edges);
-                }
-            }
-            tile.powered_edges = new_edges;
-        };
-        let power_edges = (tile, edges) => {
-            let new_edges = tile.powered_edges | edges;
-            _set_edges(tile, new_edges);
-        };
-        let depower_edges = (tile, edges) => {
-            let new_edges = tile.powered_edges & ~edges;
-            _set_edges(tile, new_edges);
-        };
+        for (let circuit of this.circuits) {
+            circuit._was_powered = circuit.is_powered;
+            circuit.is_powered = false;
+        }
 
-        // Update the state of any tiles that can generate power.  If none of them changed since
-        // last wiring update, stop here.  First, static power sources.
-        let any_changed = false;
+        // Update the state of any tiles that can generate power.  First, static power sources
         for (let tile of this.power_sources) {
-            if (! tile.cell)
-                continue;
-            let emitting = 0;
-            if (tile.type.get_emitting_edges) {
-                // This method may not exist any more, if the tile was destroyed by e.g. dynamite
-                emitting = tile.type.get_emitting_edges(tile, this);
-            }
-            if (emitting !== tile.emitting_edges) {
-                any_changed = true;
-                this._set_tile_prop(tile, 'emitting_edges', emitting);
+            if (tile.type.update_power_emission) {
+                tile.type.update_power_emission(tile, this);
             }
         }
+
         // Next, actors who are standing still, on floor/electrified, and holding a lightning bolt
-        let externally_powered_circuits = new Set;
         for (let actor of this.actors) {
             if (! actor.cell)
                 continue;
-            let emitting = 0;
+
             if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
                 let wired_tile = actor.cell.get_wired_tile();
-                if (wired_tile && (wired_tile === actor || wired_tile.type.name === 'floor' || wired_tile.type.name === 'electrified_floor')) {
-                    emitting = wired_tile.wire_directions;
+                if (wired_tile && (wired_tile === actor || wired_tile.type.can_be_powered_by_actor)) {
                     for (let circuit of this.cells_to_circuits.get(this.cell_to_scalar(wired_tile.cell))) {
-                        externally_powered_circuits.add(circuit);
+                        circuit.is_powered = true;
                     }
                 }
             }
-            if (emitting !== actor.emitting_edges) {
-                any_changed = true;
-                this._set_tile_prop(actor, 'emitting_edges', emitting);
-            }
-        }
-
-        if (! any_changed && !force_next_wire_phase) {
-            return;
         }
 
         for (let tile of this.wired_outputs) {
@@ -2331,43 +2443,29 @@ export class Level extends LevelInterface {
             tile._prev_powered_edges = tile.powered_edges;
         }
 
-        // Now go through every circuit, compute whether it's powered, and if that changed, inform
-        // its outputs
+        // Go through every circuit and recompute whether it's powered
         let circuit_changes = new Map;
         for (let circuit of this.circuits) {
-            let is_powered = false;
-
-            if (externally_powered_circuits.has(circuit)) {
-                is_powered = true;
-            }
-            else {
+            if (! circuit.is_powered) {
                 for (let [input_tile, edges] of circuit.inputs.entries()) {
-                    if (input_tile.emitting_edges & edges) {
-                        is_powered = true;
+                    if (input_tile.type.is_emitting && input_tile.type.is_emitting(input_tile, this, edges)) {
+                        circuit.is_powered = true;
                         break;
                     }
                 }
             }
 
-            let was_powered = circuit.is_powered;
-            if (is_powered === was_powered)
-                continue;
-
-            circuit.is_powered = is_powered;
-            if (this.undo_enabled) {
-                circuit_changes.set(circuit, was_powered);
-            }
-
-            for (let [tile, edges] of circuit.tiles.entries()) {
-                if (is_powered) {
-                    power_edges(tile, edges);
-                }
-                else {
-                    depower_edges(tile, edges);
-                }
+            if (this.undo_enabled && circuit.is_powered !== circuit._was_powered) {
+                circuit_changes.set(circuit, circuit._was_powered);
             }
         }
 
+        this.__apply_circuit_power_to_tiles();
+        if (this.undo_enabled && circuit_changes.size > 0 && ! this.pending_undo.circuit_power_changes) {
+            this.pending_undo.circuit_power_changes = circuit_changes;
+        }
+
+        // Finally, inform every tile of power changes, if any
         for (let tile of this.wired_outputs) {
             if (tile.powered_edges && ! tile._prev_powered_edges && tile.type.on_power) {
                 tile.type.on_power(tile, this);
@@ -2376,15 +2474,23 @@ export class Level extends LevelInterface {
                 tile.type.on_depower(tile, this);
             }
         }
+    }
 
-        this._push_pending_undo(() => {
-            for (let [tile, edges] of powered_edges_changes.entries()) {
-                tile.powered_edges = edges;
+    // Recompute which tiles (across the whole level) are powered, based on the power status of the
+    // circuits.  NOT undo-safe; instead, changes to circuit power are undone, and then this is
+    // called again to make everything consistent.  This also does NOT call on_power or on_depower;
+    // any effects from those are done (and undone) by the caller.
+    __apply_circuit_power_to_tiles() {
+        for (let circuit of this.circuits) {
+            for (let [tile, edges] of circuit.tiles.entries()) {
+                if (circuit.is_powered) {
+                    tile.powered_edges |= edges;
+                }
+                else {
+                    tile.powered_edges &= ~edges;
+                }
             }
-            for (let [circuit, is_powered] of circuit_changes.entries()) {
-                circuit.is_powered = is_powered;
-            }
-        });
+        }
     }
 
     // Level inspection -------------------------------------------------------------------------------
@@ -2412,7 +2518,7 @@ export class Level extends LevelInterface {
                 continue;
 
             if ((wired.wire_propagation_mode ?? wired.type.wire_propagation_mode) === 'none' &&
-                ! wired.type.is_power_source)
+                ! wired.type.update_power_emission)
             {
                 // Being next to e.g. a red teleporter doesn't count (but pink button is ok)
                 continue;
@@ -2429,13 +2535,6 @@ export class Level extends LevelInterface {
 
     // Undo/redo --------------------------------------------------------------------------------------
 
-    create_undo_entry() {
-        let entry = [];
-        entry.tile_changes = new Map;
-        entry.level_props = {};
-        return entry;
-    }
-
     has_undo() {
         let prev_index = this.undo_buffer_index - 1;
         if (prev_index < 0) {
@@ -2446,11 +2545,20 @@ export class Level extends LevelInterface {
     }
 
     commit() {
-        if (! this.undo_enabled) {
+        if (! this.undo_enabled)
             return;
+
+        // Any level props that haven't changed can be safely deleted
+        for (let [key, prop] of Object.entries(this.pending_undo.level_props)) {
+            if (prop === this[key]) {
+                delete this.pending_undo.level_props[key];
+            }
         }
+
+        this.pending_undo.estimate_size();
         this.undo_buffer[this.undo_buffer_index] = this.pending_undo;
-        this.pending_undo = this.create_undo_entry();
+
+        this.pending_undo = new UndoEntry;
 
         this.undo_buffer_index += 1;
         this.undo_buffer_index %= UNDO_BUFFER_SIZE;
@@ -2461,7 +2569,7 @@ export class Level extends LevelInterface {
 
         // In turn-based mode, we might still be in mid-tic with a partial undo stack; do that first
         this._undo_entry(this.pending_undo);
-        this.pending_undo = this.create_undo_entry();
+        this.pending_undo = new UndoEntry;
 
         this.undo_buffer_index -= 1;
         if (this.undo_buffer_index < 0) {
@@ -2469,11 +2577,6 @@ export class Level extends LevelInterface {
         }
         this._undo_entry(this.undo_buffer[this.undo_buffer_index]);
         this.undo_buffer[this.undo_buffer_index] = null;
-
-        if (this.undid_past_recalculate_circuitry) {
-            this.recalculate_circuitry_next_wire_phase = true;
-            this.undid_past_recalculate_circuitry = false;
-        }
     }
 
     // Reverse a single undo entry
@@ -2482,24 +2585,50 @@ export class Level extends LevelInterface {
             return;
         }
 
-        // Undo in reverse order!  There's no redo, so it's okay to destroy this
-        entry.reverse();
-        for (let undo of entry) {
-            undo();
+        // Undo in reverse order!  There's no redo, so it's okay to use the destructive reverse().
+        // These toggles go first, since they're the last things to happen in a tic
+        if (entry.toggle_green_tiles) {
+            this.__toggle_green_tiles();
         }
+        if (entry.sokoban_changes) {
+            Object.assign(this.sokoban_unpressed, entry.sokoban_changes);
+            this.__check_sokoban_buttons();
+        }
+
+        entry.actor_splices.reverse();
+        for (let args of entry.actor_splices) {
+            this.actors.splice(...args);
+        }
+
+        let needs_readding = [];
         for (let [tile, changes] of entry.tile_changes) {
-            for (let [key, value] of changes) {
-                tile[key] = value;
+            // If a tile's cell or layer changed, it needs to be removed and then added -- but to
+            // avoid ordering problems when a tile leaves a cell and a different tile enters that
+            // cell on the same tic, we can't add back any tiles until they've all been removed
+            let do_cell_dance = (Object.hasOwn(changes, 'cell') || (
+                Object.hasOwn(changes, 'type') && tile.type.layer !== changes.type.layer));
+            if (do_cell_dance && tile.cell) {
+                tile.cell._remove(tile);
+            }
+            Object.assign(tile, changes);
+            if (do_cell_dance && tile.cell) {
+                needs_readding.push(tile);
             }
         }
+        for (let tile of needs_readding) {
+            tile.cell._add(tile);
+        }
+
+        if (entry.circuit_power_changes) {
+            for (let [circuit, is_powered] of entry.circuit_power_changes.entries()) {
+                circuit.is_powered = is_powered;
+            }
+            // FIXME ah the power state doesn't undo correctly because the circuits are different
+            this.__apply_circuit_power_to_tiles();
+        }
+
         for (let [key, value] of Object.entries(entry.level_props)) {
             this[key] = value;
-        }
-    }
-
-    _push_pending_undo(thunk) {
-        if (this.undo_enabled) {
-            this.pending_undo.push(thunk)
         }
     }
 
@@ -2508,7 +2637,8 @@ export class Level extends LevelInterface {
     // it through one of these for undo/rewind purposes
 
     _set_tile_prop(tile, key, val) {
-        if (Number.isNaN(val)) throw new Error(`got a NaN for ${key} on ${tile.type.name} at ${tile.cell.x}, ${tile.cell.y}`);
+        if (Number.isNaN(val))
+            throw new Error(`got a NaN for ${key} on ${tile.type.name} at ${tile.cell.x}, ${tile.cell.y}`);
         if (! this.undo_enabled) {
             tile[key] = val;
             return;
@@ -2516,23 +2646,39 @@ export class Level extends LevelInterface {
         if (tile[key] === val)
             return;
 
-        let changes = this.pending_undo.tile_changes.get(tile);
-        if (! changes) {
-            changes = new Map;
-            this.pending_undo.tile_changes.set(tile, changes);
-        }
+        let changes = this.pending_undo.tile_changes_for(tile);
 
         // If we haven't yet done so, log the original value
-        if (! changes.has(key)) {
-            changes.set(key, tile[key]);
+        if (! Object.hasOwn(changes, key)) {
+            changes[key] = tile[key];
         }
         // If there's an original value already logged, and it's the value we're about to change
         // back to, then delete the change
-        else if (changes.get(key) === val) {
-            changes.delete(key);
+        else if (changes[key] === val) {
+            delete changes[key];
         }
 
         tile[key] = val;
+    }
+
+    _stash_toolbelt(actor) {
+        if (! this.undo_enabled)
+            return;
+
+        let changes = this.pending_undo.tile_changes_for(actor);
+        if (! ('toolbelt' in changes)) {
+            changes.toolbelt = Array.from(actor.toolbelt);
+        }
+    }
+
+    _stash_keyring(actor) {
+        if (! this.undo_enabled)
+            return;
+
+        let changes = this.pending_undo.tile_changes_for(actor);
+        if (! ('keyring' in changes)) {
+            changes.keyring = {...actor.keyring};
+        }
     }
 
     collect_chip(actor) {
@@ -2550,15 +2696,21 @@ export class Level extends LevelInterface {
         }
     }
 
+    uncollect_chip(actor) {
+        this.chips_remaining += 1;
+        // TODO sfx
+    }
+
     adjust_bonus(add, mult = 1) {
         this.bonus_points = Math.floor(this.bonus_points * mult) + add;
     }
 
     pause_timer() {
         if (this.time_remaining === null)
-            return;
+            return false;
 
         this.timer_paused = ! this.timer_paused;
+        return true;
     }
 
     adjust_timer(dt) {
@@ -2568,6 +2720,22 @@ export class Level extends LevelInterface {
             // If the timer isn't paused, this will kill the player at the end of the tic
             this.time_remaining = 1;
         }
+    }
+
+    press_sokoban(color) {
+        if (this.undo_enabled) {
+            this.pending_undo.preserve_sokoban(color, this.sokoban_unpressed[color]);
+        }
+
+        this.sokoban_unpressed[color] -= 1;
+    }
+
+    unpress_sokoban(color) {
+        if (this.undo_enabled) {
+            this.pending_undo.preserve_sokoban(color, this.sokoban_unpressed[color]);
+        }
+
+        this.sokoban_unpressed[color] += 1;
     }
 
     kill_actor(actor, killer, animation_name = null, sfx = null, fail_reason = null) {
@@ -2588,11 +2756,7 @@ export class Level extends LevelInterface {
 
                     this.transmute_tile(this.ankh_tile, 'floor');
                     this.spawn_animation(ankh_cell, 'resurrection');
-                    let old_tile = this.ankh_tile;
                     this.ankh_tile = null;
-                    this._push_pending_undo(() => {
-                        this.ankh_tile = old_tile;
-                    });
                     return;
                 }
             }
@@ -2614,7 +2778,7 @@ export class Level extends LevelInterface {
             this.transmute_tile(actor, animation_name);
         }
         else {
-            this.remove_tile(actor);
+            this.remove_tile(actor, true);
         }
     }
 
@@ -2633,22 +2797,13 @@ export class Level extends LevelInterface {
             this.sfx.play_once('lose');
         }
 
-        this._push_pending_undo(() => {
-            this.fail_reason = null;
-            if (player) {
-                player.fail_reason = null;
-            }
-            if (killer) {
-                killer.is_killer = false;
-            }
-        });
         this.state = 'failure';
         this.fail_reason = reason;
         if (player) {
-            player.fail_reason = reason;
+            this._set_tile_prop(player, 'fail_reason', reason);
         }
         if (killer) {
-            killer.is_killer = true;
+            this._set_tile_prop(killer, 'is_killer', true);
         }
     }
 
@@ -2690,37 +2845,45 @@ export class Level extends LevelInterface {
     }
 
     // Tile stuff in particular
-    // TODO should add in the right layer?  maybe?  hard to say what that is when mscc levels might
-    // have things stacked in a weird order though
-    // TODO would be nice to make these not be closures but order matters much more here
 
-    remove_tile(tile) {
-        let cell = tile.cell;
-        cell._remove(tile);
-        this._push_pending_undo(() => cell._add(tile));
+    remove_tile(tile, destroying = false) {
+        tile.cell._remove(tile);
+        this._set_tile_prop(tile, 'cell', null);
     }
 
     add_tile(tile, cell) {
+        this._set_tile_prop(tile, 'cell', cell);
         cell._add(tile);
-        this._push_pending_undo(() => cell._remove(tile));
+    }
+
+    make_actor(type, direction = 'south') {
+        return new Tile(type, direction);
     }
 
     add_actor(actor) {
+        if (this.compat.actors_move_instantly) {
+            actor.moves_instantly = true;
+        }
+
         if (this.compat.reuse_actor_slots && actor.type.layer !== LAYERS.vfx) {
-            // Place the new actor in the first slot taken up by a nonexistent one, but not VFX
-            // which aren't supposed to impact gameplay
+            // Lynx: New actors go in the first available "dead" slot.  VFX are exempt, since those
+            // are LL additions and shouldn't affect gameplay
             for (let i = 0, l = this.actors.length; i < l; i++) {
                 let old_actor = this.actors[i];
                 if (old_actor !== this.player && ! old_actor.cell) {
                     this.actors[i] = actor;
-                    this._push_pending_undo(() => this.actors[i] = old_actor);
+                    if (this.undo_enabled) {
+                        this.pending_undo.actor_splices.push([i, 1, old_actor]);
+                    }
                     return;
                 }
             }
         }
 
         this.actors.push(actor);
-        this._push_pending_undo(() => this.actors.pop());
+        if (this.undo_enabled) {
+            this.pending_undo.actor_splices.push([this.actors.length - 1, 1]);
+        }
     }
 
     _init_animation(tile) {
@@ -2749,7 +2912,7 @@ export class Level extends LevelInterface {
         if (type.layer === LAYERS.vfx) {
             let vfx = cell[type.layer];
             if (vfx) {
-                this.remove_tile(vfx);
+                this.remove_tile(vfx, true);
             }
         }
         let tile = new Tile(type);
@@ -2780,15 +2943,14 @@ export class Level extends LevelInterface {
         let new_type = TILE_TYPES[name];
         if (old_type.layer !== new_type.layer) {
             // Move it to the right layer!
-            let cell = tile.cell;
-            cell._remove(tile);
-            tile.type = new_type;
-            cell._add(tile);
-            this._push_pending_undo(() => {
-                cell._remove(tile);
-                tile.type = old_type;
-                cell._add(tile);
-            });
+            // (No need to handle undo specially here; undoing the 'type' prop automatically does
+            // this same remove/add dance)
+            if (tile.cell[new_type.layer] && new_type.layer === LAYERS.vfx) {
+                this.remove_tile(tile.cell[new_type.layer]);
+            }
+            tile.cell._remove(tile);
+            this._set_tile_prop(tile, 'type', new_type);
+            tile.cell._add(tile);
         }
         else {
             this._set_tile_prop(tile, 'type', new_type);
@@ -2848,8 +3010,8 @@ export class Level extends LevelInterface {
             }
             // Otherwise, it's either an item or a yellow teleporter we're allowed to drop, so steal
             // it out of their inventory to be dropped later
+            this._stash_toolbelt(actor);
             dropped_item = actor.toolbelt.shift();
-            this._push_pending_undo(() => actor.toolbelt.unshift(dropped_item));
         }
 
         if (this.give_actor(actor, tile.type.name)) {
@@ -2886,8 +3048,8 @@ export class Level extends LevelInterface {
             if (! actor.keyring) {
                 actor.keyring = {};
             }
+            this._stash_keyring(actor);
             actor.keyring[name] = (actor.keyring[name] ?? 0) + 1;
-            this._push_pending_undo(() => actor.keyring[name] -= 1);
         }
         else {
             // tool, presumably
@@ -2902,9 +3064,7 @@ export class Level extends LevelInterface {
                 if (i < 0)
                     return false;
 
-                if (! actor.toolbelt[i]) {
-                    this._push_pending_undo(() => actor.toolbelt[i] = null);
-                }
+                this._stash_toolbelt(actor);
                 actor.toolbelt[i] = name;
             }
             else {
@@ -2917,8 +3077,8 @@ export class Level extends LevelInterface {
                         return false;
                 }
 
+                this._stash_toolbelt(actor);
                 actor.toolbelt.push(name);
-                this._push_pending_undo(() => actor.toolbelt.pop());
             }
         }
         return true;
@@ -2931,7 +3091,7 @@ export class Level extends LevelInterface {
                 return true;
             }
 
-            this._push_pending_undo(() => actor.keyring[name] += 1);
+            this._stash_keyring(actor);
             actor.keyring[name] -= 1;
             return true;
         }
@@ -2944,8 +3104,8 @@ export class Level extends LevelInterface {
         if (actor.toolbelt) {
             let index = actor.toolbelt.indexOf(name);
             if (index >= 0) {
+                this._stash_toolbelt(actor);
                 actor.toolbelt.splice(index, 1);
-                this._push_pending_undo(() => actor.toolbelt.splice(index, 0, name));
                 return true;
             }
         }
@@ -2955,8 +3115,7 @@ export class Level extends LevelInterface {
 
     take_all_keys_from_actor(actor) {
         if (actor.keyring && Object.values(actor.keyring).some(n => n > 0)) {
-            let keyring = actor.keyring;
-            this._push_pending_undo(() => actor.keyring = keyring);
+            this._stash_keyring(actor);
             actor.keyring = {};
             return true;
         }
@@ -2964,8 +3123,7 @@ export class Level extends LevelInterface {
 
     take_all_tools_from_actor(actor) {
         if (actor.toolbelt && actor.toolbelt.length > 0) {
-            let toolbelt = actor.toolbelt;
-            this._push_pending_undo(() => actor.toolbelt = toolbelt);
+            this._stash_toolbelt(actor);
             actor.toolbelt = [];
             return true;
         }

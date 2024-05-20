@@ -18,14 +18,14 @@ body {
     color: #ececec;
 
     --main-hue: 340;
-    --hover-hue: 8;
+    --hover-hue: 15;
     --selected-hue: 320;
-    --panel-bg-color: hsl(var(--main-hue), 20%, 10%);
-    --button-bg-color: hsl(var(--main-hue), 50%, 20%);
+    --panel-bg-color: hsl(var(--main-hue), 30%, 12.5%);
+    --button-bg-color: hsl(var(--main-hue), 60%, 25%);
     --button-bg-gradient: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
     --button-bg-shadow-color: #fff1;
-    --button-bg-hover-color: hsl(var(--hover-hue), 60%, 35%);
-    --generic-bg-hover-on-white: hsl(var(--hover-hue), 60%, 90%);
+    --button-bg-hover-color: hsl(var(--hover-hue), 70%, 35%);
+    --generic-bg-hover-on-white: hsl(var(--hover-hue), 90%, 85%);
     --generic-bg-selected-on-white: hsl(var(--selected-hue), 50%, 85%);
     --generic-border-selected-on-white: hsl(var(--selected-hue), 60%, 75%);
 }
@@ -57,7 +57,7 @@ button,
     background-image: var(--button-bg-gradient);
     border: 1px solid hsl(var(--main-hue), 10%, 2.5%);
     box-shadow:
-        inset 0 0 3px 1px #ffffff18,
+        inset 0 0 0 1px #ffffff18,
         0 1px 1px hsl(var(--main-hue), 10%, 7.5%);
     border-radius: 0.25em;
     text-shadow: 0 1px 0 #0006;
@@ -75,13 +75,13 @@ button:active,
     z-index: 1;
 }
 button:enabled.button-bright {
-    background-color: hsl(var(--main-hue), 60%, 35%);
+    background-color: hsl(var(--main-hue), 60%, 40%);
 }
 button:enabled.button-bright:hover {
     background-color: hsl(var(--hover-hue), 65%, 50%);
 }
 button:disabled {
-    color: #606060;
+    color: #808080;
     background-color: #202020;
     cursor: auto;
 }
@@ -158,17 +158,17 @@ a:visited {
     text-decoration: underline dotted;
 }
 a:link {
-    color: hsl(var(--main-hue), 50%, 75%);
+    color: hsl(var(--main-hue), 80%, 75%);
 }
 a:visited {
-    color: hsl(255, 50%, 75%);
+    color: hsl(270, 80%, 75%);
 }
 a:link:hover,
 a:visited:hover {
     text-decoration: underline;
 }
 a:active {
-    color: hsl(0, 50%, 60%);
+    color: hsl(0, 90%, 75%);
 }
 
 svg#svg-iconsheet {
@@ -268,8 +268,8 @@ button.--pressed,
     cursor: pointer;
 }
 .popup-menu > li:hover {
-    color: hsl(var(--hover-hue), 90%, 10%);
-    background: hsl(var(--hover-hue), 90%, 85%);
+    color: hsl(var(--hover-hue), 60%, 10%);
+    background: var(--generic-bg-hover-on-white);
 }
 .dialog {
     display: flex;
@@ -326,6 +326,16 @@ button.--pressed,
 }
 .dialog a:visited {
     color: hsl(255, 50%, 50%);
+}
+.dialog code {
+    color: hsl(var(--main-hue), 50%, 30%);
+}
+.dialog h2 {
+    color: hsl(var(--main-hue), 75%, 25%);
+    border-bottom: 1px dotted hsl(var(--main-hue), 50%, 40%);
+}
+.dialog h2:nth-child(n+1) {
+    margin-top: 1rem;
 }
 dl.formgrid {
     display: grid;
@@ -525,6 +535,9 @@ ul.compat-flags > li > label {
     align-items: center;
     gap: 0.25em;
 }
+ul.compat-flags > li > label > input[type=check] {
+    margin: 0.25em;
+}
 ul.compat-flags > li > label > span.-desc {
     flex: 1;
 }
@@ -587,7 +600,26 @@ img.compat-icon,
 .option-volume > input[type=range] {
     flex: auto;
 }
-.option-tileset canvas {
+table.option-tilesets th,
+table.option-tilesets td {
+    padding: 0.25rem 0.5rem;
+}
+table.option-tilesets > tr > .-format {
+    font-size: 0.75em;
+    text-align: center;
+}
+table.option-tilesets > tr > .-slot {
+    padding: 0;
+}
+table.option-tilesets > tr > .-slot > label {
+    display: grid;
+    box-sizing: border-box;
+    min-width: 100%;
+    min-height: 100%;
+    padding: 0.5em 1em;
+    place-items: center;
+}
+table.option-tilesets canvas {
     vertical-align: middle;
 }
 label.option {
@@ -609,6 +641,9 @@ label.option .option-label {
 }
 .option-help.--visible {
     /* TODO */
+}
+.dialog-options input[type=file][name=custom-tileset] {
+    display: none;
 }
 
 @media (max-width: 800px) {
@@ -727,6 +762,11 @@ pre.stack-trace {
     image-rendering: crisp-edges;
     image-rendering: pixelated;
 }
+#main-compat > img {
+    height: 16px;
+    vertical-align: middle;
+    margin-right: 0.25em;
+}
 
 @media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
     body > header {
@@ -844,9 +884,11 @@ pre.stack-trace {
     height: auto;
 }
 #splash h2 {
-    border-bottom: 1px solid hsl(var(--main-hue), 10%, 30%);
-    color: hsl(var(--main-hue), 40%, 75%);
+    color: hsl(var(--main-hue), 40%, 90%);
     text-shadow: 0 1px #000c;
+    background: hsl(var(--main-hue), 40%, 25%);
+    margin: -1rem -1rem 1rem;
+    padding: 0.5rem 1rem;
 }
 #splash * + h2 {
     margin-top: 1rem;
@@ -984,6 +1026,8 @@ pre.stack-trace {
     z-index: 1;
     padding: 0.25em;
     border: 1px solid hsl(var(--main-hue), 40%, 40%);
+    background: hsl(var(--main-hue), 30%, 5%);
+    box-shadow: 0 0 1px 1px #0009;
     text-shadow: 0 1px 1px black;
     text-align: center;
 }
@@ -1010,16 +1054,15 @@ pre.stack-trace {
 .played-pack-list .-progress > .-time {
     grid-area: time;
 }
-.played-pack-list .-progress > .-levels {
-    grid-area: levels;
-}
 .played-pack-list .-progress > .-score::before {
     content: "Score: ";
-    color: #909090;
 }
 .played-pack-list .-progress > .-time::before {
     content: "Time: ";
-    color: #909090;
+}
+.played-pack-list .-progress > .-score::before,
+.played-pack-list .-progress > .-time::before {
+    color: hsl(var(--main-hue), 20%, 50%);
 }
 .played-pack-list .-editor-status {
     display: flex;
@@ -1987,7 +2030,7 @@ body.--debug #player-debug {
     display: block;
 }
 #player-debug > .-inventory > button.-wide {
-    grid-column: span 5;
+    grid-column: span 3;
     padding: 0.25em;
 }
 #player-debug .-buttons {
@@ -2272,6 +2315,9 @@ svg.level-editor-overlay g.overlay-connection {
     stroke: #e4e4e4;
     filter: url(#overlay-filter-outline);
 }
+svg.level-editor-overlay g.overlay-connection.--cursor {
+    stroke: hsl(90, 90%, 40%);
+}
 svg.level-editor-overlay g.overlay-connection[data-source=button_red] {
     stroke: hsl(0, 90%, 60%);
 }
@@ -2320,9 +2366,13 @@ svg.level-editor-overlay .overlay-adjust-cursor[data-layer=item] {
     stroke: hsl(50deg, 80%, 20%, 0.8);
     fill: hsl(50deg, 80%, 60%, 0.4);
 }
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=item-mod] {
+}
 svg.level-editor-overlay .overlay-adjust-cursor[data-layer=actor] {
     stroke: hsl(215deg, 80%, 20%, 0.8);
     fill: hsl(215deg, 80%, 60%, 0.4);
+}
+svg.level-editor-overlay .overlay-adjust-cursor[data-layer=swivel] {
 }
 svg.level-editor-overlay .overlay-adjust-cursor[data-layer=thin-wall] {
     stroke: hsl(330deg, 80%, 20%, 0.8);
@@ -2334,7 +2384,7 @@ svg.level-editor-overlay .overlay-adjust-gray-button-radius {
 }
 svg.level-editor-overlay .overlay-adjust-gray-button-shroud {
     stroke: none;
-    fill: hsla(10, 10%, 60%, 0.75);
+    fill: hsla(10, 10%, 30%, 0.6);
 }
 svg.level-editor-overlay rect.overlay-camera {
     stroke: #808080;
@@ -2360,6 +2410,10 @@ svg.level-editor-overlay text.overlay-adjust-hint {
     paint-order: stroke;
     text-anchor: middle;
     dominant-baseline: auto;
+}
+svg.level-editor-overlay .overlay-text-cursor {
+    stroke: hsla(50, 90%, 60%, 0.75);
+    fill: hsla(50, 90%, 60%, 0.25);
 }
 
 .editor-big-tooltip {
@@ -2436,12 +2490,12 @@ svg.level-editor-overlay text.overlay-adjust-hint {
 #editor .controls #editor-toolbar {
     grid-area: toolbar;
 }
-#editor-toolbar .-help {
+#editor .controls .-help {
     width: max-content;
     margin-top: -0.25em;
     margin-left: -0.5em;
 }
-#editor-toolbar button:hover .-help {
+#editor .controls button:hover .-help {
     opacity: 1;
     z-index: 2;  /* show above any that are in mid-fade */
     visibility: visible;
@@ -2449,16 +2503,27 @@ svg.level-editor-overlay text.overlay-adjust-hint {
     transition-delay: 0.5s;
     transition-timing-function: ease-in;
 }
+#editor .controls #editor-layer-selector {
+    display: flex;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+#editor .controls #editor-layer-selector .--disabled img {
+    filter: grayscale(100%);
+    opacity: 0.333;
+}
 #editor .controls .-buttons {
     grid-area: menu;
 }
-.icon-button-set {
-    display: flex;
-    flex-wrap: wrap;
+#editor .controls .-toolbar-section {
     padding: 2px;
     border-radius: 4px;
     background: hsl(var(--selected-hue), 10%, 10%);
     border: 1px solid hsl(var(--selected-hue), 10%, 20%);
+}
+.icon-button-set {
+    display: flex;
+    flex-wrap: wrap;
 }
 .icon-button-set button {
     width: auto;
@@ -2472,10 +2537,10 @@ svg.level-editor-overlay text.overlay-adjust-hint {
     box-shadow: none;
 }
 .icon-button-set button:hover {
-    background: hsl(var(--hover-hue), 40%, 30%);
+    background: hsl(var(--hover-hue), 50%, 40%);
 }
 .icon-button-set button.-selected {
-    background: hsl(var(--selected-hue), 50%, 75%);
+    background: hsl(var(--selected-hue), 90%, 75%);
 }
 .icon-button-set button img {
     display: block;
@@ -2615,9 +2680,25 @@ svg.level-editor-overlay text.overlay-adjust-hint {
 
 /* Mini editors for specific tiles with complex properties */
 /* FIXME should this stuff be on an overlay container class? */
+@keyframes balloon-appear {
+    0% {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+.overlay > .--balloon {
+    animation: balloon-appear ease-in 0.1s 1;
+}
+.overlay > .--balloon.--vanishing {
+    animation-direction: reverse;
+}
 form.editor-popup-tile-editor {
     position: relative;
-    padding: 0.5em;
+    padding: 0.75em;
     color: black;
     background: white;
     border: 1px solid black;
@@ -2631,6 +2712,7 @@ form.editor-popup-tile-editor.--above {
     margin-top: -1em;
 }
 form.editor-popup-tile-editor h3 {
+    margin-bottom: 0.25em;
     border-bottom: 1px dotted #606060;
 }
 form.editor-popup-tile-editor * + h3 {
@@ -2641,19 +2723,19 @@ form.editor-popup-tile-editor::before {
     content: '';
     display: block;
     position: absolute;
-    border: 1em solid transparent;
+    border: 0.75em solid transparent;
     left: var(--chevron-offset);
-    margin-left: -1em;
+    margin-left: -0.75em;
 
-    top: -1em;
+    top: -0.75em;
     border-top: none;
     border-bottom-color: white;
     filter: drop-shadow(0 -1px 0 black);
 }
 form.editor-popup-tile-editor.--above::before {
     top: auto;
-    bottom: -1em;
-    border: 1em solid transparent;
+    bottom: -0.75em;
+    border: 0.75em solid transparent;
     border-bottom: none;
     border-top-color: white;
     filter: drop-shadow(0 1px 0 black);
@@ -2708,6 +2790,56 @@ ol.editor-directional-block-tile-arrows {
     display: grid;
     grid: auto-flow 3em / repeat(3, 3em);
 }
+/* Thin walls have edges */
+ol.editor-thin-wall-edges {
+    position: relative;
+    --size: 5em;
+    --gap: 0.25em;
+    --breadth: 2em;
+    width: calc(var(--size) + 2 * var(--gap) + 2 * var(--breadth));
+    height: calc(var(--size) + 2 * var(--gap) + 2 * var(--breadth));
+}
+ol.editor-thin-wall-edges input {
+    display: none;
+}
+ol.editor-thin-wall-edges input:checked + .-edge {
+    --visible-color: hsl(var(--main-hue), 90%, 50%);
+}
+ol.editor-thin-wall-edges label .-edge {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: var(--breadth) solid transparent;
+    --visible-color: #c0c0c0;
+}
+ol.editor-thin-wall-edges label[data-edge=north] .-edge {
+    top: 0;
+    left: var(--gap);
+    width: var(--size);
+    border-bottom-width: 0;
+    border-top-color: var(--visible-color);
+}
+ol.editor-thin-wall-edges label[data-edge=south] .-edge {
+    bottom: 0;
+    left: var(--gap);
+    width: var(--size);
+    border-top-width: 0;
+    border-bottom-color: var(--visible-color);
+}
+ol.editor-thin-wall-edges label[data-edge=west] .-edge {
+    left: 0;
+    top: var(--gap);
+    height: var(--size);
+    border-right-width: 0;
+    border-left-color: var(--visible-color);
+}
+ol.editor-thin-wall-edges label[data-edge=east] .-edge {
+    right: 0;
+    top: var(--gap);
+    height: var(--size);
+    border-left-width: 0;
+    border-right-color: var(--visible-color);
+}
 /* Railroad tracks are...  complicated */
 ul.editor-railroad-tile-tracks {
     display: grid;
@@ -2716,4 +2848,34 @@ ul.editor-railroad-tile-tracks {
 }
 ul.editor-railroad-tile-tracks.--switch input:checked + svg {
     stroke: hsl(15, 90%, 50%);
+}
+/* Cells are their own thing */
+form.editor-popup-tile-editor .-instructions {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 0.5em;
+    color: #999;
+    font-style: italic;
+}
+form.editor-popup-tile-editor .-instructions p {
+    margin: 0;
+}
+form.editor-popup-tile-editor .-instructions :nth-child(2) {
+    text-align: right;
+}
+ul.editor-popup-cell-contents {
+    display: flex;
+    flex-direction: row;
+    gap: 0.25em;
+}
+ul.editor-popup-cell-contents li {
+    padding: 2px;
+    background: #eee;
+}
+ul.editor-popup-cell-contents li.--editable {
+    background: hsl(300, 60%, 90%);
+}
+ul.editor-popup-cell-contents li canvas {
+    display: block;
 }

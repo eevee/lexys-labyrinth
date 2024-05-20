@@ -7,8 +7,21 @@ export const TOOLS = {
     pencil: {
         icon: 'icons/tool-pencil.png',
         name: "Pencil",
-        desc: "Place, erase, and select tiles.\n\n[mouse1] Draw\n[shift] [mouse1] Draw, replacing entire cell\n[ctrl] [mouse1] Erase (terrain becomes background)\n[ctrl] [shift] [mouse1] Erase entire cell\n\n[mouse2] Pick foreground tile\n[ctrl] [mouse2] Pick background tile",
+        desc: [
+            "Place, erase, and select tiles.",
+            "Picks the top-most tile by default.",
+            "Use the layer selector to pick specific tiles.",
+            "",
+            "[mouse1] Draw",
+            "[shift] [mouse1] Draw, replacing entire cell",
+            "[ctrl] [mouse1] Erase (terrain becomes background)",
+            "[ctrl] [shift] [mouse1] Erase entire cell",
+            "",
+            "[mouse2] Pick foreground tile",
+            "[ctrl] [mouse2] Pick background tile",
+        ].join("\n"),
         uses_palette: true,
+        uses_layers: true,
         op1: mouseops.PencilOperation,
         op2: mouseops.EyedropOperation,
         shortcut: 'b',
@@ -19,7 +32,10 @@ export const TOOLS = {
         name: "Line",
         desc: "Draw straight lines",
         uses_palette: true,
+        uses_layers: undefined,
         shortcut: 'l',
+        op1: mouseops.LineOperation,
+        op2: mouseops.EyedropOperation,
     },
     box: {
         // TODO not implemented
@@ -27,13 +43,27 @@ export const TOOLS = {
         name: "Box",
         desc: "Fill a rectangular area with tiles",
         uses_palette: true,
+        uses_layers: undefined,
         shortcut: 'u',
     },
     fill: {
         icon: 'icons/tool-fill.png',
         name: "Fill",
-        desc: "Flood-fill an area with tiles.",
+        desc: [
+            "Flood-fill an area with the current tile.",
+            "By default, fills the traversable region within the same layer.",
+            "Use the layer selector to floodfill within a specific layer.",
+            "",
+            "[mouse1] Floodfill",
+            "[ctrl] [mouse1] Floodfill, ignoring traversability",
+            "[shift] [mouse1] Fill all matching tiles in the entire level",
+            "",
+            "[mouse2] Pick foreground tile",
+            // TODO override the traversable part?  ctrl?
+            // TODO fill all similar tiles instead?  shift?
+        ].join("\n"),
         uses_palette: true,
+        uses_layers: undefined,
         op1: mouseops.FillOperation,
         op2: mouseops.EyedropOperation,
         shortcut: 'g',
@@ -41,23 +71,102 @@ export const TOOLS = {
     select_box: {
         icon: 'icons/tool-select-box.png',
         name: "Box select",
-        desc: "Select and manipulate rectangles.\n\n[mouse1] Select rectangle\n[shift] [mouse1] Add to selection\n[ctrl] [mouse1] Remove from selection\n\n[mouse1] Move selection\n[ctrl] [mouse1] Clone selection",
+        desc: [
+            "Select and manipulate rectangles.",
+            "",
+            "[mouse1] Select rectangle",
+            "[shift] [mouse1] Add to selection",
+            "[ctrl] [mouse1] Remove from selection",
+            "",
+            "[mouse1] Move selection",
+            "[ctrl] [mouse1] Clone selection",
+        ].join("\n"),
         affects_selection: true,
-        op1: mouseops.SelectOperation,
+        uses_layers: undefined,
+        op1: mouseops.BoxSelectOperation,
         shortcut: 'm',
+    },
+    select_wand: {
+        icon: 'icons/tool-select-wand.png',
+        name: "Wand select",
+        desc: [
+            "Select regions of similar tiles.",
+            "",
+            "[mouse1] Select contiguous similar tiles",
+            "[mouse2] Select all similar tiles",
+            "[shift] Add to selection",
+            "[ctrl] Remove from selection",
+            "",
+            "[mouse1] Move selection",
+            "[ctrl] [mouse1] Clone selection",
+        ].join("\n"),
+        affects_selection: true,
+        uses_layers: true,
+        op1: mouseops.WandSelectOperation,
+        shortcut: 'w',
     },
     'force-floors': {
         icon: 'icons/tool-force-floors.png',
         name: "Force floors",
         desc: "Draw force floors following the cursor.",
+        uses_layers: false,
+        min_version: 'cc1',
         op1: mouseops.ForceFloorOperation,
+    },
+    ice: {
+        icon: 'icons/tool-ice.png',
+        name: "Ice",
+        desc: [
+            "Draw ice following the cursor.",
+            "",
+            "[mouse1] Lay ice",
+        ].join("\n"),
+        uses_layers: false,
+        min_version: 'cc1',
+        op1: mouseops.IceOperation,
+        op2: mouseops.IceOperation,
     },
     tracks: {
         icon: 'icons/tool-tracks.png',
         name: "Tracks",
-        desc: "Draw tracks following the cursor.\n\n[mouse1] Lay tracks\n[ctrl] [mouse1] Erase tracks\n[mouse2] Toggle track switch",
+        desc: [
+            "Draw tracks following the cursor.",
+            "",
+            "[mouse1] Lay tracks",
+            "[ctrl] [mouse1] Erase tracks",
+            "[mouse2] Toggle track switch",
+        ].join("\n"),
+        uses_layers: false,
+        min_version: 'cc2',
         op1: mouseops.TrackOperation,
         op2: mouseops.TrackOperation,
+    },
+    text: {
+        icon: 'icons/tool-text.png',
+        name: "Text",
+        desc: [
+            "Type text directly onto the floor.",
+            "",
+            "[mouse1] Move cursor",
+        ].join("\n"),
+        uses_layers: false,
+        min_version: 'cc2',
+        op1: mouseops.TextOperation,
+        op2: mouseops.TextOperation,
+    },
+    thin_walls: {
+        icon: 'icons/tool-thin-walls.png',
+        name: "Thin walls",
+        desc: [
+            "Draw thin walls by dragging along the edges of cells.",
+            "",
+            "[mouse1] Draw thin walls",
+            "[mouse2] Draw one-way walls (LL only)",
+            "[ctrl] Erase",
+        ].join("\n"),
+        uses_layers: false,
+        op1: mouseops.ThinWallOperation,
+        op2: mouseops.ThinWallOperation,
     },
     // TODO this is so clumsy.  maybe right-click to cycle target, like pencil?  i don't know.  that
     // seems annoying for piercing through a lot of thin walls
@@ -65,7 +174,16 @@ export const TOOLS = {
     rotate: {
         icon: 'icons/tool-rotate.png',
         name: "Rotate",
-        desc: "Rotate existing tiles.\nAffects the top-most tile by default.\n\n[mouse1] Rotate clockwise\n[mouse2] Rotate counter-clockwise\n[ctrl] Target terrain\n[shift] Target actor",  // TODO? \n[ctrl] [shift] Affect actor without rotating 
+        desc: [
+            "Rotate existing tiles.",
+            "Works on both actors and orientable terrain.",
+            "Affects the top-most rotatable tile by default.",
+            "Use the layer selector to affect specific tiles.",
+            "",
+            "[mouse1] Rotate clockwise",
+            "[mouse2] Rotate counter-clockwise",
+        ].join("\n"),
+        uses_layers: new Set(['terrain', 'actor']),
         op1: mouseops.RotateOperation,
         op2: mouseops.RotateOperation,
         shortcut: 'r',
@@ -73,7 +191,21 @@ export const TOOLS = {
     adjust: {
         icon: 'icons/tool-adjust.png',
         name: "Adjust",
-        desc: "Inspect and alter miscellaneous tiles in a variety of ways.\nGive it a try!  Affects the top-most tile by default.\n\n[mouse1] Toggle tile type\n[mouse1] Press button\n[mouse2] Edit properties of complex tiles\n(wires, railroads, hints, etc.)\n[ctrl] Target terrain\n[shift] Target actor\n[ctrl] [shift] Target item",
+        desc: [
+            "Inspect and alter tiles in a variety of ways:",
+            "• Transmogrify tiles (including terrain)",
+            "• Edit letter tiles or hint text",
+            "• Change frame block arrows, track directions",
+            "• Preview or press buttons",
+            "• Edit thin walls",
+            "Affects the top-most adjustable tile by default.",
+            "Use the layer selector to affect specific tiles.",
+            "",
+            "[mouse1] Adjust tile",
+            "[mouse2] View cell contents + edit complex tiles",
+            "(hints, railroad tracks, etc.)",
+        ].join("\n"),
+        uses_layers: true,
         op1: mouseops.AdjustOperation,
         op2: mouseops.AdjustOperation,
         shortcut: 'a',
@@ -81,30 +213,48 @@ export const TOOLS = {
     connect: {
         icon: 'icons/tool-connect.png',
         name: "Connect",
-        // XXX shouldn't you be able to drag the destination?
-        // TODO mod + right click for RRO or diamond alg?  ah but we only have ctrl available
-        // ok lemme think then
-        // left drag: create a new connection (supported connections only)
-        // ctrl-click: erase all connections
-        // shift-drag: create a new connection (arbitrary cells)
-        // right drag: move a connection endpoint
-        // ctrl-right drag: move the other endpoint (if a cell is both source and dest)
-        desc: "Set up CC1-style clone and trap connections.\n(WIP)\nNOTE: Not supported in the real CC2!\n\n[mouse2] Auto link using Lynx/CC2 rules",
-        //desc: "Set up CC1-style clone and trap connections.\nNOTE: Not supported in CC2!\nLeft drag: link button with valid target\nCtrl-click: erase link\nRight click: auto link using Lynx rules",
+        desc: [
+            "Set up CC1-style clone and trap connections.",
+            "(Supported in CC1 and LL, but not CC2!)",
+            "",
+            "[mouse1] Connect a button to a mechanism",
+            "[mouse1] Move existing connections",
+            "[ctrl] [mouse1] Delete connection",
+            "[shift] [mouse1] Allow connecting to any cell",
+            "(not recommended)",
+            "[mouse2] Auto link a button using Lynx/CC2 rules",
+        ].join("\n"),
+        uses_layers: false,
         op1: mouseops.ConnectOperation,
         op2: mouseops.ConnectOperation,
     },
     wire: {
         icon: 'icons/tool-wire.png',
         name: "Wire",
-        desc: "Edit CC2 wiring.\n\n[mouse1] Draw wire\n[ctrl] [mouse1] Erase wire\n\n[mouse2] Toggle tunnels (floor only)",
+        desc: [
+            "Edit CC2 wiring.",
+            "",
+            "[mouse1] Draw wire",
+            "[ctrl] [mouse1] Erase wire",
+            "",
+            "[mouse2] Toggle tunnels (floor only)",
+        ].join("\n"),
+        uses_layers: true,
         op1: mouseops.WireOperation,
         op2: mouseops.WireOperation,
     },
     camera: {
         icon: 'icons/tool-camera.png',
         name: "Camera",
-        desc: "Draw and edit camera regions.\n(LL only.  When the player is within a camera region,\nthe camera stays locked inside it.)\n\n[mouse1] Create or edit a region\n[mouse2] Delete a region",
+        desc: [
+            "Draw and edit camera regions.",
+            "(LL only.  When the player is within a camera region,",
+            "the camera stays locked inside it.)",
+            "",
+            "[mouse1] Create or edit a region",
+            "[mouse2] Delete a region",
+        ].join("\n"),
+        uses_layers: false,
         op1: mouseops.CameraOperation,
         op2: mouseops.CameraEraseOperation,
     },
@@ -113,13 +263,50 @@ export const TOOLS = {
     // slade when you have some selected?
     // TODO ah, railroads...
 };
-export const TOOL_ORDER = ['pencil', 'select_box', 'fill', 'rotate', 'adjust', 'force-floors', 'tracks', 'connect', 'wire', 'camera'];
+export const TOOL_ORDER = [
+    'pencil', 'line', 'box', 'fill',
+    'select_box', 'select_wand',
+    'rotate', 'adjust',
+    'force-floors', 'ice', 'tracks', 'text', 'thin_walls',
+    'wire', 'connect',
+    'camera',
+];
 export const TOOL_SHORTCUTS = {};
 for (let [tool, tooldef] of Object.entries(TOOLS)) {
     if (tooldef.shortcut) {
         TOOL_SHORTCUTS[tooldef.shortcut] = tool;
     }
 }
+
+export const SELECTABLE_LAYERS = [{
+    ident: 'terrain',
+    name: "terrain",
+    desc: "This layer contains all kinds of floors, walls, and doors.\nIncludes buttons, traps, cloners, logic gates, etc.",
+}, {
+    ident: 'item',
+    name: "items",
+    desc: "This layer contains keys, tools, hearts, bonus candy,\ntime bonuses, the stopwatch, and mines.",
+}, {
+    ident: 'item_mod',
+    name: "item modifiers",
+    desc: "This layer contains item modifiers: the 'no' sign,\nthe gift bow, and the toll gate.",
+}, {
+    ident: 'actor',
+    name: "actors",
+    desc: "This layer contains players, blocks, and monsters.",
+}, {
+    ident: 'swivel',
+    name: "swivel doors",
+    desc: "This layer contains the rotating part of swivel doors.\n(The floor part goes on the terrain layer.)",
+}, {
+    ident: 'thin_wall',
+    name: "thin walls",
+    desc: "This layer contains thin walls.",
+}, {
+    ident: 'canopy',
+    name: "canopies",
+    desc: "This layer contains canopies.",
+}];
 
 // TODO this MUST use a LL tileset!
 export const PALETTE = [{
@@ -183,8 +370,8 @@ export const PALETTE = [{
         'walker',
         'fireball',
         'glider',
-        'bug',
         'paramecium',
+        'bug',
 
         'doppelganger1',
         'doppelganger2',
@@ -305,8 +492,8 @@ export const PALETTE = [{
 export const SPECIAL_PALETTE_ENTRIES = {
     'thin_walls/south':     { name: 'thin_walls', edges: DIRECTIONS['south'].bit },
     'frame_block/0':        { name: 'frame_block', direction: 'south', arrows: new Set },
-    'frame_block/1':        { name: 'frame_block', direction: 'north', arrows: new Set(['north']) },
-    'frame_block/2a':       { name: 'frame_block', direction: 'north', arrows: new Set(['north', 'east']) },
+    'frame_block/1':        { name: 'frame_block', direction: 'south', arrows: new Set(['south']) },
+    'frame_block/2a':       { name: 'frame_block', direction: 'south', arrows: new Set(['south', 'west']) },
     'frame_block/2o':       { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'south']) },
     'frame_block/3':        { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south']) },
     'frame_block/4':        { name: 'frame_block', direction: 'south', arrows: new Set(['north', 'east', 'south', 'west']) },
@@ -338,6 +525,10 @@ export const SPECIAL_PALETTE_ENTRIES = {
     'sokoban_wall/green':   { name: 'sokoban_wall', color: 'green' },
     'one_way_walls/south':  { name: 'one_way_walls', edges: DIRECTIONS['south'].bit },
 };
+for (let entry of Object.values(SPECIAL_PALETTE_ENTRIES)) {
+    entry.type = TILE_TYPES[entry.name];
+    delete entry.name;
+}
 
 // Editor-specific tile properties.  Every tile has a help entry, but some complex tiles have extra
 // editor behavior as well

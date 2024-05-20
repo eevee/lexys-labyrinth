@@ -142,6 +142,7 @@ export const CC2_TILESET_LAYOUT = {
         bomb: [5, 4],
         fuse: [7, 4],
     },
+    dormant_bomb: [5, 4],  // compat tile, so needs a fallback
     green_bomb: {
         __special__: 'bomb-fuse',
         bomb: [6, 4],
@@ -160,6 +161,7 @@ export const CC2_TILESET_LAYOUT = {
     explosion_nb: [[0, 5], [1, 5], [2, 5], [3, 5]],
     splash_slime: [[0, 5], [1, 5], [2, 5], [3, 5]],
     splash: [[4, 5], [5, 5], [6, 5], [7, 5]],
+    splash_nb: [[4, 5], [5, 5], [6, 5], [7, 5]],
     flame_jet_off: [8, 5],
     flame_jet_on: {
         __special__: 'animated',
@@ -293,7 +295,7 @@ export const CC2_TILESET_LAYOUT = {
     },
     // Thin walls are built piecemeal from two tiles; the first is N/S, the second is E/W
     thin_walls: {
-        __special__: 'thin_walls',
+        __special__: 'thin-walls',
         thin_walls_ns: [1, 10],
         thin_walls_ew: [2, 10],
     },
@@ -308,7 +310,7 @@ export const CC2_TILESET_LAYOUT = {
         },
     },
     popwall: [8, 10],
-    popwall2: [8, 10],
+    popwall2: [8, 10],  // compat tile, so needs a fallback
     gravel: [9, 10],
     ball: {
         __special__: 'animated',
@@ -846,7 +848,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     wall_invisible_revealed: [0, 1],
     // FIXME in cc1 tilesets these are opaque so they should draw at the terrain layer
     thin_walls: {
-        __special__: 'thin_walls_cc1',
+        __special__: 'thin-walls-cc1',
         north: [0, 6],
         west: [0, 7],
         south: [0, 8],
@@ -896,6 +898,7 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     button_blue: [2, 8],
     teleport_blue: [2, 9],
     bomb: [2, 10],
+    dormant_bomb: [2, 10],  // compat tile, so needs a fallback
     trap: {
         __special__: 'visual-state',
         closed: [2, 11],
@@ -904,12 +907,13 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     wall_appearing: [2, 12],
     gravel: [2, 13],
     popwall: [2, 14],
-    popwall2: [2, 14],
+    popwall2: [2, 14],  // compat tile, so needs a fallback
     hint: [2, 15],
 
     cloner: [3, 1],
     force_floor_all: [3, 2],
     splash: [3, 3],
+    splash_nb: [3, 3],
     bogus_player_drowned: [3, 3],
     bogus_player_burned_fire: [3, 4],
     bogus_player_burned: [3, 5],
@@ -1164,12 +1168,12 @@ export const LL_TILESET_LAYOUT = {
     grass: [2, 7],
 
     thin_walls: {
-        __special__: 'thin_walls',
+        __special__: 'thin-walls',
         thin_walls_ns: [8, 4],
         thin_walls_ew: [8, 5],
     },
     one_way_walls: {
-        __special__: 'thin_walls',
+        __special__: 'thin-walls',
         thin_walls_ns: [9, 4],
         thin_walls_ew: [9, 5],
     },
@@ -1244,6 +1248,7 @@ export const LL_TILESET_LAYOUT = {
         all: new Array(252).fill([12, 8]).concat([
             [8, 9], [9, 9], [10, 9], [11, 9],
         ]),
+        _distinct: [[12, 8], [8, 9], [9, 9], [10, 9], [11, 9]],
     },
     cracked_ice: [12, 9],
     ice_se: [13, 8],
@@ -1332,9 +1337,13 @@ export const LL_TILESET_LAYOUT = {
     foil: [2, 17],
     xray_eye: [3, 17],
     helmet: [4, 17],
+    phantom_ring: [5, 17],
+    feather: [6, 17],
+    dormant_bomb: [7, 17],
     skeleton_key: [0, 18],
     ankh: [1, 18],
     floor_ankh: [2, 18],
+    toll_gate: [5, 18],
     no_sign: [6, 18],
     gift_bow: [7, 18],
     score_10: [0, 19],
@@ -2033,6 +2042,7 @@ export const LL_TILESET_LAYOUT = {
     explosion: [[16, 26], [17, 26], [18, 26], [19, 26]],
     explosion_nb: [[16, 26], [17, 26], [18, 26], [19, 26]],
     splash: [[16, 27], [17, 27], [18, 27], [19, 27]],
+    splash_nb: [[16, 27], [17, 27], [18, 27], [19, 27]],
     splash_slime: [[16, 28], [17, 28], [18, 28], [19, 28]],
     fall: [[16, 29], [17, 29], [18, 29], [19, 29]],
     player1_exit: [[20, 28], [21, 28], [22, 28], [23, 28]],
@@ -2086,12 +2096,21 @@ export class DrawPacket {
 
 export class Tileset {
     constructor(image, layout, size_x, size_y) {
-        // XXX curiously, i note that .image is never used within this class
         this.image = image;
         this.layout = layout;
         this.size_x = size_x;
         this.size_y = size_y;
     }
+
+    // Draw to a canvas using tile coordinates
+    blit_to_canvas(ctx, sx, sy, dx, dy, w = 1, h = w) {
+        ctx.drawImage(
+            this.image,
+            sx * this.size_x, sy * this.size_y, w * this.size_x, h * this.size_y,
+            dx * this.size_x, dy * this.size_y, w * this.size_x, h * this.size_y);
+    }
+
+    // Everything from here on uses the DrawPacket API
 
     draw(tile, packet) {
         this.draw_type(tile.type.name, tile, packet);
@@ -2345,10 +2364,10 @@ export class Tileset {
     _draw_fourway_tile_power(tile, wires, packet) {
         // Draw the unpowered tile underneath, if any edge is unpowered (and in fact if /none/ of it
         // is powered then we're done here)
-        let powered = (tile.cell ? tile.powered_edges : 0) & wires;
-        if (! tile.cell || powered !== tile.wire_directions) {
+        let powered = (tile.powered_edges ?? 0) & wires;
+        if (powered !== tile.wire_directions) {
             this._draw_fourway_power_underlay(this.layout['#unpowered'], wires, packet);
-            if (! tile.cell || powered === 0)
+            if (powered === 0)
                 return;
         }
 
@@ -2695,10 +2714,10 @@ export class Tileset {
             else if (drawspec.__special__ === 'letter') {
                 this._draw_letter(drawspec, name, tile, packet);
             }
-            else if (drawspec.__special__ === 'thin_walls') {
+            else if (drawspec.__special__ === 'thin-walls') {
                 this._draw_thin_walls(drawspec, name, tile, packet);
             }
-            else if (drawspec.__special__ === 'thin_walls_cc1') {
+            else if (drawspec.__special__ === 'thin-walls-cc1') {
                 this._draw_thin_walls_cc1(drawspec, name, tile, packet);
             }
             else if (drawspec.__special__ === 'bomb-fuse') {
@@ -2812,7 +2831,7 @@ export function parse_tile_world_large_tileset(canvas) {
             // fell: n/a
         },
         thin_walls: {
-            __special__: 'thin_walls_cc1',
+            __special__: 'thin-walls-cc1',
         },
     };
     let image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -3057,6 +3076,10 @@ export function parse_tile_world_large_tileset(canvas) {
     }
     ctx.putImageData(image_data, 0, 0);
 
+    // These are compat tiles, which need to have a fallback
+    layout['popwall2'] = layout['popwall'];
+    layout['dormant_bomb'] = layout['bomb'];
+
     return new Tileset(canvas, layout, tw, th);
 }
 
@@ -3190,4 +3213,348 @@ export function infer_tileset_from_image(img, make_canvas) {
 
     // Anything else could be Tile World's "large" layout, which has no fixed dimensions
     return parse_tile_world_large_tileset(canvas);
+}
+
+
+// -------------------------------------------------------------------------------------------------
+// Tileset conversion
+
+// Copy tiles from a source image/canvas to a context.  The specs should be either a flat list
+// (static coordinates) or a list of lists (animation).
+function blit_tile_between_layouts(tileset, old_spec, new_spec, ctx) {
+    // First fix the nesting to be consistent both ways
+    if (! (old_spec[0] instanceof Array)) {
+        old_spec = [old_spec];
+    }
+    if (! (new_spec[0] instanceof Array)) {
+        new_spec = [new_spec];
+    }
+
+    // Now blit each frame of the new spec's animation, picking the closest frame from the original
+    for (let [i, dest] of new_spec.entries()) {
+        let src = old_spec[Math.floor(i * old_spec.length / new_spec.length)];
+        tileset.blit_to_canvas(ctx, ...src, ...dest);
+    }
+}
+
+const DOUBLE_SIZE_FALLBACK = {
+    horizontal: 'east',
+    vertical: 'south',
+    north: 'vertical',
+    south: 'vertical',
+    west: 'horizontal',
+    east: 'horizontal',
+};
+
+// TODO:
+// bombs
+// vfx collision
+// no enemy underlay
+// no green/purple block overlay
+// wrong double-recessed wall, somehow??
+// no turtles
+// missing base for double-size
+// missing editor cursors
+// timid teeth uses different frames, huh.
+// inactive red tele + trans are here and shouldn't be
+// sliding player is drawn over walking player
+// no wire icon
+// no clone arrows
+function convert_drawspec(tileset, old_spec, new_spec, ctx) {
+    // If the new spec is null, the tile doesn't exist there, which is fine
+    if (! new_spec)
+        return;
+
+    let recurse = (...keys) => {
+        for (let key of keys) {
+            convert_drawspec(tileset, old_spec[key], new_spec[key], ctx);
+        }
+    };
+
+    if (new_spec instanceof Array && old_spec instanceof Array) {
+        // Simple frames
+        // TODO what if old_spec is *not* an array??
+        blit_tile_between_layouts(tileset, old_spec, new_spec, ctx);
+    }
+    else if ((new_spec.__special__ ?? 'animated') === (old_spec.__special__ ?? 'animated')) {
+        if (! new_spec.__special__ || new_spec.__special__ === 'animated') {
+            // Actor facings
+            if (old_spec instanceof Array) {
+                old_spec = {all: old_spec};
+            }
+            if (new_spec instanceof Array) {
+                new_spec = {all: new_spec};
+            }
+
+            if (old_spec.all && new_spec.all) {
+                recurse('all');
+            }
+            else if (! old_spec.all && ! new_spec.all) {
+                recurse('north', 'south', 'east', 'west');
+            }
+            else if (old_spec.all && ! new_spec.all) {
+                convert_drawspec(tileset, old_spec.all, new_spec.north, ctx);
+                convert_drawspec(tileset, old_spec.all, new_spec.south, ctx);
+                convert_drawspec(tileset, old_spec.all, new_spec.east, ctx);
+                convert_drawspec(tileset, old_spec.all, new_spec.west, ctx);
+            }
+            else {  // ! old_spec.all && new_spec.all
+                convert_drawspec(tileset, old_spec.south, new_spec.all, ctx);
+            }
+        }
+        else if (new_spec.__special__ === 'arrows') {
+            recurse('base', 'arrows');
+        }
+        else if (new_spec.__special__ === 'double-size-monster') {
+            convert_drawspec(tileset, old_spec.base, new_spec.base, ctx);
+            for (let [direction, fallback] of Object.entries(DOUBLE_SIZE_FALLBACK)) {
+                convert_drawspec(
+                    tileset, old_spec[direction] ?? old_spec[fallback], new_spec[direction], ctx);
+            }
+        }
+        else if (new_spec.__special__ === 'letter') {
+            recurse('base');
+            // Technically this doesn't work for two layouts with letters laid out differently, but
+            // no two such layouts exist, so, whatever
+            for (let [glyph, new_coords] of Object.entries(new_spec.letter_glyphs)) {
+                let old_coords = old_spec.letter_glyphs[glyph];
+                tileset.blit_to_canvas(ctx, ...old_coords, ...new_coords, 0.5, 0.5);
+            }
+            for (let [i, new_range] of new_spec.letter_ranges.entries()) {
+                let old_range = old_spec.letter_ranges[i];
+                tileset.blit_to_canvas(ctx,
+                    old_range.x0, old_range.y0, new_range.x0, new_range.y0,
+                    new_range.columns * new_range.w,
+                    Math.ceil((new_range.range[1] - new_range.range[0]) / new_range.columns) * new_range.h);
+            }
+        }
+        else if (new_spec.__special__ === 'logic-gate') {
+            tileset.blit_to_canvas(ctx,
+                old_spec.counter_numbers.x, old_spec.counter_numbers.y,
+                new_spec.counter_numbers.x, new_spec.counter_numbers.y,
+                old_spec.counter_numbers.width * 12, old_spec.counter_numbers.height);
+            for (let gate_type of ['not', 'and', 'or', 'xor', 'nand', 'latch-ccw', 'latch-cw', 'counter']) {
+                convert_drawspec(
+                    tileset, old_spec.logic_gate_tiles[gate_type], new_spec.logic_gate_tiles[gate_type], ctx);
+            }
+        }
+        else if (new_spec.__special__ === 'perception') {
+            recurse('hidden', 'revealed');
+        }
+        else if (new_spec.__special__ === 'railroad') {
+            recurse('base', 'railroad_switch');
+            for (let key of ['railroad_ties', 'railroad_inactive', 'railroad_active']) {
+                for (let dir of ['ne', 'se', 'sw', 'nw', 'ew', 'ns']) {
+                    convert_drawspec(tileset, old_spec[key][dir], new_spec[key][dir], ctx);
+                }
+            }
+        }
+        else if (new_spec.__special__ === 'rover') {
+            // No one is ever gonna come up with an alternate rover so just copy enough to hit all
+            // of CC2's frames
+            recurse('glider', 'walker', 'direction');
+        }
+        else if (new_spec.__special__ === 'scroll') {
+            let sx = old_spec.base[0] + Math.min(0, old_spec.scroll_region[0]);
+            let sy = old_spec.base[1] + Math.min(0, old_spec.scroll_region[1]);
+            let dx = new_spec.base[0] + Math.min(0, new_spec.scroll_region[0]);
+            let dy = new_spec.base[1] + Math.min(0, new_spec.scroll_region[1]);
+            tileset.blit_to_canvas(
+                ctx, sx, sy, dx, dy,
+                Math.abs(old_spec.scroll_region[0]) + 1,
+                Math.abs(old_spec.scroll_region[1]) + 1);
+        }
+        else if (new_spec.__special__ === 'thin-walls') {
+            recurse('thin_walls_ns', 'thin_walls_ew');
+        }
+        else if (new_spec.__special__ === 'thin-walls-cc1') {
+            recurse('north', 'south', 'east', 'west', 'southeast');
+        }
+        else if (new_spec.__special__ === 'visual-state') {
+            for (let key of Object.keys(new_spec)) {
+                if (key === '__special__')
+                    continue;
+
+                let old_state = old_spec[key];
+                let new_state = new_spec[key];
+                // These might be strings, meaning aliases...
+                if (typeof new_state === 'string') {
+                    // New tileset doesn't have dedicated space for this, so nothing to do
+                    continue;
+                }
+                else if (typeof old_state === 'string') {
+                    // New tileset wants it, but old tileset aliases it, so deref
+                    old_state = old_spec[old_state];
+                }
+                convert_drawspec(tileset, old_state, new_state, ctx);
+            }
+        }
+        else if (new_spec.__special__ === 'wires') {
+            recurse('base', 'wired', 'wired_cross');
+        }
+        /*
+            else if (drawspec.__special__ === 'overlay') {
+                this._draw_overlay(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'scroll') {
+                this._draw_scroll(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'bomb-fuse') {
+                this._draw_bomb_fuse(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'double-size-monster') {
+                this._draw_double_size_monster(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'rover') {
+                this._draw_rover(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'railroad') {
+                this._draw_railroad(drawspec, name, tile, packet);
+            }
+            else if (drawspec.__special__ === 'encased_item') {
+                this._draw_encased_item(drawspec, name, tile, packet);
+            }
+            else {
+                console.error(`No such special ${drawspec.__special__} for ${name}`);
+            }
+        */
+        else {
+            return false;
+        }
+    }
+    else if (new_spec.__special__ === 'double-size-monster') {
+        // Converting an old single-size monster to a new double-size one is relatively easy; we can
+        // just draw the small one offset within the double-size space.  Unfortunately for layouts
+        // like CC2 we can only show one vertical and one horizontal direction...
+
+        for (let [direction, fallback] of Object.entries(DOUBLE_SIZE_FALLBACK)) {
+            let new_frames = new_spec[direction];
+            if (! new_frames)
+                continue;
+            let old_frames = old_spec[direction] ?? old_spec[fallback];
+            for (let [i, dest] of new_frames.entries()) {
+                if (dest === null)
+                    // This means "use the base sprite"
+                    continue;
+                let src = old_frames[Math.floor(i * old_frames.length / new_frames.length)];
+                let [dx, dy] = dest;
+                if (direction === 'horizontal' || fallback === 'horizontal') {
+                    dx += i / new_frames.length;
+                }
+                else {
+                    dy += i / new_frames.length;
+                }
+                tileset.blit_to_canvas(ctx, ...src, dx, dy);
+            }
+        }
+    }
+    // TODO the other way, yikes
+    // Convert buttons to/from LL, which adds depressed states
+    else if (! old_spec.__special__ && new_spec.__special__ === 'visual-state') {
+        // Draw the static tile to every state in the new tileset
+        for (let [key, subspec] of Object.entries(new_spec)) {
+            if (key === '__special__' || typeof subspect === 'string')
+                continue;
+            convert_drawspec(tileset, old_spec, subspec, ctx);
+        }
+    }
+    else if (! new_spec.__special__ && old_spec.__special__ === 'visual-state') {
+        // Draw the most fundamental state as the static tile
+        let representative_spec = (
+            old_spec.open  // trap
+            || old_spec.released  // button
+            || old_spec.normal  // player i guess??
+        );
+        convert_drawspec(tileset, representative_spec, new_spec, ctx);
+    }
+    else {
+        return false;
+    }
+}
+
+export function convert_tileset_to_tile_world_animated(tileset) {
+}
+
+export function convert_tileset_to_layout(tileset, layout_ident) {
+    if (layout_ident === tileset.layout['#ident']) {
+        return tileset.image;
+    }
+    if (layout_ident === 'tw-animated') {
+        return convert_tileset_to_tile_world_animated(tileset);
+    }
+
+    let layout = TILESET_LAYOUTS[layout_ident];
+    let canvas = document.createElement('canvas');
+    canvas.width = layout['#dimensions'][0] * tileset.size_x;
+    canvas.height = layout['#dimensions'][1] * tileset.size_y;
+    let ctx = canvas.getContext('2d');
+
+    let comparison = {};
+    let summarize = spec => {
+        if (! spec) {
+            return null;
+        }
+        else if (spec instanceof Array) {
+            return '-';
+        }
+        else {
+            return spec.__special__;
+        }
+    };
+
+    for (let [name, spec] of Object.entries(layout)) {
+        // These things aren't tiles
+        if (name === '#ident' || name === '#name' || name === '#dimensions' ||
+            name === '#supported-versions' || name === '#wire-width')
+        {
+            continue;
+        }
+
+        // These sequences only really exist in LL and were faked with other tiles in other tilesets
+        // TODO so include the fake in LL, right?
+        if (name === 'player1_exit' || name === 'player2_exit') {
+            continue;
+        }
+
+        let old_spec = tileset.layout[name];
+        if (! old_spec)
+            // Guess we can't, uh, do much about this?
+            // TODO warn?  dummy tiles?
+            continue;
+
+        // Manually adjust some incompatible tilesets
+        // LL's tileset adds animation for ice, which others don't have, and it's difficult to
+        // convert directly because it repeats its tiles a lot
+        if (name === 'ice' && layout_ident === 'lexy') {
+            // To convert TO LL, copy a lone ice tile to every position
+            for (let coords of spec._distinct) {
+                tileset.blit_to_canvas(ctx, ...old_spec, ...coords);
+            }
+            continue;
+        }
+        else if (name === 'ice' && tileset.layout['#ident'] === 'lexy') {
+            // To convert FROM LL, pretend it only has its one tile
+            tileset.blit_to_canvas(ctx, ...old_spec._distinct[0], ...spec);
+            continue;
+        }
+
+        // OK, do the automatic thing
+        if (convert_drawspec(tileset, old_spec, spec, ctx) === false) {
+            comparison[name] = {
+                old: summarize(old_spec),
+                'new': summarize(spec),
+            };
+        }
+    }
+    console.table(comparison);
+
+    console.log(canvas);
+    console.log('%c ', `
+        display: inline-block;
+        font-size: 1px;
+        padding: ${canvas.width}px ${canvas.height}px;
+        background: url(${canvas.toDataURL()});
+    `);
+    console.log(canvas.toDataURL());
+    return canvas;
 }

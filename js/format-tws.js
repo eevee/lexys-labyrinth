@@ -13,6 +13,7 @@ const TW_DIRECTION_TO_INPUT_BITS = [
     INPUT_BITS.down | INPUT_BITS.right,
 ];
 
+// doc: http://www.muppetlabs.com/~breadbox/software/tworld/tworldff.html#3
 export function parse_solutions(bytes) {
     let buf;
     if (bytes.buffer) {
@@ -82,10 +83,12 @@ export function parse_solutions(bytes) {
             let q = p + 16;
             while (q < p + len) {
                 // There are four formats for packing solutions, identified by the lowest two bits,
-                // except that format 3 is actually two formats, don't ask
+                // except that format 3 is actually two formats.  Be aware that the documentation
+                // refers to them in a different order than suggested by the identifying nybble.
                 let fmt = bytes[q] & 0x3;
                 let fmt2 = (bytes[q] >> 4) & 0x1;
                 if (fmt === 0) {
+                    // "Third format": three consecutive moves packed into one byte
                     let val = bytes[q];
                     q += 1;
                     let input1 = TW_DIRECTION_TO_INPUT_BITS[(val >> 2) & 0x3];
@@ -98,6 +101,8 @@ export function parse_solutions(bytes) {
                     );
                 }
                 else if (fmt === 1 || fmt === 2 || (fmt === 3 && fmt2 === 0)) {
+                    // "First format" and "second format": one, two, or four bytes containing a
+                    // direction and a number of tics
                     let val;
                     if (fmt === 1) {
                         val = bytes[q];
@@ -118,9 +123,34 @@ export function parse_solutions(bytes) {
                     }
                     inputs.push(input);
                 }
-                else {  // 3-1
-                    // variable-size and only needed for ms so let's just hope not
-                    throw new Error;
+                else {  // low nybble is 3, and bit 4 is set
+                    // "Fourth format": 2 to 5 bytes, containing an exceptionally long direction
+                    // field and time field, mostly used for MSCC mouse moves
+                    let n = ((bytes[q] >> 2) & 0x3) + 2;
+                    if (q + n - 1 >= bytes.length)
+                        throw new Error(`Malformed TWS file: expected ${n} bytes starting at ${q}, but only found ${bytes.length - q}`);
+
+                    // Up to 5 bytes is an annoying amount, but we can cut it down to 1-4 by
+                    // extracting the direction first
+                    let input = (bytes[q] >> 5) | ((bytes[q + 1] & 0x3f) << 3);
+                    let duration = bytes[q + 1] >> 6;
+                    for (let i = 3; i <= n; i++) {
+                        duration |= bytes[q + i - 1] << (2 + (i - 3) * 8);
+                    }
+
+                    // Mouse moves are encoded as 16 + ((y + 9) * 19) + (x + 9), but I extremely do
+                    // not support them at the moment (and may never), so replace them with blank
+                    // input for now (and possibly forever)
+                    if (input >= 16) {
+                        input = 0;
+                    }
+
+                    // And now queue it up
+                    for (let i = 0; i < duration; i++) {
+                        inputs.push(input);
+                    }
+
+                    q += n;
                 }
             }
 
