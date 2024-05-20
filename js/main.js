@@ -570,6 +570,7 @@ class Player extends PrimaryView {
         this.scale = 1;
         this.play_speed = 1;
         this.show_captions = false;
+        this.touch_mode = 'swipe';
 
         this.level_el = this.root.querySelector('.level');
         this.overlay_message_el = this.root.querySelector('.player-overlay-message');
@@ -888,52 +889,75 @@ class Player extends PrimaryView {
             }
         });
         // Similarly, grab touch events and translate them to directions
-        this.current_touches = {};  // ident => action
-        this.touch_history = {} // ident => {x, y} representing start of touch
+        this.current_touches = {};  // ident => {x0, y0, action}
         this.touch_restart_delay = new util.DelayTimer;
         let touch_target = this.root.querySelector('#player-game-area .level');
-        let start_touches = ev => {
-            ev.stopPropagation();
-            ev.preventDefault();
-            this.using_touch = true;
-            for (let touch of ev.changedTouches) {
-                this.touch_history[touch.identifier] = {x: touch.clientX, y: touch.clientY};
-            }
-        }
         let collect_touches = ev => {
             ev.stopPropagation();
             ev.preventDefault();
             this.using_touch = true;
 
-            // Figure out where these touches are, relative to the player
             // TODO allow starting a level without moving?
             // TODO if you don't move the touch, the player can pass it and will keep going in that
             // direction?
+            let rect = this.renderer.canvas.getBoundingClientRect();
             for (let touch of ev.changedTouches) {
-                let start = this.touch_history[touch.identifier]
-                let [x, y] = this.renderer.point_to_real_cell_coords(touch.clientX, touch.clientY);
-                let [px, py] = this.renderer.point_to_real_cell_coords(start.x, start.y);
-                let dx = x - px;
-                let dy = y - py;
-                // Divine a direction from the results
-                let action;
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    if (dx < 0) {
-                        action = 'left';
-                    }
-                    else {
-                        action = 'right';
-                    }
+                let record = this.current_touches[touch.identifier];
+                if (! record) {
+                    record = { x0: touch.clientX, y0: touch.clientY };
+                    this.current_touches[touch.identifier] = record;
+                }
+
+                // Convert a touch into pixel deltas
+                let dx, dy;
+                if (this.touch_mode === 'swipe') {
+                    // Swipe mode (pixels): move relative to the direction of the touch motion
+                    dx = touch.clientX - record.x0;
+                    dy = touch.clientY - record.y0;
+                }
+                else if (this.touch_mode === 'viewport') {
+                    // Viewport tap (cells): touching in the top quadrant of the viewport means move
+                    // up, the bottom quadrant means move down, etc.
+                    dx = touch.clientX - (rect.left + rect.width / 2);
+                    dy = touch.clientY - (rect.top + rect.height / 2);
+                }
+                else if (this.touch_mode === 'player') {
+                    // Player tap: touching above the player means move up, etc.
+                    // (The difference from 'viewport' is what happens when the player is near the
+                    // edge of the viewport, such as in 10×10 levels.)
+                    let [px, py] = this.level.player.visual_position();
+                    let [cx, cy] = this.renderer.cell_coords_to_client_point(px + 0.5, py + 0.5);
+                    dx = touch.clientX - cx;
+                    dy = touch.clientY - cy;
                 }
                 else {
-                    if (dy < 0) {
-                        action = 'up';
-                    }
-                    else {
-                        action = 'down';
-                    }
+                    // ???
+                    return;
                 }
-                this.current_touches[touch.identifier] = action;
+
+                // Deadzone: if we've only moved a few pixels, don't count this as motion yet
+                // TODO allow touch-to-wait
+                if (dx*dx + dy*dy < 4)
+                    continue;
+
+                // Divine directions from the results.  Diagonal moves are also allowed, with a sort
+                // of angular deadzone: if the distance along one axis is more than 1.5× the
+                // distance along the other axis, that's probably a move in only one direction.
+                // (That corresponds to a cone of about 67° centered on each orthogonal direction,
+                // and a cone of about 23° centered on each diagonal, so a diagonal touch is likely
+                // to be deliberate.)
+                // Switching that around, we're moving along one axis as long as 1.5× the movement
+                // along that axis is greater than the movement along the other.  The order of
+                // actions doesn't actually matter, so just use one for X and one for Y:
+                record.action = null;
+                record.action2 = null;
+                if (2 * Math.abs(dx) >= Math.abs(dy)) {
+                    record.action = dx < 0 ? 'left' : 'right';
+                }
+                if (2 * Math.abs(dy) >= Math.abs(dx)) {
+                    record.action2 = dy < 0 ? 'up' : 'down';
+                }
+                record.last_move = performance.now();
             }
 
             // TODO for demo compat, this should happen as part of input reading?
@@ -941,12 +965,11 @@ class Player extends PrimaryView {
                 this.set_state('playing');
             }
         };
-        touch_target.addEventListener('touchstart', start_touches);
+        touch_target.addEventListener('touchstart', collect_touches);
         touch_target.addEventListener('touchmove', collect_touches);
         let dismiss_touches = ev => {
             for (let touch of ev.changedTouches) {
                 delete this.current_touches[touch.identifier];
-                delete this.touch_history[touch.identifier];
             }
         };
         touch_target.addEventListener('touchend', dismiss_touches);
@@ -1441,6 +1464,12 @@ class Player extends PrimaryView {
     }
 
     reload_options(options) {
+        this.touch_mode = options.touch_mode ?? 'swipe';
+        if (! ['swipe', 'viewport', 'player'].includes(this.touch_mode)) {
+            this.touch_mode = 'swipe';
+        }
+        this.renderer.use_cc2_anim_speed = options.use_cc2_anim_speed ?? false;
+
         this.music_audio_el.volume = options.music_volume ?? 1.0;
         // TODO hide music info when disabled?
         this.music_enabled = options.music_enabled ?? true;
@@ -1454,7 +1483,6 @@ class Player extends PrimaryView {
         if (! this.show_captions) {
             this.captions_el.textContent = '';
         }
-        this.renderer.use_cc2_anim_speed = options.use_cc2_anim_speed ?? false;
 
         if (this.level) {
             this.update_tileset();
@@ -1633,8 +1661,13 @@ class Player extends PrimaryView {
                 input |= INPUT_BITS[this.key_mapping[key]];
             }
             this.current_keys_new.clear();
-            for (let action of Object.values(this.current_touches)) {
-                input |= INPUT_BITS[action];
+            for (let touch of Object.values(this.current_touches)) {
+                if (touch.action) {
+                    input |= INPUT_BITS[touch.action];
+                }
+                if (touch.action2) {
+                    input |= INPUT_BITS[touch.action2];
+                }
             }
         }
 
@@ -2985,6 +3018,21 @@ class OptionsOverlay extends DialogOverlay {
 
         // Simple options
         dl.append(
+            mk('dt', "Touch controls"),
+            mk('dd',
+                mk('label',
+                    mk('input', {name: 'touch-mode', type: 'radio', value: 'swipe'}),
+                    " Swipe, starting from anywhere"),
+                mk('label',
+                    mk('input', {name: 'touch-mode', type: 'radio', value: 'viewport'}),
+                    " Tap and hold, relative to viewport"),
+                mk('label',
+                    mk('input', {name: 'touch-mode', type: 'radio', value: 'player'}),
+                    " Tap and hold, relative to player"),
+            ),
+            mk('dt'),
+            mk('dd', mk('label', mk('input', {name: 'use-cc2-anim-speed', type: 'checkbox'}), " Use CC2 animation speed")),
+            mk('h2', "Audio"),
             mk('dt', "Music volume"),
             mk('dd.option-volume',
                 mk('label', mk('input', {name: 'music-enabled', type: 'checkbox'}), " Enabled"),
@@ -3005,8 +3053,6 @@ class OptionsOverlay extends DialogOverlay {
             ),
             mk('dt'),
             mk('dd', mk('label', mk('input', {name: 'show-captions', type: 'checkbox'}), " Enable captions")),
-            mk('dt'),
-            mk('dd', mk('label', mk('input', {name: 'use-cc2-anim-speed', type: 'checkbox'}), " Use CC2 animation speed")),
         );
         // Update volume live, if the player is active and was playing when this dialog was opened
         // (note that it won't auto-pause until open())
@@ -3100,13 +3146,14 @@ class OptionsOverlay extends DialogOverlay {
         });
 
         // Load current values
+        this.root.elements['touch-mode'].value = this.conductor.options.touch_mode ?? 'swipe';
+        this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
         this.root.elements['music-volume'].value = this.conductor.options.music_volume ?? 1.0;
         this.root.elements['music-enabled'].checked = this.conductor.options.music_enabled ?? true;
         this.root.elements['sound-volume'].value = this.conductor.options.sound_volume ?? 1.0;
         this.root.elements['sound-enabled'].checked = this.conductor.options.sound_enabled ?? true;
         this.root.elements['spatial-mode'].value = this.conductor.options.spatial_mode ?? 2;
         this.root.elements['show-captions'].checked = this.conductor.options.show_captions ?? false;
-        this.root.elements['use-cc2-anim-speed'].checked = this.conductor.options.use_cc2_anim_speed ?? false;
 
         for (let slot of TILESET_SLOTS) {
             let radioset = this.root.elements[`tileset-${slot.ident}`];
@@ -3279,13 +3326,14 @@ class OptionsOverlay extends DialogOverlay {
 
     save() {
         let options = this.conductor.options;
+        options.touch_mode = this.root.elements['touch-mode'].value;
+        options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
         options.music_volume = parseFloat(this.root.elements['music-volume'].value);
         options.music_enabled = this.root.elements['music-enabled'].checked;
         options.sound_volume = parseFloat(this.root.elements['sound-volume'].value);
         options.sound_enabled = this.root.elements['sound-enabled'].checked;
         options.spatial_mode = parseInt(this.root.elements['spatial-mode'].value, 10);
         options.show_captions = this.root.elements['show-captions'].checked;
-        options.use_cc2_anim_speed = this.root.elements['use-cc2-anim-speed'].checked;
 
         // Tileset stuff: slightly more complicated.  Save custom ones to localStorage as data URIs,
         // and /delete/ any custom ones we're not using any more, both of which require knowing

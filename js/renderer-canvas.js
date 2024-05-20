@@ -149,6 +149,7 @@ export class CanvasRenderer {
             tile_w, tile_h);
     }
 
+    // XXX why do i need all of these lol
     cell_coords_from_event(ev) {
         let rect = this.canvas.getBoundingClientRect();
         let scale_x = rect.width / this.canvas.width;
@@ -183,6 +184,15 @@ export class CanvasRenderer {
         let x = (client_x - rect.x) / scale_x / this.tileset.size_x + this.viewport_x;
         let y = (client_y - rect.y) / scale_y / this.tileset.size_y + this.viewport_y;
         return [x, y];
+    }
+
+    cell_coords_to_client_point(x, y) {
+        let rect = this.canvas.getBoundingClientRect();
+        let scale_x = rect.width / this.canvas.width;
+        let scale_y = rect.height / this.canvas.height;
+        let client_x = (x - this.viewport_x) * this.tileset.size_x * scale_x + rect.x;
+        let client_y = (y - this.viewport_y) * this.tileset.size_y * scale_y + rect.y;
+        return [client_x, client_y];
     }
 
     _adjust_viewport_if_dirty() {
