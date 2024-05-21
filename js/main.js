@@ -566,6 +566,28 @@ class Player extends PrimaryView {
             e: 'cycle',
             c: 'swap',
         };
+        // The buttons in order, then two entries each for the axes (17 to 24)
+        // TODO need extra controls for: undo, rewind, pause, begin, etc., but this is currently
+        // only checked in get_input()
+        this.gamepad_mapping = {
+            0: 'drop',  // south (B)
+            1: 'wait',  // east (A)
+            2: 'cycle',  // north (X)
+            3: 'swap',  // west (Y)
+            12: 'up',
+            13: 'down',
+            14: 'left',
+            15: 'right',
+
+            17: 'left',
+            18: 'right',
+            19: 'up',
+            20: 'down',
+            21: 'left',
+            22: 'right',
+            23: 'up',
+            24: 'down',
+        };
 
         this.scale = 1;
         this.play_speed = 1;
@@ -936,6 +958,51 @@ class Player extends PrimaryView {
                 ev.stopPropagation();
                 ev.preventDefault();
             }
+        });
+
+        // Support gamepads too!
+        this.gamepads_enabled = false;
+        this.all_gamepad_mappings = null;
+        this.connected_gamepad_mappings = [];
+        window.addEventListener('gamepadconnected', async ev => {
+            if (! this.gamepads_enabled) {
+                this.all_gamepad_mappings = await util.fetch('gamepad-mappings.json', 'json');
+                this.gamepads_enabled = true;
+            }
+
+            // If the standard mapping works, trust it I guess?
+            if (ev.gamepad.mapping)
+                return;
+
+            let key, match;
+            if (match = ev.gamepad.id.match(/[(]Vendor: ([0-9a-f]{4}) Product: ([0-9a-f]{4})[)]$/)) {
+                // Chrome's format
+                key = `${match[1]}:${match[2]}`
+            }
+            else if (match = ev.gamepad.id.match(/^([0-9a-f]{4})-([0-9a-f]{4})-/)) {
+                // Firefox's format
+                key = `${match[1]}:${match[2]}`
+            }
+            else {
+                // No idea
+                return;
+            }
+
+            let mapping = this.all_gamepad_mappings[key];
+            if (! mapping)
+                return;
+
+            this.connected_gamepad_mappings[ev.gamepad.index] = mapping.split(/ /).map(control => {
+                if (control.startsWith('a')) {
+                    return ['axis', parseInt(control.substring(1), 10), control.endsWith('-') ? -1 : +1];
+                }
+                else if (control.startsWith('b')) {
+                    return ['button', parseInt(control.substring(1), 10)];
+                }
+                else {
+                    return null;
+                }
+            });
         });
 
         // When we lose focus, act as though every key was released, and pause the game
@@ -1709,26 +1776,64 @@ class Player extends PrimaryView {
     }
 
     get_input() {
-        let input;
         if (this.debug && this.debug.replay && ! this.debug.replay_recording) {
-            input = this.debug.replay.get(this.level.tic_counter);
+            return this.debug.replay.get(this.level.tic_counter);
         }
-        else {
-            // Convert input keys to actions
-            input = 0;
-            for (let key of this.current_keys) {
-                input |= INPUT_BITS[this.key_mapping[key]];
+
+        let input = 0;
+        // Keys
+        for (let key of this.current_keys) {
+            input |= INPUT_BITS[this.key_mapping[key]];
+        }
+        for (let key of this.current_keys_new) {
+            input |= INPUT_BITS[this.key_mapping[key]];
+        }
+        this.current_keys_new.clear();
+
+        // Touches
+        for (let touch of Object.values(this.current_touches)) {
+            if (touch.action) {
+                input |= INPUT_BITS[touch.action];
             }
-            for (let key of this.current_keys_new) {
-                input |= INPUT_BITS[this.key_mapping[key]];
+            if (touch.action2) {
+                input |= INPUT_BITS[touch.action2];
             }
-            this.current_keys_new.clear();
-            for (let touch of Object.values(this.current_touches)) {
-                if (touch.action) {
-                    input |= INPUT_BITS[touch.action];
-                }
-                if (touch.action2) {
-                    input |= INPUT_BITS[touch.action2];
+        }
+
+        // Gamepads maybe
+        if (this.gamepads_enabled) {
+            for (let gamepad of navigator.getGamepads()) {
+                if (! gamepad)
+                    continue;
+
+                let mapping = this.connected_gamepad_mappings[gamepad.index];
+                for (let [i, action] of Object.entries(this.gamepad_mapping)) {
+                    i *= 1;
+                    let control;
+                    if (mapping) {
+                        control = mapping[i];
+                    }
+                    else if (i <= 16) {
+                        control = ['button', i];
+                    }
+                    else {
+                        control = ['axis', Math.floor((i - 17) / 2), i % 2 ? -1 : +1];
+                    }
+                    if (! control)
+                        continue;
+
+                    let active = false;
+                    if (control[0] === 'button') {
+                        active = gamepad.buttons[control[1]].pressed;
+                    }
+                    else if (control[0] === 'axis') {
+                        let value = gamepad.axes[control[1]];
+                        active = (value && value * control[2] > 0.25);
+                    }
+
+                    if (active) {
+                        input |= INPUT_BITS[action];
+                    }
                 }
             }
         }
