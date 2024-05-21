@@ -734,14 +734,12 @@ class Player extends PrimaryView {
         this.next_player_move = null;
         this.player_used_move = false;
         let key_target = document.body;
-        this.using_touch = false;  // true if using touch controls
         this.current_keys = new Set;  // keys that are currently held
         this.current_keys_new = new Set; // keys that were pressed since input was last read
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
             if (! this.active)
                 return;
-            this.using_touch = false;
 
             // Ignore IME composition
             if (ev.isComposing || ev.keyCode === 229)
@@ -876,7 +874,6 @@ class Player extends PrimaryView {
         let collect_touches = ev => {
             ev.stopPropagation();
             ev.preventDefault();
-            this.using_touch = true;
 
             // TODO allow starting a level without moving?
             // TODO if you don't move the touch, the player can pass it and will keep going in that
@@ -2166,23 +2163,15 @@ class Player extends PrimaryView {
                 mk('h3', stored_level.author ? `by ${stored_level.author}` : "\u200b"),
                 this.mobile_pause_menu,
                 mk('div.-best-score', best_score),
+                mk('p.-controls-hint.--touch', "tap to start"),
+                mk('p.-controls-hint.--no-touch', "WASD/↑←↓→ to move · space to idle"),
             );
-            if (this.using_touch) {
-                overlay.append(mk('p.-controls-hint', "tap to start"));
-            }
-            else {
-                overlay.append(mk('p.-controls-hint', "WASD/↑←↓→ to move · space to idle"));
-            }
         }
         else if (this.state === 'paused') {
             overlay.append(mk('h2', "/// paused ///"));
-            if (this.using_touch) {
-                overlay.append(mk('p.-controls-hint', "tap to resume"));
-            }
-            else {
-                overlay.append(mk('p.-controls-hint', "press space to resume"));
-            }
             overlay.append(this.mobile_pause_menu);
+            overlay.append(mk('p.-controls-hint.--touch', "tap to resume"));
+            overlay.append(mk('p.-controls-hint.--no-touch', "press space to resume"));
         }
         else if (this.state === 'stopped') {
             // Set a timer before tapping the overlay will restart/advance
@@ -2195,14 +2184,9 @@ class Player extends PrimaryView {
                     mk('h2', "whoops" + random_choice(["", "!", "?", "..."])),
                     mk('h3', random_choice(obits)),
                     this.mobile_pause_menu,
+                    mk('p.-controls-hint.--touch', "tap to try again, or use undo/rewind above"),
+                    mk('p.-controls-hint.--no-touch', "press space to try again, or Z to rewind"),
                 );
-                if (this.using_touch) {
-                    // TODO touch gesture to rewind?
-                    overlay.append(mk('p.-controls-hint', "tap to try again, or use undo/rewind above"));
-                }
-                else {
-                    overlay.append(mk('p.-controls-hint', "press space to try again, or Z to rewind"));
-                }
             }
             else {
                 // We just beat the level!  Hey, that's cool.
@@ -2370,12 +2354,10 @@ class Player extends PrimaryView {
                         mk('p', util.format_duration(savefile.total_abstime / TICS_PER_SECOND, 2))),
                 ));
 
-                if (this.using_touch) {
-                    overlay.append(mk('p.-controls-hint', "tap to move on"));
-                }
-                else {
-                    overlay.append(mk('p.-controls-hint', "press space to move on"));
-                }
+                overlay.append(
+                    mk('p.-controls-hint.--touch', "tap to move on"),
+                    mk('p.-controls-hint.--no-touch', "press space to move on"),
+                );
             }
         }
         else if (this.state === 'ended') {

@@ -1493,8 +1493,19 @@ body.--debug .player-overlay-message {
 }
 .player-overlay-message .-controls-hint {
     grid-area: controls;
+    margin: 0;
     font-size: 0.75em;
     color: #c0c0c0;
+}
+@media (pointer: coarse), (pointer: none) {
+    .player-overlay-message .-controls-hint.--no-touch {
+        display: none;
+    }
+}
+@media (pointer: fine) {
+    .player-overlay-message .-controls-hint.--touch {
+        display: none;
+    }
 }
 .player-overlay-message .mobile-pause-menu {
     grid-area: space;
@@ -1929,8 +1940,8 @@ body.--debug .player-overlay-message {
         display: none;
     }
 }
-@media (pointer: coarse) {
-    /* Overlay is a bit different on a touchscreen */
+@media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
+    /* Overlay is a bit different on a small screen, when the headers are missing */
     .player-overlay-message[data-reason='waiting'] > p {
         /* Hide the "Ready!" and controls, since there's a menu */
         display: none;
