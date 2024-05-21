@@ -814,26 +814,7 @@ class Player extends PrimaryView {
                 // Don't scroll pls
                 ev.preventDefault();
 
-                if (this.state === 'waiting') {
-                    // Start without moving
-                    this.set_state('playing');
-                    return;
-                }
-                else if (this.state === 'paused') {
-                    // Turns out I do this an awful lot expecting it to work, so
-                    this.set_state('playing');
-                    return;
-                }
-                else if (this.state === 'stopped') {
-                    if (this.level.state === 'success') {
-                        this.proceed_to_next_level();
-                    }
-                    else {
-                        // Restart
-                        if (!this.current_keys.has(ev.key)) {
-                            this.restart_level();
-                        }
-                    }
+                if (this._advance_overlay()) {
                     return;
                 }
             }
@@ -999,29 +980,17 @@ class Player extends PrimaryView {
         };
         touch_target.addEventListener('touchend', dismiss_touches);
         touch_target.addEventListener('touchcancel', dismiss_touches);
-        // Also grab taps on the overlay, for the specific cases that tapping on the end of level
-        // tally advances to the next level, and tapping on a non-phone dismisses the overlay
-        this.overlay_message_el.addEventListener('touchstart', ev => {
-            if (this.state === 'waiting' || this.state === 'paused') {
-                if (getComputedStyle(this.mobile_pause_menu).display === 'none') {
-                    this.set_state('playing');
-                    ev.stopPropagation();
-                    ev.preventDefault();
-                }
-            }
-            if (this.state === 'stopped') {
-                if (this.touch_restart_delay.active) {
-                    // If it's only been a very short time since the level ended, ignore taps
-                    // here, so you don't accidentally mash restart and lose the chance to undo
-                }
-                else if (this.level.state === 'success') {
-                    // Advance to the next level
-                    this.proceed_to_next_level();
-                }
-                else {
-                    // Restart
-                    this.restart_level();
-                }
+        // Treat clicks on the overlay like pressing spacebar -- this allows tapping the end of
+        // level tally to advance to the next level, it's just kind of convenient on a desktop (I
+        // sure seem to do it a lot), and it's helpful on a touchscreen if the controls are missing
+        // for some reason
+        this.overlay_message_el.addEventListener('click', ev => {
+            // If it's only been a very short time since the level ended, ignore taps here, so you
+            // don't accidentally mash restart and lose the chance to undo
+            if (this.state === 'stopped' && this.touch_restart_delay.active)
+                return;
+
+            if (this._advance_overlay()) {
                 ev.stopPropagation();
                 ev.preventDefault();
             }
@@ -1641,6 +1610,35 @@ class Player extends PrimaryView {
         this.update_ui();
         // Force a redraw, which won't happen on its own since the game isn't running
         this._redraw();
+    }
+
+    // Various event handlers
+
+    // Handle clicking, tapping, or pressing spacebar at the overlay.  Returns true if we did
+    // something level-management-y and shouldn't treat a keypress as an event
+    _advance_overlay() {
+        if (this.state === 'waiting') {
+            // Start without moving
+            this.set_state('playing');
+            return true;
+        }
+        else if (this.state === 'paused') {
+            // Turns out I do this an awful lot expecting it to work, so
+            this.set_state('playing');
+            return true;
+        }
+        else if (this.state === 'stopped') {
+            if (this.level.state === 'success') {
+                this.proceed_to_next_level();
+            }
+            else {
+                // Restart (as long as we didn't die /with/ the spacebar held down)
+                if (! this.current_keys.has(' ')) {
+                    this.restart_level();
+                }
+            }
+            return true;
+        }
     }
 
     proceed_to_next_level() {
