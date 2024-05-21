@@ -1832,7 +1832,7 @@ body.--debug .player-overlay-message {
     display: none;
     position: relative;
     overflow: hidden;
-    font-size: calc(var(--tile-height) * var(--scale) / 4);
+    font-size: calc(var(--tile-height) * var(--scale) / 3);
     font-family: serif;
     color: hsl(var(--main-hue), 20%, 80%);
     background: url(#svg-icon-hint) hsl(var(--main-hue), 10%, 10%);
@@ -1856,7 +1856,7 @@ body.--debug .player-overlay-message {
     min-height: 100%;
     width: 0;
     min-width: 100%;
-    padding: 0.5em 0.625em;
+    padding: 0.5em;
     line-height: 1.5;
     white-space: pre-wrap;
 }
