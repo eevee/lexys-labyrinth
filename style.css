@@ -1929,8 +1929,8 @@ body.--debug .player-overlay-message {
         display: none;
     }
 }
-@media (orientation: portrait) and (max-width: 800px), (orientation: landscape) and (max-height: 600px) {
-    /* Overlay is a bit different on what I assume is a touchscreen */
+@media (pointer: coarse) {
+    /* Overlay is a bit different on a touchscreen */
     .player-overlay-message[data-reason='waiting'] > p {
         /* Hide the "Ready!" and controls, since there's a menu */
         display: none;
