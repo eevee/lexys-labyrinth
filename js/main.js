@@ -705,6 +705,10 @@ class Player extends PrimaryView {
                 });
             }),
         );
+        // The overlay responds to touches, so don't let clicks on these actual buttons get through
+        this.mobile_pause_menu.addEventListener('click', ev => {
+            ev.stopPropagation();
+        });
 
         this.use_interpolation = true;
         // Default to the LL tileset for safety, but change when we load a level
