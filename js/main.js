@@ -881,89 +881,8 @@ class Player extends PrimaryView {
             // TODO allow starting a level without moving?
             // TODO if you don't move the touch, the player can pass it and will keep going in that
             // direction?
-            let rect = this.renderer.canvas.getBoundingClientRect();
-            let deadzone = this.renderer.tileset.size_x * this.scale / 2;  // half a tile
             for (let touch of ev.changedTouches) {
-                let record = this.current_touches[touch.identifier];
-                if (! record) {
-                    record = { x0: touch.clientX, y0: touch.clientY };
-                    this.current_touches[touch.identifier] = record;
-                }
-
-                // Convert a touch into pixel deltas
-                let dx, dy;
-                if (this.touch_mode === 'swipe') {
-                    // Swipe mode (pixels): move relative to the direction of the touch motion, with
-                    // two specific behaviors:
-                    // 1. If the player swipes down and then /immediately/ right, then Lexy should
-                    // move down now and right on her next move.  To make this work we keep a
-                    // sliding window of the last 100ms of touch deltas (half a normal step).
-                    // 2. If the player swipes down and holds their finger in place, then Lexy
-                    // should continue moving down until they either swipe again or lift their
-                    // finger.  But we get this for free with deadzone handling; if the motion is
-                    // too small then we'll skip the rest of the loop and keep our last direction.
-
-                    let this_dx = touch.clientX - record.x0;
-                    let this_dy = touch.clientY - record.y0;
-
-                    let now = performance.now();
-                    record.sliding_window ??= [];
-                    while (record.sliding_window.length > 0 && record.sliding_window[0].time < now - 100) {
-                        record.sliding_window.shift();
-                    }
-                    record.sliding_window.push({ time: now, dx: this_dx, dy: this_dy });
-                    record.x0 = touch.clientX;
-                    record.y0 = touch.clientY;
-
-                    dx = 0;
-                    dy = 0;
-                    for (let snapshot of record.sliding_window) {
-                        dx += snapshot.dx;
-                        dy += snapshot.dy;
-                    }
-                }
-                else if (this.touch_mode === 'viewport') {
-                    // Viewport tap (cells): touching in the top quadrant of the viewport means move
-                    // up, the bottom quadrant means move down, etc.
-                    dx = touch.clientX - (rect.left + rect.width / 2);
-                    dy = touch.clientY - (rect.top + rect.height / 2);
-                }
-                else if (this.touch_mode === 'player') {
-                    // Player tap: touching above the player means move up, etc.
-                    // (The difference from 'viewport' is what happens when the player is near the
-                    // edge of the viewport, such as in 10×10 levels.)
-                    let [px, py] = this.level.player.visual_position();
-                    let [cx, cy] = this.renderer.cell_coords_to_client_point(px + 0.5, py + 0.5);
-                    dx = touch.clientX - cx;
-                    dy = touch.clientY - cy;
-                }
-                else {
-                    // ???
-                    return;
-                }
-
-                // Deadzone: if we've only moved a few pixels, don't count this as motion yet
-                // TODO allow touch-to-wait
-                if (dx*dx + dy*dy < deadzone * deadzone)
-                    continue;
-
-                // Divine directions from the results.  Diagonal moves are also allowed, with a sort
-                // of angular deadzone: if the distance along one axis is more than 1.5× the
-                // distance along the other axis, that's probably a move in only one direction.
-                // (That corresponds to a cone of about 67° centered on each orthogonal direction,
-                // and a cone of about 23° centered on each diagonal, so a diagonal touch is likely
-                // to be deliberate.)
-                // Switching that around, we're moving along one axis as long as 1.5× the movement
-                // along that axis is greater than the movement along the other.  The order of
-                // actions doesn't actually matter, so just use one for X and one for Y:
-                record.action = null;
-                record.action2 = null;
-                if (2 * Math.abs(dx) >= Math.abs(dy)) {
-                    record.action = dx < 0 ? 'left' : 'right';
-                }
-                if (2 * Math.abs(dy) >= Math.abs(dx)) {
-                    record.action2 = dy < 0 ? 'up' : 'down';
-                }
+                this._track_pointer(touch.identifier, touch.clientX, touch.clientY);
             }
 
             // TODO for demo compat, this should happen as part of input reading?
@@ -975,11 +894,33 @@ class Player extends PrimaryView {
         touch_target.addEventListener('touchmove', collect_touches);
         let dismiss_touches = ev => {
             for (let touch of ev.changedTouches) {
-                delete this.current_touches[touch.identifier];
+                this._forget_pointer(touch.identifier);
             }
         };
         touch_target.addEventListener('touchend', dismiss_touches);
         touch_target.addEventListener('touchcancel', dismiss_touches);
+        // There's no reason not to let the mouse work the same way
+        touch_target.addEventListener('mousedown', ev => {
+            if (ev.button === 0) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                this._track_pointer('mouse', ev.clientX, ev.clientY);
+            }
+        });
+        touch_target.addEventListener('mousemove', ev => {
+            if (ev.button === 0 && this.current_touches['mouse']) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                this._track_pointer('mouse', ev.clientX, ev.clientY);
+            }
+        });
+        touch_target.addEventListener('mouseup', ev => {
+            if (ev.button === 0) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                this._forget_pointer('mouse');
+            }
+        });
         // Treat clicks on the overlay like pressing spacebar -- this allows tapping the end of
         // level tally to advance to the next level, it's just kind of convenient on a desktop (I
         // sure seem to do it a lot), and it's helpful on a touchscreen if the controls are missing
@@ -1639,6 +1580,96 @@ class Player extends PrimaryView {
             }
             return true;
         }
+    }
+
+    // Track touches (or mouse drags) within the viewport
+    _track_pointer(ident, x, y) {
+        let deadzone = this.renderer.tileset.size_x * this.scale / 2;  // half a tile
+
+        let record = this.current_touches[ident];
+        if (! record) {
+            record = { x0: x, y0: y };
+            this.current_touches[ident] = record;
+        }
+
+        // Convert a touch into pixel deltas
+        let dx, dy;
+        if (this.touch_mode === 'swipe') {
+            // Swipe mode (pixels): move relative to the direction of the touch motion, with two
+            // specific behaviors:
+            // 1. If the player swipes down and then /immediately/ right, then Lexy should move down
+            // now and right on her next move.  To make this work we keep a sliding window of the
+            // last 100ms of touch deltas (half the time a normal step takes).
+            // 2. If the player swipes down and holds their finger in place, then Lexy should
+            // continue moving down until they either swipe again or lift their finger.  But we get
+            // this for free with deadzone handling; if the motion is too small then we'll skip the
+            // rest of the loop and keep our last direction.
+
+            let this_dx = x - record.x0;
+            let this_dy = y - record.y0;
+
+            let now = performance.now();
+            record.sliding_window ??= [];
+            while (record.sliding_window.length > 0 && record.sliding_window[0].time < now - 100) {
+                record.sliding_window.shift();
+            }
+            record.sliding_window.push({ time: now, dx: this_dx, dy: this_dy });
+            record.x0 = x;
+            record.y0 = y;
+
+            dx = 0;
+            dy = 0;
+            for (let snapshot of record.sliding_window) {
+                dx += snapshot.dx;
+                dy += snapshot.dy;
+            }
+        }
+        else if (this.touch_mode === 'viewport') {
+            // Viewport tap (cells): touching in the top quadrant of the viewport means move up, the
+            // bottom quadrant means move down, etc.
+            let rect = this.renderer.canvas.getBoundingClientRect();
+            dx = x - (rect.left + rect.width / 2);
+            dy = y - (rect.top + rect.height / 2);
+        }
+        else if (this.touch_mode === 'player') {
+            // Player tap: touching above the player means move up, etc.
+            // (The difference from 'viewport' is what happens when the player is near the edge of
+            // the viewport, such as in 10×10 levels.)
+            let [px, py] = this.level.player.visual_position();
+            let [cx, cy] = this.renderer.cell_coords_to_client_point(px + 0.5, py + 0.5);
+            dx = x - cx;
+            dy = y - cy;
+        }
+        else {
+            // ???
+            return;
+        }
+
+        // Deadzone: if we've only moved a few pixels, don't count this as motion yet
+        // TODO allow touch-to-wait
+        if (dx*dx + dy*dy < deadzone * deadzone)
+            return;
+
+        // Divine directions from the results.  Diagonal moves are also allowed, with a sort of
+        // angular deadzone: if the distance along one axis is more than 1.5× the distance along the
+        // other axis, that's probably a move in only one direction.  (That corresponds to a cone of
+        // about 67° centered on each orthogonal direction, and a cone of about 23° centered on each
+        // diagonal, so a diagonal touch is likely to be deliberate.)
+        // Switching that around, we're moving along one axis as long as 1.5× the movement along
+        // that axis is greater than the movement along the other.  The order of actions doesn't
+        // actually matter, so just use one for X and one for Y:
+        record.action = null;
+        record.action2 = null;
+        if (2 * Math.abs(dx) >= Math.abs(dy)) {
+            record.action = dx < 0 ? 'left' : 'right';
+        }
+        if (2 * Math.abs(dy) >= Math.abs(dx)) {
+            record.action2 = dy < 0 ? 'up' : 'down';
+        }
+    }
+
+    _forget_pointer(ident) {
+        delete this.current_touches[ident];
     }
 
     proceed_to_next_level() {
