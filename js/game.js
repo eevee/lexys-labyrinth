@@ -2610,8 +2610,11 @@ export class Level extends LevelInterface {
             // If a tile's cell or layer changed, it needs to be removed and then added -- but to
             // avoid ordering problems when a tile leaves a cell and a different tile enters that
             // cell on the same tic, we can't add back any tiles until they've all been removed
-            let do_cell_dance = (Object.hasOwn(changes, 'cell') || (
-                Object.hasOwn(changes, 'type') && tile.type.layer !== changes.type.layer));
+            //let do_cell_dance = (Object.hasOwn(changes, 'cell') || (
+            //    Object.hasOwn(changes, 'type') && tile.type.layer !== changes.type.layer));
+            // Fucking Safari
+            let do_cell_dance = (Object.prototype.hasOwnProperty.call(changes, 'cell') || (
+                Object.prototype.hasOwnProperty.call(changes, 'type') && tile.type.layer !== changes.type.layer));
             if (do_cell_dance && tile.cell) {
                 tile.cell._remove(tile);
             }
@@ -2654,7 +2657,9 @@ export class Level extends LevelInterface {
         let changes = this.pending_undo.tile_changes_for(tile);
 
         // If we haven't yet done so, log the original value
-        if (! Object.hasOwn(changes, key)) {
+        //if (! Object.hasOwn(changes, key)) {
+        // Fucking Safari
+        if (! Object.prototype.hasOwnProperty.call(changes, key)) {
             changes[key] = tile[key];
         }
         // If there's an original value already logged, and it's the value we're about to change

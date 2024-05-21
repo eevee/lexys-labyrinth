@@ -2932,7 +2932,17 @@ class Splash extends PrimaryView {
 
     // Look for something we can load, and load it
     async search_multi_source(source) {
-        let paths = await Array.fromAsync(source.iter_all_files());
+        let paths;
+        if (Array.fromAsync) {
+            paths = await Array.fromAsync(source.iter_all_files());
+        }
+        else {
+            // Fucking Safari
+            paths = [];
+            for await (let path of source.iter_all_files()) {
+                paths.push(path);
+            }
+        }
         // TODO should handle having multiple candidates, but this is good enough for now
         paths.sort((a, b) => a.length - b.length);
         for (let path of paths) {
