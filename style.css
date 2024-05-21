@@ -21,7 +21,7 @@ body {
     --main-hue: 340;
     --hover-hue: 15;
     --selected-hue: 320;
-    --panel-bg-color: hsl(var(--main-hue), 30%, 12.5%);
+    --panel-bg-color: hsl(var(--main-hue), 20%, 12.5%);
     --button-bg-color: hsl(var(--main-hue), 60%, 25%);
     --button-bg-gradient: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
     --button-bg-shadow-color: #fff1;
@@ -890,7 +890,7 @@ pre.stack-trace {
 #splash h2 {
     color: hsl(var(--main-hue), 40%, 90%);
     text-shadow: 0 1px #000c;
-    background: hsl(var(--main-hue), 40%, 25%);
+    background: hsl(var(--main-hue), 40%, 20%);
     margin: -1rem -1rem 1rem;
     padding: 0.5rem 1rem;
 }
