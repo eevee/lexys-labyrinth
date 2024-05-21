@@ -901,6 +901,7 @@ class Player extends PrimaryView {
             // TODO if you don't move the touch, the player can pass it and will keep going in that
             // direction?
             let rect = this.renderer.canvas.getBoundingClientRect();
+            let deadzone = this.renderer.tileset.size_x * this.scale / 2;  // half a tile
             for (let touch of ev.changedTouches) {
                 let record = this.current_touches[touch.identifier];
                 if (! record) {
@@ -911,9 +912,34 @@ class Player extends PrimaryView {
                 // Convert a touch into pixel deltas
                 let dx, dy;
                 if (this.touch_mode === 'swipe') {
-                    // Swipe mode (pixels): move relative to the direction of the touch motion
-                    dx = touch.clientX - record.x0;
-                    dy = touch.clientY - record.y0;
+                    // Swipe mode (pixels): move relative to the direction of the touch motion, with
+                    // two specific behaviors:
+                    // 1. If the player swipes down and then /immediately/ right, then Lexy should
+                    // move down now and right on her next move.  To make this work we keep a
+                    // sliding window of the last 100ms of touch deltas (half a normal step).
+                    // 2. If the player swipes down and holds their finger in place, then Lexy
+                    // should continue moving down until they either swipe again or lift their
+                    // finger.  But we get this for free with deadzone handling; if the motion is
+                    // too small then we'll skip the rest of the loop and keep our last direction.
+
+                    let this_dx = touch.clientX - record.x0;
+                    let this_dy = touch.clientY - record.y0;
+
+                    let now = performance.now();
+                    record.sliding_window ??= [];
+                    while (record.sliding_window.length > 0 && record.sliding_window[0].time < now - 100) {
+                        record.sliding_window.shift();
+                    }
+                    record.sliding_window.push({ time: now, dx: this_dx, dy: this_dy });
+                    record.x0 = touch.clientX;
+                    record.y0 = touch.clientY;
+
+                    dx = 0;
+                    dy = 0;
+                    for (let snapshot of record.sliding_window) {
+                        dx += snapshot.dx;
+                        dy += snapshot.dy;
+                    }
                 }
                 else if (this.touch_mode === 'viewport') {
                     // Viewport tap (cells): touching in the top quadrant of the viewport means move
@@ -937,7 +963,7 @@ class Player extends PrimaryView {
 
                 // Deadzone: if we've only moved a few pixels, don't count this as motion yet
                 // TODO allow touch-to-wait
-                if (dx*dx + dy*dy < 4)
+                if (dx*dx + dy*dy < deadzone * deadzone)
                     continue;
 
                 // Divine directions from the results.  Diagonal moves are also allowed, with a sort
@@ -957,7 +983,6 @@ class Player extends PrimaryView {
                 if (2 * Math.abs(dy) >= Math.abs(dx)) {
                     record.action2 = dy < 0 ? 'up' : 'down';
                 }
-                record.last_move = performance.now();
             }
 
             // TODO for demo compat, this should happen as part of input reading?
