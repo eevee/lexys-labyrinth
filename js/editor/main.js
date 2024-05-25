@@ -489,14 +489,15 @@ export class Editor extends PrimaryView {
             this.redo();
         });
         let edit_items = [
-            ["Rotate left", () => {
-                this.rotate_level_left();
             }],
             ["Rotate right", () => {
                 this.rotate_level_right();
             }],
+            ["Rotate left", () => {
+                this.rotate_level_left();
+            }],
             ["Rotate 180°", () => {
-                this.rotate_level_right();
+                this.rotate_level_180();
             }],
             ["Mirror horizontally", () => {
                 this.mirror_level();
@@ -504,10 +505,10 @@ export class Editor extends PrimaryView {
             ["Flip vertically", () => {
                 this.flip_level();
             }],
-            ["Pivot around main diagonal", () => {
+            ["Transpose around main diagonal", () => {
                 this.pivot_level_main();
             }],
-            ["Pivot around anti diagonal", () => {
+            ["Transpose around anti diagonal", () => {
                 this.pivot_level_anti();
             }],
         ];
@@ -1453,9 +1454,10 @@ export class Editor extends PrimaryView {
             tile, include_faux_adjustments ? 'adjust_forward' : null, 'rotate_right', 'right');
     }
     rotate_tile_180(tile) {
-        let changed = this.rotate_tile_right(tile);
-        changed ||= this.rotate_tile_right(tile);
-        return changed;
+        // Note that we need to avoid short-circuiting here
+        let changed1 = this.rotate_tile_right(tile);
+        let changed2 = this.rotate_tile_right(tile);
+        return changed1 || changed2;
     }
     mirror_tile(tile) {
         return this._transform_tile(tile, null, 'mirror', 'mirrored');
