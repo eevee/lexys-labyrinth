@@ -353,7 +353,7 @@ export class Editor extends PrimaryView {
         // Toolbox
         // Selected tile and rotation buttons
         this.fg_tile_el = this.renderer.draw_single_tile_type('wall');
-        this.fg_tile_el.id = 'editor-tile';
+        this.fg_tile_el.id = 'editor-fg-tile';
         this.fg_tile_el.addEventListener('click', () => {
             if (this.fg_tile && TILES_WITH_PROPS[this.fg_tile.type.name]) {
                 this.open_tile_prop_overlay(
@@ -382,100 +382,13 @@ export class Editor extends PrimaryView {
             this.rotate_tile_left(this.fg_tile);
             this.redraw_foreground_tile();
         });
-        this.root.querySelector('.controls').append(
+        this.root.querySelector('.-menubar').append(
             mk('div.editor-tile-controls',
-                rotate_right_button, this.fg_tile_el, rotate_left_button,
-                this.bg_tile_el));
-        // Tools themselves
-        let toolbox = mk('div.icon-button-set.-toolbar-section', {id: 'editor-toolbar'});
-        this.root.querySelector('.controls').append(toolbox);
-        this.tool_button_els = {};
-        for (let toolname of TOOL_ORDER) {
-            let tooldef = TOOLS[toolname];
-            let header_text = tooldef.name;
-            if (tooldef.shortcut) {
-                let shortcut;
-                if (tooldef.shortcut === tooldef.shortcut.toUpperCase()) {
-                    shortcut = `Shift-${tooldef.shortcut}`;
-                }
-                else {
-                    shortcut = tooldef.shortcut.toUpperCase();
-                }
-                header_text += ` (${shortcut})`;
-            }
-            let tooltip = mk('div.-help.editor-big-tooltip', mk('h3', header_text));
-            let button = mk(
-                'button', {
-                    type: 'button',
-                    'data-tool': toolname,
-                },
-                mk('img', {
-                    src: tooldef.icon,
-                    alt: tooldef.name,
-                }),
-                tooltip,
-            );
+                rotate_right_button, this.fg_tile_el, rotate_left_button, this.bg_tile_el));
 
-            // Replace the [key] elements in the tooltip
-            for (let [_, literal, key] of tooldef.desc.matchAll(/(.*?)(?:\[(.+?)\]|$)/gs)) {
-                tooltip.append(literal);
-                if (key === 'mouse1') {
-                    tooltip.append(this.svg_icon('svg-icon-mouse1'));
-                }
-                else if (key === 'mouse2') {
-                    tooltip.append(this.svg_icon('svg-icon-mouse2'));
-                }
-                else if (key) {
-                    tooltip.append(mk('kbd', key));
-                }
-            }
-
-            this.tool_button_els[toolname] = button;
-            toolbox.append(button);
-        }
-        this.current_tool = null;
-        this.select_tool('pencil');
-        toolbox.addEventListener('click', ev => {
-            let button = ev.target.closest('.icon-button-set button');
-            if (! button)
-                return;
-
-            this.select_tool(button.getAttribute('data-tool'));
-        });
-
-        // Layer selection
-        this.selectable_layers = [];
-        this.layer_selector = mk('div.icon-button-set.-toolbar-section', {id: 'editor-layer-selector'});
-        for (let info of SELECTABLE_LAYERS) {
-            let button = mk('button', {type: 'button', 'data-layer': info.ident},
-                mk('img', {src: `icons/layer-${info.ident}.png`}),
-                mk('div.-help.editor-big-tooltip',
-                    mk('h3', `Layer selector: ${info.name}`),
-                    `${info.desc}\n\n`,
-                    "Disable a layer to make it intangible to tools that\n",
-                    "normally affect all layers (eyedrop, rotate, adjust),\n",
-                    "as well as selection tools.\n",
-                    "(Drawing to the layer is unaffected.)",
-                ),
-            );
-            this.layer_selector.append(button);
-            this.selectable_layers[LAYERS[info.ident]] = {
-                enabled: true,
-                button,
-            };
-        }
-        this.layer_selector.addEventListener('click', ev => {
-            let button = ev.target.closest('[data-layer]');
-            if (! button)
-                return;
-
-            this.toggle_layer(LAYERS[button.getAttribute('data-layer')]);
-        });
-        this.root.querySelector('.controls').append(this.layer_selector);
-
-        // Toolbar buttons for saving, exporting, etc.
+        // Menu bar, more or less
         let button_container = mk('div.-buttons');
-        this.root.querySelector('.controls').append(button_container);
+        this.root.querySelector('.-menubar').append(button_container);
         let _make_button = (label, onclick) => {
             let button = mk('button', {type: 'button'}, label);
             button.addEventListener('click', onclick);
@@ -489,7 +402,32 @@ export class Editor extends PrimaryView {
             this.redo();
         });
         let edit_items = [
+            ["Select all\t[ctrl] A", () => {
             }],
+            ["Select none\t[ctrl] [shift] A", () => {
+            }],
+            ["Delete\t[del]", () => {
+                this.rotate_level_right();
+            }],
+            null,
+            ["Level properties...", () => {
+                this.mirror_level();
+            }],
+            ["Pack properties...", () => {
+                this.flip_level();
+            }],
+        ];
+        let edit_menu = new MenuOverlay(
+            this.conductor,
+            edit_items,
+            item => item[0],
+            item => item[1](),
+        );
+        let edit_menu_button = _make_button("Edit ", ev => {
+            edit_menu.open_relative_to(ev.currentTarget);
+        });
+        edit_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
+        let transform_items = [
             ["Rotate right", () => {
                 this.rotate_level_right();
             }],
@@ -512,16 +450,16 @@ export class Editor extends PrimaryView {
                 this.pivot_level_anti();
             }],
         ];
-        this.edit_menu = new MenuOverlay(
+        let transform_menu = new MenuOverlay(
             this.conductor,
-            edit_items,
+            transform_items,
             item => item[0],
             item => item[1](),
         );
-        let edit_menu_button = _make_button("Edit ", ev => {
-            this.edit_menu.open_relative_to(ev.currentTarget);
+        let transform_menu_button = _make_button("Transform ", ev => {
+            transform_menu.open_relative_to(ev.currentTarget);
         });
-        edit_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
+        transform_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
         _make_button("Pack properties...", () => {
             new dialogs.EditorPackMetaOverlay(this.conductor, this.conductor.stored_game).open();
         });
@@ -625,7 +563,7 @@ export class Editor extends PrimaryView {
         //_make_button("Toggle green objects");
 
         // Tile palette
-        let palette_el = this.root.querySelector('.palette');
+        let palette_el = this.root.querySelector('.-palette');
         this.palette = {};  // name => element
         for (let sectiondef of PALETTE) {
             let section_el = mk('section');
@@ -710,6 +648,93 @@ export class Editor extends PrimaryView {
         this.palette_tooltip = mk('div.editor-palette-tooltip.editor-big-tooltip', mk('h3'), mk('p'));
         this.root.append(this.palette_tooltip);
 
+        // Toolbox, on the right side
+        let toolbox = mk('div.icon-button-set.-toolbar-section', {id: 'editor-toolbar'});
+        this.root.querySelector('.-tools').append(toolbox);
+        this.tool_button_els = {};
+        for (let toolname of TOOL_ORDER) {
+            let tooldef = TOOLS[toolname];
+            let header_text = tooldef.name;
+            if (tooldef.shortcut) {
+                let shortcut;
+                if (tooldef.shortcut === tooldef.shortcut.toUpperCase()) {
+                    shortcut = `Shift-${tooldef.shortcut}`;
+                }
+                else {
+                    shortcut = tooldef.shortcut.toUpperCase();
+                }
+                header_text += ` (${shortcut})`;
+            }
+            let tooltip = mk('div.-help.editor-big-tooltip', mk('h3', header_text));
+            let button = mk(
+                'button', {
+                    type: 'button',
+                    'data-tool': toolname,
+                },
+                mk('img', {
+                    src: tooldef.icon,
+                    alt: tooldef.name,
+                }),
+                tooltip,
+            );
+
+            // Replace the [key] elements in the tooltip
+            for (let [_, literal, key] of tooldef.desc.matchAll(/(.*?)(?:\[(.+?)\]|$)/gs)) {
+                tooltip.append(literal);
+                if (key === 'mouse1') {
+                    tooltip.append(this.svg_icon('svg-icon-mouse1'));
+                }
+                else if (key === 'mouse2') {
+                    tooltip.append(this.svg_icon('svg-icon-mouse2'));
+                }
+                else if (key) {
+                    tooltip.append(mk('kbd', key));
+                }
+            }
+
+            this.tool_button_els[toolname] = button;
+            toolbox.append(button);
+        }
+        this.current_tool = null;
+        this.select_tool('pencil');
+        toolbox.addEventListener('click', ev => {
+            let button = ev.target.closest('.icon-button-set button');
+            if (! button)
+                return;
+
+            this.select_tool(button.getAttribute('data-tool'));
+        });
+
+        // Layer selection
+        this.selectable_layers = [];
+        this.layer_selector = mk('div.icon-button-set.-toolbar-section', {id: 'editor-layer-selector'});
+        for (let info of SELECTABLE_LAYERS) {
+            let button = mk('button', {type: 'button', 'data-layer': info.ident},
+                mk('img', {src: `icons/layer-${info.ident}.png`}),
+                mk('div.-help.editor-big-tooltip',
+                    mk('h3', `Layer selector: ${info.name}`),
+                    `${info.desc}\n\n`,
+                    "Disable a layer to make it intangible to tools that\n",
+                    "normally affect all layers (eyedrop, rotate, adjust),\n",
+                    "as well as selection tools.\n",
+                    "(Drawing to the layer is unaffected.)",
+                ),
+            );
+            this.layer_selector.append(button);
+            this.selectable_layers[LAYERS[info.ident]] = {
+                enabled: true,
+                button,
+            };
+        }
+        this.layer_selector.addEventListener('click', ev => {
+            let button = ev.target.closest('[data-layer]');
+            if (! button)
+                return;
+
+            this.toggle_layer(LAYERS[button.getAttribute('data-layer')]);
+        });
+        this.root.querySelector('.-tools').append(this.layer_selector);
+
         this.fg_tile = null;  // used for most drawing
         this.fg_tile_from_palette = false;
         this.fg_tile_source_cell = null;
@@ -718,7 +743,6 @@ export class Editor extends PrimaryView {
         this.bg_tile_source_cell = null;
         this.select_foreground_tile('wall', 'palette');
         this.select_background_tile('floor', 'palette');
-
         this.selection = new Selection(this);
 
         this.reset_undo();
@@ -1736,8 +1760,6 @@ export class Editor extends PrimaryView {
                 this.selection._set_from_set(old_selection_cells);
             }
         });
-
-        this.commit_undo();
     }
 
     // Rearranges cells in the current selection or whole level, based on a few callbacks.

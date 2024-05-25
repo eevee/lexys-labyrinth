@@ -227,7 +227,23 @@ export class MenuOverlay extends TransientOverlay {
     constructor(conductor, items, make_label, onclick) {
         super(conductor, mk('ol.popup-menu'));
         for (let [i, item] of items.entries()) {
-            this.root.append(mk('li', {'data-index': i}, make_label(item)));
+            if (item === null) {
+                this.root.append(mk('li.-separator', {'data-index': i}));
+                continue;
+            }
+            let [label, shortcut] = make_label(item).split(/\t/);
+            let li = mk('li', {'data-index': i}, label);
+            if (shortcut) {
+                let span = mk('span.-shortcut');
+                for (let [_, literal, key] of shortcut.matchAll(/(.*?)(?:\[(.+?)\]|$)/gs)) {
+                    span.append(literal);
+                    if (key) {
+                        span.append(mk('kbd', key));
+                    }
+                }
+                li.append(span);
+            }
+            this.root.append(li);
         }
 
         this.root.addEventListener('click', ev => {
@@ -237,6 +253,9 @@ export class MenuOverlay extends TransientOverlay {
 
             let i = parseInt(li.getAttribute('data-index'), 10);
             let item = items[i];
+            if (! item)
+                return;
+
             onclick(item);
             this.close();
         });

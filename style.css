@@ -259,14 +259,37 @@ button.--pressed,
 .popup-menu {
     position: absolute;
     min-width: 10vw;
-    border: 1px solid #444;
+    border: 1px solid #999;
     color: black;
     background: hsl(var(--main-hue), 20%, 95%);
     box-shadow: 0 1px 3px 1px #0009;
 }
 .popup-menu > li {
+    /* flex for shortcuts */
+    display: flex;
+    justify-content: space-between;
+    gap: 1em;
+
     padding: 0.375em 0.625em;
+    white-space: nowrap;
     cursor: pointer;
+}
+.popup-menu > li > .-shortcut {
+    color: #444;
+}
+.popup-menu > li > .-shortcut > kbd {
+    font-size: 0.75rem;
+    vertical-align: 0.125rem;
+    background: #d8d8d8;
+    letter-spacing: -1px;
+    text-transform: lowercase;
+}
+.popup-menu > li.-separator {
+    height: 0;
+    margin: 0.25em 0;
+    padding: 0;
+    border-bottom: 1px solid #999;
+    cursor: default;
 }
 .popup-menu > li:hover {
     color: hsl(var(--hover-hue), 60%, 10%);
@@ -2190,10 +2213,10 @@ body.--debug #player-debug {
     flex: 1 1 auto;
     display: grid;
     grid:
-        "controls   controls"   min-content
-        "palette    level"      1fr
-        "palette    status"     min-content
-        / min-content 1fr
+        "controls   controls    controls"   min-content
+        "palette    level       tools"      1fr
+        "palette    status      tools"      min-content
+        / min-content 1fr min-content
     ;
     gap: 0.5em;
 
@@ -2476,7 +2499,7 @@ svg.level-editor-overlay .overlay-text-cursor {
     margin: 0 -0.25em;  /* these are mouse buttons; shave off some of the extra space */
     vertical-align: -0.375em;
 }
-#editor .controls {
+#editor .-menubar {
     /* TODO with the hint area gone i don't think this needs to be a grid?  could just flex */
     grid-area: controls;
     display: grid;
@@ -2487,49 +2510,65 @@ svg.level-editor-overlay .overlay-text-cursor {
     align-items: center;
     column-gap: 1em;
 }
-#editor .controls .editor-tile-controls {
+#editor .-menubar .editor-tile-controls {
     grid-area: tile;
     display: flex;
     align-items: center;
     gap: 0.25em;
 }
-#editor .controls #editor-tile canvas {
+#editor .-menubar #editor-fg-tile canvas {
     display: block;
 }
-#editor .controls #editor-toolbar {
-    grid-area: toolbar;
-}
-#editor .controls .-help {
-    width: max-content;
-    margin-top: -0.25em;
-    margin-left: -0.5em;
-}
-#editor .controls button:hover .-help {
-    opacity: 1;
-    z-index: 2;  /* show above any that are in mid-fade */
-    visibility: visible;
-    margin-top: 0.25em;
-    transition-delay: 0.5s;
-    transition-timing-function: ease-in;
-}
-#editor .controls #editor-layer-selector {
-    display: flex;
-    padding-left: 4px;
-    padding-right: 4px;
-}
-#editor .controls #editor-layer-selector .--disabled img {
-    filter: grayscale(100%);
-    opacity: 0.333;
-}
-#editor .controls .-buttons {
+#editor .-menubar .-buttons {
     grid-area: menu;
 }
-#editor .controls .-toolbar-section {
+#editor .-menubar .-toolbar-section {
     padding: 2px;
     border-radius: 4px;
     background: hsl(var(--selected-hue), 10%, 10%);
     border: 1px solid hsl(var(--selected-hue), 10%, 20%);
 }
+#editor .-tools {
+    grid-area: tools;
+    /* cheap separation of tools and layer selector */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em;
+}
+/* hint stuff */
+#editor .-tools button {
+    position: relative;
+}
+#editor .-tools .-help {
+    position: absolute;
+    top: 0;
+    right: 100%;
+    width: max-content;
+}
+#editor .-tools #editor-layer-selector .-help {
+    top: auto;
+    bottom: 0;
+}
+#editor .-tools button:hover .-help {
+    opacity: 1;
+    z-index: 2;  /* show above any that are in mid-fade */
+    visibility: visible;
+    margin-right: 1em;
+    transition-delay: 0.5s;
+    transition-timing-function: ease-in;
+}
+/* layer selector */
+#editor-layer-selector {
+    display: flex;
+    flex-direction: column-reverse;  /* put terrain layer on bottom */
+}
+#editor-layer-selector .--disabled img {
+    filter: grayscale(100%);
+    opacity: 0.333;
+}
+/* both the tools list and the layer selector */
 .icon-button-set {
     display: flex;
     flex-wrap: wrap;
@@ -2554,8 +2593,16 @@ svg.level-editor-overlay .overlay-text-cursor {
 .icon-button-set button img {
     display: block;
 }
+@media (max-height: 1000px) {
+    /* This sucks but I can't find a better solution: if the window is rather short (at normal zoom
+     * and using my fonts and a reasonable width...), put the tools on two rows */
+    #editor-toolbar {
+        display: grid;
+        grid: auto-flow / repeat(2, min-content);
+    }
+}
 
-#editor .palette {
+#editor .-palette {
     isolation: isolate;
     grid-area: palette;
     width: calc(32px * 8 + 4px * 9);
@@ -2565,16 +2612,16 @@ svg.level-editor-overlay .overlay-text-cursor {
      * possibility of a scrollbar into account */
     overflow-y: auto;
 }
-#editor .palette h2 {
+#editor .-palette h2 {
     font-size: 1em;
     margin-top: 1em;
     border-bottom: 1px solid currentColor;
     color: #909090;
 }
-#editor .palette h2:first-child {
+#editor .-palette h2:first-child {
     margin-top: 0;
 }
-#editor .palette section {
+#editor .-palette section {
     display: grid;
     margin: 0.33em 4px;  /* matches gap */
     grid: auto-flow 32px / repeat(8, 32px);
