@@ -608,10 +608,8 @@ export class Selection {
         }
 
         // Track the old and new centers of the bboxes so the transform can be center-relative
-        let [cx0, cy0] = convert_coords(
-            Math.floor(this.bbox.x + this.bbox.width / 2),
-            Math.floor(this.bbox.y + this.bbox.height / 2),
-            w, h);
+        let cx0 = this.bbox.x + this.bbox.width / 2;
+        let cy0 = this.bbox.y + this.bbox.height / 2;
 
         // Alter the bbox by just transforming two opposite corners
         let [x1, y1] = convert_coords(this.bbox.left, this.bbox.top, w, h);
@@ -623,12 +621,10 @@ export class Selection {
         this.bbox = new DOMRect(xs[0], ys[0], xs[1] - xs[0] + 1, ys[1] - ys[0] + 1);
 
         // Now make it center-relative by shifting the offsets
-        let [cx1, cy1] = convert_coords(
-            Math.floor(this.bbox.x + this.bbox.width / 2),
-            Math.floor(this.bbox.y + this.bbox.height / 2),
-            w, h);
-        this.floated_offset[0] += cx1 - cx0;
-        this.floated_offset[1] += cy1 - cy0;
+        let cx1 = this.bbox.x + this.bbox.width / 2;
+        let cy1 = this.bbox.y + this.bbox.height / 2;
+        this.floated_offset[0] += Math.floor(cx0 - cx1);
+        this.floated_offset[1] += Math.floor(cy0 - cy1);
         this._update_floating_transform();
 
         // No need for undo; this is undone by performing the reverse operation
