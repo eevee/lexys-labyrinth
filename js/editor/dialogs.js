@@ -166,45 +166,64 @@ export class EditorLevelMetaOverlay extends DialogOverlay {
         this.root.elements['hide_logic'].checked = stored_level.hide_logic;
         this.root.elements['use_cc1_boots'].checked = stored_level.use_cc1_boots;
         // TODO:
-        // - chips?
+        // - chips?  fitting that into cc2 style editing is tricky
         // - password???
-        // - comment
-        // - use CC1 tools
-        // - hide logic
         // - "unviewable", "read only"
 
         this.add_button("save", () => {
             let els = this.root.elements;
+            let changed = false;
 
-            let title = els.title.value;
-            if (title !== stored_level.title) {
-                stored_level.title = title;
-                this.conductor.stored_game.level_metadata[this.conductor.level_index].title = title;
+            let change_field = (field, new_value, after = () => {}) => {
+                let old_value = stored_level[field];
+                if (old_value === new_value)
+                    return;
+
+                this.conductor.editor._do(() => {
+                    stored_level[field] = new_value;
+                    after(new_value);
+                }, () => {
+                    stored_level[field] = old_value;
+                    after(old_value);
+                });
+                changed = true;
+            };
+
+            let meta = this.conductor.stored_game.level_metadata[this.conductor.level_index];
+            change_field('title', els.title.value, title => {
+                meta.title = title;
                 this.conductor.update_level_title();
-            }
-            let author = els.author.value;
-            if (author !== stored_level.author) {
-                stored_level.author = author;
-            }
+            });
+            change_field('author', els.author.value);
 
-            // FIXME gotta deal with NaNs here too, sigh, might just need a teeny tiny form library
-            stored_level.time_limit = Math.max(0, Math.min(65535, parseInt(els.time_limit.value, 10)));
+            let time_limit = Math.max(0, Math.min(65535, parseInt(els.time_limit.value, 10)));
+            if (Number.isNaN(time_limit)) {
+                time_limit = 0;
+            }
+            change_field('time_limit', time_limit);
 
             let size_x = Math.max(1, Math.min(100, parseInt(els.size_x.value, 10)));
             let size_y = Math.max(1, Math.min(100, parseInt(els.size_y.value, 10)));
             if (size_x !== stored_level.size_x || size_y !== stored_level.size_y) {
                 this.conductor.editor.crop_level(0, 0, size_x, size_y);
+                changed = true;
             }
 
-            stored_level.blob_behavior = parseInt(els.blob_behavior.value, 10);
-            stored_level.hide_logic = els.hide_logic.checked;
-            stored_level.use_cc1_boots = els.use_cc1_boots.checked;
+            change_field('blob_behavior', parseInt(els.blob_behavior.value, 10));
+            change_field('hide_logic', els.hide_logic.checked);
+            change_field('use_cc1_boots', els.use_cc1_boots.checked);
+
             let viewport_size = parseInt(els.viewport.value, 10);
             if (viewport_size !== 9 && viewport_size !== 10) {
                 viewport_size = 10;
             }
-            stored_level.viewport_size = viewport_size;
-            this.conductor.player.update_viewport_size();
+            change_field('viewport_size', viewport_size, () => {
+                this.conductor.player.update_viewport_size();
+            });
+
+            if (changed) {
+                this.conductor.editor.commit_undo();
+            }
 
             this.close();
         });
@@ -438,6 +457,10 @@ export class EditorLevelBrowserOverlay extends DialogOverlay {
             canvas.getContext('2d').drawImage(this.renderer.canvas, 0, 0, canvas.width, canvas.height);
             element.querySelector('.-preview').append(canvas);
             element.classList.add('--rendered');
+
+            // Title may also have changed
+            let meta = this.conductor.stored_game.level_metadata[index];
+            element.querySelector('.-title').textContent = meta.error ? "(error!)" : meta.title;
 
             if (performance.now() - t0 > 10)
                 break;
