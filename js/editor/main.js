@@ -1350,7 +1350,7 @@ export class Editor extends PrimaryView {
 
         // Place it out of the way of the palette (so, overlaying the level) but roughly vertically
         // aligned
-        let palette_rect = this.root.querySelector('.palette').getBoundingClientRect();
+        let palette_rect = this.root.querySelector('.-palette').getBoundingClientRect();
         let entry_rect = this.palette[key].getBoundingClientRect();
         let tip_height = this.palette_tooltip.offsetHeight;
         this.palette_tooltip.style.left = `${palette_rect.right}px`;
