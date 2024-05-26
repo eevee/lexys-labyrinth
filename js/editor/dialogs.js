@@ -382,6 +382,15 @@ export class EditorLevelBrowserOverlay extends DialogOverlay {
         });
     }
 
+    open() {
+        super.open();
+
+        // Once we're visible (and thus have a size), reset the selection (since we might have been
+        // re-opened), then scroll to make the selected level visible
+        this._select(this.conductor.level_index);
+        this.list.childNodes[this.selection].scrollIntoView({block: 'center'});
+    }
+
     _make_list_item(index, meta) {
         let li = mk('li',
             {'data-index': index},
