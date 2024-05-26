@@ -4636,6 +4636,14 @@ class Conductor {
         await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, identifier, title);
         if (solutions) {
             this.stored_game.level_replays = solutions.levels;
+            // A bit rude, but since parse_and_load_game already switched us to the player, which
+            // thus loaded a level, manually inject the replay we just loaded so it's already
+            // visible in the debug panel
+            let level_number = this.player?.level?.stored_level?.number;
+            if (level_number !== undefined && solutions.levels[level_number - 1]) {
+                this.player.level.stored_level._replay = solutions.levels[level_number - 1];
+                this.player._update_replay_ui();
+            }
         }
     }
 
