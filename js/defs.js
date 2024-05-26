@@ -248,20 +248,23 @@ export const COMPAT_FLAG_CATEGORIES = [{
         rulesets: new Set(['steam', 'steam-strict']),
     }, {
         key: 'emulate_spring_mining',
-        label: "Pushing a block off a recessed wall may cause you to move into the resulting wall",
+        label: "Pushing a block off a recessed wall might move you into the resulting wall (\"spring mining\")",
         rulesets: new Set(['steam-strict']),
     }, {
         key: 'no_early_push',
         label: "Pushing blocks happens at move time (block slapping is disabled)",
-        // XXX wait but the DEFAULT behavior allows block slapping, which lynx has, so why is lynx listed here?
+        // XXX uhhhh
+        // 1. this does not disable block slapping
+        // 2. actually nothing disables block slapping for ms currently
+        // 3. it shouldn't disable block slapping bc it's a lynx compat flag
         rulesets: new Set(['lynx', 'ms']),
     }, {
         key: 'allow_pushing_blocks_off_faux_walls',
-        label: "Blocks may be pushed off of blue (fake) and revealing walls",
+        label: "Blocks may be pushed (\"flicked\") off of illusory and reveal walls",
         rulesets: new Set(['lynx']),
     }, {
         key: 'allow_pushing_blocks_off_all_walls',
-        label: "Blocks may be pushed off of anything, even walls",
+        label: "Blocks may be pushed (\"flicked\") off of anything, even walls",
         rulesets: new Set(['ms']),
     }, {
         key: 'use_pgchip_ice_blocks',
@@ -271,12 +274,6 @@ export const COMPAT_FLAG_CATEGORIES = [{
         key: 'block_splashes_dont_block',
         label: "Block splashes don't block the player",
         rulesets: new Set(['ms']),
-/* XXX not implemented
-}, {
-    key: 'emulate_flicking',
-    label: "Flicking is possible",
-    rulesets: new Set(['ms']),
-*/
     }],
 }, {
     title: "Terrain",
