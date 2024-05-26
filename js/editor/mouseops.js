@@ -641,7 +641,7 @@ export class PencilOperation extends MouseOperation {
 }
 
 
-export class LineOperation extends MouseOperation {
+class BigDrawOperation extends MouseOperation {
     constructor(...args) {
         super(...args);
         this.set_cursor_element(mk_svg('image', {
@@ -665,15 +665,14 @@ export class LineOperation extends MouseOperation {
             image.setAttribute('href', url);
         }
     }
-    // Technically the cursor should be hidden while dragging, but in practice it highlights the
-    // endpoint of the line (by drawing it twice), which I kind of like
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+
+    handle_press(x, y) {
+        this.update_drawn_points([[x, y]]);
+    }
+    update_drawn_points(iterable) {
         let existing_nodes = this.preview_element.childNodes;
         let i = 0;
-        for (let [x, y] of walk_grid(
-            this.click_cell_x + 0.5, this.click_cell_y + 0.5, cell_x + 0.5, cell_y + 0.5,
-            -1, -1, this.editor.stored_level.size_x, this.editor.stored_level.size_y))
-        {
+        for (let [x, y] of iterable) {
             if (! this.editor.is_in_bounds(x, y))
                 continue;
 
@@ -698,6 +697,7 @@ export class LineOperation extends MouseOperation {
             existing_nodes[i].remove();
         }
     }
+
     commit_press() {
         for (let [x, y] of this.points) {
             this.editor.place_in_cell(this.cell(x, y), this.editor.fg_tile);
@@ -707,6 +707,86 @@ export class LineOperation extends MouseOperation {
     cleanup_press() {
         this.points = [];
         this.preview_element.textContent = '';
+    }
+}
+
+export class LineOperation extends BigDrawOperation {
+    // Technically the cursor should be hidden while dragging, but in practice it highlights the
+    // endpoint of the line (by drawing it twice), which I kind of like
+    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        this.update_drawn_points(walk_grid(
+            this.click_cell_x + 0.5, this.click_cell_y + 0.5, cell_x + 0.5, cell_y + 0.5,
+            -1, -1, this.editor.stored_level.size_x, this.editor.stored_level.size_y));
+    }
+}
+
+
+export class RectangleOperation extends BigDrawOperation {
+    *_iter_rectangle_outline(x0, y0, x1, y1) {
+        // Top
+        for (let x = x0; x <= x1; x++) {
+            yield [x, y0];
+        }
+        if (y0 !== y1) {
+            // Bottom
+            for (let x = x0; x <= x1; x++) {
+                yield [x, y1];
+            }
+        }
+
+        // Left
+        for (let y = y0 + 1; y < y1; y++) {
+            yield [x0, y];
+        }
+        if (x0 !== x1) {
+            for (let y = y0 + 1; y < y1; y++) {
+                yield [x1, y];
+            }
+        }
+    }
+    *_iter_rectangle_fill(x0, y0, x1, y1) {
+        for (let y = y0; y <= y1; y++) {
+            for (let x = x0; x <= x1; x++) {
+                yield [x, y];
+            }
+        }
+    }
+    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        let x0 = Math.min(this.click_cell_x, cell_x);
+        let x1 = Math.max(this.click_cell_x, cell_x);
+        let y0 = Math.min(this.click_cell_y, cell_y);
+        let y1 = Math.max(this.click_cell_y, cell_y);
+
+        if (this.shift) {
+            // Force a square, with the added wrinkle that we need to shrink towards the cursor
+            if (x1 - x0 < y1 - y0) {
+                let size = x1 - x0;
+                if (y0 === this.click_cell_y) {
+                    y1 = y0 + size;
+                }
+                else {
+                    y0 = y1 - size;
+                }
+            }
+            else if (y1 - y0 < x1 - x0) {
+                let size = y1 - y0;
+                if (x0 === this.click_cell_x) {
+                    x1 = x0 + size;
+                }
+                else {
+                    x0 = x1 - size;
+                }
+            }
+        }
+
+        if (this.ctrl) {
+            // Fill
+            this.update_drawn_points(this._iter_rectangle_fill(x0, y0, x1, y1));
+        }
+        else {
+            // Outline
+            this.update_drawn_points(this._iter_rectangle_outline(x0, y0, x1, y1));
+        }
     }
 }
 
