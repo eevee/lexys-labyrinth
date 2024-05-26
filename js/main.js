@@ -4602,12 +4602,41 @@ class Conductor {
         }
     }
 
+    // FIXME all this api fucking sucks lol.  a pack definition should probably be a Thing?  how
+    // does the canonical ident even come into play here???  does it?????????
     async fetch_pack(path, title, identifier) {
+        let solutions;
+        if (this.debug.enabled) {
+            if (title === "Chip's Challenge Level Pack 1") {
+                let solutions_buf = await util.fetch('levels/public_CCLP1-lynx.dac.tws');
+                solutions = format_tws.parse_solutions(solutions_buf);
+            }
+            else if (title === "Chip's Challenge Level Pack 2-X") {
+                let solutions_buf = await util.fetch('levels/public_CCLXP2.dac.tws');
+                solutions = format_tws.parse_solutions(solutions_buf);
+            }
+            else if (title === "Chip's Challenge Level Pack 3") {
+                let solutions_buf = await util.fetch('levels/public_CCLP3-lynx.dac.tws');
+                solutions = format_tws.parse_solutions(solutions_buf);
+            }
+            else if (title === "Chip's Challenge Level Pack 4") {
+                let solutions_buf = await util.fetch('levels/public_CCLP4-lynx.dac.tws');
+                solutions = format_tws.parse_solutions(solutions_buf);
+            }
+            else if (path === 'levels/CC1.ccl') {
+                let solutions_buf = await util.fetch('levels/public_CHIPS-lynx.dac.tws');
+                solutions = format_tws.parse_solutions(solutions_buf);
+            }
+        }
+
         // TODO indicate we're downloading something
         // TODO handle errors
         // TODO cancel a download if we start another one?
         let buf = await util.fetch(path);
         await this.parse_and_load_game(buf, new util.HTTPFileSource(new URL(location)), path, identifier, title);
+        if (solutions) {
+            this.stored_game.level_replays = solutions.levels;
+        }
     }
 
     async parse_and_load_game(buf, source, path, identifier, title) {
