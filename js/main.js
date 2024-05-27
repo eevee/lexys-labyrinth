@@ -4606,7 +4606,7 @@ class Conductor {
     // does the canonical ident even come into play here???  does it?????????
     async fetch_pack(path, title, identifier) {
         let solutions;
-        if (this.debug.enabled) {
+        if (this.player.debug.enabled) {
             if (title === "Chip's Challenge Level Pack 1") {
                 let solutions_buf = await util.fetch('levels/public_CCLP1-lynx.dac.tws');
                 solutions = format_tws.parse_solutions(solutions_buf);
