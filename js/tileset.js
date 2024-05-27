@@ -845,7 +845,13 @@ export const TILE_WORLD_TILESET_LAYOUT = {
     water: [0, 3],
     fire: [0, 4],
     wall_invisible: [0, 5],
-    wall_invisible_revealed: [0, 1],
+    wall_invisible_revealed: {
+        // This is specifically /invisible/ when you have the xray glasses
+        __special__: 'perception',
+        modes: new Set(['xray']),
+        hidden: [0, 1],
+        revealed: null,
+    },
     // FIXME in cc1 tilesets these are opaque so they should draw at the terrain layer
     thin_walls: {
         __special__: 'thin-walls-cc1',
@@ -1115,6 +1121,19 @@ export const LL_TILESET_LAYOUT = {
         revealed: [6, 2],
     },
     popdown_wall: [6, 3],
+    wall_invisible_overlay: {
+        __special__: 'perception',
+        modes: new Set(['palette', 'editor', 'xray']),
+        hidden: [7, 3],
+        revealed: [7, 2],
+    },
+    wall_invisible_overlay_revealed: {
+        // This is specifically /invisible/ when you have the xray glasses
+        __special__: 'perception',
+        modes: new Set(['xray']),
+        hidden: [0, 3],
+        revealed: null,
+    },
     thief_tools: [8, 2],
     thief_keys: [8, 3],
     canopy: {
@@ -1177,6 +1196,7 @@ export const LL_TILESET_LAYOUT = {
         thin_walls_ns: [9, 4],
         thin_walls_ew: [9, 5],
     },
+    thief_lock: [8, 6],
 
     force_floor_n: {
         __special__: 'scroll',
@@ -1323,6 +1343,27 @@ export const LL_TILESET_LAYOUT = {
         all: [[0, 15], [1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15]],
     },
 
+    conveyor_n: {
+        __special__: 'animated',
+        duration: 24,
+        all: [[12, 12], [13, 12], [14, 12], [15, 12]],
+    },
+    conveyor_e: {
+        __special__: 'animated',
+        duration: 24,
+        all: [[12, 13], [13, 13], [14, 13], [15, 13]],
+    },
+    conveyor_s: {
+        __special__: 'animated',
+        duration: 24,
+        all: [[12, 14], [13, 14], [14, 14], [15, 14]],
+    },
+    conveyor_w: {
+        __special__: 'animated',
+        duration: 24,
+        all: [[12, 15], [13, 15], [14, 15], [15, 15]],
+    },
+
     // Items
     flippers: [0, 16],
     fire_boots: [1, 16],
@@ -1339,10 +1380,11 @@ export const LL_TILESET_LAYOUT = {
     helmet: [4, 17],
     phantom_ring: [5, 17],
     feather: [6, 17],
-    dormant_bomb: [7, 17],
+    dumbbell: [7, 17],
     skeleton_key: [0, 18],
     ankh: [1, 18],
     floor_ankh: [2, 18],
+    dormant_bomb: [3, 18],
     toll_gate: [5, 18],
     no_sign: [6, 18],
     gift_bow: [7, 18],
@@ -1374,6 +1416,16 @@ export const LL_TILESET_LAYOUT = {
         __special__: 'animated',
         duration: 24,
         all: [[8, 17], [9, 17], [10, 17], [9, 17]],
+    },
+    double_chip: {
+        __special__: 'animated',
+        duration: 24,
+        all: [[8, 18], [9, 18], [10, 18], [9, 18]],
+    },
+    nega_chip: {
+        __special__: 'animated',
+        duration: 24,
+        all: [[13, 18], [14, 18], [15, 18], [14, 18]],
     },
     bowling_ball: [9, 19],
     rolling_ball: {
@@ -1442,12 +1494,21 @@ export const LL_TILESET_LAYOUT = {
         all: [[4, 22], [5, 22], [6, 22], [7, 22]],
     },
     teleport_green: {
-        __special__: 'animated',
-        duration: 20,
-        cc2_duration: 16,
-        // Nice little touch: green teleporters aren't animated in sync
-        positionally_hashed: true,
-        all: [[4, 23], [5, 23], [6, 23], [7, 23]],
+        // Note that wired green teleporters are an LL extension
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: {
+                __special__: 'animated',
+                duration: 20,
+                cc2_duration: 16,
+                // Nice little touch: green teleporters aren't animated in sync
+                positionally_hashed: true,
+                all: [[4, 23], [5, 23], [6, 23], [7, 23]],
+            },
+            inactive: [11, 23],
+        },
     },
     teleport_blue_exit: {
         __special__: 'wires',
@@ -1482,6 +1543,19 @@ export const LL_TILESET_LAYOUT = {
             cc2_duration: 16,
             all: [[8, 21], [9, 21], [10, 21], [11, 21]],
         }
+    },
+    teleport_rainbow: {
+        __special__: 'wires',
+        base: [0, 2],
+        wired: {
+            __special__: 'visual-state',
+            active: {
+                __special__: 'animated',
+                duration: 16,
+                all: [[12, 20], [13, 20], [14, 20], [15, 20]],
+            },
+            inactive: [12, 23],
+        },
     },
     flame_jet_off: [12, 21],
     flame_jet_on: {
@@ -1550,6 +1624,20 @@ export const LL_TILESET_LAYOUT = {
         released: [7, 24],
         pressed: [7, 25],
     },
+    button_cyan: {
+        __special__: 'visual-state',
+        released: [8, 24],
+        pressed: [8, 25],
+    },
+    button_pink_framed: {
+        __special__: 'wires',
+        base: [0, 31],
+        wired: {
+            __special__: 'visual-state',
+            released: [9, 24],
+            pressed: [9, 25],
+        },
+    },
     light_switch_off: {
         __special__: 'wires',
         base: [15, 25],
@@ -1573,6 +1661,12 @@ export const LL_TILESET_LAYOUT = {
     '#unpowered': [2, 28],
     '#powered': [2, 29],
     '#wire-tunnel': [2, 30],
+    floor_framed: {
+        __special__: 'wires',
+        base: [0, 31],
+        wired: [0, 30],
+        wired_cross: [1, 30],
+    },
     logic_gate: {
         __special__: 'logic-gate',
         counter_numbers: {
@@ -1630,6 +1724,18 @@ export const LL_TILESET_LAYOUT = {
                 east: [10, 29],
                 south: [10, 30],
                 west: [10, 31],
+            },
+            delay: {
+                north: [11, 28],
+                east: [11, 29],
+                south: [11, 30],
+                west: [11, 31],
+            },
+            battery: {
+                north: [12, 28],
+                east: [12, 29],
+                south: [12, 30],
+                west: [12, 31],
             },
         },
     },
@@ -1886,6 +1992,14 @@ export const LL_TILESET_LAYOUT = {
         west: [[19, 19], [20, 19], [21, 19], [20, 19]],
     },
 
+    bear: [24, 14],
+    bull: [24, 15],
+    green_twister: [25, 15],
+    green_block: [16, 23],
+    log: [20, 22],
+    glint: [22, 18],
+    shark: [26, 15],
+
     // Blocks
     dirt_block: {
         __special__: 'perception',
@@ -1904,6 +2018,7 @@ export const LL_TILESET_LAYOUT = {
         base: [18, 20],
         arrows: [18, 21],
     },
+    burr: [19, 20],
     glass_block: {
         __special__: 'encased_item',
         base: [19, 21],
@@ -2610,7 +2725,7 @@ export class Tileset {
         if (tile && tile.cell) {
             // What goes on top varies a bit...
             let r = this.layout['#wire-width'] / 2;
-            if (tile.gate_type === 'not' || tile.gate_type === 'counter' || tile.gate_type === 'diode') {
+            if (['not', 'diode', 'delay', 'battery', 'counter'].includes(tile.gate_type)) {
                 this._draw_fourway_tile_power(tile, 0x0f, packet);
             }
             else {
@@ -3047,7 +3162,13 @@ export function parse_tile_world_large_tileset(canvas) {
                     layout['wall_invisible'] = spec;
                 }
                 else if (name === 'wall') {
-                    layout['wall_invisible_revealed'] = spec;
+                    // This is specifically /invisible/ when you have the xray glasses
+                    layout['wall_invisible_revealed'] = {
+                        __special__: 'perception',
+                        modes: new Set(['xray']),
+                        hidden: spec,
+                        revealed: null,
+                    };
                 }
                 else if (name === 'fake_wall') {
                     layout['fake_floor'] = spec;
