@@ -2009,6 +2009,8 @@ const TILE_TYPES = {
     teleport_green: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
+        contains_wire: true,
+        wire_propagation_mode: 'all',
         *teleport_dest_order(me, level, other) {
             // The CC2 green teleporter scheme is:
             // 1. Use the PRNG to pick another green teleporter
@@ -2076,6 +2078,19 @@ const TILE_TYPES = {
             yield [me, other.direction];
             return;
         },
+        on_power(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
+        },
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
+        visual_state(me) {
+            return me && me.is_active === false ? 'inactive' : 'active';
+        },
     },
     teleport_yellow: {
         layer: LAYERS.terrain,
@@ -2087,6 +2102,28 @@ const TILE_TYPES = {
             for (let [dest, cell] of find_terrain_linear(level, me.cell, new Set(['teleport_yellow']), true)) {
                 yield [dest, exit_direction];
             }
+        },
+    },
+    teleport_rainbow: {
+        layer: LAYERS.terrain,
+        slide_mode: 'teleport',
+        contains_wire: true,
+        wire_propagation_mode: 'all',
+        *teleport_dest_order(me, level, other) {
+            // LOL TODO
+        },
+        on_power(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', true);
+            }
+        },
+        on_depower(me, level) {
+            if (me.is_wired) {
+                level._set_tile_prop(me, 'is_active', false);
+            }
+        },
+        visual_state(me) {
+            return me && me.is_active === false ? 'inactive' : 'active';
         },
     },
     // Flame jet rules:
@@ -2123,31 +2160,42 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         wire_propagation_mode: 'all',
         can_be_powered_by_actor: true,
-        on_begin(me, level) {
-            level._set_tile_prop(me, 'is_active', false);
+        is_emitting(me, level) {
+            // Only count us as a power /source/ if we're activated by a button; otherwise we're
+            // just passing along current from elsewhere.  Either way, the wire phase should power
+            // all our edges, so we can be checked for actually being active via powered_edges
+            return !! me.presses;
+        },
+        update_power_emission(me, level) {
+        },
+        // We're also powered by (any number of) cyan buttons, so this is similar to trap code
+        on_ready(me, level) {
             level._set_tile_prop(me, 'wire_directions', 15);
-            level.recalculate_circuitry_next_wire_phase = true;
+            // This may run before or after any pressed buttons, but, that's fine
+            if (me.presses === undefined) {
+                level._set_tile_prop(me, 'presses', 0);
+            }
+        },
+        add_press(me, level) {
+            level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
+        },
+        remove_press(me, level) {
+            level._set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
         },
         on_stand(me, level, other) {
-            if (! me.is_active)
-                return;
-
-            level.kill_actor(other, me, 'explosion', 'bomb', 'electrocuted');
-        },
-        on_power(me, level) {
-            level._set_tile_prop(me, 'is_active', true);
-        },
-        on_depower(me, level) {
-            level._set_tile_prop(me, 'is_active', false);
+            if (me.powered_edges) {
+                level.kill_actor(other, me, 'explosion', 'bomb', 'electrocuted');
+            }
         },
         on_death(me, level) {
-            //needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile
-            //need to remove our wires since they're an implementation detail
+            // Need to remove our wires since they're an implementation detail
+            // (needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile)
             level._set_tile_prop(me, 'wire_directions', 0);
+            level._set_tile_prop(me, 'powered_edges', 0);
             level.recalculate_circuitry_next_wire_phase = true;
         },
         visual_state(me) {
-            return me && me.is_active ? 'active' : 'inactive';
+            return me && me.powered_edges ? 'active' : 'inactive';
         },
     },
 
@@ -2283,7 +2331,59 @@ const TILE_TYPES = {
         },
         visual_state: button_visual_state,
     },
+    button_cyan: {
+        layer: LAYERS.terrain,
+        connects_to: new Set(['electrified_floor']),
+        connect_order: 'diamond',
+        on_ready(me, level) {
+            // Inform the floor of any actors that start out holding us down
+            let floor = me.connection;
+            if (! (floor && floor.cell))
+                return;
+
+            if (me.cell.get_actor()) {
+                floor.type.add_press_ready(trap, level);
+            }
+        },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+
+            // Electrified floors are active while at least one connected button is pressed
+            let floor = me.connection;
+            if (floor && floor.cell && floor.type.name === 'electrified_floor') {
+                floor.type.add_press(floor, level);
+            }
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+            let floor = me.connection;
+            if (floor && floor.cell && floor.type.name === 'electrified_floor') {
+                floor.type.remove_press(floor, level);
+            }
+        },
+        visual_state: button_visual_state,
+    },
     button_pink: {
+        layer: LAYERS.terrain,
+        contains_wire: true,
+        wire_propagation_mode: 'none',
+        is_emitting(me, level) {
+            // We emit current as long as there's an actor fully on us
+            let actor = me.cell.get_actor();
+            return (actor && actor.movement_cooldown === 0);
+        },
+        update_power_emission(me, level) {
+        },
+        on_arrive(me, level, other) {
+            level.sfx.play_once('button-press', me.cell);
+        },
+        on_depart(me, level, other) {
+            level.sfx.play_once('button-release', me.cell);
+        },
+        visual_state: button_visual_state,
+    },
+    button_pink_framed: {
+        // TODO on_gray_button
         layer: LAYERS.terrain,
         contains_wire: true,
         wire_propagation_mode: 'none',
@@ -2364,6 +2464,8 @@ const TILE_TYPES = {
         _gate_types: {
             not: ['out0', null, 'in0', null],
             diode: ['out0', null, 'in0', null],
+            delay: ['out0', null, 'in0', null],
+            battery: ['out0', null, 'in0', null],
             and: ['out0', 'in0', null, 'in1'],
             or: ['out0', 'in0', null, 'in1'],
             xor: ['out0', 'in0', null, 'in1'],
@@ -2387,6 +2489,12 @@ const TILE_TYPES = {
                 me.decrementing = false;
                 me.underflowing = false;
                 me.direction = 'north';
+            }
+            else if (me.gate_type === 'delay') {
+                me.buffer = 0;
+            }
+            else if (me.gate_type === 'battery') {
+                me.timeout = 0;
             }
 
             me.in0 = me.in1 = null;
@@ -2450,6 +2558,24 @@ const TILE_TYPES = {
             }
             else if (me.gate_type === 'diode') {
                 output0 = input0;
+            }
+            else if (me.gate_type === 'delay') {
+                let buffer = me.buffer;
+                buffer <<= 1;
+                if (input0) {
+                    buffer |= 1;
+                }
+                output0 = ((buffer & 0x1000) !== 0);
+                level._set_tile_prop(me, 'buffer', buffer & 0x0fff);
+            }
+            else if (me.gate_type === 'battery') {
+                if (input0) {
+                    level._set_tile_prop(me, 'timeout', 12);
+                }
+                else if (me.timeout > 0) {
+                    level._set_tile_prop(me, 'timeout', me.timeout - 1);
+                }
+                output0 = (me.timeout > 0);
             }
             else if (me.gate_type === 'and') {
                 output0 = input0 && input1;
