@@ -1737,6 +1737,8 @@ export const LL_TILESET_LAYOUT = {
                 south: [12, 30],
                 west: [12, 31],
             },
+
+            bogus: [1, 31],
         },
     },
 
@@ -1995,9 +1997,26 @@ export const LL_TILESET_LAYOUT = {
     bear: [24, 14],
     bull: [24, 15],
     green_twister: [25, 15],
-    green_block: [16, 23],
     log: [20, 22],
-    glint: [22, 18],
+    glint: {
+        __special__: 'visual-state',
+        uncharged: {
+            __special__: 'animated',
+            duration: 1,
+            north: [[22, 16], [23, 16], [24, 16], [23, 16]],
+            east: [[22, 17], [23, 17], [24, 17], [23, 17]],
+            south: [[22, 18], [23, 18], [24, 18], [23, 18]],
+            west: [[22, 19], [23, 19], [24, 19], [23, 19]],
+        },
+        charged: {
+            __special__: 'animated',
+            duration: 1,
+            north: [[25, 16], [26, 16], [27, 16], [26, 16]],
+            east: [[25, 17], [26, 17], [27, 17], [26, 17]],
+            south: [[25, 18], [26, 18], [27, 18], [26, 18]],
+            west: [[25, 19], [26, 19], [27, 19], [26, 19]],
+        },
+    },
     shark: [26, 15],
 
     // Blocks
@@ -2023,12 +2042,27 @@ export const LL_TILESET_LAYOUT = {
         __special__: 'encased_item',
         base: [19, 21],
     },
-    boulder: [20, 20],
+    boulder: {
+        __special__: 'animated',
+        duration: 4,
+        global: false,
+        idle: [20, 20],
+        north: [[21, 21], [22, 21], [23, 21]],
+        east: [[21, 20], [22, 20], [23, 20]],
+        south: [[21, 21], [22, 21], [23, 21]],
+        west: [[21, 20], [22, 20], [23, 20]],
+    },
     circuit_block: {
         __special__: 'wires',
         base: [16, 22],
         wired: [17, 22],
         wired_cross: [18, 22],
+    },
+    green_block: {
+        north: [16, 23],
+        east: [17, 23],
+        south: [18, 23],
+        west: [19, 23],
     },
     sokoban_block: {
         __special__: 'perception',
@@ -2311,7 +2345,7 @@ export class Tileset {
             duration = drawspec.cc2_duration;
         }
 
-        let n;
+        let frame;
         if (is_global) {
             // This tile animates on a global timer, looping every 'duration' frames
             let p = packet.clock * 3 / duration;
@@ -2324,7 +2358,7 @@ export class Tileset {
                 h = Math.imul(h ^ packet.y, 0x01000193);
                 p += (h & 63) / 64;
             }
-            n = Math.floor(p % 1 * frames.length);
+            frame = frames[Math.floor(p % 1 * frames.length)];
         }
         else if (tile && tile.movement_speed) {
             // This tile is in motion and its animation runs 'duration' times each move.
@@ -2355,19 +2389,19 @@ export class Tileset {
                 // (Note that large fractional durations like 2.5 will not work.)
                 p = p * duration % 1;
             }
-            n = Math.floor(p * frames.length);
+            frame = frames[Math.floor(p * frames.length)];
         }
         else {
             // This is an actor that's not moving, so use the idle frame
-            n = drawspec.idle_frame_index ?? 0;
+            frame = drawspec.idle ?? frames[drawspec.idle_frame_index ?? 0];
         }
 
         if (drawspec.triple) {
             // Lynx-style big splashes and explosions
-            packet.blit(...frames[n], 0, 0, 3, 3, -1, -1);
+            packet.blit(...frame, 0, 0, 3, 3, -1, -1);
         }
         else {
-            packet.blit(...frames[n]);
+            packet.blit(...frame);
         }
     }
 
