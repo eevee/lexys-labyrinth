@@ -2755,14 +2755,22 @@ export class Level extends LevelInterface {
                 let ankh_cell = this.ankh_tile.cell;
                 let existing_actor = ankh_cell.get_actor();
                 if (! existing_actor) {
-                    // FIXME water should still splash, etc
                     this.sfx.play_once('revive');
 
+                    let cell = actor.cell;
                     this._set_tile_prop(actor, 'movement_cooldown', null);
                     this._set_tile_prop(actor, 'movement_speed', null);
                     this._set_tile_prop(actor, 'is_sliding', false);
                     this._set_tile_prop(actor, 'is_pending_slide', false);
                     this.move_to(actor, ankh_cell);
+
+                    if (sfx) {
+                        this.sfx.play_once(sfx, cell);
+                    }
+                    // Have to do this after moving the player, or there's no room for the animation
+                    if (animation_name) {
+                        this.spawn_animation(cell, animation_name);
+                    }
 
                     this.transmute_tile(this.ankh_tile, 'floor');
                     this.spawn_animation(ankh_cell, 'resurrection');
