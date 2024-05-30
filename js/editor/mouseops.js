@@ -714,6 +714,43 @@ export class LineOperation extends BigDrawOperation {
     // Technically the cursor should be hidden while dragging, but in practice it highlights the
     // endpoint of the line (by drawing it twice), which I kind of like
     handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+        if (this.shift) {
+            // Force lines at "nice" angles -- orthogonal, 1:1, or 1:2
+            let dx = cell_x - this.click_cell_x;
+            let dy = cell_y - this.click_cell_y;
+            // If either delta is zero, we're already orthogonal, nothing to do
+            if (dx !== 0 && dy !== 0) {
+                let ratio = Math.abs(dx / dy);
+                let small_ratio = ratio < 1 ? ratio : 1 / ratio;
+                // We're either between ortho and 1:2, or between 1:2 and 1:1.  Could do some clever
+                // geometry to figure out the closer one but fuck it, just compare the absolute
+                // difference in ratios: are we closer to 0, 0.5, or 1?
+                // As for actually figuring out the new endpoint: keep the resulting line within the
+                // bbox established by the mouse.
+                let snapped_ratio;
+                if (small_ratio <= 0.25) {
+                    // Snap to orthogonal
+                    snapped_ratio = 0;
+                }
+                else if (small_ratio < 0.75) {
+                    // Snap to 1:2
+                    snapped_ratio = 0.5;
+                }
+                else {
+                    // Snap to 1:2
+                    snapped_ratio = 1;
+                }
+
+                if (ratio < 1) {
+                    // Keep x, shrink y to match
+                    cell_x = this.click_cell_x + snapped_ratio * Math.abs(dy) * Math.sign(dx);
+                }
+                else {
+                    cell_y = this.click_cell_y + snapped_ratio * Math.abs(dx) * Math.sign(dy);
+                }
+            }
+        }
+
         this.update_drawn_points(walk_grid(
             this.click_cell_x + 0.5, this.click_cell_y + 0.5, cell_x + 0.5, cell_y + 0.5,
             -1, -1, this.editor.stored_level.size_x, this.editor.stored_level.size_y));

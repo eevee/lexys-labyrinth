@@ -35,7 +35,7 @@ export const TOOLS = {
             "Use the layer selector to pick specific tiles.",
             "",
             "[mouse1] Draw a line",
-            //"[shift] [mouse1] Snap to nice angles",
+            "[shift] [mouse1] Snap to nice angles",
             "",
             "[mouse2] Pick foreground tile",
             "[ctrl] [mouse2] Pick background tile",
