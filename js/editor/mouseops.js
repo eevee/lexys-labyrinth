@@ -381,7 +381,13 @@ export class MouseOperation {
     }
 
     rehover() {
-        this.handle_hover(null, null, this.prev_frac_cell_x, this.prev_frac_cell_y, this.prev_cell_x, this.prev_cell_y);
+        // Same as for do_move, but only using our previous mouse position
+        if (this.held_button !== null) {
+            this.handle_drag(null, null, this.prev_frac_cell_x, this.prev_frac_cell_y, this.prev_cell_x, this.prev_cell_y, true);
+        }
+        else if (this.is_hover_visible) {
+            this.handle_hover(null, null, this.prev_frac_cell_x, this.prev_frac_cell_y, this.prev_cell_x, this.prev_cell_y, true);
+        }
     }
 
     do_leave() {
@@ -409,6 +415,18 @@ export class MouseOperation {
             if (this.preview_element) {
                 this.preview_element.style.display = 'none';
             }
+        }
+    }
+
+    set_modifier(key, state) {
+        if (key === 'Control') {
+            this.ctrl = state;
+        }
+        else if (key === 'Shift') {
+            this.shift = state;
+        }
+        else if (key === 'Alt') {
+            this.alt = state;
         }
     }
 
@@ -487,9 +505,6 @@ export class MouseOperation {
     handle_tile_updated(is_bg = false) {}
     // Called when the mouse leaves the level or viewport while the button is NOT held down
     handle_leave() {}
-    // Called when any hover state should be thrown away, due to some external change, just before
-    // handle_drag or handle_hover is called
-    handle_refresh() {}
 }
 
 export class PanOperation extends MouseOperation {
@@ -693,8 +708,9 @@ class BigDrawOperation extends MouseOperation {
         }
 
         this.points.splice(i);
-        for (; i < existing_nodes.length; i++) {
-            existing_nodes[i].remove();
+        // This is a live NodeList, so iterate backwards to remove the remaining items
+        for (let j = existing_nodes.length - 1; j >= i; j--) {
+            existing_nodes[j].remove();
         }
     }
 
@@ -743,10 +759,10 @@ export class LineOperation extends BigDrawOperation {
 
                 if (ratio < 1) {
                     // Keep x, shrink y to match
-                    cell_x = this.click_cell_x + snapped_ratio * Math.abs(dy) * Math.sign(dx);
+                    cell_x = this.click_cell_x + Math.floor(snapped_ratio * Math.abs(dy)) * Math.sign(dx);
                 }
                 else {
-                    cell_y = this.click_cell_y + snapped_ratio * Math.abs(dx) * Math.sign(dy);
+                    cell_y = this.click_cell_y + Math.floor(snapped_ratio * Math.abs(dx)) * Math.sign(dy);
                 }
             }
         }
@@ -1568,11 +1584,10 @@ export class ConnectOperation extends MouseOperation {
         this.editor.svg_overlay.append(this.source_cursor, this.target_cursor);
     }
 
-    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y && ! this.hover_stale)
+    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y, force = false) {
+        if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y && ! force)
             return;
 
-        this.hover_stale = false;
         let cell = this.cell(cell_x, cell_y);
         let terrain = cell[LAYERS.terrain];
         if (terrain.type.connects_to) {
@@ -1742,12 +1757,7 @@ export class ConnectOperation extends MouseOperation {
         }
         this.pending_cxns = [];
 
-        this.hover_stale = true;
         this.rehover();
-    }
-
-    handle_refresh() {
-        this.hover_stale = true;
     }
 
     do_destroy() {
@@ -2338,8 +2348,6 @@ const ADJUST_SPECIAL = {
     button_pink(editor, tile, cell) {
     },
 };
-// FIXME the preview is not very good because the hover effect becomes stale, pressing ctrl/shift
-// leaves it stale, etc
 export class AdjustOperation extends MouseOperation {
     constructor(...args) {
         super(...args);
@@ -2394,15 +2402,12 @@ export class AdjustOperation extends MouseOperation {
     // The real work happens on hover, since we need to actually adjust the tile in order to preview
     // it anyway; clicking just commits it.
     handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        // TODO hrmm if we undo without moving the mouse then this becomes wrong (even without the
-        // stuff here)
-        // TODO uhhh that's true for all kinds of kb shortcuts actually, even for pressing/releasing
-        // ctrl or shift to change the target.  dang
         /*
-         * XXX this is wrong for e.g. ice corners
+         * XXX this is wrong for e.g. ice corners and tracks and force floors, which all make use of
+         * fractional position
         if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y &&
             (! this.hovered_edge || this.hovered_edge === get_cell_edge(frac_cell_x, frac_cell_y)) &&
-            ! this.hover_stale)
+            ! force)
         {
             return;
         }
@@ -2411,7 +2416,6 @@ export class AdjustOperation extends MouseOperation {
         let cell = this.cell(cell_x, cell_y);
 
         // Find our target tile, and in most cases, adjust it
-        this.hover_stale = false;
         this.adjusted_tile = null;
         this.hovered_edge = null;
         for (let layer = LAYERS.MAX - 1; layer >= 0; layer--) {
@@ -2699,7 +2703,6 @@ export class AdjustOperation extends MouseOperation {
             }
             this.editor.redraw_entire_level();
             this.editor.commit_undo();
-            this.handle_refresh();
             this.rehover();
         }
         else if (ADJUST_SPECIAL[this.adjusted_tile.type.name]) {
@@ -2711,8 +2714,6 @@ export class AdjustOperation extends MouseOperation {
             this.editor.place_in_cell(cell, this.adjusted_tile);
             this.editor.commit_undo();
             // The tile has changed, so invalidate our hover
-            // TODO should the editor do this automatically, since the cell changed?
-            this.handle_refresh();
             this.rehover();
         }
         /*
@@ -2723,10 +2724,6 @@ export class AdjustOperation extends MouseOperation {
                 tile, cell, this.editor.renderer.get_cell_rect(cell.x, cell.y));
         }
         */
-    }
-
-    handle_refresh() {
-        this.hover_stale = true;
     }
 
     // Adjust tool doesn't support dragging

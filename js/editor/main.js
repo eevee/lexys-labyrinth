@@ -168,6 +168,14 @@ export class Editor extends PrimaryView {
                 return;
             }
 
+            // Immediately refresh any ongoing mouse operation when pressing a modifier key
+            if (this.mouse_op && ['Control', 'Shift', 'Alt'].includes(ev.key)) {
+                // Note that e.g. ev.shiftKey is not well-defined when actually pressing or
+                // releasing the shift key itself
+                this.mouse_op.set_modifier(ev.key, true);
+                this.mouse_op.rehover();
+            }
+
             if (ev.ctrlKey) {
                 if (ev.key === 'a') {
                     // Select all
@@ -251,6 +259,17 @@ export class Editor extends PrimaryView {
             ev.stopPropagation();
             ev.preventDefault();
         });
+        window.addEventListener('keyup', ev => {
+            if (! this.active)
+                return;
+
+            // Immediately refresh any ongoing mouse operation when releasing a modifier key
+            if (this.mouse_op && ['Control', 'Shift', 'Alt'].includes(ev.key)) {
+                this.mouse_op.set_modifier(ev.key, false);
+                this.mouse_op.rehover();
+            }
+        });
+
 
         // Level canvas and mouse handling
         this.mouse_coords = null;
@@ -2223,6 +2242,9 @@ export class Editor extends PrimaryView {
         this._track_undo_offset(-1, entry.modifies);
 
         this._update_ui_after_edit();
+        if (this.mouse_op) {
+            this.mouse_op.rehover();
+        }
     }
 
     redo() {
@@ -2239,6 +2261,9 @@ export class Editor extends PrimaryView {
         this._track_undo_offset(+1, entry.modifies);
 
         this._update_ui_after_edit();
+        if (this.mouse_op) {
+            this.mouse_op.rehover();
+        }
     }
 
     _track_undo_offset(delta, modifies) {
@@ -2307,7 +2332,7 @@ export class Editor extends PrimaryView {
     }
 
     cancel_mouse_drag() {
-        if (this.mouse_op && this.mouse_op.is_held) {
+        if (this.mouse_op) {
             this.mouse_op.do_abort();
         }
     }
