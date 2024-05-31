@@ -68,6 +68,15 @@ export class Tile {
             // MS: Monsters are never blocked by keys
             return false;
 
+        // Special override
+        if (other.type.blocked_by) {
+            let blocked = other.type.blocked_by(other, level, this);
+            if (blocked !== undefined) {
+                return blocked;
+            }
+        }
+
+        // Normal collision check
         if (this.type.blocks_collision & other.type.collision_mask)
             return true;
 
@@ -83,9 +92,6 @@ export class Tile {
             return true;
 
         if (this.type.blocks && this.type.blocks(this, level, other, direction))
-            return true;
-
-        if (other.type.blocked_by && other.type.blocked_by(other, level, this))
             return true;
 
         return false;
