@@ -518,10 +518,7 @@ export class Level extends LevelInterface {
             this.connect_button(connectable);
         }
 
-        this.recalculate_circuitry_next_wire_phase = false;
-        this.recalculate_circuitry(true);
-
-        // Finally, let all tiles do custom init behavior...  but backwards, to match actor order
+        // Let all tiles do custom init behavior...  but backwards, to match actor order
         for (let i = this.linear_cells.length - 1; i >= 0; i--) {
             let cell = this.linear_cells[i];
             for (let tile of cell) {
@@ -534,6 +531,10 @@ export class Level extends LevelInterface {
         }
         // Erase undo, in case any on_ready added to it (we don't want to undo initialization!)
         this.pending_undo = new UndoEntry;
+
+        // And finally, build circuits
+        this.recalculate_circuitry_next_wire_phase = false;
+        this.recalculate_circuitry(true);
     }
 
     connect_button(connectable) {
