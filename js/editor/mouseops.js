@@ -8,7 +8,7 @@ import { mk, mk_svg, walk_grid } from '../util.js';
 
 import { SPECIAL_TILE_BEHAVIOR } from './editordefs.js';
 import { SVGConnection } from './helpers.js';
-import { TILES_WITH_PROPS, CellEditorOverlay } from './tile-overlays.js';
+import { CellEditorOverlay } from './tile-overlays.js';
 
 const FORCE_FLOOR_TILES_BY_DIRECTION = {
     north: 'force_floor_n',
@@ -39,16 +39,16 @@ function mouse_move_to_direction(prevx, prevy, x, y) {
 }
 
 // Return whether this point is closer to the center of the cell than the edges
-function is_cell_center(frac_cell_x, frac_cell_y) {
-    let frac_x = frac_cell_x % 1;
-    let frac_y = frac_cell_y % 1;
+function is_cell_center(real_cell_x, real_cell_y) {
+    let frac_x = real_cell_x % 1;
+    let frac_y = real_cell_y % 1;
     return (Math.abs(frac_x - 0.5) <= 0.25 && Math.abs(frac_y - 0.5) <= 0.25);
 }
 
 // Returns the edge of the cell that this point is closest to
-function get_cell_edge(frac_cell_x, frac_cell_y) {
-    let frac_x = frac_cell_x % 1;
-    let frac_y = frac_cell_y % 1;
+function get_cell_edge(real_cell_x, real_cell_y) {
+    let frac_x = real_cell_x % 1;
+    let frac_y = real_cell_y % 1;
     if (frac_x >= frac_y) {
         if (frac_x >= 1 - frac_y) {
             return 'east';
@@ -69,20 +69,20 @@ function get_cell_edge(frac_cell_x, frac_cell_y) {
 
 // Returns the edge of the cell that this point is closest to, or 'null' if the point is closer to
 // the center than the edges
-function get_cell_edge_or_center(frac_cell_x, frac_cell_y) {
-    if (is_cell_center(frac_cell_x, frac_cell_y)) {
+function get_cell_edge_or_center(real_cell_x, real_cell_y) {
+    if (is_cell_center(real_cell_x, real_cell_y)) {
         return null;
     }
     else {
-        return get_cell_edge(frac_cell_x, frac_cell_y);
+        return get_cell_edge(real_cell_x, real_cell_y);
     }
 }
 
 // Returns the corner of the cell this point is in, as an integer from 0 to 3 (clockwise, starting
 // northeast, matching the order of railroad tracks)
-function get_cell_corner(frac_cell_x, frac_cell_y) {
-    if (frac_cell_x % 1 >= 0.5) {
-        if (frac_cell_y % 1 <= 0.5) {
+function get_cell_corner(real_cell_x, real_cell_y) {
+    if (real_cell_x % 1 >= 0.5) {
+        if (real_cell_y % 1 <= 0.5) {
             return 0;
         }
         else {
@@ -90,7 +90,7 @@ function get_cell_corner(frac_cell_x, frac_cell_y) {
         }
     }
     else {
-        if (frac_cell_y % 1 >= 0.5) {
+        if (real_cell_y % 1 >= 0.5) {
             return 2;
         }
         else {
@@ -238,6 +238,26 @@ function floodfill_from(x0, y0, editor, respect_selection) {
 }
 
 
+class MousePosition {
+    constructor(client_x, client_y, real_x, real_y) {
+        this.client_x = client_x;
+        this.client_y = client_y;
+        this.real_x = real_x;
+        this.real_y = real_y;
+        this.x = Math.floor(this.real_x);
+        this.y = Math.floor(this.real_y);
+    }
+
+    static from_event(ev, renderer) {
+        return new this(ev.clientX, ev.clientY, ...renderer.real_cell_coords_from_event(ev));
+    }
+
+    clone() {
+        return new this.constructor(this.client_x, this.client_y, this.real_x, this.real_y);
+    }
+}
+
+
 // TODO some minor grievances
 // - the track overlay doesn't explain "direction" (may not be necessary anyway), allows picking a
 // bad initial switch direction
@@ -258,22 +278,9 @@ export class MouseOperation {
         this.shift = false;
 
         // Client coordinates of the previous mouse event
-        this.prev_client_x = null;
-        this.prev_client_y = null;
-        // Cell coordinates
-        this.prev_cell_x = null;
-        this.prev_cell_y = null;
-        // Fractional cell coordinates
-        this.prev_frac_cell_x = null;
-        this.prev_frac_cell_y = null;
-
+        this.pos = null;
         // Same as above, but for the most recent click (so drag ops know where they started)
-        this.click_client_x = null;
-        this.click_client_y = null;
-        this.click_cell_x = null;
-        this.click_cell_y = null;
-        this.click_frac_cell_x = null;
-        this.click_frac_cell_y = null;
+        this.click_pos = null;
 
         this.cursor_element = null;
         this.preview_element = null;
@@ -315,46 +322,34 @@ export class MouseOperation {
         this.alt_mode = (ev.button === 2);
         this._update_modifiers(ev);
 
-        this.client_x = ev.clientX;
-        this.client_y = ev.clientY;
-        [this.click_frac_cell_x, this.click_frac_cell_y] = this.editor.renderer.real_cell_coords_from_event(ev);
-        this.click_cell_x = Math.floor(this.click_frac_cell_x);
-        this.click_cell_y = Math.floor(this.click_frac_cell_y);
+        this.click_pos = MousePosition.from_event(ev, this.editor.renderer);
+        this.prev_pos = this.click_pos;
 
-        this.prev_client_x = this.client_x;
-        this.prev_client_y = this.client_y;
-        this.prev_frac_cell_x = this.click_frac_cell_x;
-        this.prev_frac_cell_y = this.click_frac_cell_y;
-        this.prev_cell_x = this.click_cell_x;
-        this.prev_cell_y = this.click_cell_y;
-
-        this.handle_press(this.click_cell_x, this.click_cell_y, ev);
+        this.handle_press(this.click_pos, ev);
     }
 
     do_move(ev) {
         this._update_modifiers(ev);
-        let [frac_cell_x, frac_cell_y] = this.editor.renderer.real_cell_coords_from_event(ev);
-        let cell_x = Math.floor(frac_cell_x);
-        let cell_y = Math.floor(frac_cell_y);
+        let pos = MousePosition.from_event(ev, this.editor.renderer);
 
         if (this.held_button !== null && (ev.buttons & MOUSE_BUTTON_MASKS[this.held_button]) === 0) {
             this.do_abort();
         }
 
         if (this.cursor_element) {
-            this.cursor_element.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
+            this.cursor_element.setAttribute('transform', `translate(${pos.x} ${pos.y})`);
         }
 
         if (this.held_button !== null) {
             // Continue a drag even if the mouse goes outside the viewport
-            this.handle_drag(ev.clientX, ev.clientY, frac_cell_x, frac_cell_y, cell_x, cell_y);
+            this.handle_drag(pos);
         }
         else {
             // This is a hover, which has separate behavior for losing track of the mouse.  Note
             // that we can't just check if the cell coordinates are valid; we also need to know that
             // the mouse is actually over the visible viewport (the canvas may have scrolled!)
             let in_bounds = false;
-            if (this.editor.is_in_bounds(cell_x, cell_y)) {
+            if (this.editor.is_in_bounds(pos.x, pos.y)) {
                 let rect = this.editor.actual_viewport_el.getBoundingClientRect();
                 let cx = ev.clientX, cy = ev.clientY;
                 if (rect.left <= cx && cx < rect.right && rect.top <= cy && cy < rect.bottom) {
@@ -364,7 +359,7 @@ export class MouseOperation {
 
             if (in_bounds) {
                 this.show();
-                this.handle_hover(ev.clientX, ev.clientY, frac_cell_x, frac_cell_y, cell_x, cell_y);
+                this.handle_hover(pos);
             }
             else {
                 this.hide();
@@ -372,21 +367,16 @@ export class MouseOperation {
             }
         }
 
-        this.prev_client_x = ev.clientX;
-        this.prev_client_y = ev.clientY;
-        this.prev_frac_cell_x = frac_cell_x;
-        this.prev_frac_cell_y = frac_cell_y;
-        this.prev_cell_x = cell_x;
-        this.prev_cell_y = cell_y;
+        this.prev_pos = pos;
     }
 
     rehover() {
         // Same as for do_move, but only using our previous mouse position
         if (this.held_button !== null) {
-            this.handle_drag(null, null, this.prev_frac_cell_x, this.prev_frac_cell_y, this.prev_cell_x, this.prev_cell_y, true);
+            this.handle_drag(this.prev_pos, true);
         }
         else if (this.is_hover_visible) {
-            this.handle_hover(null, null, this.prev_frac_cell_x, this.prev_frac_cell_y, this.prev_cell_x, this.prev_cell_y, true);
+            this.handle_hover(this.prev_pos, true);
         }
     }
 
@@ -473,9 +463,9 @@ export class MouseOperation {
         }
     }
 
-    *iter_touched_cells(frac_cell_x, frac_cell_y) {
+    *iter_touched_cells(real_x, real_y) {
         for (let pt of walk_grid(
-            this.prev_frac_cell_x, this.prev_frac_cell_y, frac_cell_x, frac_cell_y,
+            this.prev_pos.real_x, this.prev_pos.real_y, real_x, real_y,
             // Bound the grid walk to one cell beyond the edges of the level, so that dragging the
             // mouse in from outside the actual edges still works reliably
             -1, -1, this.editor.stored_level.size_x, this.editor.stored_level.size_y))
@@ -489,9 +479,9 @@ export class MouseOperation {
     // -- Implement these --
 
     // Called when the mouse button is first pressed
-    handle_press(x, y, ev) {}
+    handle_press(pos, ev) {}
     // Called when the mouse is moved while the button is held down
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {}
+    handle_drag(pos, force = false) {}
     // Called when releasing the mouse button
     commit_press() {}
     // Called when aborting a held mouse, e.g. by pressing Esc or losing focus
@@ -500,7 +490,7 @@ export class MouseOperation {
     cleanup_press() {}
 
     // Called when the mouse is moved while the button is NOT held down
-    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {}
+    handle_hover(pos, force = false) {}
     // Called when the foreground or background tile changes (after it's been redrawn)
     handle_tile_updated(is_bg = false) {}
     // Called when the mouse leaves the level or viewport while the button is NOT held down
@@ -508,10 +498,10 @@ export class MouseOperation {
 }
 
 export class PanOperation extends MouseOperation {
-    handle_drag(client_x, client_y) {
+    handle_drag(pos) {
         let target = this.editor.actual_viewport_el;
-        let dx = this.prev_client_x - client_x;
-        let dy = this.prev_client_y - client_y;
+        let dx = this.prev_pos.client_x - pos.client_x;
+        let dy = this.prev_pos.client_y - pos.client_y;
         target.scrollLeft += dx;
         target.scrollTop += dy;
     }
@@ -572,12 +562,12 @@ export class EyedropOperation extends MouseOperation {
         }
     }
 
-    handle_press(x, y) {
-        this.eyedrop(x, y);
+    handle_press(pos) {
+        this.eyedrop(pos.x, pos.y);
     }
-    handle_drag(x, y) {
+    handle_drag(pos) {
         // FIXME should only re-eyedrop if we enter a new cell or click again
-        this.eyedrop(x, y);
+        this.eyedrop(pos.x, pos.y);
     }
 }
 
@@ -609,11 +599,11 @@ export class PencilOperation extends MouseOperation {
         this.tile_element.setAttribute('href', this.editor.fg_tile_el.toDataURL());
     }
 
-    handle_press(x, y) {
-        this.draw_in_cell(x, y);
+    handle_press(pos) {
+        this.draw_in_cell(pos.x, pos.y);
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        for (let [x, y] of this.iter_touched_cells(frac_cell_x, frac_cell_y)) {
+    handle_drag(pos) {
+        for (let [x, y] of this.iter_touched_cells(pos.real_x, pos.real_y)) {
             this.draw_in_cell(x, y);
         }
     }
@@ -681,8 +671,8 @@ class BigDrawOperation extends MouseOperation {
         }
     }
 
-    handle_press(x, y) {
-        this.update_drawn_points([[x, y]]);
+    handle_press(pos) {
+        this.update_drawn_points([[pos.x, pos.y]]);
     }
     update_drawn_points(iterable) {
         let existing_nodes = this.preview_element.childNodes;
@@ -729,11 +719,13 @@ class BigDrawOperation extends MouseOperation {
 export class LineOperation extends BigDrawOperation {
     // Technically the cursor should be hidden while dragging, but in practice it highlights the
     // endpoint of the line (by drawing it twice), which I kind of like
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+    handle_drag(pos) {
+        let x = pos.x;
+        let y = pos.y;
         if (this.shift) {
             // Force lines at "nice" angles -- orthogonal, 1:1, or 1:2
-            let dx = cell_x - this.click_cell_x;
-            let dy = cell_y - this.click_cell_y;
+            let dx = x - this.click_pos.x;
+            let dy = y - this.click_pos.y;
             // If either delta is zero, we're already orthogonal, nothing to do
             if (dx !== 0 && dy !== 0) {
                 let ratio = Math.abs(dx / dy);
@@ -759,16 +751,16 @@ export class LineOperation extends BigDrawOperation {
 
                 if (ratio < 1) {
                     // Keep x, shrink y to match
-                    cell_x = this.click_cell_x + Math.floor(snapped_ratio * Math.abs(dy)) * Math.sign(dx);
+                    x = this.click_pos.x + Math.floor(snapped_ratio * Math.abs(dy)) * Math.sign(dx);
                 }
                 else {
-                    cell_y = this.click_cell_y + Math.floor(snapped_ratio * Math.abs(dx)) * Math.sign(dy);
+                    y = this.click_pos.y + Math.floor(snapped_ratio * Math.abs(dx)) * Math.sign(dy);
                 }
             }
         }
 
         this.update_drawn_points(walk_grid(
-            this.click_cell_x + 0.5, this.click_cell_y + 0.5, cell_x + 0.5, cell_y + 0.5,
+            this.click_pos.x + 0.5, this.click_pos.y + 0.5, x + 0.5, y + 0.5,
             -1, -1, this.editor.stored_level.size_x, this.editor.stored_level.size_y));
     }
 }
@@ -804,17 +796,17 @@ export class RectangleOperation extends BigDrawOperation {
             }
         }
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        let x0 = Math.min(this.click_cell_x, cell_x);
-        let x1 = Math.max(this.click_cell_x, cell_x);
-        let y0 = Math.min(this.click_cell_y, cell_y);
-        let y1 = Math.max(this.click_cell_y, cell_y);
+    handle_drag(pos) {
+        let x0 = Math.min(this.click_pos.x, pos.x);
+        let x1 = Math.max(this.click_pos.x, pos.x);
+        let y0 = Math.min(this.click_pos.y, pos.y);
+        let y1 = Math.max(this.click_pos.y, pos.y);
 
         if (this.shift) {
             // Force a square, with the added wrinkle that we need to shrink towards the cursor
             if (x1 - x0 < y1 - y0) {
                 let size = x1 - x0;
-                if (y0 === this.click_cell_y) {
+                if (y0 === this.click_pos.y) {
                     y1 = y0 + size;
                 }
                 else {
@@ -823,7 +815,7 @@ export class RectangleOperation extends BigDrawOperation {
             }
             else if (y1 - y0 < x1 - x0) {
                 let size = y1 - y0;
-                if (x0 === this.click_cell_x) {
+                if (x0 === this.click_pos.x) {
                     x1 = x0 + size;
                 }
                 else {
@@ -878,10 +870,10 @@ export class FillOperation extends MouseOperation {
         this.last_known_tile = this.editor.fg_tile;
     }
 
-    handle_hover(_mx, _my, _gxf, _gyf, cell_x, cell_y) {
-        this.last_known_coords = [cell_x, cell_y];
+    handle_hover(pos) {
+        this.last_known_coords = [pos.x, pos.y];
         this.last_known_tile = this.editor.fg_tile;
-        this._floodfill_from(cell_x, cell_y);
+        this._floodfill_from(pos.x, pos.y);
     }
     _floodfill_from(x0, y0) {
         let i0 = this.editor.coords_to_scalar(x0, y0);
@@ -964,7 +956,7 @@ class BaseSelectOperation extends MouseOperation {
     handle_press() {
         this.has_moved = false;
         if (! this.shift && ! this.editor.selection.is_empty &&
-            this.editor.selection.contains(this.click_cell_x, this.click_cell_y))
+            this.editor.selection.contains(this.click_pos.x, this.click_pos.y))
         {
             // Move existing selection
             this.mode = 'float';
@@ -975,9 +967,9 @@ class BaseSelectOperation extends MouseOperation {
         }
     }
 
-    drag_floating_selection(cell_x, cell_y) {
+    drag_floating_selection(x, y) {
         if (this.has_moved) {
-            this.editor.selection.move_by(Math.floor(cell_x - this.prev_cell_x), Math.floor(cell_y - this.prev_cell_y));
+            this.editor.selection.move_by(Math.floor(x - this.prev_pos.x), Math.floor(y - this.prev_pos.y));
             return;
         }
 
@@ -995,9 +987,9 @@ class BaseSelectOperation extends MouseOperation {
         }
     }
 
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+    handle_drag(pos) {
         if (this.mode === 'float') {
-            this.drag_floating_selection(cell_x, cell_y);
+            this.drag_floating_selection(pos.x, pos.y);
         }
         else {
             this.continue_selection();
@@ -1008,8 +1000,8 @@ class BaseSelectOperation extends MouseOperation {
     commit_press() {
         if (this.mode === 'float') {
             // Make selection move undoable
-            let dx = Math.floor(this.prev_cell_x - this.click_cell_x);
-            let dy = Math.floor(this.prev_cell_y - this.click_cell_y);
+            let dx = Math.floor(this.prev_pos.x - this.click_pos.x);
+            let dy = Math.floor(this.prev_pos.y - this.click_pos.y);
             if (dx || dy) {
                 this.editor._done(
                     () => this.editor.selection.move_by(dx, dy),
@@ -1099,16 +1091,16 @@ export class BoxSelectOperation extends BaseSelectOperation {
 
     _update_pending_selection() {
         this.pending_selection.set_extrema(
-            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.click_cell_x)),
-            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.click_cell_y)),
-            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.prev_cell_x)),
-            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.prev_cell_y)));
+            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.click_pos.x)),
+            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.click_pos.y)),
+            Math.max(0, Math.min(this.editor.stored_level.size_x - 1, this.prev_pos.x)),
+            Math.max(0, Math.min(this.editor.stored_level.size_y - 1, this.prev_pos.y)));
     }
 }
 
 export class WandSelectOperation extends BaseSelectOperation {
     start_selection() {
-        let filled_cells = floodfill_from(this.click_cell_x, this.click_cell_y, this.editor, false);
+        let filled_cells = floodfill_from(this.click_pos.x, this.click_pos.y, this.editor, false);
         let cells = new Set;
         if (filled_cells) {
             for (let [i, filled] of filled_cells.entries()) {
@@ -1157,18 +1149,18 @@ export class WandSelectOperation extends BaseSelectOperation {
 // FORCE FLOORS
 
 export class ForceFloorOperation extends MouseOperation {
-    handle_press(x, y) {
+    handle_press(pos) {
         // Begin by placing an all-way force floor under the mouse
-        this.editor.place_in_cell(this.cell(x, y), {type: TILE_TYPES.force_floor_all});
+        this.editor.place_in_cell(this.cell(pos.x, pos.y), {type: TILE_TYPES.force_floor_all});
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
+    handle_drag(pos) {
         // Walk the mouse movement and change each we touch to match the direction we
         // crossed the border
         // FIXME occasionally i draw a tetris S kinda shape and both middle parts point
         // the same direction, but shouldn't
         let i = 0;
         let prevx, prevy;
-        for (let [x, y] of this.iter_touched_cells(frac_cell_x, frac_cell_y)) {
+        for (let [x, y] of this.iter_touched_cells(pos.real_x, pos.real_y)) {
             i += 1;
             // The very first cell is the one the mouse was already in, and we don't
             // have a movement direction yet, so leave that alone
@@ -1213,17 +1205,17 @@ export class ForceFloorOperation extends MouseOperation {
 
 // This is sort of like a combination of the force floor tool and track tool
 export class IceOperation extends MouseOperation {
-    handle_press(x, y) {
+    handle_press(pos) {
         // Begin by placing regular ice
-        this.editor.place_in_cell(this.cell(x, y), {type: TILE_TYPES.ice});
+        this.editor.place_in_cell(this.cell(pos.x, pos.y), {type: TILE_TYPES.ice});
         this.entry_direction = null;
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
+    handle_drag(pos) {
         // Walk the mouse movement.  For tiles we enter, turn them to ice.  For tiles we leave, if
         // the mouse crossed two adjacent edges on its way in and out, change it to a corner
         let prevx = null;
         let prevy = null;
-        for (let [x, y] of this.iter_touched_cells(frac_cell_x, frac_cell_y)) {
+        for (let [x, y] of this.iter_touched_cells(pos.real_x, pos.real_y)) {
             let cell = this.cell(x, y);
             let terrain = cell[LAYERS.terrain];
             if (terrain && ! ICE_TILES.has(terrain.type.name)) {
@@ -1294,16 +1286,16 @@ export class TrackOperation extends MouseOperation {
         this.entry_direction = null;
 
         // ...unless...
-        let tri_x = Math.floor((this.click_frac_cell_x - this.click_cell_x) * 3);
-        let tri_y = Math.floor((this.click_frac_cell_y - this.click_cell_y) * 3);
+        let tri_x = Math.floor((this.click_pos.real_x - this.click_pos.x) * 3);
+        let tri_y = Math.floor((this.click_pos.real_y - this.click_pos.y) * 3);
         // TODO add or remove track on the edge clicked here?  hover preview?
         // TODO ctrl-mouse2 for the popup?
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
+    handle_drag(pos) {
         // Walk the mouse movement and, for every tile we LEAVE, add a railroad track matching the
         // two edges of it that we crossed.
         let prevx = null, prevy = null;
-        for (let [x, y] of this.iter_touched_cells(frac_cell_x, frac_cell_y)) {
+        for (let [x, y] of this.iter_touched_cells(pos.real_x, pos.real_y)) {
             if (prevx === null || prevy === null) {
                 prevx = x;
                 prevy = y;
@@ -1386,13 +1378,13 @@ export class TextOperation extends MouseOperation {
         this.editor.svg_overlay.append(this.text_cursor);
     }
 
-    handle_press(x, y) {
-        this.initial_cursor_x = x;
-        this.place_cursor(x, y);
+    handle_press(pos) {
+        this.initial_cursor_x = pos.x;
+        this.place_cursor(pos.x, pos.y);
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        this.initial_cursor_x = cell_x;
-        this.place_cursor(cell_x, cell_y);
+    handle_drag(pos) {
+        this.initial_cursor_x = pos.x;
+        this.place_cursor(pos.x, pos.y);
     }
 
     // TODO handle ctrl-z?
@@ -1468,6 +1460,7 @@ export class TextOperation extends MouseOperation {
 
     do_destroy() {
         this.editor.redirect_keys_to_tool = false;
+        super.do_destroy();
     }
 }
 
@@ -1478,16 +1471,17 @@ export class TextOperation extends MouseOperation {
 export class ThinWallOperation extends MouseOperation {
     handle_press() {
         // On initial click, place/erase a thin wall on the nearest edge
-        let edge = get_cell_edge(this.click_frac_cell_x, this.click_frac_cell_y);
-        let cell = this.cell(this.click_cell_x, this.click_cell_y);
+        let edge = get_cell_edge(this.click_pos.real_x, this.click_pos.real_y);
+        let cell = this.cell(this.click_pos.x, this.click_pos.y);
         this.affect_cell_edge(cell, edge);
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
+    handle_drag(pos) {
         // Drawing should place a thin wall any time we cross the center line of a cell, either
         // horizontally or vertically.  Walk a double-size grid to find when this happens
+        // FIXME? use iter_touched_cells here but add a scale factor?
         let prevhx = null, prevhy = null;
         for (let [hx, hy] of walk_grid(
-            this.prev_frac_cell_x * 2, this.prev_frac_cell_y * 2, frac_cell_x * 2, frac_cell_y * 2,
+            this.prev_pos.real_x * 2, this.prev_pos.real_y * 2, pos.real_x * 2, pos.real_y * 2,
             -1, -1, this.editor.stored_level.size_x * 2, this.editor.stored_level.size_y * 2))
         {
             let phx = prevhx;
@@ -1584,21 +1578,21 @@ export class ConnectOperation extends MouseOperation {
         this.editor.svg_overlay.append(this.source_cursor, this.target_cursor);
     }
 
-    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y, force = false) {
-        if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y && ! force)
+    handle_hover(pos, force = false) {
+        if (pos.x === this.prev_pos.x && pos.y === this.prev_pos.y && ! force)
             return;
 
-        let cell = this.cell(cell_x, cell_y);
+        let cell = this.cell(pos.x, pos.y);
         let terrain = cell[LAYERS.terrain];
         if (terrain.type.connects_to) {
             this.source_cursor.classList.add('--visible');
-            this.source_cursor.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
+            this.source_cursor.setAttribute('transform', `translate(${pos.x} ${pos.y})`);
             this.target_cursor.classList.remove('--visible');
         }
         else {
             this.pending_sources = [];
             this.pending_cxns = [];
-            let pt = this.editor.coords_to_scalar(cell_x, cell_y);
+            let pt = this.editor.coords_to_scalar(pos.x, pos.y);
             this.pending_original_target = pt;
             for (let [src, dest] of this.editor.stored_level.custom_connections) {
                 if (dest === pt) {
@@ -1612,7 +1606,7 @@ export class ConnectOperation extends MouseOperation {
             this.source_cursor.classList.remove('--visible');
             if (this.pending_sources.length > 0) {
                 this.target_cursor.classList.add('--visible');
-                this.target_cursor.setAttribute('transform', `translate(${cell_x} ${cell_y})`);
+                this.target_cursor.setAttribute('transform', `translate(${pos.x} ${pos.y})`);
             }
             else {
                 this.target_cursor.classList.remove('--visible');
@@ -1620,11 +1614,11 @@ export class ConnectOperation extends MouseOperation {
         }
     }
 
-    handle_press(x, y) {
+    handle_press(pos) {
         // TODO restrict to button/cloner unless holding shift
         // TODO what do i do when you erase a button/cloner?  can i detect if you're picking it up?
-        let pt = this.editor.coords_to_scalar(x, y);
-        let cell = this.cell(x, y);
+        let pt = this.editor.coords_to_scalar(pos.x, pos.y);
+        let cell = this.cell(pos.x, pos.y);
         let terrain = cell[LAYERS.terrain];
         if (this.alt_mode) {
             // Auto connect using Lynx rules
@@ -1661,7 +1655,7 @@ export class ConnectOperation extends MouseOperation {
         // Otherwise, this is the start of a drag, which could be one of two things...
         if (terrain.type.connects_to) {
             // This is a source, and we're dragging to a destination
-            let cxn = new SVGConnection(x, y, x, y);
+            let cxn = new SVGConnection(pos.x, pos.y, pos.x, pos.y);
             this.pending_cxns = [cxn];
             this.pending_sources = [pt];
             this.pending_type = terrain.type.name;
@@ -1696,19 +1690,19 @@ export class ConnectOperation extends MouseOperation {
         }
         return null;
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+    handle_drag(pos) {
         if (this.pending_cxns.length === 0)
             return;
 
         for (let cxn of this.pending_cxns) {
-            cxn.set_dest(cell_x, cell_y);
+            cxn.set_dest(pos.x, pos.y);
         }
 
-        let cell = this.cell(cell_x, cell_y);
+        let cell = this.cell(pos.x, pos.y);
         if (this.shift ||
             TILE_TYPES[this.pending_type].connects_to.has(cell[LAYERS.terrain].type.name))
         {
-            this.pending_target = this.editor.coords_to_scalar(cell_x, cell_y);
+            this.pending_target = this.editor.coords_to_scalar(pos.x, pos.y);
             for (let cxn of this.pending_cxns) {
                 cxn.element.style.opacity = '';
             }
@@ -1779,10 +1773,10 @@ export class WireOperation extends MouseOperation {
         this.editor.svg_overlay.append(this.circuitry_g);
     }
 
-    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        let edge = get_cell_edge(frac_cell_x, frac_cell_y);
+    handle_hover(pos) {
+        let edge = get_cell_edge(pos.real_x, pos.real_y);
         let edgebit = DIRECTIONS[edge].bit;
-        let cell = this.cell(cell_x, cell_y);
+        let cell = this.cell(pos.x, pos.y);
         // Wire can only be in terrain or the circuit block, and this tool ignores circuit
         // blocks for circuit-tracing purposes
         let terrain = cell[LAYERS.terrain];
@@ -1854,11 +1848,11 @@ export class WireOperation extends MouseOperation {
         if (this.alt_mode) {
             // Place or remove wire tunnels
             // TODO this could just be a separate tool now
-            let cell = this.cell(this.click_frac_cell_x, this.click_frac_cell_y);
+            let cell = this.cell(this.click_pos.real_x, this.click_pos.real_y);
             if (! cell)
                 return;
 
-            let direction = get_cell_edge(this.click_frac_cell_x, this.click_frac_cell_y);
+            let direction = get_cell_edge(this.click_pos.real_x, this.click_pos.real_y);
             let bit = DIRECTIONS[direction].bit;
 
             let terrain = cell[LAYERS.terrain];
@@ -1878,11 +1872,11 @@ export class WireOperation extends MouseOperation {
         }
         else {
             // A single click affects the edge of the touched cell
-            this.affect_cell_edge(this.click_cell_x, this.click_cell_y,
-                get_cell_edge(this.click_frac_cell_x, this.click_frac_cell_y));
+            this.affect_cell_edge(this.click_pos.x, this.click_pos.y,
+                get_cell_edge(this.click_pos.real_x, this.click_pos.real_y));
         }
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y) {
+    handle_drag(pos) {
         if (this.alt_mode) {
             // Wire tunnels don't support dragging
             // TODO but maybe they should??  makes erasing a lot of them easier at least
@@ -1907,7 +1901,7 @@ export class WireOperation extends MouseOperation {
         // TODO maybe i should just have a walk_grid variant that yields line crossings, christ
         let prevqx = null, prevqy = null;
         for (let [qx, qy] of walk_grid(
-            this.prev_frac_cell_x * 4, this.prev_frac_cell_y * 4, frac_cell_x * 4, frac_cell_y * 4,
+            this.prev_pos.real_x * 4, this.prev_pos.real_y * 4, pos.real_x * 4, pos.real_y * 4,
             // See comment in iter_touched_cells
             -1, -1, this.editor.stored_level.size_x * 4, this.editor.stored_level.size_y * 4))
         {
@@ -2091,13 +2085,13 @@ export class RotateOperation extends MouseOperation {
         return null;
     }
 
-    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+    handle_hover(pos) {
         // TODO hrmm if we undo without moving the mouse then this becomes wrong (even without the
         // stuff here)
         // TODO uhhh that's true for all kinds of kb shortcuts actually, even for pressing/releasing
         // ctrl or shift to change the target.  dang
 
-        let cell = this.cell(cell_x, cell_y);
+        let cell = this.cell(pos.x, pos.y);
         let layer = this._find_target_tile(cell);
         this.hovered_layer = layer;
 
@@ -2122,7 +2116,7 @@ export class RotateOperation extends MouseOperation {
     }
 
     handle_press() {
-        let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
+        let cell = this.cell(this.prev_pos.x, this.prev_pos.y);
         if (this.hovered_layer === null)
             return;
         let tile = cell[this.hovered_layer];
@@ -2401,19 +2395,19 @@ export class AdjustOperation extends MouseOperation {
 
     // The real work happens on hover, since we need to actually adjust the tile in order to preview
     // it anyway; clicking just commits it.
-    handle_hover(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
+    handle_hover(pos) {
         /*
          * XXX this is wrong for e.g. ice corners and tracks and force floors, which all make use of
          * fractional position
-        if (cell_x === this.prev_cell_x && cell_y === this.prev_cell_y &&
-            (! this.hovered_edge || this.hovered_edge === get_cell_edge(frac_cell_x, frac_cell_y)) &&
+        if (pos.x === this.prev_pos.x && pos.y === this.prev_pos.y &&
+            (! this.hovered_edge || this.hovered_edge === get_cell_edge(pos.real_x, pos.real_y)) &&
             ! force)
         {
             return;
         }
         */
 
-        let cell = this.cell(cell_x, cell_y);
+        let cell = this.cell(pos.x, pos.y);
 
         // Find our target tile, and in most cases, adjust it
         this.adjusted_tile = null;
@@ -2447,7 +2441,7 @@ export class AdjustOperation extends MouseOperation {
 
             // Set swivel corner
             if (layer === LAYERS.swivel) {
-                let corner = get_cell_corner(frac_cell_x, frac_cell_y);
+                let corner = get_cell_corner(pos.real_x, pos.real_y);
                 let swivel_type = ['swivel_ne', 'swivel_se', 'swivel_sw', 'swivel_nw'][corner];
                 this.adjusted_tile = {...tile, type: TILE_TYPES[swivel_type]};
                 break;
@@ -2456,7 +2450,7 @@ export class AdjustOperation extends MouseOperation {
             // Place or delete individual thin walls
             // FIXME uhhh need to erase the tile on mouse move or on right-click
             if (layer === LAYERS.thin_wall) {
-                let edge = get_cell_edge(frac_cell_x, frac_cell_y);
+                let edge = get_cell_edge(pos.real_x, pos.real_y);
                 this.hovered_edge = edge;
                 this.adjusted_tile = {...tile};
                 this.adjusted_tile.edges ^= DIRECTIONS[edge].bit;
@@ -2465,7 +2459,7 @@ export class AdjustOperation extends MouseOperation {
 
             // Change the direction of force floors
             if (FORCE_FLOOR_TILES.has(tile.type.name)) {
-                let edge = get_cell_edge_or_center(frac_cell_x, frac_cell_y);
+                let edge = get_cell_edge_or_center(pos.real_x, pos.real_y);
                 if (edge === null) {
                     this.adjusted_tile = {...tile, type: TILE_TYPES['force_floor_all']};
                 }
@@ -2478,11 +2472,11 @@ export class AdjustOperation extends MouseOperation {
             // Change the direction of ice corners
             if (ICE_TILES.has(tile.type.name)) {
                 let ice_type;
-                if (is_cell_center(frac_cell_x, frac_cell_y)) {
+                if (is_cell_center(pos.real_x, pos.real_y)) {
                     ice_type = 'ice';
                 }
                 else {
-                    let corner = get_cell_corner(frac_cell_x, frac_cell_y);
+                    let corner = get_cell_corner(pos.real_x, pos.real_y);
                     ice_type = ['ice_ne', 'ice_se', 'ice_sw', 'ice_nw'][corner];
                 }
 
@@ -2493,8 +2487,8 @@ export class AdjustOperation extends MouseOperation {
             // Edit railroad tiles
             if (tile.type.name === 'railroad') {
                 // Locate the cursor on a 3×3 grid
-                let tri_x = Math.floor(frac_cell_x % 1 * 3);
-                let tri_y = Math.floor(frac_cell_y % 1 * 3);
+                let tri_x = Math.floor(pos.real_x % 1 * 3);
+                let tri_y = Math.floor(pos.real_y % 1 * 3);
                 let tri = tri_x + 3 * tri_y;
                 let segment = [3, 5, 0, 4, null, 4, 2, 5, 1][tri];
                 this.adjusted_tile = {...tile};
@@ -2566,7 +2560,7 @@ export class AdjustOperation extends MouseOperation {
             if (tile.type.name === 'frame_block') {
                 // TODO this kinda obviates the need for a frame block editor
                 this.adjusted_tile = {...tile, arrows: new Set(tile.arrows)};
-                let edge = get_cell_edge(frac_cell_x, frac_cell_y);
+                let edge = get_cell_edge(pos.real_x, pos.real_y);
                 this.hovered_edge = edge;
                 if (this.adjusted_tile.arrows.has(edge)) {
                     this.adjusted_tile.arrows.delete(edge);
@@ -2584,33 +2578,7 @@ export class AdjustOperation extends MouseOperation {
                 this.adjusted_tile = {...tile, _editor_pressed: ! tile._editor_pressed};
                 break;
             }
-
-            // These are
-            // TODO need a single-click thing to do for 
-
-            // TODO hmm. what do i do with these
-            /*
-            if (TILES_WITH_PROPS[tile.type.name]) {
-                // Open special tile editors
-                return [layer, "Edit"];
-            }
-
-            if (ADJUST_SPECIAL[tile.type.name]) {
-                return [layer, "Press"];
-            }
-            */
         }
-        /*
-        if (hint === null) {
-            this.click_hint.classList.remove('--visible');
-        }
-        else {
-            this.click_hint.classList.add('--visible');
-            this.click_hint.setAttribute('x', cell_x + 0.5);
-            this.click_hint.setAttribute('y', cell_y - 0.125);
-            this.click_hint.textContent = hint;
-        }
-        */
 
         if (! this.adjusted_tile) {
             this.cursor_element.classList.remove('--visible');
@@ -2631,10 +2599,10 @@ export class AdjustOperation extends MouseOperation {
         // Special previewing behavior
         if (this.adjusted_tile.type.name === 'button_gray') {
             this.gray_button_preview.classList.add('--visible');
-            let gx0 = Math.max(0, cell_x - 2);
-            let gy0 = Math.max(0, cell_y - 2);
-            let gx1 = Math.min(this.editor.stored_level.size_x - 1, cell_x + 2);
-            let gy1 = Math.min(this.editor.stored_level.size_y - 1, cell_y + 2);
+            let gx0 = Math.max(0, pos.x - 2);
+            let gy0 = Math.max(0, pos.y - 2);
+            let gx1 = Math.min(this.editor.stored_level.size_x - 1, pos.x + 2);
+            let gy1 = Math.min(this.editor.stored_level.size_y - 1, pos.y + 2);
 
             this.gray_button_bounds_rect.setAttribute('x', gx0);
             this.gray_button_bounds_rect.setAttribute('y', gy0);
@@ -2674,7 +2642,7 @@ export class AdjustOperation extends MouseOperation {
     }
 
     handle_press() {
-        let cell = this.cell(this.prev_cell_x, this.prev_cell_y);
+        let cell = this.cell(this.prev_pos.x, this.prev_pos.y);
 
         // Right-click: open an overlay showing every tile in the cell
         if (this.alt_mode) {
@@ -2716,14 +2684,6 @@ export class AdjustOperation extends MouseOperation {
             // The tile has changed, so invalidate our hover
             this.rehover();
         }
-        /*
-        else if (TILES_WITH_PROPS[tile.type.name]) {
-            // Open special tile editors -- this is a last resort, which is why right-click does it
-            // explicitly
-            this.editor.open_tile_prop_overlay(
-                tile, cell, this.editor.renderer.get_cell_rect(cell.x, cell.y));
-        }
-        */
     }
 
     // Adjust tool doesn't support dragging
@@ -2744,7 +2704,7 @@ export class AdjustOperation extends MouseOperation {
 // FIXME undo
 // TODO view is not especially visible
 export class CameraOperation extends MouseOperation {
-    handle_press(x, y, ev) {
+    handle_press(pos, ev) {
         this.offset_x = 0;
         this.offset_y = 0;
         this.resize_x = 0;
@@ -2757,9 +2717,9 @@ export class CameraOperation extends MouseOperation {
             // Clicking in empty space creates a new camera region
             this.mode = 'create';
             cursor = 'move';
-            this.region = new DOMRect(this.click_cell_x, this.click_cell_y, 1, 1);
+            this.region = new DOMRect(this.click_pos.x, this.click_pos.y, 1, 1);
             this.target = mk_svg('rect.overlay-camera', {
-                x: this.click_cell_x, y: this.prev_cell_y, width: 1, height: 1,
+                x: this.click_pos.x, y: this.prev_pos.y, width: 1, height: 1,
                 'data-region-index': this.editor.stored_level.camera_regions.length,
             });
             this.editor.connections_g.append(this.target);
@@ -2769,10 +2729,10 @@ export class CameraOperation extends MouseOperation {
 
             // If we're grabbing an edge, resize it
             let rect = this.target.getBoundingClientRect();
-            let grab_left = (this.click_client_x < rect.left + 16);
-            let grab_right = (this.click_client_x > rect.right - 16);
-            let grab_top = (this.click_client_y < rect.top + 16);
-            let grab_bottom = (this.click_client_y > rect.bottom - 16);
+            let grab_left = (this.click_pos.client_x < rect.left + 16);
+            let grab_right = (this.click_pos.client_x > rect.right - 16);
+            let grab_top = (this.click_pos.client_y < rect.top + 16);
+            let grab_bottom = (this.click_pos.client_y > rect.bottom - 16);
             if (grab_left || grab_right || grab_top || grab_bottom) {
                 this.mode = 'resize';
 
@@ -2827,18 +2787,18 @@ export class CameraOperation extends MouseOperation {
         this.size_text.setAttribute('y', this.region.y + this.offset_y + (this.region.height + this.resize_y) / 2);
         this.size_text.textContent = `${this.region.width + this.resize_x} × ${this.region.height + this.resize_y}`;
     }
-    handle_drag(client_x, client_y, frac_cell_x, frac_cell_y, cell_x, cell_y) {
-        // FIXME not right if we zoom, should use frac_cell_x
-        let dx = Math.floor((client_x - this.click_client_x) / this.editor.renderer.tileset.size_x + 0.5);
-        let dy = Math.floor((client_y - this.click_client_y) / this.editor.renderer.tileset.size_y + 0.5);
+    handle_drag(pos) {
+        // FIXME not right if we zoom, should use pos.real_x
+        let dx = Math.floor((pos.client_x - this.click_pos.client_x) / this.editor.renderer.tileset.size_x + 0.5);
+        let dy = Math.floor((pos.client_y - this.click_pos.client_y) / this.editor.renderer.tileset.size_y + 0.5);
 
         let stored_level = this.editor.stored_level;
         if (this.mode === 'create') {
             // Just make the new region span between the original click and the new position
-            this.region.x = Math.min(cell_x, this.click_cell_x);
-            this.region.y = Math.min(cell_y, this.click_cell_y);
-            this.region.width = Math.max(cell_x, this.click_cell_x) + 1 - this.region.x;
-            this.region.height = Math.max(cell_y, this.click_cell_y) + 1 - this.region.y;
+            this.region.x = Math.min(pos.x, this.click_pos.x);
+            this.region.y = Math.min(pos.y, this.click_pos.y);
+            this.region.width = Math.max(pos.x, this.click_pos.x) + 1 - this.region.x;
+            this.region.height = Math.max(pos.y, this.click_pos.y) + 1 - this.region.y;
         }
         else if (this.mode === 'move') {
             // Keep it within the map!
@@ -2913,7 +2873,7 @@ export class CameraOperation extends MouseOperation {
 }
 
 export class CameraEraseOperation extends MouseOperation {
-    handle_press(x, y, ev) {
+    handle_press(pos, ev) {
         let target = ev.target.closest('.overlay-camera');
         if (target) {
             let index = parseInt(target.getAttribute('data-region-index'), 10);
