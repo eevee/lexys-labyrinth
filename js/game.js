@@ -1,5 +1,5 @@
 import * as algorithms from './algorithms.js';
-import { DIRECTIONS, DIRECTION_ORDER, LAYERS, INPUT_BITS, PICKUP_PRIORITIES, TICS_PER_SECOND } from './defs.js';
+import { ACTOR_TRAITS, DIRECTIONS, DIRECTION_ORDER, LAYERS, INPUT_BITS, PICKUP_PRIORITIES, TICS_PER_SECOND } from './defs.js';
 import { LevelInterface } from './format-base.js';
 import TILE_TYPES from './tiletypes.js';
 
@@ -8,6 +8,7 @@ export class Tile {
         this.type = type;
         if (type.is_actor) {
             this.direction = direction;
+            this.traits = this.compute_traits();
         }
         this.cell = null;
 
@@ -25,6 +26,16 @@ export class Tile {
         let tile = new this(type, tile_template.direction);
         // Copy any extra properties in verbatim
         return Object.assign(tile, tile_template);
+    }
+
+    compute_traits() {
+        let traits = this.type.innate_traits ?? 0;
+        if (this.toolbelt) {
+            for (let tool_name of this.toolbelt) {
+                traits |= (TILE_TYPES[tool_name].item_traits ?? 0);
+            }
+        }
+        return traits;
     }
 
     movement_progress(update_progress, update_rate) {
@@ -97,40 +108,6 @@ export class Tile {
         return false;
     }
 
-    ignores(name) {
-        if (this.type.ignores && this.type.ignores.has(name))
-            return true;
-
-        if (this.toolbelt) {
-            for (let item of this.toolbelt) {
-                if (! item)
-                    continue;
-                let item_type = TILE_TYPES[item];
-                if (item_type.item_ignores && item_type.item_ignores.has(name))
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    slide_ignores(name) {
-        if (this.type.slide_ignores && this.type.slide_ignores.has(name))
-            return true;
-
-        if (this.toolbelt) {
-            for (let item of this.toolbelt) {
-                if (! item)
-                    continue;
-                let item_type = TILE_TYPES[item];
-                if (item_type.item_slide_ignores && item_type.item_slide_ignores.has(name))
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
     can_push(tile, direction, level) {
         // This tile already has a push queued, sorry
         if (tile.pending_push)
@@ -186,6 +163,7 @@ Object.assign(Tile.prototype, {
     wire_directions: 0,
     wire_tunnel_directions: 0,
     // Actor defaults
+    traits: 0,  // bitmask of flags in ACTOR_TRAITS
     movement_cooldown: 0,
     movement_speed: null,
     previous_cell: null,
@@ -1112,14 +1090,11 @@ export class Level extends LevelInterface {
                 // turnaround effect)
                 this.set_actor_direction(actor, DIRECTIONS[direction].opposite);
 
-                // Now check for ignores for real, so ice corners don't affect ghosts
-                if (! actor.ignores(terrain.type.name)) {
-                    if (terrain.type.on_arrive) {
-                        terrain.type.on_arrive(terrain, this, actor);
-                    }
-                    if (terrain.type.on_stand) {
-                        terrain.type.on_stand(terrain, this, actor, true);
-                    }
+                if (terrain.type.on_arrive) {
+                    terrain.type.on_arrive(terrain, this, actor);
+                }
+                if (terrain.type.on_stand) {
+                    terrain.type.on_stand(terrain, this, actor, true);
                 }
 
                 // Immediately try moving again, since we're guaranteed to have changed direction
@@ -1209,7 +1184,7 @@ export class Level extends LevelInterface {
             this.sfx.play_once('step-gravel');
         }
         else if (terrain.type.name === 'water') {
-            if (actor.ignores(terrain.type.name)) {
+            if (actor.traits & ACTOR_TRAITS.waterproof) {
                 this.sfx.play_once('step-water');
             }
         }
@@ -1255,13 +1230,13 @@ export class Level extends LevelInterface {
     _do_actor_idle(actor) {
         if (actor.movement_cooldown <= 0) {
             let terrain = actor.cell.get_terrain();
-            if (terrain.type.on_stand && ! actor.ignores(terrain.type.name)) {
+            if (terrain.type.on_stand) {
                 terrain.type.on_stand(terrain, this, actor);
             }
             // You might think a loop would be good here but this is unbelievably faster and the
             // only non-terrain tile with an on_stand is the bomb anyway
             let item = actor.cell.get_item();
-            if (item && item.type.on_stand && ! actor.ignores(item.type.name)) {
+            if (item && item.type.on_stand) {
                 item.type.on_stand(item, this, actor);
             }
         }
@@ -1725,7 +1700,6 @@ export class Level extends LevelInterface {
                 continue;
 
             let original_type = tile.type;
-            // TODO check ignores here?
             if (tile.type.on_bumped) {
                 tile.type.on_bumped(tile, this, actor, direction);
             }
@@ -1934,7 +1908,7 @@ export class Level extends LevelInterface {
         // does NOT act like a bonk (hence why it's here)
         if (this.compat.no_backwards_override) {
             let terrain = orig_cell.get_terrain()
-            if (! actor.ignores(terrain.type.name) &&
+            if (! (actor.traits & ACTOR_TRAITS.forceproof) &&
                 terrain.type.force_floor_direction === DIRECTIONS[direction].opposite)
             {
                 return false;
@@ -2019,38 +1993,41 @@ export class Level extends LevelInterface {
         if (! success)
             return false;
 
-        // We're clear!  Compute our speed and move us
+        // We're clear!  Move us
         // FIXME this feels clunky
         let goal_cell = this.get_neighboring_cell(actor.cell, direction);
-        let terrain = goal_cell.get_terrain();
-        let ignore = actor.ignores(terrain.type.name) || actor.slide_ignores(terrain.type.name);
-        if (terrain.type.speed_factor && ! ignore) {
-            speed *= terrain.type.speed_factor;
-        }
-        // Speed boots speed us up, UNLESS we're entering a terrain with a speed factor and an
-        // unignored slide mode -- so e.g. we gain 2x on teleports, ice + ice skates, force floors +
-        // suction boots, sand and dash floors, but we don't gain 2x sliding on ice or force floors
-        // unless it's the turn we're leaving them
-        if (actor.has_item('speed_boots') && (
-                ! terrain.type.speed_factor || ! terrain.type.slide_mode || ignore))
-        {
-            speed /= 2;
-        }
-
-        // Once we successfully start a move (even out of turn), this flag becomes obsolete
-        this._set_tile_prop(actor, 'is_pending_slide', false);
-
         let orig_cell = actor.cell;
         this._set_tile_prop(actor, 'previous_cell', orig_cell);
+        this.move_to(actor, goal_cell);
+
+        // Now that we know whether we're sliding (generally set by the terrain's on_approach),
+        // compute our speed
+        let terrain = goal_cell.get_terrain();
+        // FIXME ah this is kind of a fucking mess huh
+        if (terrain.type.speed_factor && ! (
+            // Don't take the speed into account for sliding tiles that we're immune to
+            (terrain.type.slide_mode === 'force' && (actor.traits & ACTOR_TRAITS.forceproof)) ||
+            (terrain.type.slide_mode === 'ice' && (actor.traits & ACTOR_TRAITS.iceproof))
+        ))
+        {
+            speed *= terrain.type.speed_factor;
+        }
+        else if (actor.traits & ACTOR_TRAITS.hasty) {
+            // Speed boots speed us up, UNLESS we're about to speed up /due to a slide/ — notably
+            // they still take effect when teleporting or walking on sand
+            speed /= 2;
+        }
         let duration = speed * 3;
         this._set_tile_prop(actor, 'movement_cooldown', duration);
         this._set_tile_prop(actor, 'movement_speed', duration);
-        this.move_to(actor, goal_cell);
 
         // Whether we're sliding is determined entirely by whether we most recently moved onto a
         // sliding tile that we don't ignore.  This could /almost/ be computed on the fly, except
         // that an actor that starts on e.g. ice or a teleporter is not considered sliding.
-        this._set_tile_prop(actor, 'is_sliding', terrain.type.slide_mode && ! ignore);
+        this._set_tile_prop(actor, 'is_sliding', terrain.type.slide_mode && ! (
+            (terrain.type.slide_mode === 'force' && (actor.traits & ACTOR_TRAITS.forceproof)) ||
+            (terrain.type.slide_mode === 'ice' && (actor.traits & ACTOR_TRAITS.iceproof))
+        ));
 
         // Do Lexy-style hooking here: only attempt to pull things just after we've actually moved
         // successfully, which means the hook can never stop us from moving and hook slapping is not
@@ -2105,6 +2082,8 @@ export class Level extends LevelInterface {
         if (actor.cell === goal_cell)
             return;
 
+        this._set_tile_prop(actor, 'is_pending_slide', false);
+
         if (actor.type.on_starting_move) {
             actor.type.on_starting_move(actor, this);
         }
@@ -2122,8 +2101,6 @@ export class Level extends LevelInterface {
                 continue;
             if (tile === actor)
                 continue;
-            if (actor.ignores(tile.type.name))
-                continue;
 
             if (tile.type.on_depart) {
                 tile.type.on_depart(tile, this, actor);
@@ -2135,8 +2112,6 @@ export class Level extends LevelInterface {
             if (! tile)
                 continue;
             if (tile === actor)
-                continue;
-            if (actor.ignores(tile.type.name))
                 continue;
 
             if (tile.type.on_approach) {
@@ -2172,8 +2147,6 @@ export class Level extends LevelInterface {
                 continue;
             if (tile === actor)
                 continue;
-            if (actor.ignores(tile.type.name))
-                continue;
 
             if (tile.type.teleport_dest_order) {
                 // This is used by an extra pass just after our caller, so it doesn't need to undo.
@@ -2201,11 +2174,7 @@ export class Level extends LevelInterface {
                     continue;
                 }
             }
-            else if (tile.type.on_arrive && !actor.slide_ignores(tile.type.name)) {
-                // Kind of weird putting slide_ignores here, except that all sliding happens on
-                // on_arrive, and tiles that make you slide in on_arrive don't do anything else, so
-                // for now it works
-                // XXX that is jank as hell what are you talking about
+            else if (tile.type.on_arrive) {
                 tile.type.on_arrive(tile, this, actor);
             }
 
@@ -2213,7 +2182,7 @@ export class Level extends LevelInterface {
             // usually happen anyway during the actor's idle phase.  it also requires random force
             // floors to have a clumsy check that you aren't already about to slide
             // TODO maybe don't do this for lynx?  i don't really grok the implications
-            if (tile.type.on_stand && !actor.slide_ignores(tile.type.name)) {
+            if (tile.type.on_stand) {
                 tile.type.on_stand(tile, this, actor, true);
             }
         }
@@ -2338,6 +2307,7 @@ export class Level extends LevelInterface {
         if (this._place_dropped_item(name, actor.cell, actor)) {
             this._stash_toolbelt(actor);
             actor.toolbelt.shift();
+            this.recompute_traits(actor);
             return true;
         }
         return false;
@@ -2768,7 +2738,6 @@ export class Level extends LevelInterface {
                     this._set_tile_prop(actor, 'movement_cooldown', null);
                     this._set_tile_prop(actor, 'movement_speed', null);
                     this._set_tile_prop(actor, 'is_sliding', false);
-                    this._set_tile_prop(actor, 'is_pending_slide', false);
                     this.move_to(actor, ankh_cell);
 
                     if (sfx) {
@@ -2981,6 +2950,10 @@ export class Level extends LevelInterface {
             this._set_tile_prop(tile, 'type', new_type);
         }
 
+        if (old_type.is_actor || new_type.is_actor) {
+            this.recompute_traits(tile);
+        }
+
         // For transmuting into an animation, set up the timer immediately
         if (tile.type.ttl) {
             if (! old_type.is_actor) {
@@ -3037,6 +3010,7 @@ export class Level extends LevelInterface {
             // it out of their inventory to be dropped later
             this._stash_toolbelt(actor);
             dropped_item = actor.toolbelt.shift();
+            this.recompute_traits(actor);
         }
 
         if (this.give_actor(actor, tile.type.name)) {
@@ -3105,6 +3079,10 @@ export class Level extends LevelInterface {
                 this._stash_toolbelt(actor);
                 actor.toolbelt.push(name);
             }
+
+            if (type.item_traits) {
+                this._set_tile_prop(actor, 'traits', actor.traits | type.item_traits);
+            }
         }
         return true;
     }
@@ -3131,6 +3109,7 @@ export class Level extends LevelInterface {
             if (index >= 0) {
                 this._stash_toolbelt(actor);
                 actor.toolbelt.splice(index, 1);
+                this.recompute_traits(actor);
                 return true;
             }
         }
@@ -3150,8 +3129,13 @@ export class Level extends LevelInterface {
         if (actor.toolbelt && actor.toolbelt.length > 0) {
             this._stash_toolbelt(actor);
             actor.toolbelt = [];
+            this.recompute_traits(actor);
             return true;
         }
+    }
+
+    recompute_traits(actor) {
+        this._set_tile_prop(actor, 'traits', actor.compute_traits());
     }
 
     // Change an actor's direction

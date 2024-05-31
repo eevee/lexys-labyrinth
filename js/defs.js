@@ -125,6 +125,25 @@ export const PICKUP_PRIORITIES = {
     real_player: 0,
 };
 
+export const ACTOR_TRAITS = {
+    iceproof:           0x0001,
+    forceproof:         0x0002,
+    fireproof:          0x0004,
+    waterproof:         0x0008,
+    dirtproof:          0x0010,
+    hasty:              0x0020,
+    charged:            0x0040,
+    trackproof:         0x0080,
+    invulnerable:       0x0100,
+    foiled:             0x0200,
+    adhesive:           0x0400,
+    perceptive:         0x0800,
+    weightless:         0x1000,
+    weighted:           0x2000,
+    phasing:            0x4000,
+    shockproof:         0x8000,
+};
+
 export const COMPAT_RULESET_LABELS = {
     lexy: "Lexy",
     steam: "Steam",

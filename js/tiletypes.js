@@ -1,5 +1,5 @@
 import { find_terrain_linear } from './algorithms.js';
-import { COLLISION, DIRECTIONS, DIRECTION_ORDER, LAYERS, TICS_PER_SECOND, PICKUP_PRIORITIES } from './defs.js';
+import { ACTOR_TRAITS, COLLISION, DIRECTIONS, DIRECTION_ORDER, LAYERS, TICS_PER_SECOND, PICKUP_PRIORITIES } from './defs.js';
 
 // TODO factor out some repeated stuff: common monster bits, common item bits, repeated collision
 // masks
@@ -85,6 +85,9 @@ function _define_force_floor(direction, opposite_type) {
         // Used by Lynx to prevent backwards overriding
         force_floor_direction: direction,
         on_stand(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.forceproof)
+                return;
+
             level.schedule_actor_slide(other, direction);
         },
         activate(me, level) {
@@ -392,6 +395,9 @@ const TILE_TYPES = {
             }
         },
         on_arrive(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             // Lynx/MS: These activate on arrival, not departure
             if (level.compat.popwalls_pop_on_arrive) {
                 this.activate(me, level, other);
@@ -399,8 +405,9 @@ const TILE_TYPES = {
         },
         on_depart(me, level, other) {
             // CC2 quirk: nothing happens if there's still an actor on us (i.e. dynamite)
-            // FIXME does this imply on_depart isn't called at all if we walk off dynamite?
-            if (me.cell.has('dynamite_lit'))
+            if (me.cell.get_actor())
+                return;
+            if (other.type.name === 'ghost')
                 return;
 
             if (! level.compat.popwalls_pop_on_arrive) {
@@ -414,6 +421,9 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         on_depart(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             level.spawn_animation(me.cell, 'puff');
             level.transmute_tile(me, 'popwall');
         },
@@ -537,6 +547,9 @@ const TILE_TYPES = {
         layer: LAYERS.swivel,
         thin_walls: new Set(['north', 'east']),
         on_depart(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             if (other.direction === 'north') {
                 level.transmute_tile(me, 'swivel_se');
             }
@@ -555,6 +568,9 @@ const TILE_TYPES = {
         layer: LAYERS.swivel,
         thin_walls: new Set(['south', 'east']),
         on_depart(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             if (other.direction === 'south') {
                 level.transmute_tile(me, 'swivel_ne');
             }
@@ -573,6 +589,9 @@ const TILE_TYPES = {
         layer: LAYERS.swivel,
         thin_walls: new Set(['south', 'west']),
         on_depart(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             if (other.direction === 'south') {
                 level.transmute_tile(me, 'swivel_nw');
             }
@@ -591,6 +610,9 @@ const TILE_TYPES = {
         layer: LAYERS.swivel,
         thin_walls: new Set(['north', 'west']),
         on_depart(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             if (other.direction === 'north') {
                 level.transmute_tile(me, 'swivel_sw');
             }
@@ -624,16 +646,6 @@ const TILE_TYPES = {
             // If there's already an actor on us, it's treated as though it entered the tile moving
             // in this direction
             me.entered_direction = 'north';
-        },
-        // TODO feel like "ignores" was the wrong idea and there should just be some magic flags for
-        // particular objects that can be immune to.  or maybe those objects should have their own
-        // implementations of immunity
-        _is_affected(me, other) {
-            if (other.type.name === 'ghost')
-                return false;
-            if (other.has_item('railroad_sign'))
-                return false;
-            return true;
         },
         *_iter_tracks(me) {
             let order = me.type.track_order;
@@ -669,31 +681,34 @@ const TILE_TYPES = {
             return false;
         },
         blocks(me, level, other, direction) {
-            return me.type._is_affected(me, other) &&
+            return ! (other.traits & ACTOR_TRAITS.trackproof) &&
                 ! me.type.has_opening(me, DIRECTIONS[direction].opposite);
         },
         blocks_leaving(me, level, other, direction) {
             // FIXME needs the same logic as redirect_exit, so that an illegal entrance can't leave
             // at all
-            return me.type._is_affected(me, other) && ! me.type.has_opening(me, direction);
+            return ! (other.traits & ACTOR_TRAITS.trackproof) &&
+                ! me.type.has_opening(me, direction);
         },
         on_arrive(me, level, other) {
             level._set_tile_prop(me, 'entered_direction', other.direction);
         },
         on_depart(me, level, other) {
-            if (other.type.name === 'ghost')
-                // Ghosts do not switch tracks
+            if (me.track_switch === null)
                 return;
-            if (! level.is_tile_wired(me, false)) {
-                // Only switch if both the entering and the leaving are CURRENTLY valid directions
-                // (which has some quirky implications for the railroad sign)
-                if (me.track_switch === null)
-                    return;
 
-                let track = this.track_order[me.track_switch];
-                if (track.indexOf(DIRECTIONS[me.entered_direction].opposite) >= 0 && track.indexOf(other.direction) >= 0) {
-                    me.type._switch_track(me, level);
-                }
+            // Ghosts never switch tracks
+            if (other.type.name === 'ghost')
+                return;
+            // Wired switches are /only/ controlled by wire
+            if (level.is_tile_wired(me, false))
+                return;
+
+            // Only switch if both the entering and the leaving are CURRENTLY valid directions
+            // (which has some quirky implications for the railroad sign)
+            let track = this.track_order[me.track_switch];
+            if (track.indexOf(DIRECTIONS[me.entered_direction].opposite) >= 0 && track.indexOf(other.direction) >= 0) {
+                me.type._switch_track(me, level);
             }
         },
         on_power(me, level) {
@@ -704,7 +719,7 @@ const TILE_TYPES = {
             me.type._switch_track(me, level);
         },
         redirect_exit(me, other, direction) {
-            if (! me.type._is_affected(me, other))
+            if (other.traits & ACTOR_TRAITS.trackproof)
                 return direction;
 
             let legal_exits = new Set;
@@ -752,12 +767,15 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         blocks(me, level, other) {
+            // XXX special-casing this several times feels clumsy, but the only alternative is to
+            // give everyone dirtproof by default, OR have a dirt-averse flag that dirtproof
+            // /removes/??  (but then i'd still have to check for ghost??)
             return ((other.type.name === 'player2' || other.type.name === 'doppelganger2') &&
-                ! other.has_item('hiking_boots'));
+                ! (other.traits & ACTOR_TRAITS.dirtproof));
         },
         on_arrive(me, level, other) {
-            // Bizarre interaction
-            if (other.type.name === 'ghost' && ! other.has_item('hiking_boots'))
+            // CC2 quirk: ghosts don't pack down dirt, /unless/ they have hiking boots
+            if (other.type.name === 'ghost' && ! (other.traits & ACTOR_TRAITS.dirtproof))
                 return;
             level.transmute_tile(me, 'floor');
             if (other === level.player) {
@@ -770,7 +788,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.monster_typical,
         blocks(me, level, other) {
             return ((other.type.name === 'player2' || other.type.name === 'doppelganger2') &&
-                ! other.has_item('hiking_boots'));
+                ! (other.traits & ACTOR_TRAITS.dirtproof));
         },
     },
     sand: {
@@ -811,7 +829,7 @@ const TILE_TYPES = {
     spikes: {
         layer: LAYERS.terrain,
         blocks(me, level, other) {
-            return !(!other.type.is_player || other.has_item('hiking_boots'));
+            return other.type.is_player && ! (other.traits & ACTOR_TRAITS.dirtproof);
         },
         on_arrive(me, level, other) {
             if (other.type.name === 'glass_block') {
@@ -882,11 +900,12 @@ const TILE_TYPES = {
         on_arrive(me, level, other) {
             if (other.type.name === 'ghost') {
                 // Ghosts with fire boots erase fire, otherwise are unaffected
-                if (other.has_item('fire_boots')) {
+                if (other.traits & ACTOR_TRAITS.fireproof) {
                     level.transmute_tile(me, 'floor');
                 }
+                return;
             }
-            else if (other.has_item('fire_boots')) {
+            else if (other.traits & ACTOR_TRAITS.fireproof) {
                 return;
             }
             else if (other.type.name === 'ice_block') {
@@ -903,10 +922,13 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks(me, level, other) {
             // Water blocks ghosts...  unless they have flippers
-            if (other.type.name === 'ghost' && ! other.has_item('flippers'))
+            if (other.type.name === 'ghost' && ! (other.traits & ACTOR_TRAITS.waterproof))
                 return true;
         },
         on_arrive(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.waterproof)
+                return;
+
             // TODO cc1 allows items under water, i think; water was on the upper layer
             level.sfx.play_once('splash', me.cell);
             let splash_type = level.compat.block_splashes_dont_block ? 'splash_nb' : 'splash';
@@ -955,7 +977,11 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.ghost | COLLISION.fireball,
         on_depart(me, level, other) {
             // CC2 quirk: nothing happens if there's still an actor on us (i.e. dynamite)
-            if (me.cell.has('dynamite_lit'))
+            if (me.cell.get_actor())
+                return;
+
+            // Gliders don't sink us (but ghosts do)
+            if (other.type.name === 'glider')
                 return;
 
             level.transmute_tile(me, 'water');
@@ -971,9 +997,16 @@ const TILE_TYPES = {
         slide_mode: 'ice',
         speed_factor: 0.5,
         on_arrive(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.iceproof)
+                return;
+
             level.schedule_actor_slide(other);
         },
         on_depart(me, level, other) {
+            // Cerises don't break cracked terrain
+            if (other.type.name === 'player2' || other.type.name === 'doppelganger2')
+                return;
+
             level.transmute_tile(me, 'water');
             level.spawn_animation(me.cell, 'splash');
             level.sfx.play_once('splash', me.cell);
@@ -984,6 +1017,9 @@ const TILE_TYPES = {
         slide_mode: 'ice',
         speed_factor: 0.5,
         on_arrive(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.iceproof)
+                return;
+
             level.schedule_actor_slide(other);
         },
     },
@@ -994,6 +1030,9 @@ const TILE_TYPES = {
         speed_factor: 0.5,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.iceproof)
+                return;
+
             let direction = {
                 north: 'north',
                 south: 'east',
@@ -1010,6 +1049,9 @@ const TILE_TYPES = {
         speed_factor: 0.5,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.iceproof)
+                return;
+
             let direction = {
                 north: 'east',
                 south: 'south',
@@ -1026,6 +1068,9 @@ const TILE_TYPES = {
         speed_factor: 0.5,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.iceproof)
+                return;
+
             let direction = {
                 north: 'west',
                 south: 'south',
@@ -1042,6 +1087,9 @@ const TILE_TYPES = {
         speed_factor: 0.5,
         blocks_leaving: blocks_leaving_thin_walls,
         on_arrive(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.iceproof)
+                return;
+
             let direction = {
                 north: 'north',
                 south: 'west',
@@ -1065,7 +1113,10 @@ const TILE_TYPES = {
                 (other.type.collision_mask & COLLISION.monster_typical));
         },
         on_stand(me, level, other) {
-            if (! other.is_pending_slide && ! level.compat.force_floors_on_arrive) {
+            if (other.traits & ACTOR_TRAITS.forceproof)
+                return;
+
+            if (! other.is_pending_slide) {
                 level.schedule_actor_slide(other, level.get_force_floor_direction());
             }
         },
@@ -1101,11 +1152,17 @@ const TILE_TYPES = {
             }
         },
         on_arrive(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             if (level.compat.bombs_detonate_on_arrive) {
                 me.type._detonate(me, level, other);
             }
         },
         on_stand(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             // Lynx: Bombs detonate on arrival, not on idle
             // Steam: Bombs detonate when stood on, even if a player starts the level on one.  This
             // is useless in CC2 design and breaks some CC1 levels, so it's off by default
@@ -1145,6 +1202,9 @@ const TILE_TYPES = {
             }
         },
         on_arrive(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             level.kill_actor(other, me, 'fall', null, 'fell');
         },
         visual_state(me) {
@@ -1156,6 +1216,10 @@ const TILE_TYPES = {
     cracked_floor: {
         layer: LAYERS.terrain,
         on_depart(me, level, other) {
+            // Cerises don't break cracked terrain
+            if (other.type.name === 'player2' || other.type.name === 'doppelganger2')
+                return;
+
             level.spawn_animation(me.cell, 'puff');
             if (other === level.player) {
                 level.sfx.play_once('popwall', me.cell);
@@ -1164,7 +1228,7 @@ const TILE_TYPES = {
             level.transmute_tile(me, 'hole');
             // Update hole visual state (note that me.type is hole now)
             me.type.on_ready(me, level);
-            let one_south = level.cell(me.cell.x, me.cell.y + 1);
+            let one_south = level.get_neighboring_cell(me.cell, 'south');
             if (one_south && one_south.get_terrain().type.name === 'hole') {
                 me.type.on_ready(one_south.get_terrain(), level);
             }
@@ -1292,7 +1356,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.always,
         is_actor: true,
         is_block: true,
-        ignores: new Set(['fire', 'flame_jet_on', 'electrified_floor']),
+        innate_traits: ACTOR_TRAITS.fireproof | ACTOR_TRAITS.shockproof,
         can_reverse_on_railroad: true,
         movement_speed: 4,
     },
@@ -1373,7 +1437,7 @@ const TILE_TYPES = {
             ice_block: true,
             frame_block: true,
         },
-        ignores: new Set(['fire', 'flame_jet_on', 'electrified_floor']),
+        innate_traits: ACTOR_TRAITS.fireproof | ACTOR_TRAITS.shockproof,
         can_reverse_on_railroad: true,
         movement_speed: 4,
         decide_movement(me, level) {
@@ -1440,7 +1504,6 @@ const TILE_TYPES = {
                 return true;
         },
         on_death(me, level) {
-            //needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile
             if (me.encased_item !== null) {
                 level._place_dropped_item(me.encased_item, me.cell ?? me.previous_cell, me);
                 level._set_tile_prop(me, 'encased_item', null);
@@ -1505,6 +1568,9 @@ const TILE_TYPES = {
         is_required_chip: true,
         green_toggle_counterpart: 'green_chip',
         on_arrive(me, level, other) {
+            if (other.type.name === 'ghost')
+                return;
+
             // Unlike regular bombs, these only seem to respond to being stepped on, not stood on
             level.remove_tile(me);
             level.kill_actor(other, me, 'explosion', 'bomb', 'exploded');
@@ -1816,7 +1882,9 @@ const TILE_TYPES = {
             // Note: Transmogrifiers technically contain wires the way teleports do, and CC2 uses
             // the presence and poweredness of those wires to determine whether the transmogrifier
             // should appear to be on or off, but the /functionality/ is controlled entirely by
-            // whether an adjoining cell carries current to our edge, like a railroad or cloner
+            // whether an adjoining cell carries current to our edge, like a railroad or cloner.
+            // (This probably doesn't matter because the CC2 editor draws wires between cell
+            // centers, not from center to edge.  Maybe that's a good idea.)
             if (! me.is_active)
                 return;
             let name = other.type.name;
@@ -2151,9 +2219,9 @@ const TILE_TYPES = {
         on_gray_button: activate_me,
         on_power: activate_me,
         on_stand(me, level, other) {
-            // Note that (dirt?) blocks, fireballs, and anything with fire boots are immune
-            // TODO would be neat if this understood "ignores anything with fire immunity" but that
-            // might be a bit too high-level for this game
+            if (other.traits & ACTOR_TRAITS.fireproof)
+                return;
+
             level.kill_actor(other, me, 'explosion', 'bomb', 'burned');
         },
     },
@@ -2184,13 +2252,12 @@ const TILE_TYPES = {
             level._set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
         },
         on_stand(me, level, other) {
-            if (me.powered_edges) {
+            if (me.powered_edges && ! (other.traits & ACTOR_TRAITS.shockproof)) {
                 level.kill_actor(other, me, 'explosion', 'bomb', 'electrocuted');
             }
         },
         on_death(me, level) {
             // Need to remove our wires since they're an implementation detail
-            // (needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile)
             level._set_tile_prop(me, 'wire_directions', 0);
             level._set_tile_prop(me, 'powered_edges', 0);
             level.recalculate_circuitry_next_wire_phase = true;
@@ -2343,7 +2410,7 @@ const TILE_TYPES = {
                 return;
 
             if (me.cell.get_actor()) {
-                floor.type.add_press_ready(trap, level);
+                floor.type.add_press_ready(floor, level);
             }
         },
         on_arrive(me, level, other) {
@@ -2477,6 +2544,7 @@ const TILE_TYPES = {
             'latch-ccw': ['out0', 'in0', null, 'in1'],
             // inputs: inc, dec; outputs: overflow, underflow
             counter: ['out1', 'in0', 'in1', 'out0'],
+            bogus: [null, null, null, null],
         },
         layer: LAYERS.terrain,
         on_ready(me, level) {
@@ -2900,7 +2968,7 @@ const TILE_TYPES = {
     fireball: {
         ...COMMON_MONSTER,
         collision_mask: COLLISION.fireball,
-        ignores: new Set(['fire', 'flame_jet_on']),
+        innate_traits: ACTOR_TRAITS.fireproof,
         decide_movement(me, level) {
             // turn right: preserve current direction; if that doesn't work, turn right, then left,
             // then back the way we came
@@ -2910,7 +2978,8 @@ const TILE_TYPES = {
     },
     glider: {
         ...COMMON_MONSTER,
-        ignores: new Set(['water', 'turtle']),  // doesn't cause turtles to disappear
+        // also doesn't cause turtles to disappear, but we don't have a trait for just that
+        innate_traits: ACTOR_TRAITS.waterproof,
         decide_movement(me, level) {
             // turn left: preserve current direction; if that doesn't work, turn left, then right,
             // then back the way we came
@@ -2922,23 +2991,33 @@ const TILE_TYPES = {
         ...COMMON_MONSTER,
         collision_mask: COLLISION.ghost,
         item_pickup_priority: PICKUP_PRIORITIES.normal,
+        // Ghosts:
+        // - are blocked by steel and custom walls/floors, but very little else
+        // - are blocked by water, unless they have flippers
+        // - are blocked by lilypads, always
+        // - do not activate swivels
+        // - do not activate popwalls or set off mines
+        // - are not affected by force floors
+        // Unfortunately only a tiny bit of this behavior is available as traits.
+        innate_traits: ACTOR_TRAITS.iceproof | ACTOR_TRAITS.forceproof | ACTOR_TRAITS.trackproof,
         ignores: new Set([
             'bomb', 'green_bomb',
             'water',
             'ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice',
-            'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
+            //'force_floor_n', 'force_floor_s', 'force_floor_e', 'force_floor_w', 'force_floor_all',
             // Ghosts don't activate swivels or popwalls
             'popwall', 'swivel_nw', 'swivel_ne', 'swivel_se', 'swivel_sw',
             'hole', 'cracked_floor',
         ]),
-        // TODO ignores /most/ walls.  collision is basically completely different.  has a regular inventory, except red key.  good grief
         decide_movement(me, level) {
-            // turn left: preserve current direction; if that doesn't work, turn left, then right,
-            // then back the way we came (same as glider)
-            // TODO weird cc2 quirk: ghosts can't turn on ice, and FIXME they stop if they have cleats
+            // CC2 quirk: ghosts don't slide on ice, but they can't turn on it, either (and so they
+            // get stuck on a steel wall if they have cleats!)
             if (me.cell.get_terrain().type.slide_mode === 'ice') {
                 return [me.direction];
             }
+
+            // turn left: preserve current direction; if that doesn't work, turn left, then right,
+            // then back the way we came (same as glider)
             let d = DIRECTIONS[me.direction];
             return [me.direction, d.left, d.right, d.opposite];
         },
@@ -3019,34 +3098,23 @@ const TILE_TYPES = {
     // TODO note: ms allows blocks to pass over tools
     cleats: {
         ...COMMON_TOOL,
-        item_ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se']),
-        // XXX this is literally the only definition of slide_ignores
-        item_slide_ignores: new Set(['cracked_ice']),
+        item_traits: ACTOR_TRAITS.iceproof,
     },
     suction_boots: {
         ...COMMON_TOOL,
-        item_ignores: new Set([
-            'force_floor_n',
-            'force_floor_s',
-            'force_floor_e',
-            'force_floor_w',
-            'force_floor_all',
-        ]),
+        item_traits: ACTOR_TRAITS.forceproof,
     },
     fire_boots: {
         ...COMMON_TOOL,
-        // Note that these do NOT ignore fire because of the ghost interaction
-        // XXX starting to wonder if this is even useful really
-        item_ignores: new Set(['flame_jet_on']),
+        item_traits: ACTOR_TRAITS.fireproof,
     },
     flippers: {
         ...COMMON_TOOL,
-        item_ignores: new Set(['water']),
+        item_traits: ACTOR_TRAITS.waterproof,
     },
     hiking_boots: {
         ...COMMON_TOOL,
-        item_ignores: new Set(['sand']),
-        // FIXME uhh these "ignore" that dirt and gravel block us, but they don't ignore the on_arrive, so, uhhhh
+        item_traits: ACTOR_TRAITS.dirtproof,
     },
     // Other tools
     dynamite: {
@@ -3057,6 +3125,13 @@ const TILE_TYPES = {
             if (me.cell.get_item_mod())
                 return;
 
+            // Dynamite inherits a copy of the player's inventory, which largely doesn't matter
+            // except for suction boots, helmet, lightning bolt, and fire boots; keys can't matter
+            // because dynamite is blocked by doors.
+            // (Do this before the transmute so that the traits get recomputed.)
+            if (other.toolbelt) {
+                level._set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
+            }
             // XXX wiki just says about 4.3 seconds; more likely this is exactly 255 frames (and
             // there haven't been any compat problems so far...)
             level._set_tile_prop(me, 'timer', 85);
@@ -3064,12 +3139,6 @@ const TILE_TYPES = {
             // Actors are expected to have this, so populate it
             level._set_tile_prop(me, 'movement_cooldown', 0);
             level.add_actor(me);
-            // Dynamite inherits a copy of the player's inventory, which largely doesn't matter
-            // except for suction boots, helmet, or lightning bolt; keys can't matter because
-            // dynamite is blocked by doors
-            if (other.toolbelt) {
-                level._set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
-            }
             // Dynamite that lands on a force floor is moved by it, and dynamite that lands on a
             // button holds it down
             // TODO is there anything this should NOT activate?
@@ -3084,7 +3153,7 @@ const TILE_TYPES = {
         blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.always,
         movement_speed: 4,
-        // FIXME especially for buttons, destroyed actors should on_depart (behind compat flag)
+        // FIXME especially for buttons, destroyed actors should on_depart -- even cc2 appears to do this!
         decide_movement(me, level) {
             level._set_tile_prop(me, 'timer', me.timer - 1);
             if (me.timer > 0)
@@ -3237,6 +3306,7 @@ const TILE_TYPES = {
     },
     railroad_sign: {
         ...COMMON_TOOL,
+        item_traits: ACTOR_TRAITS.trackproof,
     },
     foil: {
         ...COMMON_TOOL,
@@ -3247,6 +3317,7 @@ const TILE_TYPES = {
     },
     speed_boots: {
         ...COMMON_TOOL,
+        item_traits: ACTOR_TRAITS.hasty,
     },
     bribe: {
         ...COMMON_TOOL,
@@ -3325,7 +3396,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.real_player,
         can_reveal_walls: true,
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice', 'cracked_floor']),
+        innate_traits: ACTOR_TRAITS.iceproof,
         pushes: COMMON_PUSHES,
         infinite_items: {
             key_yellow: true,
@@ -3363,7 +3434,7 @@ const TILE_TYPES = {
         item_pickup_priority: PICKUP_PRIORITIES.player,
         can_reveal_walls: true,  // XXX i think?
         movement_speed: 4,
-        ignores: new Set(['ice', 'ice_nw', 'ice_ne', 'ice_sw', 'ice_se', 'cracked_ice', 'cracked_floor']),
+        innate_traits: ACTOR_TRAITS.iceproof,
         pushes: COMMON_PUSHES,
         infinite_items: {
             key_yellow: true,
