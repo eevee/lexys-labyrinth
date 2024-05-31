@@ -1436,7 +1436,8 @@ const TILE_TYPES = {
             this.try_pickup_item(me, level);
         },
         blocked_by(me, level, other) {
-            return other.cell.get_item() !== null && me.encased_item !== null;
+            if (other.type.layer === LAYERS.item && me.encased_item)
+                return true;
         },
         on_death(me, level) {
             //needs to be called by transmute_tile to ttl and by dynamite_lit before remove_tile
