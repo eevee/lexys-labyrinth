@@ -334,7 +334,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_ghost,
         on_bumped(me, level, other) {
-            if (other.has_item('foil')) {
+            if (other.traits & ACTOR_TRAITS.foiled) {
                 level.transmute_tile(me, 'steel');
             }
         },
@@ -3300,9 +3300,11 @@ const TILE_TYPES = {
     },
     xray_eye: {
         ...COMMON_TOOL,
+        item_traits: ACTOR_TRAITS.perceptive,
     },
     helmet: {
         ...COMMON_TOOL,
+        item_traits: ACTOR_TRAITS.invulnerable,
     },
     railroad_sign: {
         ...COMMON_TOOL,
@@ -3310,10 +3312,11 @@ const TILE_TYPES = {
     },
     foil: {
         ...COMMON_TOOL,
+        item_traits: ACTOR_TRAITS.foiled,
     },
     lightning_bolt: {
         ...COMMON_TOOL,
-        item_ignores: new Set(['electrified_floor']),
+        item_traits: ACTOR_TRAITS.charged | ACTOR_TRAITS.shockproof,
     },
     speed_boots: {
         ...COMMON_TOOL,
@@ -3324,6 +3327,7 @@ const TILE_TYPES = {
     },
     hook: {
         ...COMMON_TOOL,
+        item_traits: ACTOR_TRAITS.adhesive,
     },
     skeleton_key: {
         ...COMMON_TOOL,

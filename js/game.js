@@ -1189,7 +1189,7 @@ export class Level extends LevelInterface {
             }
         }
         else if (terrain.type.name === 'fire') {
-            if (actor.has_item('fire_boots')) {
+            if (actor.traits & ACTOR_TRAITS.fireproof) {
                 this.sfx.play_once('step-fire');
             }
         }
@@ -1877,7 +1877,7 @@ export class Level extends LevelInterface {
     }
 
     _check_for_player_death(actor, tile) {
-        if (actor.has_item('helmet') || tile.has_item('helmet')) {
+        if ((actor.traits | tile.traits) & ACTOR_TRAITS.invulnerable) {
             // Helmet disables this, do nothing.  In most cases, normal collision will kick
             // in.  Note that this doesn't protect you from bowling balls, which aren't
             // blocked by anything.
@@ -1934,7 +1934,7 @@ export class Level extends LevelInterface {
         // block to stop us, and it has to use pending decisions rather than an immediate move
         // because we're still in the way (so the block can't move) and also to prevent a block from
         // being able to follow us through a swivel (which we haven't swiveled at decision time).
-        if (this.compat.use_legacy_hooking && success && actor.has_item('hook')) {
+        if (this.compat.use_legacy_hooking && success && (actor.traits & ACTOR_TRAITS.adhesive)) {
             let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
@@ -2032,7 +2032,7 @@ export class Level extends LevelInterface {
         // Do Lexy-style hooking here: only attempt to pull things just after we've actually moved
         // successfully, which means the hook can never stop us from moving and hook slapping is not
         // a thing, and also make them a real move rather than a weird pending thing
-        if (! this.compat.use_legacy_hooking && actor.has_item('hook')) {
+        if (! this.compat.use_legacy_hooking && (actor.traits & ACTOR_TRAITS.adhesive)) {
             let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
@@ -2409,7 +2409,7 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
-            if (actor.movement_cooldown === 0 && actor.has_item('lightning_bolt')) {
+            if (actor.movement_cooldown === 0 && (actor.traits & ACTOR_TRAITS.charged)) {
                 let wired_tile = actor.cell.get_wired_tile();
                 if (wired_tile && (wired_tile === actor || wired_tile.type.can_be_powered_by_actor)) {
                     for (let circuit of this.cells_to_circuits.get(this.cell_to_scalar(wired_tile.cell))) {
