@@ -168,7 +168,8 @@ Object.assign(Tile.prototype, {
     movement_speed: null,
     previous_cell: null,
     is_sliding: false,
-    is_pending_slide: false,
+    // Indicates the actor's next decision is a compulsory slide of this type
+    pending_slide_mode: false,
     can_override_slide: false,
     is_blocked: false,
     is_pushing: false,
@@ -674,7 +675,7 @@ export class Level extends LevelInterface {
         // not in an un-overrideable slide
         if (this.player.movement_cooldown > 0)
             return false;
-        if (! this.player.is_pending_slide)
+        if (! this.player.pending_slide_mode)
             return true;
         if (! this.player.can_override_slide)
             return false;
@@ -924,7 +925,7 @@ export class Level extends LevelInterface {
             }
 
             // This only persists until the next decision
-            this._set_tile_prop(actor, 'is_pending_slide', false);
+            this._set_tile_prop(actor, 'pending_slide_mode', null);
             // Note that pending_push is only cleared when we actually move, both to prevent being
             // pushed a second time when we're already in mid-push, and to avoid a pending push
             // leaking over into the tic /after/ this one when it's made between our own decision
@@ -1113,7 +1114,7 @@ export class Level extends LevelInterface {
             // FIXME this feels very much like a bug to me...  but you can also free a monster
             // trapped in one, so...  i don't knoww...
             // FIXME showing a teleport sparkle through an inactive red teleporter also feels buggy
-            this.schedule_actor_slide(actor);
+            this.schedule_actor_slide(actor, 'teleport');
             // TODO this is copy-pasted from attempt_teleport, which kind of implies it should be
             // somewhere more central?  do we also simulate stepping on a red teleport??
             if (actor.type.is_real_player && terrain.type.allow_player_override) {
@@ -1460,7 +1461,7 @@ export class Level extends LevelInterface {
         //   succeed, even if overriding in the same direction we're already moving, that does count
         //   as an override.
         let terrain = actor.cell.get_terrain();
-        let may_move = ! forced_only && (! actor.is_pending_slide || (
+        let may_move = ! forced_only && (! actor.pending_slide_mode || (
                 actor.can_override_slide && terrain.type.allow_player_override));
         let [dir1, dir2] = this._extract_player_directions(input);
 
@@ -1489,7 +1490,7 @@ export class Level extends LevelInterface {
             }
         }
 
-        if (actor.is_pending_slide && ! (may_move && dir1)) {
+        if (actor.pending_slide_mode && ! (may_move && dir1)) {
             // This is a forced move and we're not overriding it, so we're done
             actor.decision = actor.direction;
             this.remember_player_move(actor.decision);
@@ -1554,7 +1555,7 @@ export class Level extends LevelInterface {
             // If we're overriding a force floor but the direction we're moving in is blocked, we
             // keep our override power (but only under the CC2 behavior of instant bonking).
             // Notably, this happens even if we do end up able to move!
-            if (actor.is_pending_slide && terrain.type.slide_mode === 'force' && ! open &&
+            if (actor.pending_slide_mode === 'force' && ! open &&
                 ! this.compat.bonking_isnt_instant)
             {
                 actor.decision = actor.direction;
@@ -1584,7 +1585,7 @@ export class Level extends LevelInterface {
 
         let direction_preference;
         let terrain = actor.cell.get_terrain();
-        if (actor.is_pending_slide) {
+        if (actor.pending_slide_mode) {
             // Actors can't make voluntary moves while sliding; they just, ah, slide.
             actor.decision = actor.direction;
             return;
@@ -2082,7 +2083,7 @@ export class Level extends LevelInterface {
         if (actor.cell === goal_cell)
             return;
 
-        this._set_tile_prop(actor, 'is_pending_slide', false);
+        this._set_tile_prop(actor, 'pending_slide_mode', null);
 
         if (actor.type.on_starting_move) {
             actor.type.on_starting_move(actor, this);
@@ -2239,7 +2240,7 @@ export class Level extends LevelInterface {
         // on a teleporter, so they need to be performed explicitly here
         // TODO is this set by a teleporter's on_arrive, maybe?  hence why you slide even if you
         // don't teleport?  but that doesn't make sense for yellow teleporters
-        this.schedule_actor_slide(actor);
+        this.schedule_actor_slide(actor, 'teleport');
         // Real players might be able to immediately override the resulting slide
         if (actor.type.is_real_player && teleporter.type.allow_player_override) {
             this._set_tile_prop(actor, 'can_override_slide', true);
@@ -2967,7 +2968,7 @@ export class Level extends LevelInterface {
             this._init_animation(tile);
             this._set_tile_prop(tile, 'previous_cell', null);
             this._set_tile_prop(tile, 'is_sliding', false);
-            this._set_tile_prop(tile, 'is_pending_slide', false);
+            this._set_tile_prop(tile, 'pending_slide_mode', null);
         }
     }
 
@@ -3143,10 +3144,10 @@ export class Level extends LevelInterface {
         this._set_tile_prop(actor, 'direction', direction);
     }
 
-    schedule_actor_slide(actor, direction = null) {
+    schedule_actor_slide(actor, mode, direction = null) {
         if (direction) {
             this.set_actor_direction(actor, direction);
         }
-        this._set_tile_prop(actor, 'is_pending_slide', true);
+        this._set_tile_prop(actor, 'pending_slide_mode', mode);
     }
 }

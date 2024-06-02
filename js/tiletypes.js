@@ -88,7 +88,7 @@ function _define_force_floor(direction, opposite_type) {
             if (other.traits & ACTOR_TRAITS.forceproof)
                 return;
 
-            level.schedule_actor_slide(other, direction);
+            level.schedule_actor_slide(other, me.type.slide_mode, direction);
         },
         activate(me, level) {
             level.transmute_tile(me, opposite_type);
@@ -143,7 +143,7 @@ function player_visual_state(me) {
         return 'slimed';
     }
     if (me.fail_reason === 'electrocuted') {
-        return 'burned'; //same gfx for now
+        return 'burned';
     }
     if (me.fail_reason === 'fell') {
         return 'fell';
@@ -158,11 +158,11 @@ function player_visual_state(me) {
     // away from water (as CC2 does), but NOT when stepping off a lilypad (which will already have
     // been turned into water), and NOT without flippers (which can happen if we start on water)
     if (me.cell && (me.previous_cell || me.cell).has('water') &&
-        ! me.not_swimming && me.has_item('flippers'))
+        ! me.not_swimming && (me.traits & ACTOR_TRAITS.waterproof))
     {
         return 'swimming';
     }
-    if (me.is_sliding || me.is_pending_slide) {
+    if (me.is_sliding || me.pending_slide_mode) {
         let terrain = me.cell.get_terrain();
         if (terrain.type.slide_mode === 'ice') {
             return 'skating';
@@ -844,14 +844,13 @@ const TILE_TYPES = {
         wire_propagation_mode: 'all',
         slide_mode: 'turntable',
         on_arrive(me, level, other) {
-            level._set_tile_prop(other, 'is_pending_slide', true);
-            level.set_actor_direction(other, DIRECTIONS[other.direction].right);
+            level.schedule_actor_slide(other, me.type.slide_mode, DIRECTIONS[other.direction].right);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'right');
             }
         },
         on_stand(me, level, other) {
-            level.schedule_actor_slide(other);
+            level.schedule_actor_slide(other, me.type.slide_mode);
         },
         activate(me, level) {
             level.transmute_tile(me, 'turntable_ccw');
@@ -866,14 +865,13 @@ const TILE_TYPES = {
         wire_propagation_mode: 'all',
         slide_mode: 'turntable',
         on_arrive(me, level, other) {
-            level._set_tile_prop(other, 'is_pending_slide', true);
-            level.set_actor_direction(other, DIRECTIONS[other.direction].left);
+            level.schedule_actor_slide(other, me.type.slide_mode, DIRECTIONS[other.direction].right);
             if (other.type.on_rotate) {
                 other.type.on_rotate(other, level, 'left');
             }
         },
         on_stand(me, level, other) {
-            level.schedule_actor_slide(other);
+            level.schedule_actor_slide(other, me.type.slide_mode);
         },
         activate(me, level) {
             level.transmute_tile(me, 'turntable_cw');
@@ -1000,7 +998,7 @@ const TILE_TYPES = {
             if (other.traits & ACTOR_TRAITS.iceproof)
                 return;
 
-            level.schedule_actor_slide(other);
+            level.schedule_actor_slide(other, me.type.slide_mode);
         },
         on_depart(me, level, other) {
             // Cerises don't break cracked terrain
@@ -1020,7 +1018,7 @@ const TILE_TYPES = {
             if (other.traits & ACTOR_TRAITS.iceproof)
                 return;
 
-            level.schedule_actor_slide(other);
+            level.schedule_actor_slide(other, me.type.slide_mode);
         },
     },
     ice_sw: {
@@ -1039,7 +1037,7 @@ const TILE_TYPES = {
                 east: 'east',
                 west: 'north',
             }[other.direction];
-            level.schedule_actor_slide(other, direction);
+            level.schedule_actor_slide(other, me.type.slide_mode, direction);
         },
     },
     ice_nw: {
@@ -1058,7 +1056,7 @@ const TILE_TYPES = {
                 east: 'east',
                 west: 'south',
             }[other.direction];
-            level.schedule_actor_slide(other, direction);
+            level.schedule_actor_slide(other, me.type.slide_mode, direction);
         },
     },
     ice_ne: {
@@ -1077,7 +1075,7 @@ const TILE_TYPES = {
                 east: 'south',
                 west: 'west',
             }[other.direction];
-            level.schedule_actor_slide(other, direction);
+            level.schedule_actor_slide(other, me.type.slide_mode, direction);
         },
     },
     ice_se: {
@@ -1096,7 +1094,7 @@ const TILE_TYPES = {
                 east: 'north',
                 west: 'west',
             }[other.direction];
-            level.schedule_actor_slide(other, direction);
+            level.schedule_actor_slide(other, me.type.slide_mode, direction);
         },
     },
     force_floor_n: _define_force_floor('north', 'force_floor_s'),
@@ -1116,8 +1114,10 @@ const TILE_TYPES = {
             if (other.traits & ACTOR_TRAITS.forceproof)
                 return;
 
-            if (! other.is_pending_slide) {
-                level.schedule_actor_slide(other, level.get_force_floor_direction());
+            // FIXME this is a kludge to avoid rolling too many RFFs, but i think the real problem
+            // is calling on_stand too many times
+            if (! other.pending_slide_mode) {
+                level.schedule_actor_slide(other, me.type.slide_mode, level.get_force_floor_direction());
             }
         },
     },
