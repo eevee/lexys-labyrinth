@@ -178,29 +178,10 @@ export class Editor extends PrimaryView {
 
             if (ev.ctrlKey) {
                 if (ev.key === 'a') {
-                    // Select all
-                    if (TOOLS[this.current_tool].affects_selection) {
-                        // If we're in the middle of using a selection tool, cancel it
-                        this.cancel_mouse_drag();
-                    }
-                    let new_rect = new DOMRect(0, 0, this.stored_level.size_x, this.stored_level.size_y);
-                    if (this.selection.cells.size !== this.stored_level.size_x * this.stored_level.size_y) {
-                        this.selection.clear();
-                        this.selection.add_rect(new_rect);
-                        this.commit_undo();
-                    }
+                    this.select_all();
                 }
                 else if (ev.key === 'A') {
-                    // Deselect
-                    if (TOOLS[this.current_tool].affects_selection) {
-                        // If we're in the middle of using a selection tool, cancel it
-                        this.cancel_mouse_drag();
-                    }
-                    if (! this.selection.is_empty) {
-                        this.selection.commit_floating();
-                        this.selection.clear();
-                        this.commit_undo();
-                    }
+                    this.select_none();
                 }
                 else if (ev.key === 'z') {
                     this.undo();
@@ -414,26 +395,29 @@ export class Editor extends PrimaryView {
             button_container.append(button);
             return button;
         };
-        this.undo_button = _make_button("Undo", () => {
-            this.undo();
-        });
-        this.redo_button = _make_button("Redo", () => {
-            this.redo();
-        });
+        this.undo_button = _make_button("Undo", () => this.undo());
+        this.redo_button = _make_button("Redo", () => this.redo());
         let edit_items = [
-            ["Select all\t[ctrl] A", () => {
-            }],
-            ["Select none\t[ctrl] [shift] A", () => {
-            }],
+            ["Select all\t[ctrl] A", () => this.select_all()],
+            ["Select none\t[ctrl] [shift] A", () => this.select_none()],
+            /* TODO implement me pleeease
             ["Delete\t[del]", () => {
-                this.rotate_level_right();
+            }],
+            */
+            ["Crop to selection", () => {
+                // TODO dim this out if there's no selection?
+                if (this.selection.is_empty)
+                    return;
+
+                let bbox = this.selection.bbox;
+                this.crop_level(bbox.x, bbox.y, bbox.width, bbox.height);
             }],
             null,
             ["Level properties...", () => {
-                this.mirror_level();
+                new dialogs.EditorLevelMetaOverlay(this.conductor, this.stored_level).open();
             }],
             ["Pack properties...", () => {
-                this.flip_level();
+                new dialogs.EditorPackMetaOverlay(this.conductor, this.conductor.stored_game).open();
             }],
         ];
         let edit_menu = new MenuOverlay(
@@ -479,12 +463,6 @@ export class Editor extends PrimaryView {
             transform_menu.open_relative_to(ev.currentTarget);
         });
         transform_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
-        _make_button("Pack properties...", () => {
-            new dialogs.EditorPackMetaOverlay(this.conductor, this.conductor.stored_game).open();
-        });
-        _make_button("Level properties...", () => {
-            new dialogs.EditorLevelMetaOverlay(this.conductor, this.stored_level).open();
-        });
         this.save_button = _make_button("Save", () => {
             this.save_level();
         });
@@ -1198,6 +1176,7 @@ export class Editor extends PrimaryView {
     }
 
     // ------------------------------------------------------------------------------------------------
+    // General editor operations
 
     zoom_by(dz, origin_x = null, origin_y = null) {
         if (dz === 0)
@@ -1525,6 +1504,31 @@ export class Editor extends PrimaryView {
         this.palette_rotation_index += 1;
         this.palette_rotation_index %= 4;
         this.palette_actor_direction = DIRECTIONS[this.palette_actor_direction].left;
+    }
+
+    select_all() {
+        if (TOOLS[this.current_tool].affects_selection) {
+            // If we're in the middle of using a selection tool, cancel it
+            this.cancel_mouse_drag();
+        }
+        let new_rect = new DOMRect(0, 0, this.stored_level.size_x, this.stored_level.size_y);
+        if (this.selection.cells.size !== this.stored_level.size_x * this.stored_level.size_y) {
+            this.selection.clear();
+            this.selection.add_rect(new_rect);
+            this.commit_undo();
+        }
+    }
+
+    select_none() {
+        if (TOOLS[this.current_tool].affects_selection) {
+            // If we're in the middle of using a selection tool, cancel it
+            this.cancel_mouse_drag();
+        }
+        if (! this.selection.is_empty) {
+            this.selection.commit_floating();
+            this.selection.clear();
+            this.commit_undo();
+        }
     }
 
     // ------------------------------------------------------------------------------------------------
