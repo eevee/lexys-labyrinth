@@ -1145,7 +1145,7 @@ export class Level extends LevelInterface {
         if (actor.movement_cooldown <= 0) {
             if (actor.type.ttl) {
                 // This is an animation that just finished, so destroy it
-                this.remove_tile(actor, true);
+                this.remove_tile(actor);
                 return;
             }
 
@@ -1697,7 +1697,7 @@ export class Level extends LevelInterface {
     // have side effects, depending on the value of push_mode:
     // - null: Default.  Do not impact game state.  Treat pushable objects as blocking.
     // - 'bump': Fire bump triggers.  Don't move pushable objects, but do check whether they /could/
-    //   be pushed, recursively if necessary.
+    //   be pushed, recursively if necessary.  Only used for teleporting.
     // - 'slap': Like 'bump', but also sets the 'decision' of pushable objects.  Only used with the
     //   no_early_push Lynx compat flag.
     // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
@@ -1751,21 +1751,33 @@ export class Level extends LevelInterface {
                 }
             }
 
-            if (tile.blocks(actor, direction, this)) {
-                if (layer !== LAYERS.actor && (
-                    this.compat.allow_pushing_blocks_off_all_walls ||
-                    (this.compat.allow_pushing_blocks_off_faux_walls &&
-                        original_type.is_flickable_in_lynx)))
-                {
-                    // MS: blocks can be pushed off of *anything*, so defer being stopped until
-                    // after we check for pushable tiles
-                    // Lynx: blocks can be pushed off of blue walls and reveal walls
-                    deferred_blocked = true;
-                    continue;
-                }
-            }
-            else {
+            if (! tile.blocks(actor, direction, this))
                 // Not blocking, move on
+                continue;
+
+            if (layer !== LAYERS.actor && (
+                this.compat.allow_pushing_blocks_off_all_walls ||
+                (this.compat.allow_pushing_blocks_off_faux_walls &&
+                    original_type.is_flickable_in_lynx)))
+            {
+                // MS: blocks can be pushed off of *anything*, so defer being stopped until after we
+                // check for pushable tiles
+                // Lynx: blocks can be pushed off of blue walls and reveal walls
+                deferred_blocked = true;
+                continue;
+            }
+
+            if (layer === LAYERS.item && pushable_tiles.length > 0) {
+                // CC2 quirk: If an actor bumps a cell containing an item and an animation (or a
+                // block it can push), it will erase the animation (or push the block), even if it
+                // can't move onto the item.  If the actor is sliding, it will move into the cell
+                // despite the item!
+                // So if we see an item and there's been a pushable block, defer it, based on
+                // whether we're sliding.
+                // TODO this doesn't quite fix Bumper Cars
+                // TODO this is jank-ass behavior.  compat flag?  but it's necessary for some types
+                // of bestowal.  urrgh
+                deferred_blocked = ! actor.current_slide_mode;
                 continue;
             }
 
@@ -2099,7 +2111,7 @@ export class Level extends LevelInterface {
         let original_cell = actor.cell;
         // Physically remove the actor first, so that it won't get in the way of e.g. a splash
         // spawned from stepping off of a lilypad
-        this.remove_tile(actor, false);
+        this.remove_tile(actor);
 
         // Announce we're leaving, for the handful of tiles that care about it.  Do so from the top
         // down, specifically so dynamite becomes lit before a lilypad tries to splash
@@ -2271,7 +2283,7 @@ export class Level extends LevelInterface {
             }
 
             // Now physically move the actor, but their movement waits until next decision phase
-            this.remove_tile(actor, false);
+            this.remove_tile(actor);
             this.add_tile(actor, dest.cell);
             // Erase this to prevent tail-biting through a teleport
             this._set_tile_prop(actor, 'previous_cell', null);
@@ -2783,7 +2795,7 @@ export class Level extends LevelInterface {
             this.transmute_tile(actor, animation_name);
         }
         else {
-            this.remove_tile(actor, true);
+            this.remove_tile(actor);
         }
     }
 
@@ -2851,7 +2863,7 @@ export class Level extends LevelInterface {
 
     // Tile stuff in particular
 
-    remove_tile(tile, destroying = false) {
+    remove_tile(tile) {
         tile.cell._remove(tile);
         this._set_tile_prop(tile, 'cell', null);
     }
@@ -2917,7 +2929,7 @@ export class Level extends LevelInterface {
         if (type.layer === LAYERS.vfx) {
             let vfx = cell[type.layer];
             if (vfx) {
-                this.remove_tile(vfx, true);
+                this.remove_tile(vfx);
             }
         }
         let tile = new Tile(type);
