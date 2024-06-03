@@ -1326,6 +1326,7 @@ class Player extends PrimaryView {
             this._redraw();
         });
         wire_checkbox('show_actor_tooltips', ev => {
+            // TODO this would be more useful if it (a) were on screen regardless of scroll, (b) showed number so you know you have the right one, (c) maybe compressed movement and direction a bit
             if (ev.target.checked) {
                 let element = mk('div.player-debug-actor-tooltip');
                 let header = mk('h3');
@@ -1333,7 +1334,7 @@ class Player extends PrimaryView {
                 let props = {};
                 for (let key of [
                     'direction', 'movement_speed', 'movement_cooldown',
-                    'is_sliding', 'is_pending_slide', 'can_override_slide',
+                    'current_slide_mode', 'pending_slide_mode',
                     'pending_push', 'is_blocked',
                 ]) {
                     let dd = mk('dd');
@@ -1394,8 +1395,8 @@ class Player extends PrimaryView {
             if (! actor)
                 return;
 
-            tooltip.element.style.left = `${ev.clientX}px`;
-            tooltip.element.style.top = `${ev.clientY}px`;
+            tooltip.element.style.left = `${ev.clientX + document.documentElement.scrollLeft}px`;
+            tooltip.element.style.top = `${ev.clientY + document.documentElement.scrollTop}px`;
             tooltip.header.textContent = actor.type.name;
             for (let [key, element] of Object.entries(tooltip.props)) {
                 element.textContent = String(actor[key] ?? "—");

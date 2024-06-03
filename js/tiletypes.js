@@ -80,8 +80,8 @@ function _define_force_floor(direction, opposite_type) {
     return {
         layer: LAYERS.terrain,
         slide_mode: 'force',
+        slide_override_mode: 'player-force',
         speed_factor: 0.5,
-        allow_player_override: true,
         // Used by Lynx to prevent backwards overriding
         force_floor_direction: direction,
         on_stand(me, level, other) {
@@ -96,6 +96,35 @@ function _define_force_floor(direction, opposite_type) {
         is_gray_button_editor_safe: true,
         on_gray_button: activate_me,
         on_power: activate_me,
+    };
+}
+function _define_ice_corner(dir1, dir2) {
+    let direction_map = {};
+    for (let direction of Object.keys(DIRECTIONS)) {
+        direction_map[direction] = direction;
+    }
+    direction_map[dir1] = DIRECTIONS[dir2].opposite;
+    direction_map[dir2] = DIRECTIONS[dir1].opposite;
+
+    return {
+        layer: LAYERS.terrain,
+        thin_walls: new Set([dir1, dir2]),
+        slide_mode: 'ice',
+        speed_factor: 0.5,
+        blocks_leaving: blocks_leaving_thin_walls,
+        on_arrive(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.iceproof)
+                return;
+
+            level.schedule_actor_slide(other, me.type.slide_mode);
+        },
+        on_stand(me, level, other) {
+            if (other.traits & ACTOR_TRAITS.iceproof)
+                return;
+
+            //level.schedule_actor_slide(other, me.type.slide_mode, direction);
+            level._set_tile_prop(other, 'direction', direction_map[other.direction]);
+        },
     };
 }
 
@@ -162,7 +191,8 @@ function player_visual_state(me) {
     {
         return 'swimming';
     }
-    if (me.is_sliding || me.pending_slide_mode) {
+    // Rough check for sliding: are we moving faster than normal?
+    if (me.movement_speed && me.movement_speed < 12) {
         let terrain = me.cell.get_terrain();
         if (terrain.type.slide_mode === 'ice') {
             return 'skating';
@@ -1021,82 +1051,10 @@ const TILE_TYPES = {
             level.schedule_actor_slide(other, me.type.slide_mode);
         },
     },
-    ice_sw: {
-        layer: LAYERS.terrain,
-        thin_walls: new Set(['south', 'west']),
-        slide_mode: 'ice',
-        speed_factor: 0.5,
-        blocks_leaving: blocks_leaving_thin_walls,
-        on_arrive(me, level, other) {
-            if (other.traits & ACTOR_TRAITS.iceproof)
-                return;
-
-            let direction = {
-                north: 'north',
-                south: 'east',
-                east: 'east',
-                west: 'north',
-            }[other.direction];
-            level.schedule_actor_slide(other, me.type.slide_mode, direction);
-        },
-    },
-    ice_nw: {
-        layer: LAYERS.terrain,
-        thin_walls: new Set(['north', 'west']),
-        slide_mode: 'ice',
-        speed_factor: 0.5,
-        blocks_leaving: blocks_leaving_thin_walls,
-        on_arrive(me, level, other) {
-            if (other.traits & ACTOR_TRAITS.iceproof)
-                return;
-
-            let direction = {
-                north: 'east',
-                south: 'south',
-                east: 'east',
-                west: 'south',
-            }[other.direction];
-            level.schedule_actor_slide(other, me.type.slide_mode, direction);
-        },
-    },
-    ice_ne: {
-        layer: LAYERS.terrain,
-        thin_walls: new Set(['north', 'east']),
-        slide_mode: 'ice',
-        speed_factor: 0.5,
-        blocks_leaving: blocks_leaving_thin_walls,
-        on_arrive(me, level, other) {
-            if (other.traits & ACTOR_TRAITS.iceproof)
-                return;
-
-            let direction = {
-                north: 'west',
-                south: 'south',
-                east: 'south',
-                west: 'west',
-            }[other.direction];
-            level.schedule_actor_slide(other, me.type.slide_mode, direction);
-        },
-    },
-    ice_se: {
-        layer: LAYERS.terrain,
-        thin_walls: new Set(['south', 'east']),
-        slide_mode: 'ice',
-        speed_factor: 0.5,
-        blocks_leaving: blocks_leaving_thin_walls,
-        on_arrive(me, level, other) {
-            if (other.traits & ACTOR_TRAITS.iceproof)
-                return;
-
-            let direction = {
-                north: 'north',
-                south: 'west',
-                east: 'north',
-                west: 'west',
-            }[other.direction];
-            level.schedule_actor_slide(other, me.type.slide_mode, direction);
-        },
-    },
+    ice_sw: _define_ice_corner('south', 'west'),
+    ice_nw: _define_ice_corner('north', 'west'),
+    ice_ne: _define_ice_corner('north', 'east'),
+    ice_se: _define_ice_corner('south', 'east'),
     force_floor_n: _define_force_floor('north', 'force_floor_s'),
     force_floor_s: _define_force_floor('south', 'force_floor_n'),
     force_floor_e: _define_force_floor('east', 'force_floor_w'),
@@ -1104,8 +1062,8 @@ const TILE_TYPES = {
     force_floor_all: {
         layer: LAYERS.terrain,
         slide_mode: 'force',
+        slide_override_mode: 'player-force',
         speed_factor: 0.5,
-        allow_player_override: true,
         blocks(me, level, other) {
             return (level.compat.rff_blocks_monsters &&
                 (other.type.collision_mask & COLLISION.monster_typical));
@@ -1155,6 +1113,7 @@ const TILE_TYPES = {
             if (other.type.name === 'ghost')
                 return;
 
+            // XXX this crashes if i remove the condition?
             if (level.compat.bombs_detonate_on_arrive) {
                 me.type._detonate(me, level, other);
             }
@@ -2024,9 +1983,9 @@ const TILE_TYPES = {
     teleport_red: {
         layer: LAYERS.terrain,
         slide_mode: 'teleport',
+        slide_override_mode: 'player',
         contains_wire: true,
         wire_propagation_mode: 'none',
-        allow_player_override: true,
         on_begin(me, level) {
             // FIXME must be connected to something that can convey current: a wire, a switch, a
             // blue teleporter, etc; NOT nothing, a wall, a transmogrifier, a force floor, etc.
@@ -2165,7 +2124,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         item_priority: PICKUP_PRIORITIES.always,
         slide_mode: 'teleport',
-        allow_player_override: true,
+        slide_override_mode: 'player',
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;
             for (let [dest, cell] of find_terrain_linear(level, me.cell, new Set(['teleport_yellow']), true)) {
@@ -3289,7 +3248,7 @@ const TILE_TYPES = {
             if (obstacle && obstacle.type.is_actor) {
                 level.kill_actor(obstacle, me, 'explosion');
             }
-            else if (me.is_sliding || me._clone_release) {
+            else if (me.current_slide_mode || me._clone_release) {
                 // Sliding bowling balls don't blow up if they hit a regular wall, and neither do
                 // bowling balls in the process of being released from a cloner
                 return;
