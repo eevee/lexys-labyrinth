@@ -2147,14 +2147,21 @@ export class Level extends LevelInterface {
             }
         }
 
-        // Now add the actor back; we have to wait this long because e.g. monsters erase splashes
-        if (goal_cell.get_actor()) {
-            this.add_tile(actor, original_cell);
-            return;
+        // If there's an animation in the way, this is our last chance to erase it.  Usually it gets
+        // erased by on_bumped, but that's not always the case for e.g. pushing off a lilypad
+        let blocking_actor = goal_cell.get_actor();
+        if (blocking_actor) {
+            if (blocking_actor.type.ttl) {
+                this.remove_tile(blocking_actor);
+            }
+            else {
+                // Uh oh.  This shouldn't happen.  Put them back??
+                console.error("Actor", blocking_actor, "in the way of our movement", actor);
+                this.add_tile(actor, original_cell);
+                return;
+            }
         }
-        else {
-            this.add_tile(actor, goal_cell);
-        }
+        this.add_tile(actor, goal_cell);
 
         if (this.compat.actors_move_instantly) {
             this.step_on_cell(actor, actor.cell);
