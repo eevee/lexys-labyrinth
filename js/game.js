@@ -1965,7 +1965,7 @@ export class Level extends LevelInterface {
             return false;
 
         // If we have the hook, pull anything behind us, now that we're out of the way.
-        // In CC2, this has to happen here to make hook-slapping work and allow hooking a moving
+        // In CC2, this has to happen here to make hook slapping work and allow hooking a moving
         // block to stop us, and it has to use pending decisions rather than an immediate move
         // because we're still in the way (so the block can't move) and also to prevent a block from
         // being able to follow us through a swivel (which we haven't swiveled at decision time).
@@ -2203,7 +2203,14 @@ export class Level extends LevelInterface {
                 }
             }
             else if (tile.type.on_arrive) {
+                // It seems that CC2's recursive push prevention is a little more zealous than mine:
+                // a block that's just now pressing a clone machine button cannot be pushed by the
+                // output of that clone machine
+                // TODO just hoist this to the right place so you don't have to do it in multiple
+                // places?
+                actor._trying_to_push = true;
                 tile.type.on_arrive(tile, this, actor);
+                actor._trying_to_push = false;
             }
 
             // XXX this does seem to be correct by CC2 rules, but it's very weird -- this will
