@@ -128,6 +128,7 @@ function test_level(stored_level, compat) {
     level.sfx = dummy_sfx;
     level.undo_enabled = false; // slight performance boost
     replay.configure_level(level);
+    let idle_time = 0;
 
     while (true) {
         let input = replay.get(level.tic_counter);
@@ -143,13 +144,27 @@ function test_level(stored_level, compat) {
                 return make_result('success', "Won");
             }
         }
-        else if (level.state === 'failure') {
+        if (level.state === 'failure') {
             return make_result('failure', "Lost", true);
         }
-        else if (level.tic_counter >= replay.duration + 220) {
-            // This threshold of 11 seconds was scientifically calculated by noticing that
-            // the TWS of Southpole runs 11 seconds past its last input
+        // Some replays seem to end early because the level ends by holding a single input for a
+        // while, which gets truncated within the replay proper.  The most obvious is Southpole
+        // (which takes 11 seconds), but I've seen others take longer.  So once we run out of input,
+        // keep simulating as long as the player keeps moving every so often, unless we surpass some
+        // clearly ridiculous cap like half a minute.
+        if (level.tic_counter > replay.duration + 30 * 20) {
             return make_result('short', "Out of input", true);
+        }
+        else if (level.tic_counter > replay.duration) {
+            if (level.player.movement_cooldown) {
+                idle_time = 0;
+            }
+            else {
+                idle_time += 1;
+                if (idle_time > 3 * 20) {
+                    return make_result('short', "Out of input", true);
+                }
+            }
         }
 
         if (level.tic_counter % 20 === 1) {
