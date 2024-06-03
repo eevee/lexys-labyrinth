@@ -1956,6 +1956,11 @@ export class Level extends LevelInterface {
             this.can_actor_leave_cell(actor, orig_cell, direction, push_mode) &&
             this.can_actor_enter_cell(actor, dest_cell, direction, push_mode));
 
+        // If we became an animation in there somewhere (e.g. because we walked into a bowling
+        // ball), stop here
+        if (actor.type.ttl)
+            return false;
+
         // If we have the hook, pull anything behind us, now that we're out of the way.
         // In CC2, this has to happen here to make hook-slapping work and allow hooking a moving
         // block to stop us, and it has to use pending decisions rather than an immediate move
@@ -2979,6 +2984,7 @@ export class Level extends LevelInterface {
 
         // For transmuting into an animation, set up the timer immediately
         if (tile.type.ttl) {
+            // FIXME should be able to keep the position here while still animating
             if (! old_type.is_actor) {
                 console.warn("Transmuting a non-actor into an animation!");
             }
