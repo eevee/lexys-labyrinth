@@ -1712,6 +1712,9 @@ export class Level extends LevelInterface {
             let original_type = tile.type;
             if (tile.type.on_bumped) {
                 tile.type.on_bumped(tile, this, actor, direction);
+                // If that destroyed the tile (e.g. by erasing an animation), skip the rest of this
+                if (! tile.cell)
+                    continue;
             }
 
             if (this.compat.player_safe_at_decision_time &&
