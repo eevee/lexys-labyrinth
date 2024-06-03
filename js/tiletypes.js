@@ -3238,7 +3238,7 @@ const TILE_TYPES = {
         decide_movement(me, level) {
             return [me.direction];
         },
-        on_approach(me, level, other) {
+        on_bumped(me, level, other) {
             // Blow up anything that runs into us
             level.kill_actor(other, me, 'explosion');
             level.kill_actor(me, me, 'explosion', 'bomb');
