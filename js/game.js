@@ -3095,6 +3095,11 @@ export class Level extends LevelInterface {
             }
             this._stash_keyring(actor);
             actor.keyring[name] = (actor.keyring[name] ?? 0) + 1;
+
+            if (this.compat.keys_overflow_at_256) {
+                // CC2 + Lynx: Key counts are stored in a u8 and overflow because C
+                actor.keyring[name] %= 256;
+            }
         }
         else {
             // tool, presumably

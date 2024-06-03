@@ -333,6 +333,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         label: "Mines under players detonate when the level starts",
         rulesets: new Set(['steam-strict']),
     }, {
+        key: 'keys_overflow_at_256',
+        label: "Key counts overflow at 256",
+        rulesets: new Set(['steam-strict', 'lynx']),
+    }, {
         key: 'bombs_detonate_on_arrive',
         label: "Mines detonate only when stepped on",
         rulesets: new Set(['lynx', 'ms']),
