@@ -197,6 +197,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         label: "Actors may move forwards twice in one tic",
         rulesets: new Set(['steam', 'steam-strict', 'lynx']),
     }, {
+        key: 'simulate_teleport_stacking',
+        label: "Actors can teleport into occupied blue teleporters",
+        rulesets: new Set(['lynx']),
+    }, {
         key: 'teleport_every_tic',
         label: "Actors try to teleport as long as they're on a teleporter",
         rulesets: new Set(['lynx']),

@@ -1375,7 +1375,7 @@ export class Level extends LevelInterface {
         let p = 0;
         for (let i = 0, l = this.actors.length; i < l; i++) {
             let actor = this.actors[i];
-            if (actor.cell || (
+            if (actor.cell || actor.is_detached || (
                 // Don't strip out actors under Lynx, where slots were reused -- unless they're VFX,
                 // which aren't in the original game and thus are exempt
                 this.compat.reuse_actor_slots && actor.type.layer !== LAYERS.vfx))
@@ -1792,6 +1792,8 @@ export class Level extends LevelInterface {
             }
 
             // If we reach this point, we're blocked, but we may still need to do our push behavior
+            // XXX this is only used for fireballs hitting ice blocks, to make them also bounce off;
+            // could just return true from on_bumped to indicate definitely still blocking
             if (tile.type.on_after_bumped) {
                 tile.type.on_after_bumped(tile, this, actor);
             }
@@ -2249,17 +2251,48 @@ export class Level extends LevelInterface {
         // movement towards the teleporter it just stepped on, not the teleporter it's moved to
         this.set_tile_prop(actor, 'destination_cell', actor.cell);
 
+        // Lynx teleporting has a serious bug, at least according to Tile World.  Cells remember
+        // whether they contain an actor (other than the player) with just a flag, and the actor
+        // list is otherwise separate.  As an actor tries to teleport, it physically moves between
+        // each candidate exit teleporter, and if it can't leave that teleporter, it'll move to the
+        // next one.  But it doesn't check whether the teleporter is already occupied, *and* if it
+        // can't exit, it clears the cell's "occupied" flag when it departs for the next candidate,
+        // even if the cell already contained an actor!  This mostly only comes up when teleporters
+        // are blocked, or when two actors enter teleporters at the same time, but the upshot is
+        // that an arbitrary number of monsters can occupy a single teleporter.
+        // The "actor" flag is also used for non-player collision, so an occupied-but-unflagged
+        // teleporter mostly acts empty, EXCEPT that the player can still push blocks out of it.
+        // The effect is contained to just the teleporter tile, since taking a step out of the
+        // teleporter will flag the monster's new cell as normal...  but it can linger between tics.
+        // We simulate this with an `is_detached` flag on actors, which allows an actor to have a
+        // .cell property without actually being in the cell's actor layer.
+        // Yes this comment is very long but it's complicated.  See `teleportcreature` in lxlogic.c.
+        // Classic example: https://www.youtube.com/watch?v=eKoKZwFj3rM
+        // Level: https://c.eev.ee/lexys-labyrinth/#level=eJxzdjbyZWJgYDBnCPEM8eEHskrzSjJLclJTFHJSy1JzGPwDQvwkgcK4AJOff4grI4gV4Ojs7QikxVmYFRQY_zMub2AVZ2IUZGpn-58y-z8jU8tcRvHWFbNUWEQE7cXmHm11m_uMU5KhAqTVxfLM__8-_0__B4L-_65-LgpgEwFLDyYv
+        // TODO put that in a lynx testcases file maybe
+        // FIXME the player can't push blocks out once they become detached.  can i fudge this with
+        // an intermediate flag that makes everything but players ignore it??  whoof
+        let may_stack = this.compat.simulate_teleport_stacking && teleporter.type.name === 'teleport_blue';
+
         let dest, direction, success;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
             // Teleporters already containing an actor are blocked and unusable
-            // Note that Tile World Lynx has a bug allowing other actors to teleport into the same
-            // cell as the player (and possibly other combinations under some circumstances?), but
-            // that is not actually the behavior of the original Lynx game and also is clearly
-            // ludicrous, so I'm making the executive decision to not emulate it
-            if (dest !== teleporter && dest.cell.get_actor())
-                continue;
-
-            // XXX lynx treats this as a slide and does it in a pass in the main loop
+            let clog = dest.cell.get_actor();
+            if (dest !== teleporter && clog) {
+                if (may_stack) {
+                    // Lynx: detach any non-player actor here...
+                    if (! actor.type.is_real_player) {
+                        this.detach_actor(clog);
+                    }
+                    // ...and move on, except that other actors *can* teleport onto the player,
+                    // because the player's cell isn't considered occupied
+                    if (! clog.type.is_real_player)
+                        continue;
+                }
+                else {
+                    continue;
+                }
+            }
 
             if (dest === teleporter &&
                 teleporter.type.item_priority !== undefined &&
@@ -2282,7 +2315,8 @@ export class Level extends LevelInterface {
             // "blocked" by a block that won't be there anyway by the time you try to move, but that
             // seems very obscure and i haven't run into a case with it yet.  offhand i don't think
             // it can even come up under cc2 rules, since teleporting is done after an actor cools
-            // down and before the next actor even gets a chance to act
+            // down and before the next actor even gets a chance to act.  FIXME should be null for
+            // lynx, definitely
             if (this.check_movement(actor, dest.cell, direction, 'bump')) {
                 success = true;
                 break;
@@ -2318,7 +2352,20 @@ export class Level extends LevelInterface {
 
             // Now physically move the actor, but their movement waits until next decision phase
             this.remove_tile(actor);
-            this.add_tile(actor, dest.cell);
+            let clog = dest.cell.get_actor();
+            if (may_stack && clog) {
+                // Lynx: To avoid erasing the existing actor, set the /traveller/ as detached.  This
+                // isn't quite right, but it's extremely likely to be cleared next tic when we move,
+                // and it smooths out Lynx's odd special handling of the player.
+                // (Might diverge if they become blocked before they get to move, though.)
+                this.set_tile_prop(actor, 'is_detached', true);
+                this.set_tile_prop(actor, 'cell', dest.cell);
+            }
+            else {
+                // Normal behavior: just place them
+                this.add_tile(actor, dest.cell);
+            }
+
             // Erase this to prevent tail-biting through a teleport
             this.set_tile_prop(actor, 'previous_cell', null);
         }
@@ -2648,11 +2695,11 @@ export class Level extends LevelInterface {
             // Fucking Safari
             let do_cell_dance = (Object.prototype.hasOwnProperty.call(changes, 'cell') || (
                 Object.prototype.hasOwnProperty.call(changes, 'type') && tile.type.layer !== changes.type.layer));
-            if (do_cell_dance && tile.cell) {
+            if (do_cell_dance && tile.cell && ! tile.is_detached) {
                 tile.cell._remove(tile);
             }
             Object.assign(tile, changes);
-            if (do_cell_dance && tile.cell) {
+            if (do_cell_dance && tile.cell && ! tile.is_detached) {
                 needs_readding.push(tile);
             }
         }
@@ -2898,13 +2945,26 @@ export class Level extends LevelInterface {
     // Tile stuff in particular
 
     remove_tile(tile) {
-        tile.cell._remove(tile);
+        // Detached tiles aren't in the cell in the first place, so they don't need to be removed
+        if (tile.is_detached) {
+            this.set_tile_prop(tile, 'is_detached', false);
+        }
+        else {
+            tile.cell._remove(tile);
+        }
         this.set_tile_prop(tile, 'cell', null);
     }
 
     add_tile(tile, cell) {
         this.set_tile_prop(tile, 'cell', cell);
         cell._add(tile);
+    }
+
+    detach_actor(actor) {
+        // FIXME draw detached actors; i guess this would need a sub-array on Cell eugh?  unless the
+        // renderer just reads the actor list, but that seems, dubious
+        this.set_tile_prop(actor, 'is_detached', true);
+        actor.cell[LAYERS.actor] = null;
     }
 
     make_actor(type, direction = 'south') {
