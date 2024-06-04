@@ -1717,20 +1717,19 @@ export class Level extends LevelInterface {
                     continue;
             }
 
-            if (this.compat.player_safe_at_decision_time &&
-                tile.type.is_real_player && push_mode !== 'push')
-            {
-                // Lynx + MS: At decision time, pretend the player isn't there; we'll collide
-                // with them later, at movement time
+            // Lynx + MS: Players can't die at decision time, but they don't block movement either
+            let ignore_player = (this.compat.player_safe_at_decision_time && push_mode !== 'push');
+            // If this is a monster and the tile is a player, we can just ignore it now; if the
+            // other way around, the player might still e.g. slap a block
+            if (ignore_player && tile.type.is_real_player)
                 continue;
-            }
 
             // Death happens here: if a monster or block even thinks about moving into a player, or
             // a player thinks about moving into a monster, the player dies.  A player standing on a
             // wall is only saved by the wall being checked first.  This is also why standing on an
             // item won't save you: actors are checked before items!
             // TODO merge this with player_protected_by_items?  seems like they don't make sense independently
-            if (layer === LAYERS.actor &&
+            if (layer === LAYERS.actor && ! ignore_player &&
                 // If we've already given up on this cell and are just waiting to see if we can do a
                 // flick, definitely don't try to kill a player
                 ! deferred_blocked &&
