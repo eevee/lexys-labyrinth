@@ -156,6 +156,13 @@ export class Tile {
             return this.toolbelt && this.toolbelt.some(item => item === name);
         }
     }
+
+    // Custom console.log output for the bulk tester (i.e. node), where a full dump of a tile is not
+    // especially useful
+    [Symbol.for('nodejs.util.inspect.custom')](_depth, _options, _inspect) {
+        let where = this.cell ? `(${this.cell.x}, ${this.cell.y})` : "nowhere";
+        return `Tile{${this.type.name} at ${where}}`;
+    }
 }
 Object.assign(Tile.prototype, {
     // Wire stuff, to avoid a lot of boring checks in circuit code
