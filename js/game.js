@@ -1242,7 +1242,14 @@ export class Level extends LevelInterface {
             if (item && item.type.on_stand) {
                 item.type.on_stand(item, this, actor);
             }
+
+            if (this.compat.teleport_every_tic && terrain.type.teleport_dest_order) {
+                // Lynx: Actors try to teleport for as long as they remain on a teleporter, most
+                // notably (for CCLP purposes) when starting the level already on one
+                actor.just_stepped_on_teleporter = terrain;
+            }
         }
+
         // Lynx gives everything in an open trap an extra cooldown, which makes things walk into
         // open traps at double speed and does weird things to the ejection timing
         if (this.compat.traps_like_lynx) {
@@ -1251,6 +1258,7 @@ export class Level extends LevelInterface {
                 this.do_extra_cooldown(actor);
             }
         }
+
         if (actor.just_stepped_on_teleporter) {
             this.attempt_teleport(actor);
         }
