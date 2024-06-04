@@ -183,8 +183,10 @@ Object.assign(Tile.prototype, {
     is_pushing: false,
     pending_push: null,
     destination_cell: null,
+    // Weird edge cases
     is_making_failure_move: false,
     temp_ignore_item_collision: false,
+    is_detached: false,
 });
 
 
@@ -2311,12 +2313,6 @@ export class Level extends LevelInterface {
             // Note that this uses 'bump' even for players; it would be very bad if we could
             // initiate movement in this pass (in Lexy rules, anyway), because we might try to push
             // something that's still waiting to teleport itself!
-            // XXX is this correct?  it does mean you won't try to teleport to a teleporter that's
-            // "blocked" by a block that won't be there anyway by the time you try to move, but that
-            // seems very obscure and i haven't run into a case with it yet.  offhand i don't think
-            // it can even come up under cc2 rules, since teleporting is done after an actor cools
-            // down and before the next actor even gets a chance to act.  FIXME should be null for
-            // lynx, definitely
             if (this.check_movement(actor, dest.cell, direction, 'bump')) {
                 success = true;
                 break;
