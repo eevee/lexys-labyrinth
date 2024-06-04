@@ -2259,12 +2259,13 @@ export class Level extends LevelInterface {
                 teleporter.type.item_priority >= actor.type.item_pickup_priority &&
                 this.allow_taking_yellow_teleporters)
             {
-                // Super duper special yellow teleporter behavior: you pick it the fuck up
-                this.attempt_take(actor, teleporter);
-                if (actor === this.player) {
-                    this.sfx.play_once('get-tool', teleporter.cell);
+                // Super duper special yellow teleporter failure behavior: you pick it the fuck up
+                if (this.attempt_take(actor, teleporter)) {
+                    if (actor === this.player) {
+                        this.sfx.play_once('get-tool', teleporter.cell);
+                    }
+                    return;
                 }
-                return;
             }
 
             // Note that this uses 'bump' even for players; it would be very bad if we could
