@@ -827,7 +827,6 @@ export class Level extends LevelInterface {
     _set_p1_input(p1_input) {
         this.p1_input = p1_input;
         this.p1_released |= ~p1_input;  // Action keys released since we last checked them
-        this.swap_player1 = false;
     }
 
     do_init_phase() {
@@ -938,7 +937,10 @@ export class Level extends LevelInterface {
         }
 
         // Post-action stuff
-        this._swap_players();
+        if (this.remaining_players <= 0) {
+            this.win();
+        }
+
         this.do_post_actor_phase();
     }
 
@@ -1247,49 +1249,43 @@ export class Level extends LevelInterface {
         }
     }
 
-    _swap_players() {
-        if (this.remaining_players <= 0) {
-            this.win();
-        }
-
-        // Possibly switch players
+    // This is consistently called 'swap' only because 'switch' is a keyword.
+    swap_players() {
         // FIXME cc2 has very poor interactions between this feature and cloners; come up with some
         // better rules as a default
-        if (this.swap_player1) {
-            this.swap_player1 = false;
-            // Reset the set of keys released since last tic (but not the swap key, or holding it
-            // will swap us endlessly)
-            // FIXME this doesn't even quite work, it just swaps less aggressively?  wtf
-            this.p1_released = 0xff & ~INPUT_BITS.swap;
-            // Clear remembered moves
-            this.player1_move = null;
-            this.player2_move = null;
 
-            // Iterate backwards over the actor list looking for a viable next player to control
-            let i0 = this.actors.indexOf(this.player);
-            if (i0 < 0) {
-                i0 = 0;
+        // Reset the set of keys released since last tic (but not the swap key, or holding it
+        // will swap us endlessly)
+        // FIXME this doesn't even quite work, it just swaps less aggressively?  wtf
+        this.p1_released = 0xff & ~INPUT_BITS.swap;
+        // Clear remembered moves
+        this.player1_move = null;
+        this.player2_move = null;
+
+        // Iterate backwards over the actor list looking for a viable next player to control
+        let i0 = this.actors.indexOf(this.player);
+        if (i0 < 0) {
+            i0 = 0;
+        }
+        let i = i0;
+        while (true) {
+            i -= 1;
+            if (i < 0) {
+                i += this.actors.length;
             }
-            let i = i0;
-            while (true) {
-                i -= 1;
-                if (i < 0) {
-                    i += this.actors.length;
-                }
-                if (i === i0)
-                    break;
+            if (i === i0)
+                break;
 
-                let actor = this.actors[i];
-                if (! actor.cell)
-                    continue;
+            let actor = this.actors[i];
+            if (! actor.cell)
+                continue;
 
-                if (actor.type.is_real_player) {
-                    this.player = actor;
-                    if (this.compat.player_moves_last && i !== 0) {
-                        [this.actors[0], this.actors[i]] = [this.actors[i], this.actors[0]];
-                    }
-                    break;
+            if (actor.type.is_real_player) {
+                this.player = actor;
+                if (this.compat.player_moves_last && i !== 0) {
+                    [this.actors[0], this.actors[i]] = [this.actors[i], this.actors[0]];
                 }
+                break;
             }
         }
     }
@@ -1468,20 +1464,24 @@ export class Level extends LevelInterface {
         if (! forced_only) {
             let new_input = input & this.p1_released;
             if (new_input & INPUT_BITS.cycle) {
-                this.cycle_inventory(this.player);
                 this.p1_released &= ~INPUT_BITS.cycle;
+                this.cycle_inventory(actor);
             }
             if ((new_input & INPUT_BITS.drop) && may_move) {
-                if (this.drop_item(this.player)) {
+                this.p1_released &= ~INPUT_BITS.drop;
+                if (this.drop_item(actor)) {
                     this.sfx.play_once('drop');
                 }
-                this.p1_released &= ~INPUT_BITS.drop;
             }
-            if ((new_input & INPUT_BITS.swap) && this.remaining_players > 1) {
-                // This is delayed until the end of the tic to avoid screwing up anything
-                // checking this.player
-                this.swap_player1 = true;
+            if (new_input & INPUT_BITS.swap) {
                 this.p1_released &= ~INPUT_BITS.swap;
+                this.swap_players();
+
+                if (! this.compat.allow_simultaneous_movement) {
+                    // Lexy: Input is only given to the first player to read it; a conscious swap
+                    // erases all input before the swapped-to player can read it
+                    this.p1_input = 0;
+                }
             }
         }
 

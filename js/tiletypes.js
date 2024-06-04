@@ -3475,7 +3475,7 @@ const TILE_TYPES = {
                 level.remaining_players -= 1;
                 if (level.remaining_players > 0) {
                     if (other === level.player) {
-                        level.swap_player1 = true;
+                        level.swap_players();
                     }
                     level.sfx.play_once('exit', me.cell);
                     level.transmute_tile(other, other.type.name === 'player' ? 'player1_exit' : 'player2_exit');

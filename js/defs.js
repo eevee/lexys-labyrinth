@@ -189,6 +189,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         label: "Actors teleport immediately after moving",
         rulesets: new Set(['steam', 'steam-strict']),
     }, {
+        key: 'allow_simultaneous_movement',
+        label: "Two players can move at once, by switching while moving",
+        rulesets: new Set(['steam-strict']),
+    }, {
         key: 'allow_double_cooldowns',
         label: "Actors may move forwards twice in one tic",
         rulesets: new Set(['steam', 'steam-strict', 'lynx']),
