@@ -1805,13 +1805,15 @@ export class Level extends LevelInterface {
             return ! deferred_blocked;
         }
 
-        // This flag (and the try/finally to ensure it's immediately cleared) detects recursive push
-        // attempts, which can happen with a row of ice clogged by stuck sliding ice blocks
-        actor._trying_to_push = true;
-        try {
-            for (let tile of pushable_tiles) {
-                if (tile._trying_to_push)
-                    return false;
+        for (let tile of pushable_tiles) {
+            if (tile._being_pushed)
+                return false;
+
+            // This flag (and the try/finally to ensure it's immediately cleared) detects recursive
+            // push attempts, which can happen with a row of ice clogged by stuck sliding ice blocks
+            try {
+                tile._being_pushed = true;
+
                 if (push_mode === 'bump' || push_mode === 'slap') {
                     if (tile.movement_cooldown > 0)
                         return false;
@@ -1869,9 +1871,9 @@ export class Level extends LevelInterface {
                     }
                 }
             }
-        }
-        finally {
-            delete actor._trying_to_push;
+            finally {
+                delete tile._being_pushed;
+            }
         }
 
         // In push mode, check one last time for being blocked, in case we e.g. pushed a block off
@@ -1881,10 +1883,10 @@ export class Level extends LevelInterface {
         // result, (c) the actor moves into the cell anyway.  In most cases this is prevented on
         // accident, because pushes happen at decision time during the collision check, and then the
         // actual movement happens later with a second collision check.
-        // Note that there is one exception: CC2 does seem to have spring mining prevention when
-        // pushing a row of ice blocks, so we keep the check if we're a block ourselves.  See BLOX
-        // replay; without this, ice blocks spring mine around 61.9s.
-        if ((! this.compat.emulate_spring_mining || actor.type.is_block) &&
+        // There's one exception: CC2 does seem to have spring mining prevention when pushing a
+        // /row/ of ice blocks, so we keep the check if we're in the middle of push-recursing.
+        // See CC2 #163 BLOX replay; without this, ice blocks spring mine around 61.9s.
+        if ((! this.compat.emulate_spring_mining || actor._being_pushed) &&
             push_mode === 'push' &&
             cell.some(tile => tile && tile.blocks(actor, direction, this)))
         {
@@ -2207,9 +2209,9 @@ export class Level extends LevelInterface {
                 // output of that clone machine
                 // TODO just hoist this to the right place so you don't have to do it in multiple
                 // places?
-                actor._trying_to_push = true;
+                actor._being_pushed = true;
                 tile.type.on_arrive(tile, this, actor);
-                actor._trying_to_push = false;
+                actor._being_pushed = false;
             }
 
             // XXX this does seem to be correct by CC2 rules, but it's very weird -- this will
