@@ -123,7 +123,7 @@ function _define_ice_corner(dir1, dir2) {
                 return;
 
             //level.schedule_actor_slide(other, me.type.slide_mode, direction);
-            level._set_tile_prop(other, 'direction', direction_map[other.direction]);
+            level.set_tile_prop(other, 'direction', direction_map[other.direction]);
         },
     };
 }
@@ -139,15 +139,15 @@ function update_wireable(me, level) {
         if (new_is_wired && !me.is_wired)
         {
             //connected
-            level._set_tile_prop(me, 'is_wired', true);
+            level.set_tile_prop(me, 'is_wired', true);
             //TODO: it'll always get on_power called later if it's wired to something already given power, right?
-            level._set_tile_prop(me, 'is_active', false);
+            level.set_tile_prop(me, 'is_active', false);
         }
         else if (!new_is_wired && me.is_wired)
         {
             //disconnected
-            level._set_tile_prop(me, 'is_wired', false);
-            level._set_tile_prop(me, 'is_active', true);
+            level.set_tile_prop(me, 'is_wired', false);
+            level.set_tile_prop(me, 'is_active', true);
         }
     }
 }
@@ -699,7 +699,7 @@ const TILE_TYPES = {
                     if (me.tracks & (1 << current))
                         break;
                 }
-                level._set_tile_prop(me, 'track_switch', current);
+                level.set_tile_prop(me, 'track_switch', current);
             }
         },
         has_opening(me, direction) {
@@ -734,7 +734,7 @@ const TILE_TYPES = {
             return true;
         },
         on_arrive(me, level, other) {
-            level._set_tile_prop(me, 'entered_direction', other.direction);
+            level.set_tile_prop(me, 'entered_direction', other.direction);
         },
         on_depart(me, level, other) {
             if (me.track_switch === null)
@@ -978,7 +978,7 @@ const TILE_TYPES = {
             }
             else if (other.type.name === 'circuit_block') {
                 level.transmute_tile(me, 'floor');
-                level._set_tile_prop(me, 'wire_directions', other.wire_directions);
+                level.set_tile_prop(me, 'wire_directions', other.wire_directions);
                 level.transmute_tile(other, splash_type);
                 level.recalculate_circuitry_next_wire_phase = true;
             }
@@ -1013,7 +1013,7 @@ const TILE_TYPES = {
             level.sfx.play_once('splash', me.cell);
             // Visual property, so the actor knows it's stepping off a lilypad, not swimming out of
             // the water we just turned into
-            level._set_tile_prop(other, 'not_swimming', true);
+            level.set_tile_prop(other, 'not_swimming', true);
         },
     },
     cracked_ice: {
@@ -1150,10 +1150,10 @@ const TILE_TYPES = {
         on_ready(me, level) {
             let one_north = level.cell(me.cell.x, me.cell.y - 1);
             if (one_north === null || one_north.get_terrain().type.name !== 'hole') {
-                level._set_tile_prop(me, 'visual_state', 'north');
+                level.set_tile_prop(me, 'visual_state', 'north');
             }
             else {
-                level._set_tile_prop(me, 'visual_state', 'open');
+                level.set_tile_prop(me, 'visual_state', 'open');
             }
         },
         on_arrive(me, level, other) {
@@ -1374,7 +1374,7 @@ const TILE_TYPES = {
             for (let arrow of me.arrows) {
                 new_arrows.add(DIRECTIONS[arrow][turn]);
             }
-            level._set_tile_prop(me, 'arrows', new_arrows);
+            level.set_tile_prop(me, 'arrows', new_arrows);
         },
     },
     boulder: {
@@ -1397,7 +1397,7 @@ const TILE_TYPES = {
         movement_speed: 4,
         decide_movement(me, level) {
             if (me.rolling) {
-                level._set_tile_prop(me, 'rolling', false);
+                level.set_tile_prop(me, 'rolling', false);
                 return [me.direction, null];
             }
             else {
@@ -1406,14 +1406,14 @@ const TILE_TYPES = {
         },
         on_bumped(me, level, other, direction) {
             if (other.type.name === 'boulder') {
-                level._set_tile_prop(me, 'rolling', true);
-                level._set_tile_prop(me, 'direction', direction);
-                level._set_tile_prop(other, 'rolling', false);
+                level.set_tile_prop(me, 'rolling', true);
+                level.set_tile_prop(me, 'direction', direction);
+                level.set_tile_prop(other, 'rolling', false);
             }
         },
         on_starting_move(me, level) {
             if (!me.rolling) {
-                level._set_tile_prop(me, 'rolling', true);
+                level.set_tile_prop(me, 'rolling', true);
             }
         },
     },
@@ -1439,13 +1439,13 @@ const TILE_TYPES = {
                 }
                 //hmm, actually chips seem to work OK. Alright, why not then?
                 if (item /*&& !item.type.is_chip*/ && item.type.item_priority !== undefined) {
-                  level._set_tile_prop(me, 'encased_item', item.type.name);
+                  level.set_tile_prop(me, 'encased_item', item.type.name);
                   level.remove_tile(item);
                 }
             }
         },
         on_ready(me, level) {
-            level._set_tile_prop(me, 'encased_item', null);
+            level.set_tile_prop(me, 'encased_item', null);
             this.try_pickup_item(me, level);
         },
         on_clone(me, original) {
@@ -1461,7 +1461,7 @@ const TILE_TYPES = {
         on_death(me, level) {
             if (me.encased_item !== null) {
                 level._place_dropped_item(me.encased_item, me.cell ?? me.previous_cell, me);
-                level._set_tile_prop(me, 'encased_item', null);
+                level.set_tile_prop(me, 'encased_item', null);
             }
         }
     },
@@ -1602,7 +1602,7 @@ const TILE_TYPES = {
                 return;
             if (other.type.name === 'sokoban_block' && me.color !== other.color)
                 return;
-            level._set_tile_prop(me, 'pressed', true);
+            level.set_tile_prop(me, 'pressed', true);
             level.sfx.play_once('button-press', me.cell);
 
             level.press_sokoban(me.color);
@@ -1610,7 +1610,7 @@ const TILE_TYPES = {
         on_depart(me, level, other) {
             if (! me.pressed)
                 return;
-            level._set_tile_prop(me, 'pressed', false);
+            level.set_tile_prop(me, 'pressed', false);
             level.sfx.play_once('button-release', me.cell);
 
             level.unpress_sokoban(me.color);
@@ -1711,15 +1711,15 @@ const TILE_TYPES = {
         on_ready(me, level) {
             // This may run before or after any pressed buttons, but, that's fine
             if (me.presses === undefined) {
-                level._set_tile_prop(me, 'presses', 0);
+                level.set_tile_prop(me, 'presses', 0);
             }
         },
         add_press_ready(me, level, other) {
             // Same as below, but without ejection
-            level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
+            level.set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
         },
         add_press(me, level, is_wire = false) {
-            level._set_tile_prop(me, 'presses', me.presses + 1);
+            level.set_tile_prop(me, 'presses', me.presses + 1);
             if (me.presses === 1 && ! is_wire) {
                 // Free any actor on us, if we went from 0 to 1 presses (i.e. closed to open)
                 let actor = me.cell.get_actor();
@@ -1731,9 +1731,9 @@ const TILE_TYPES = {
             }
         },
         remove_press(me, level) {
-            level._set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
+            level.set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
             if (me._initially_open) {
-                level._set_tile_prop(me, '_initially_open', false);
+                level.set_tile_prop(me, '_initially_open', false);
             }
         },
         // FIXME also doesn't trap ghosts, is that a special case???
@@ -1853,14 +1853,14 @@ const TILE_TYPES = {
             else if (name === 'glass_block' && other.encased_item) {
                 let new_item = me.type._mogrifications[other.encased_item];
                 if (new_item) {
-                    level._set_tile_prop(other, 'encased_item', new_item);
+                    level.set_tile_prop(other, 'encased_item', new_item);
                 }
                 else {
                     return;
                 }
             }
             else if (name === 'sokoban_block') {
-                level._set_tile_prop(other, 'color', ({
+                level.set_tile_prop(other, 'color', ({
                     red: 'blue',
                     blue: 'red',
                     yellow: 'green',
@@ -1875,12 +1875,12 @@ const TILE_TYPES = {
         },
         on_power(me, level) {
             if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', true);
+                level.set_tile_prop(me, 'is_active', true);
             }
         },
         on_depower(me, level) {
             if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', false);
+                level.set_tile_prop(me, 'is_active', false);
             }
         },
         visual_state(me) {
@@ -2018,12 +2018,12 @@ const TILE_TYPES = {
         },
         on_power(me, level) {
             if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', true);
+                level.set_tile_prop(me, 'is_active', true);
             }
         },
         on_depower(me, level) {
             if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', false);
+                level.set_tile_prop(me, 'is_active', false);
             }
         },
         visual_state(me) {
@@ -2104,12 +2104,12 @@ const TILE_TYPES = {
         },
         on_power(me, level) {
             if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', true);
+                level.set_tile_prop(me, 'is_active', true);
             }
         },
         on_depower(me, level) {
             if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', false);
+                level.set_tile_prop(me, 'is_active', false);
             }
         },
         visual_state(me) {
@@ -2138,12 +2138,12 @@ const TILE_TYPES = {
         },
         on_power(me, level) {
             if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', true);
+                level.set_tile_prop(me, 'is_active', true);
             }
         },
         on_depower(me, level) {
             if (me.is_wired) {
-                level._set_tile_prop(me, 'is_active', false);
+                level.set_tile_prop(me, 'is_active', false);
             }
         },
         visual_state(me) {
@@ -2194,17 +2194,17 @@ const TILE_TYPES = {
         },
         // We're also powered by (any number of) cyan buttons, so this is similar to trap code
         on_ready(me, level) {
-            level._set_tile_prop(me, 'wire_directions', 15);
+            level.set_tile_prop(me, 'wire_directions', 15);
             // This may run before or after any pressed buttons, but, that's fine
             if (me.presses === undefined) {
-                level._set_tile_prop(me, 'presses', 0);
+                level.set_tile_prop(me, 'presses', 0);
             }
         },
         add_press(me, level) {
-            level._set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
+            level.set_tile_prop(me, 'presses', (me.presses ?? 0) + 1);
         },
         remove_press(me, level) {
-            level._set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
+            level.set_tile_prop(me, 'presses', Math.max(0, me.presses - 1));
         },
         on_stand(me, level, other) {
             if (me.powered_edges && ! (other.traits & ACTOR_TRAITS.shockproof)) {
@@ -2213,8 +2213,8 @@ const TILE_TYPES = {
         },
         on_death(me, level) {
             // Need to remove our wires since they're an implementation detail
-            level._set_tile_prop(me, 'wire_directions', 0);
-            level._set_tile_prop(me, 'powered_edges', 0);
+            level.set_tile_prop(me, 'wire_directions', 0);
+            level.set_tile_prop(me, 'powered_edges', 0);
             level.recalculate_circuitry_next_wire_phase = true;
         },
         visual_state(me) {
@@ -2239,7 +2239,7 @@ const TILE_TYPES = {
                     continue;
                 }
 
-                level._set_tile_prop(actor, 'pending_reverse', ! actor.pending_reverse);
+                level.set_tile_prop(actor, 'pending_reverse', ! actor.pending_reverse);
             }
         },
         on_arrive(me, level, other) {
@@ -2257,7 +2257,7 @@ const TILE_TYPES = {
             level.sfx.play_once('button-press', me.cell);
             for (let actor of level.actors) {
                 if (actor.type.name === 'tank_yellow') {
-                    level._set_tile_prop(actor, 'pending_decision', other.direction);
+                    level.set_tile_prop(actor, 'pending_decision', other.direction);
                 }
             }
         },
@@ -2444,8 +2444,8 @@ const TILE_TYPES = {
         update_power_emission(me, level) {
             let actor = me.cell.get_actor();
             let ret = me.emitting;
-            level._set_tile_prop(me, 'emitting', me.next_emitting);
-            level._set_tile_prop(me, 'next_emitting', ! (actor && actor.movement_cooldown === 0));
+            level.set_tile_prop(me, 'emitting', me.next_emitting);
+            level.set_tile_prop(me, 'next_emitting', ! (actor && actor.movement_cooldown === 0));
             return ret;
         },
         on_arrive(me, level, other) {
@@ -2590,14 +2590,14 @@ const TILE_TYPES = {
                     buffer |= 1;
                 }
                 output0 = ((buffer & 0x1000) !== 0);
-                level._set_tile_prop(me, 'buffer', buffer & 0x0fff);
+                level.set_tile_prop(me, 'buffer', buffer & 0x0fff);
             }
             else if (me.gate_type === 'battery') {
                 if (input0) {
-                    level._set_tile_prop(me, 'timeout', 12);
+                    level.set_tile_prop(me, 'timeout', 12);
                 }
                 else if (me.timeout > 0) {
-                    level._set_tile_prop(me, 'timeout', me.timeout - 1);
+                    level.set_tile_prop(me, 'timeout', me.timeout - 1);
                 }
                 output0 = (me.timeout > 0);
             }
@@ -2615,13 +2615,13 @@ const TILE_TYPES = {
             }
             else if (me.gate_type === 'latch-cw') {
                 if (input0) {
-                    level._set_tile_prop(me, 'memory', input1);
+                    level.set_tile_prop(me, 'memory', input1);
                 }
                 output0 = me.memory;
             }
             else if (me.gate_type === 'latch-ccw') {
                 if (input1) {
-                    level._set_tile_prop(me, 'memory', input0);
+                    level.set_tile_prop(me, 'memory', input0);
                 }
                 output0 = me.memory;
             }
@@ -2630,7 +2630,7 @@ const TILE_TYPES = {
                 let dec = input1 && ! me.decrementing;
                 let mem = me.memory;
                 if (inc || dec) {
-                    level._set_tile_prop(me, 'underflowing', false);
+                    level.set_tile_prop(me, 'underflowing', false);
                 }
                 if (inc && ! dec) {
                     mem += 1;
@@ -2644,13 +2644,13 @@ const TILE_TYPES = {
                     if (mem < 0) {
                         mem = 9;
                         // Underflow is persistent until the next pulse
-                        level._set_tile_prop(me, 'underflowing', true);
+                        level.set_tile_prop(me, 'underflowing', true);
                     }
                 }
                 output1 = me.underflowing;
-                level._set_tile_prop(me, 'memory', mem);
-                level._set_tile_prop(me, 'incrementing', input0);
-                level._set_tile_prop(me, 'decrementing', input1);
+                level.set_tile_prop(me, 'memory', mem);
+                level.set_tile_prop(me, 'incrementing', input0);
+                level.set_tile_prop(me, 'decrementing', input1);
             }
 
             // This should only need to persist for a tic, and can be recomputed during undo, and
@@ -2675,18 +2675,18 @@ const TILE_TYPES = {
         },
         update_power_emission(me, level) {
             if (me.is_first_frame) {
-                level._set_tile_prop(me, 'emitting', true);
-                level._set_tile_prop(me, 'is_first_frame', false);
+                level.set_tile_prop(me, 'emitting', true);
+                level.set_tile_prop(me, 'is_first_frame', false);
             }
             else {
-                level._set_tile_prop(me, 'emitting', false);
+                level.set_tile_prop(me, 'emitting', false);
             }
         },
         on_arrive(me, level, other) {
             // TODO distinct sfx?  more clicky?
             level.sfx.play_once('button-press', me.cell);
             level.transmute_tile(me, 'light_switch_on');
-            level._set_tile_prop(me, 'is_first_frame', true);
+            level.set_tile_prop(me, 'is_first_frame', true);
         },
     },
     light_switch_on: {
@@ -2702,17 +2702,17 @@ const TILE_TYPES = {
         },
         update_power_emission(me, level) {
             if (me.is_first_frame) {
-                level._set_tile_prop(me, 'emitting', false);
-                level._set_tile_prop(me, 'is_first_frame', false);
+                level.set_tile_prop(me, 'emitting', false);
+                level.set_tile_prop(me, 'is_first_frame', false);
             }
             else {
-                level._set_tile_prop(me, 'emitting', true);
+                level.set_tile_prop(me, 'emitting', true);
             }
         },
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
             level.transmute_tile(me, 'light_switch_off');
-            level._set_tile_prop(me, 'is_first_frame', true);
+            level.set_tile_prop(me, 'is_first_frame', true);
         },
     },
     // LL tile: circuit block, overrides the wiring on the floor below (if any)
@@ -2732,7 +2732,7 @@ const TILE_TYPES = {
             me.wire_directions = original.wire_directions;
         },
         on_starting_move(me, level) {
-            level._set_tile_prop(me, 'powered_edges', 0);
+            level.set_tile_prop(me, 'powered_edges', 0);
             level.recalculate_circuitry_next_wire_phase = true;
         },
         on_finishing_move(me, level) {
@@ -2848,7 +2848,7 @@ const TILE_TYPES = {
             let direction = me.direction;
             if (me.pending_reverse) {
                 direction = DIRECTIONS[me.direction].opposite;
-                level._set_tile_prop(me, 'pending_reverse', false);
+                level.set_tile_prop(me, 'pending_reverse', false);
             }
             if (me.cell.has('cloner')) {
                 // Tanks on cloners should definitely ignore the flag, but we clear it first
@@ -2865,7 +2865,7 @@ const TILE_TYPES = {
         decide_movement(me, level) {
             if (me.pending_decision) {
                 let decision = me.pending_decision;
-                level._set_tile_prop(me, 'pending_decision', null);
+                level.set_tile_prop(me, 'pending_decision', null);
                 // Yellow tanks don't keep trying to move if blocked, but they DO turn regardless
                 // XXX consider a compat flag; this is highly unintuitive to me
                 level.set_actor_direction(me, decision);
@@ -3001,10 +3001,10 @@ const TILE_TYPES = {
         },
         _emulatees: ['teeth', 'glider', 'bug', 'ball', 'teeth_timid', 'fireball', 'paramecium', 'walker'],
         decide_movement(me, level) {
-            level._set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
+            level.set_tile_prop(me, 'attempted_moves', me.attempted_moves + 1);
             if (me.attempted_moves >= 32) {
-                level._set_tile_prop(me, 'attempted_moves', 0);
-                level._set_tile_prop(me, 'current_emulatee', (me.current_emulatee + 1) % me.type._emulatees.length);
+                level.set_tile_prop(me, 'attempted_moves', 0);
+                level.set_tile_prop(me, 'current_emulatee', (me.current_emulatee + 1) % me.type._emulatees.length);
             }
 
             let emulatee = me.type._emulatees[me.current_emulatee];
@@ -3086,14 +3086,14 @@ const TILE_TYPES = {
             // because dynamite is blocked by doors.
             // (Do this before the transmute so that the traits get recomputed.)
             if (other.toolbelt) {
-                level._set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
+                level.set_tile_prop(me, 'toolbelt', [...other.toolbelt]);
             }
             // XXX wiki just says about 4.3 seconds; more likely this is exactly 255 frames (and
             // there haven't been any compat problems so far...)
-            level._set_tile_prop(me, 'timer', 85);
+            level.set_tile_prop(me, 'timer', 85);
             level.transmute_tile(me, 'dynamite_lit');
             // Actors are expected to have this, so populate it
-            level._set_tile_prop(me, 'movement_cooldown', 0);
+            level.set_tile_prop(me, 'movement_cooldown', 0);
             level.add_actor(me);
             // Dynamite that lands on a force floor is moved by it, and dynamite that lands on a
             // button holds it down
@@ -3111,7 +3111,7 @@ const TILE_TYPES = {
         movement_speed: 4,
         // FIXME especially for buttons, destroyed actors should on_depart -- even cc2 appears to do this!
         decide_movement(me, level) {
-            level._set_tile_prop(me, 'timer', me.timer - 1);
+            level.set_tile_prop(me, 'timer', me.timer - 1);
             if (me.timer > 0)
                 return null;
 
@@ -3188,7 +3188,7 @@ const TILE_TYPES = {
                             // This doesn't require any real logic changes, but for readability,
                             // inform the renderer.
                             if (terrain.type.wire_propagation_mode) {
-                                level._set_tile_prop(terrain, 'wire_propagation_mode',
+                                level.set_tile_prop(terrain, 'wire_propagation_mode',
                                     terrain.type.wire_propagation_mode);
                             }
                             level.transmute_tile(terrain, 'floor');

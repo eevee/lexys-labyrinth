@@ -2255,9 +2255,9 @@ class DummyRunningLevel {
         this.cell = cell;
     }
 
-    _set_tile_prop(tile, key, value) {
+    set_tile_prop(tile, key, value) {
         if (tile !== this.tile) {
-            console.error("DummyRunningLevel._set_tile_prop called on an unknown tile:", tile, "expected:", this.tile);
+            console.error("DummyRunningLevel.set_tile_prop called on an unknown tile:", tile, "expected:", this.tile);
             return;
         }
 

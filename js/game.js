@@ -740,7 +740,7 @@ export class Level extends LevelInterface {
             return;
         }
 
-        this._do_init_phase();
+        this.do_init_phase();
         this._set_p1_input(p1_input);
 
         if (this.compat.emulate_60fps) {
@@ -759,40 +759,40 @@ export class Level extends LevelInterface {
         // FIXME this breaks item bestowal contraptions that immediately flip a force floor, since
         // the critters on the force floors don't get a bonk before this happens
         if (this.tic_counter === 0) {
-            this._do_wire_phase();
-            this._do_wire_phase();
+            this.do_wire_phase();
+            this.do_wire_phase();
         }
 
-        this._do_decision_phase();
-        this._do_action_phase(3);
+        this.do_decision_phase();
+        this.do_action_phase(3);
 
         // Wire updates every frame, which means thrice per tic
-        this._do_wire_phase();
-        this._do_wire_phase();
-        this._do_wire_phase();
+        this.do_wire_phase();
+        this.do_wire_phase();
+        this.do_wire_phase();
 
-        this._do_cleanup_phase();
+        this.do_cleanup_phase();
     }
 
     // CC2 loop: similar to the Lynx loop, but run three times per tic, and non-forced decisions can
     // only be made every third frame
     _advance_tic_lynx60() {
-        this._do_decision_phase(true);
-        this._do_action_phase(1);
-        this._do_wire_phase();
+        this.do_decision_phase(true);
+        this.do_action_phase(1);
+        this.do_wire_phase();
 
         this.frame_offset = 1;
-        this._do_decision_phase(true);
-        this._do_action_phase(1);
-        this._do_wire_phase();
+        this.do_decision_phase(true);
+        this.do_action_phase(1);
+        this.do_wire_phase();
 
         this.frame_offset = 2;
-        this._do_decision_phase();
-        this._do_action_phase(1);
-        this._do_wire_phase();
+        this.do_decision_phase();
+        this.do_action_phase(1);
+        this.do_wire_phase();
 
         this.frame_offset = 0;
-        this._do_cleanup_phase();
+        this.do_cleanup_phase();
     }
 
     // Attempt to advance by one FRAME at a time.  Primarily useful for running 60 FPS mode at,
@@ -801,17 +801,17 @@ export class Level extends LevelInterface {
         if (this.compat.emulate_60fps) {
             // CC2
             if (this.frame_offset === 0) {
-                this._do_init_phase(p1_input);
+                this.do_init_phase(p1_input);
             }
             this._set_p1_input(p1_input);
             let is_decision_frame = this.frame_offset === 2;
 
-            this._do_decision_phase(! is_decision_frame);
-            this._do_action_phase(1);
-            this._do_wire_phase();
+            this.do_decision_phase(! is_decision_frame);
+            this.do_action_phase(1);
+            this.do_wire_phase();
 
             if (this.frame_offset === 2) {
-                this._do_cleanup_phase();
+                this.do_cleanup_phase();
             }
         }
         else {
@@ -830,7 +830,7 @@ export class Level extends LevelInterface {
         this.swap_player1 = false;
     }
 
-    _do_init_phase() {
+    do_init_phase() {
         // At the beginning of the very first tic, some tiles want to do initialization that's not
         // appropriate to do before the game begins
         // FIXME this was originally added for bomb, which no longer uses it, so, god i would like
@@ -868,7 +868,7 @@ export class Level extends LevelInterface {
     }
 
     // Decision phase: all actors decide on their movement "simultaneously"
-    _do_decision_phase(forced_only = false) {
+    do_decision_phase(forced_only = false) {
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
 
@@ -877,11 +877,11 @@ export class Level extends LevelInterface {
             actor.decision = null;
             // This is a renderer prop and only exists between two loops
             if (actor.destination_cell) {
-                this._set_tile_prop(actor, 'destination_cell', null);
+                this.set_tile_prop(actor, 'destination_cell', null);
             }
             // This is only used for killing an ankh'd player on an item
             if (actor.temp_ignore_item_collision) {
-                this._set_tile_prop(actor, 'temp_ignore_item_collision', false);
+                this.set_tile_prop(actor, 'temp_ignore_item_collision', false);
             }
 
             if (! actor.cell)
@@ -890,7 +890,7 @@ export class Level extends LevelInterface {
             if (actor.type.ttl) {
                 // Animations, bizarrely, do their cooldown at decision time, so they're removed
                 // early on the tic that they expire
-                this._do_actor_cooldown(actor, this.update_rate);
+                this.do_actor_cooldown(actor, this.update_rate);
                 continue;
             }
 
@@ -899,13 +899,13 @@ export class Level extends LevelInterface {
 
             // Erase old traces of movement now
             if (actor.movement_speed) {
-                this._set_tile_prop(actor, 'previous_cell', null);
-                this._set_tile_prop(actor, 'movement_speed', null);
+                this.set_tile_prop(actor, 'previous_cell', null);
+                this.set_tile_prop(actor, 'movement_speed', null);
                 if (actor.is_pulled) {
-                    this._set_tile_prop(actor, 'is_pulled', false);
+                    this.set_tile_prop(actor, 'is_pulled', false);
                 }
                 if (actor.not_swimming) {
-                    this._set_tile_prop(actor, 'not_swimming', false);
+                    this.set_tile_prop(actor, 'not_swimming', false);
                 }
             }
 
@@ -918,7 +918,7 @@ export class Level extends LevelInterface {
             }
 
             // Pending slides only last until a decision is made
-            this._set_tile_prop(actor, 'pending_slide_mode', null);
+            this.set_tile_prop(actor, 'pending_slide_mode', null);
 
             // Note that pending_push is only cleared when we actually move, both to prevent being
             // pushed a second time when we're already in mid-push, and to avoid a pending push
@@ -929,7 +929,7 @@ export class Level extends LevelInterface {
         }
     }
 
-    _do_action_phase(cooldown) {
+    do_action_phase(cooldown) {
         if (this.compat.no_separate_idle_phase) {
             this._do_combined_action_phase(cooldown);
         }
@@ -939,7 +939,7 @@ export class Level extends LevelInterface {
 
         // Post-action stuff
         this._swap_players();
-        this._do_post_actor_phase();
+        this.do_post_actor_phase();
     }
 
     // Lynx + Lexy action phase: move and cool down in one loop, idle in another
@@ -949,12 +949,12 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
-            this._do_actor_movement(actor);
+            this.do_actor_movement(actor);
             if (actor.type.ttl)
                 continue;
 
-            this._do_actor_cooldown(actor, cooldown);
-            this._do_actor_trap_ejection(actor);
+            this.do_actor_cooldown(actor, cooldown);
+            this.do_actor_trap_ejection(actor);
         }
         for (let i = this.actors.length - 1; i >= 0; i--) {
             let actor = this.actors[i];
@@ -963,7 +963,7 @@ export class Level extends LevelInterface {
             if (actor.type.ttl)
                 continue;
 
-            this._do_actor_idle(actor);
+            this.do_actor_idle(actor);
         }
     }
 
@@ -974,18 +974,18 @@ export class Level extends LevelInterface {
             if (! actor.cell)
                 continue;
 
-            this._do_actor_movement(actor);
+            this.do_actor_movement(actor);
             if (actor.type.ttl)
                 continue;
 
-            this._do_actor_cooldown(actor, cooldown);
-            this._do_actor_trap_ejection(actor);
-            this._do_actor_idle(actor);
+            this.do_actor_cooldown(actor, cooldown);
+            this.do_actor_trap_ejection(actor);
+            this.do_actor_idle(actor);
         }
     }
 
     // Have an actor attempt to move
-    _do_actor_movement(actor) {
+    do_actor_movement(actor) {
         // Check this again, since an earlier pass may have caused us to start moving
         if (actor.movement_cooldown > 0)
             return;
@@ -1004,7 +1004,7 @@ export class Level extends LevelInterface {
 
         // Track when the player is blocked for visual effect
         if (actor === this.player && ! success && ! actor.is_making_failure_move) {
-            this._set_tile_prop(actor, 'is_blocked', true);
+            this.set_tile_prop(actor, 'is_blocked', true);
             if (actor.last_blocked_direction !== actor.direction) {
                 // This is only used for checking when to play the mmf sound, doesn't need undoing;
                 // it's cleared when we make a successful move or a null decision
@@ -1107,21 +1107,21 @@ export class Level extends LevelInterface {
         }
         else {
             // Other kinds of slides (i.e. normal teleporting) just expire normally
-            this._set_tile_prop(actor, 'current_slide_mode', null);
+            this.set_tile_prop(actor, 'current_slide_mode', null);
         }
 
         return false;
     }
 
-    _do_actor_cooldown(actor, cooldown = 3) {
+    do_actor_cooldown(actor, cooldown = 3) {
         if (actor.movement_cooldown <= 0) {
             if (actor.is_making_failure_move) {
                 // For actors that are causing the game to end with an attempted move, and which
                 // aren't actually moving, give them a cooldown /as if/ they were moving into the
                 // deadly cell (which should have already been fudged with .destination_cell)
                 let speed = actor.type.movement_speed * 3;
-                this._set_tile_prop(actor, 'movement_cooldown', speed - cooldown);
-                this._set_tile_prop(actor, 'movement_speed', speed);
+                this.set_tile_prop(actor, 'movement_cooldown', speed - cooldown);
+                this.set_tile_prop(actor, 'movement_speed', speed);
             }
             return;
         }
@@ -1129,7 +1129,7 @@ export class Level extends LevelInterface {
         if (actor.last_extra_cooldown_tic === this.tic_counter)
             return;
 
-        this._set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - cooldown));
+        this.set_tile_prop(actor, 'movement_cooldown', Math.max(0, actor.movement_cooldown - cooldown));
 
         if (actor.movement_cooldown <= 0) {
             if (actor.type.ttl) {
@@ -1148,7 +1148,7 @@ export class Level extends LevelInterface {
             if (! this.compat.actors_move_instantly) {
                 this.step_on_cell(actor, actor.cell);
             }
-            this._set_tile_prop(actor, 'current_slide_mode', null);
+            this.set_tile_prop(actor, 'current_slide_mode', null);
 
             // Note that we don't erase the movement bookkeeping until next decision phase, because
             // the renderer interpolates back in time and needs to know to draw us finishing the
@@ -1203,7 +1203,7 @@ export class Level extends LevelInterface {
     // Lynx: Actors standing on brown buttons perform trap ejection immediately after their
     // cooldown, in actor order.  This causes a lot of double movement and there's not really any
     // way to simulate it other than to just do this awkward pseudo-phase
-    _do_actor_trap_ejection(actor) {
+    do_actor_trap_ejection(actor) {
         if (! this.compat.traps_like_lynx)
             return;
         if (actor.movement_cooldown > 0)
@@ -1218,7 +1218,7 @@ export class Level extends LevelInterface {
         }
     }
 
-    _do_actor_idle(actor) {
+    do_actor_idle(actor) {
         if (actor.movement_cooldown <= 0) {
             let terrain = actor.cell.get_terrain();
             if (terrain.type.on_stand) {
@@ -1236,7 +1236,7 @@ export class Level extends LevelInterface {
         if (this.compat.traps_like_lynx) {
             let terrain = actor.cell.get_terrain();
             if (terrain && terrain.type.name === 'trap' && terrain.presses > 0) {
-                this._do_extra_cooldown(actor);
+                this.do_extra_cooldown(actor);
             }
         }
         if (actor.just_stepped_on_teleporter) {
@@ -1291,10 +1291,10 @@ export class Level extends LevelInterface {
         }
     }
 
-    _do_post_actor_phase() {
+    do_post_actor_phase() {
         if (this.pending_green_toggle) {
             // Swap green objects
-            this.__toggle_green_tiles();
+            this._toggle_green_tiles();
             this.pending_green_toggle = false;
 
             if (this.undo_enabled) {
@@ -1302,10 +1302,10 @@ export class Level extends LevelInterface {
             }
         }
 
-        this.__check_sokoban_buttons();
+        this._check_sokoban_buttons();
     }
 
-    __toggle_green_tiles() {
+    _toggle_green_tiles() {
         // This is NOT undo-safe; it's undone by calling it again!
         // Assumes:
         // 1. Green tile types come in pairs, which toggle into one another
@@ -1325,7 +1325,7 @@ export class Level extends LevelInterface {
 
     // Check for changes to sokoban buttons, and swap the appropriate floors/walls if necessary.
     // NOT undo-safe; this is undone by calling it again after an undo.
-    __check_sokoban_buttons() {
+    _check_sokoban_buttons() {
         for (let [color, was_satisfied] of Object.entries(this.sokoban_satisfied)) {
             let is_satisfied = this.sokoban_unpressed[color] === 0;
             if (was_satisfied !== is_satisfied) {
@@ -1343,14 +1343,14 @@ export class Level extends LevelInterface {
         }
     }
 
-    _do_cleanup_phase() {
+    do_cleanup_phase() {
         // Lynx compat: Any blue tank that still has the reversal flag set here, but is in motion,
         // should ignore it.  Unfortunately this has to be done as its own pass (as it is in Lynx!)
         // because of acting order issues
         if (this.compat.tanks_ignore_button_while_moving) {
             for (let actor of this.actors) {
                 if (actor.cell && actor.pending_reverse && actor.movement_cooldown > 0) {
-                    this._set_tile_prop(actor, 'pending_reverse', false);
+                    this.set_tile_prop(actor, 'pending_reverse', false);
                 }
             }
         }
@@ -1424,10 +1424,10 @@ export class Level extends LevelInterface {
 
     make_player_decision(actor, input, forced_only = false) {
         // Only reset the player's is_pushing between movement, so it lasts for the whole push
-        this._set_tile_prop(actor, 'is_pushing', false);
+        this.set_tile_prop(actor, 'is_pushing', false);
         // This effect only lasts one tic, after which we can move again
         if (! forced_only) {
-            this._set_tile_prop(actor, 'is_blocked', false);
+            this.set_tile_prop(actor, 'is_blocked', false);
         }
 
         // TODO player in a cloner can't move (but player in a trap can still turn)
@@ -1485,10 +1485,10 @@ export class Level extends LevelInterface {
             // This is a forced move and we're not overriding it, so we're done
             actor.decision = actor.direction;
             this.remember_player_move(actor.decision);
-            this._set_tile_prop(actor, 'current_slide_mode', actor.pending_slide_mode);
+            this.set_tile_prop(actor, 'current_slide_mode', actor.pending_slide_mode);
 
             if (terrain.type.slide_mode === 'force') {
-                this._set_tile_prop(actor, 'can_override_force_floor', true);
+                this.set_tile_prop(actor, 'can_override_force_floor', true);
             }
         }
         else if (forced_only) {
@@ -1553,11 +1553,11 @@ export class Level extends LevelInterface {
                 ! this.compat.bonking_isnt_instant)
             {
                 actor.decision = actor.direction;
-                this._set_tile_prop(actor, 'can_override_force_floor', true);
+                this.set_tile_prop(actor, 'can_override_force_floor', true);
             }
             else {
                 // Otherwise this is 100% a conscious move, so we lose override
-                this._set_tile_prop(actor, 'can_override_force_floor', false);
+                this.set_tile_prop(actor, 'can_override_force_floor', false);
             }
         }
 
@@ -1572,7 +1572,7 @@ export class Level extends LevelInterface {
             // they can make a decision, even if they're still sliding or are off-tic.  Also used
             // for hooking.  (Note that if the block is on a force floor and is blocked in the push
             // direction, under CC2 rules it'll then try the force floor; see attempt_step.)
-            // This isn't cleared until the block actually attempts a move; see _do_actor_movement.
+            // This isn't cleared until the block actually attempts a move; see do_actor_movement.
             actor.decision = actor.pending_push;
             return;
         }
@@ -1582,7 +1582,7 @@ export class Level extends LevelInterface {
         if (actor.pending_slide_mode) {
             // Actors can't make voluntary moves while sliding; they just, ah, slide.
             actor.decision = actor.direction;
-            this._set_tile_prop(actor, 'current_slide_mode', actor.pending_slide_mode);
+            this.set_tile_prop(actor, 'current_slide_mode', actor.pending_slide_mode);
             return;
         }
         else if (actor.type.name === 'ghost' && terrain.type.slide_mode === 'ice') {
@@ -1731,13 +1731,13 @@ export class Level extends LevelInterface {
                 // kills the player, AND the player has an inscribed ankh, then the monster should
                 // be able to continue on into the cell despite the item!  So make that happen too.
                 if (tile.type.is_real_player && tile.cell !== cell) {
-                    this._set_tile_prop(actor, 'temp_ignore_item_collision', true);
+                    this.set_tile_prop(actor, 'temp_ignore_item_collision', true);
                     return true;
                 }
                 else {
-                    this._set_tile_prop(actor, 'previous_cell', actor.cell);
-                    this._set_tile_prop(actor, 'destination_cell', cell);
-                    this._set_tile_prop(actor, 'is_making_failure_move', true);
+                    this.set_tile_prop(actor, 'previous_cell', actor.cell);
+                    this.set_tile_prop(actor, 'destination_cell', cell);
+                    this.set_tile_prop(actor, 'is_making_failure_move', true);
                 }
             }
 
@@ -1818,7 +1818,7 @@ export class Level extends LevelInterface {
 
                     if (push_mode === 'slap') {
                         if (actor === this.player) {
-                            this._set_tile_prop(actor, 'is_pushing', true);
+                            this.set_tile_prop(actor, 'is_pushing', true);
                             this.sfx.play_once('push');
                         }
                         // FIXME we get here for monsters in lynx mode!  check this is actually
@@ -1828,7 +1828,7 @@ export class Level extends LevelInterface {
                 }
                 else if (push_mode === 'push') {
                     if (actor === this.player) {
-                        this._set_tile_prop(actor, 'is_pushing', true);
+                        this.set_tile_prop(actor, 'is_pushing', true);
                     }
 
                     // We can (and in CC2, must!) do a pending push for blocks that are in motion,
@@ -1843,7 +1843,7 @@ export class Level extends LevelInterface {
                         // CC2: Can't directly push a sliding block, even one on a force floor
                         // that's stuck on a wall (and thus not moving).  Such a push ALWAYS becomes
                         // a pending push, so it won't happen until next tic, and we remain blocked
-                        this._set_tile_prop(tile, 'pending_push', direction);
+                        this.set_tile_prop(tile, 'pending_push', direction);
                         // If the block already had its decision phase this turn, override it
                         tile.decision = direction;
                         return false;
@@ -1860,7 +1860,7 @@ export class Level extends LevelInterface {
                         if (! this.compat.no_directly_pushing_sliding_blocks && must_pending_push) {
                             // If the push failed and the obstacle is in the middle of a slide,
                             // remember this as the next move it'll make
-                            this._set_tile_prop(tile, 'pending_push', direction);
+                            this.set_tile_prop(tile, 'pending_push', direction);
                             tile.decision = direction;
                         }
                         return false;
@@ -1937,7 +1937,7 @@ export class Level extends LevelInterface {
         let original_direction = direction;
         direction = this.can_actor_leave_cell(actor, orig_cell, direction, push_mode);
         if (set_direction) {
-            this._set_tile_prop(actor, 'direction', direction ?? original_direction);
+            this.set_tile_prop(actor, 'direction', direction ?? original_direction);
 
             // Some tiles (ahem, frame blocks) rotate when their attempted direction is redirected,
             // even if the movement ultimately fails, so it can only happen here
@@ -1987,9 +1987,9 @@ export class Level extends LevelInterface {
                     else if (push_mode === 'push') {
                         // Only blocks can actually be moved via pulling, but monsters can still
                         // count as pulled, which stops them from killing us
-                        this._set_tile_prop(behind_actor, 'is_pulled', true);
+                        this.set_tile_prop(behind_actor, 'is_pulled', true);
                         if (behind_actor.type.is_block) {
-                            this._set_tile_prop(behind_actor, 'pending_push', direction);
+                            this.set_tile_prop(behind_actor, 'pending_push', direction);
                             behind_actor.decision = direction;
                         }
                     }
@@ -2008,7 +2008,7 @@ export class Level extends LevelInterface {
             return false;
 
         // Once we try to move, this expires
-        this._set_tile_prop(actor, 'pending_push', null);
+        this.set_tile_prop(actor, 'pending_push', null);
 
         // Grab speed /first/, in case the movement or on_blocked turns us into an animation
         // immediately (and then we won't have a speed!)
@@ -2022,7 +2022,7 @@ export class Level extends LevelInterface {
         // We're clear!  Move us
         let goal_cell = this.get_neighboring_cell(actor.cell, direction);
         let orig_cell = actor.cell;
-        this._set_tile_prop(actor, 'previous_cell', orig_cell);
+        this.set_tile_prop(actor, 'previous_cell', orig_cell);
         this.move_to(actor, goal_cell);
 
         // Now that we know whether we're sliding (generally set by the terrain's on_approach),
@@ -2043,8 +2043,8 @@ export class Level extends LevelInterface {
             speed /= 2;
         }
         let duration = speed * 3;
-        this._set_tile_prop(actor, 'movement_cooldown', duration);
-        this._set_tile_prop(actor, 'movement_speed', duration);
+        this.set_tile_prop(actor, 'movement_cooldown', duration);
+        this.set_tile_prop(actor, 'movement_speed', duration);
 
         // Do Lexy-style hooking here: only attempt to pull things just after we've actually moved
         // successfully, which means the hook can never stop us from moving and hook slapping is not
@@ -2054,7 +2054,7 @@ export class Level extends LevelInterface {
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
                 if (behind_actor && actor.can_pull(behind_actor, direction) && behind_actor.type.is_block) {
-                    this._set_tile_prop(behind_actor, 'is_pulled', true);
+                    this.set_tile_prop(behind_actor, 'is_pulled', true);
                     this.attempt_out_of_turn_step(behind_actor, direction);
                 }
             }
@@ -2080,16 +2080,16 @@ export class Level extends LevelInterface {
         }
         let success = this.attempt_step(actor, direction);
         if (success) {
-            this._do_extra_cooldown(actor);
+            this.do_extra_cooldown(actor);
         }
         return success;
     }
 
-    _do_extra_cooldown(actor) {
-        this._do_actor_cooldown(actor, this.update_rate);
+    do_extra_cooldown(actor) {
+        this.do_actor_cooldown(actor, this.update_rate);
         // Only Lexy has double-cooldown protection
         if (! this.compat.allow_double_cooldowns) {
-            this._set_tile_prop(actor, 'last_extra_cooldown_tic', this.tic_counter);
+            this.set_tile_prop(actor, 'last_extra_cooldown_tic', this.tic_counter);
         }
     }
 
@@ -2100,7 +2100,7 @@ export class Level extends LevelInterface {
         if (actor.cell === goal_cell)
             return;
 
-        this._set_tile_prop(actor, 'pending_slide_mode', null);
+        this.set_tile_prop(actor, 'pending_slide_mode', null);
 
         if (actor.type.on_starting_move) {
             actor.type.on_starting_move(actor, this);
@@ -2226,7 +2226,7 @@ export class Level extends LevelInterface {
 
         // We're about to abruptly move the actor, and the renderer needs to know to interpolate its
         // movement towards the teleporter it just stepped on, not the teleporter it's moved to
-        this._set_tile_prop(actor, 'destination_cell', actor.cell);
+        this.set_tile_prop(actor, 'destination_cell', actor.cell);
 
         let dest, direction, success;
         for ([dest, direction] of teleporter.type.teleport_dest_order(teleporter, this, actor)) {
@@ -2298,7 +2298,7 @@ export class Level extends LevelInterface {
             this.remove_tile(actor);
             this.add_tile(actor, dest.cell);
             // Erase this to prevent tail-biting through a teleport
-            this._set_tile_prop(actor, 'previous_cell', null);
+            this.set_tile_prop(actor, 'previous_cell', null);
         }
     }
 
@@ -2406,7 +2406,7 @@ export class Level extends LevelInterface {
 
     // Wiring -----------------------------------------------------------------------------------------
 
-    _do_wire_phase() {
+    do_wire_phase() {
         if (this.recalculate_circuitry_next_wire_phase) {
             // This property doesn't tend to last beyond a single tic, but if we recalculate now, we
             // also need to recalculate if we undo beyond this point.  So set it as a level prop,
@@ -2476,7 +2476,7 @@ export class Level extends LevelInterface {
             }
         }
 
-        this.__apply_circuit_power_to_tiles();
+        this._apply_circuit_power_to_tiles();
         if (this.undo_enabled && circuit_changes.size > 0 && ! this.pending_undo.circuit_power_changes) {
             this.pending_undo.circuit_power_changes = circuit_changes;
         }
@@ -2496,7 +2496,7 @@ export class Level extends LevelInterface {
     // circuits.  NOT undo-safe; instead, changes to circuit power are undone, and then this is
     // called again to make everything consistent.  This also does NOT call on_power or on_depower;
     // any effects from those are done (and undone) by the caller.
-    __apply_circuit_power_to_tiles() {
+    _apply_circuit_power_to_tiles() {
         for (let circuit of this.circuits) {
             for (let [tile, edges] of circuit.tiles.entries()) {
                 if (circuit.is_powered) {
@@ -2604,11 +2604,11 @@ export class Level extends LevelInterface {
         // Undo in reverse order!  There's no redo, so it's okay to use the destructive reverse().
         // These toggles go first, since they're the last things to happen in a tic
         if (entry.toggle_green_tiles) {
-            this.__toggle_green_tiles();
+            this._toggle_green_tiles();
         }
         if (entry.sokoban_changes) {
             Object.assign(this.sokoban_unpressed, entry.sokoban_changes);
-            this.__check_sokoban_buttons();
+            this._check_sokoban_buttons();
         }
 
         entry.actor_splices.reverse();
@@ -2643,7 +2643,7 @@ export class Level extends LevelInterface {
                 circuit.is_powered = is_powered;
             }
             // FIXME ah the power state doesn't undo correctly because the circuits are different
-            this.__apply_circuit_power_to_tiles();
+            this._apply_circuit_power_to_tiles();
         }
 
         for (let [key, value] of Object.entries(entry.level_props)) {
@@ -2655,7 +2655,7 @@ export class Level extends LevelInterface {
     // EVERYTHING that changes the state of a level, including the state of a single tile, should do
     // it through one of these for undo/rewind purposes
 
-    _set_tile_prop(tile, key, val) {
+    set_tile_prop(tile, key, val) {
         if (Number.isNaN(val))
             throw new Error(`got a NaN for ${key} on ${tile.type.name} at ${tile.cell.x}, ${tile.cell.y}`);
         if (! this.undo_enabled) {
@@ -2769,10 +2769,10 @@ export class Level extends LevelInterface {
                     this.sfx.play_once('revive');
 
                     let cell = actor.cell;
-                    this._set_tile_prop(actor, 'movement_cooldown', null);
-                    this._set_tile_prop(actor, 'movement_speed', null);
-                    this._set_tile_prop(actor, 'pending_slide_mode', null);
-                    this._set_tile_prop(actor, 'current_slide_mode', null);
+                    this.set_tile_prop(actor, 'movement_cooldown', null);
+                    this.set_tile_prop(actor, 'movement_speed', null);
+                    this.set_tile_prop(actor, 'pending_slide_mode', null);
+                    this.set_tile_prop(actor, 'current_slide_mode', null);
                     this.move_to(actor, ankh_cell);
 
                     if (sfx) {
@@ -2829,10 +2829,10 @@ export class Level extends LevelInterface {
         this.state = 'failure';
         this.fail_reason = reason;
         if (player) {
-            this._set_tile_prop(player, 'fail_reason', reason);
+            this.set_tile_prop(player, 'fail_reason', reason);
         }
         if (killer) {
-            this._set_tile_prop(killer, 'is_killer', true);
+            this.set_tile_prop(killer, 'is_killer', true);
         }
     }
 
@@ -2842,7 +2842,7 @@ export class Level extends LevelInterface {
 
         this.sfx.play_once('win');
         this.state = 'success';
-        this._set_tile_prop(this.player, 'exited', true);
+        this.set_tile_prop(this.player, 'exited', true);
     }
 
     get_scorecard() {
@@ -2877,11 +2877,11 @@ export class Level extends LevelInterface {
 
     remove_tile(tile) {
         tile.cell._remove(tile);
-        this._set_tile_prop(tile, 'cell', null);
+        this.set_tile_prop(tile, 'cell', null);
     }
 
     add_tile(tile, cell) {
-        this._set_tile_prop(tile, 'cell', cell);
+        this.set_tile_prop(tile, 'cell', cell);
         cell._add(tile);
     }
 
@@ -2930,9 +2930,9 @@ export class Level extends LevelInterface {
             // XXX wait am i sure that cc2 doesn't work that way too?
             duration = (12 + (this.tic_counter + this.step_parity) % 2) * 3;
         }
-        this._set_tile_prop(tile, 'movement_speed', duration);
-        this._set_tile_prop(tile, 'movement_cooldown', duration);
-        this._do_extra_cooldown(tile);
+        this.set_tile_prop(tile, 'movement_speed', duration);
+        this.set_tile_prop(tile, 'movement_cooldown', duration);
+        this.do_extra_cooldown(tile);
     }
 
     spawn_animation(cell, name) {
@@ -2949,8 +2949,8 @@ export class Level extends LevelInterface {
         // Note that newly-spawned animations don't have their cooldown decremented right away, and
         // in the case of lilypads, this has gameplay implications.  I can't just not tick them down
         // or the renderer will break, so cheat by extending the duration by a tic
-        this._set_tile_prop(tile, 'movement_speed', tile.movement_speed + 3);
-        this._set_tile_prop(tile, 'movement_cooldown', tile.movement_cooldown + 3);
+        this.set_tile_prop(tile, 'movement_speed', tile.movement_speed + 3);
+        this.set_tile_prop(tile, 'movement_cooldown', tile.movement_cooldown + 3);
         this.add_tile(tile, cell);
         this.add_actor(tile);
     }
@@ -2978,11 +2978,11 @@ export class Level extends LevelInterface {
                 this.remove_tile(tile.cell[new_type.layer]);
             }
             tile.cell._remove(tile);
-            this._set_tile_prop(tile, 'type', new_type);
+            this.set_tile_prop(tile, 'type', new_type);
             tile.cell._add(tile);
         }
         else {
-            this._set_tile_prop(tile, 'type', new_type);
+            this.set_tile_prop(tile, 'type', new_type);
         }
 
         if (old_type.is_actor || new_type.is_actor) {
@@ -2998,12 +2998,12 @@ export class Level extends LevelInterface {
             // This is effectively a completely new object, so remove double cooldown prevention;
             // the initial cooldown MUST happen, because the renderer can't handle cooldown == speed
             if (tile.last_extra_cooldown_tic) {
-                this._set_tile_prop(tile, 'last_extra_cooldown_tic', null);
+                this.set_tile_prop(tile, 'last_extra_cooldown_tic', null);
             }
             this._init_animation(tile);
-            this._set_tile_prop(tile, 'previous_cell', null);
-            this._set_tile_prop(tile, 'pending_slide_mode', null);
-            this._set_tile_prop(tile, 'current_slide_mode', null);
+            this.set_tile_prop(tile, 'previous_cell', null);
+            this.set_tile_prop(tile, 'pending_slide_mode', null);
+            this.set_tile_prop(tile, 'current_slide_mode', null);
         }
     }
 
@@ -3122,7 +3122,7 @@ export class Level extends LevelInterface {
             }
 
             if (type.item_traits) {
-                this._set_tile_prop(actor, 'traits', actor.traits | type.item_traits);
+                this.set_tile_prop(actor, 'traits', actor.traits | type.item_traits);
             }
         }
         return true;
@@ -3176,18 +3176,18 @@ export class Level extends LevelInterface {
     }
 
     recompute_traits(actor) {
-        this._set_tile_prop(actor, 'traits', actor.compute_traits());
+        this.set_tile_prop(actor, 'traits', actor.compute_traits());
     }
 
     // Change an actor's direction
     set_actor_direction(actor, direction) {
-        this._set_tile_prop(actor, 'direction', direction);
+        this.set_tile_prop(actor, 'direction', direction);
     }
 
     schedule_actor_slide(actor, mode, direction = null) {
         if (direction) {
             this.set_actor_direction(actor, direction);
         }
-        this._set_tile_prop(actor, 'pending_slide_mode', mode);
+        this.set_tile_prop(actor, 'pending_slide_mode', mode);
     }
 }
