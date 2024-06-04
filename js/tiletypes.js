@@ -1889,7 +1889,7 @@ const TILE_TYPES = {
     },
     teleport_blue: {
         layer: LAYERS.terrain,
-        slide_mode: 'teleport',
+        slide_mode: 'teleport-hard',
         contains_wire: true,
         wire_propagation_mode: 'all',
         *teleport_dest_order(me, level, other) {
@@ -1978,7 +1978,7 @@ const TILE_TYPES = {
     },
     teleport_red: {
         layer: LAYERS.terrain,
-        slide_mode: 'teleport',
+        slide_mode: 'teleport-soft',
         slide_override_mode: 'player',
         contains_wire: true,
         wire_propagation_mode: 'none',
@@ -2032,7 +2032,7 @@ const TILE_TYPES = {
     },
     teleport_green: {
         layer: LAYERS.terrain,
-        slide_mode: 'teleport',
+        slide_mode: 'teleport-hard',
         contains_wire: true,
         wire_propagation_mode: 'all',
         *teleport_dest_order(me, level, other) {
@@ -2119,7 +2119,7 @@ const TILE_TYPES = {
     teleport_yellow: {
         layer: LAYERS.terrain,
         item_priority: PICKUP_PRIORITIES.always,
-        slide_mode: 'teleport',
+        slide_mode: 'teleport-soft',
         slide_override_mode: 'player',
         *teleport_dest_order(me, level, other) {
             let exit_direction = other.direction;
@@ -2130,7 +2130,7 @@ const TILE_TYPES = {
     },
     teleport_rainbow: {
         layer: LAYERS.terrain,
-        slide_mode: 'teleport',
+        // Doesn't cause a slide!  No teleporter ejection
         contains_wire: true,
         wire_propagation_mode: 'all',
         *teleport_dest_order(me, level, other) {

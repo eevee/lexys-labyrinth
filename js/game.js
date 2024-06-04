@@ -1100,10 +1100,10 @@ export class Level extends LevelInterface {
                 }
             }
         }
-        else if (actor.current_slide_mode === 'teleport-red') {
+        else if (actor.current_slide_mode === 'teleport-forever') {
             // Teleport slides do not bonk, with one oddball special case for red teleporters:
             // if you pass through a wired but inactive one, you keep sliding indefinitely
-            this.schedule_actor_slide(actor, 'teleport-red');
+            this.schedule_actor_slide(actor, 'teleport-forever');
         }
         else {
             // Other kinds of slides (i.e. normal teleporting) just expire normally
@@ -1488,7 +1488,9 @@ export class Level extends LevelInterface {
             this.remember_player_move(actor.decision);
             this.set_tile_prop(actor, 'current_slide_mode', actor.pending_slide_mode);
 
-            if (terrain.type.slide_mode === 'force') {
+            // Any kind of "soft" slide enables us to override a future force floor, which is all
+            // slides except ice and green/yellow teleporters
+            if (actor.pending_slide_mode !== 'ice' && actor.pending_slide_mode !== 'teleport-hard') {
                 this.set_tile_prop(actor, 'can_override_force_floor', true);
             }
         }
@@ -2273,10 +2275,10 @@ export class Level extends LevelInterface {
         // ice or force floors, so they get a different slide mode
         // TODO is this set by a teleporter's on_arrive, maybe...?
         if (teleporter.type.name === 'teleport_red' && ! teleporter.is_active) {
-            this.schedule_actor_slide(actor, 'teleport-red');
+            this.schedule_actor_slide(actor, 'teleport-forever');
         }
         else {
-            this.schedule_actor_slide(actor, 'teleport');
+            this.schedule_actor_slide(actor, teleporter.type.slide_mode);
         }
 
         this.set_actor_direction(actor, direction);
