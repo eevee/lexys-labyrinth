@@ -1100,9 +1100,12 @@ export class Level extends LevelInterface {
                 }
             }
         }
-        else if (actor.current_slide_mode === 'teleport-forever') {
+        else if (actor.current_slide_mode === 'teleport-forever' &&
+            ! actor.cell.get_terrain().is_active)
+        {
             // Teleport slides do not bonk, with one oddball special case for red teleporters:
-            // if you pass through a wired but inactive one, you keep sliding indefinitely
+            // if you pass through a wired but inactive one, you keep sliding indefinitely, until
+            // the teleporter becomes active again
             this.schedule_actor_slide(actor, 'teleport-forever');
         }
         else {
