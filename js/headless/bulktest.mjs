@@ -161,7 +161,7 @@ function test_level(stored_level, compat) {
             }
             else {
                 idle_time += 1;
-                if (idle_time > 3 * 20) {
+                if (idle_time > 5 * 20) {
                     return make_result('short', "Out of input", true);
                 }
             }
