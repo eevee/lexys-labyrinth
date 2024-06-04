@@ -130,10 +130,8 @@ export class Tile {
             return false;
         }
 
-        // Obey railroad curvature
-        direction = tile.cell.redirect_exit(tile, direction);
-        // Need to explicitly check this here, otherwise you could /attempt/ to push a block,
-        // which would fail, but it would still change the block's direction
+        // Need to explicitly check this here, otherwise you could /attempt/ to push a block on a
+        // railroad, which would fail, but it would still change the block's direction
         return level.can_actor_leave_cell(tile, tile.cell, direction);
     }
 
@@ -241,15 +239,6 @@ export class Cell extends Array {
     has(name) {
         let current = this[TILE_TYPES[name].layer];
         return current && current.type.name === name;
-    }
-
-    // Special railroad ability: change the direction we attempt to leave
-    redirect_exit(actor, direction) {
-        let terrain = this.get_terrain();
-        if (terrain && terrain.type.redirect_exit) {
-            return terrain.type.redirect_exit(terrain, actor, direction);
-        }
-        return direction;
     }
 }
 
@@ -1444,10 +1433,7 @@ export class Level extends LevelInterface {
         // TODO player in a cloner can't move (but player in a trap can still turn)
 
         let try_direction = (direction, push_mode) => {
-            direction = actor.cell.redirect_exit(actor, direction);
-            // FIXME if the player steps into a monster cell here, they die instantly!  but only
-            // if the cell doesn't block them??
-            return this.check_movement(actor, actor.cell, direction, push_mode);
+            return !! this.check_movement(actor, actor.cell, direction, push_mode);
         };
 
         // The player is unusual in several ways.
@@ -1646,8 +1632,6 @@ export class Level extends LevelInterface {
                 direction = direction();
             }
 
-            direction = actor.cell.redirect_exit(actor, direction);
-
             if (this.check_movement(actor, actor.cell, direction, push_mode)) {
                 // We found a good direction!  Stop here
                 actor.decision = direction;
@@ -1664,33 +1648,36 @@ export class Level extends LevelInterface {
 
     // Actor movement ---------------------------------------------------------------------------------
 
+    // Returns a direction or null -- this is where railroads redirect movement!
     can_actor_leave_cell(actor, cell, direction, push_mode) {
         // The only tiles that can trap us are thin walls and terrain, so for perf (this is very hot
         // code), only bother checking those)
         let terrain = cell[LAYERS.terrain];
         let thin_walls = cell[LAYERS.thin_wall];
-        let blocker;
+
+        let blocked = (blocker) => {
+            if (push_mode === 'push' && actor.type.on_blocked) {
+                actor.type.on_blocked(actor, this, direction, blocker);
+            }
+            return null;
+        };
 
         if (thin_walls && thin_walls.type.blocks_leaving && thin_walls.type.blocks_leaving(thin_walls, this, actor, direction)) {
-            blocker = thin_walls;
+            return blocked(thin_walls);
         }
-        else if (terrain.type.traps && terrain.type.traps(terrain, this, actor)) {
-            blocker = terrain;
+        if (terrain.type.traps && terrain.type.traps(terrain, this, actor)) {
+            return blocked(terrain);
         }
-        else if (terrain.type.blocks_leaving && terrain.type.blocks_leaving(terrain, this, actor, direction)) {
-            blocker = terrain;
+        // This is where railroad redirection happens.  push_mode check is very important since the
+        // redirection also calls us again
+        if (push_mode !== null && terrain.type.redirect_exit) {
+            direction = terrain.type.redirect_exit(terrain, this, actor, direction);
         }
-
-        if (blocker) {
-            if (push_mode === 'push') {
-                if (actor.type.on_blocked) {
-                    actor.type.on_blocked(actor, this, direction, blocker);
-                }
-            }
-            return false;
+        if (terrain.type.blocks_leaving && terrain.type.blocks_leaving(terrain, this, actor, direction)) {
+            return blocked(terrain);
         }
 
-        return true;
+        return direction;
     }
 
     // Check if this actor can move this direction into this cell.  Returns true on success.  May
@@ -1826,8 +1813,7 @@ export class Level extends LevelInterface {
                     if (tile.movement_cooldown > 0)
                         return false;
 
-                    let redirected_direction = tile.cell.redirect_exit(tile, direction);
-                    if (! this.check_movement(tile, tile.cell, redirected_direction, push_mode))
+                    if (! this.check_movement(tile, tile.cell, direction, push_mode))
                         return false;
 
                     if (push_mode === 'slap') {
@@ -1933,7 +1919,10 @@ export class Level extends LevelInterface {
         }
     }
 
-    check_movement(actor, orig_cell, direction, push_mode) {
+    // Can cause redirection (via railroads), so returns the movement direction on success, null on
+    // failure.
+    // XXX set_direction feels rather jank but it's awkward to express otherwise
+    check_movement(actor, orig_cell, direction, push_mode, set_direction) {
         // Lynx: Nothing can move backwards on force floors, and it functions like blocking, but
         // does NOT act like a bonk (hence why it's here)
         if (this.compat.no_backwards_override) {
@@ -1941,9 +1930,28 @@ export class Level extends LevelInterface {
             if (! (actor.traits & ACTOR_TRAITS.forceproof) &&
                 terrain.type.force_floor_direction === DIRECTIONS[direction].opposite)
             {
-                return false;
+                return null;
             }
         }
+
+        let original_direction = direction;
+        direction = this.can_actor_leave_cell(actor, orig_cell, direction, push_mode);
+        if (set_direction) {
+            this._set_tile_prop(actor, 'direction', direction ?? original_direction);
+
+            // Some tiles (ahem, frame blocks) rotate when their attempted direction is redirected,
+            // even if the movement ultimately fails, so it can only happen here
+            if (direction && direction !== original_direction && actor.type.on_rotate) {
+                // FIXME there's a weird case involving thin walls where a block doesn't rotate as
+                // expected, but i can't quite work out where or why it happens
+                let turn = ['right', 'left', 'opposite'].filter(t => {
+                    return DIRECTIONS[original_direction][t] === direction;
+                })[0];
+                actor.type.on_rotate(actor, this, turn);
+            }
+        }
+        if (! direction)
+            return null;
 
         let dest_cell = this.get_neighboring_cell(orig_cell, direction);
         if (! dest_cell) {
@@ -1952,30 +1960,29 @@ export class Level extends LevelInterface {
                     actor.type.on_blocked(actor, this, direction, null);
                 }
             }
-            return false;
+            return null;
         }
 
-        let success = (
-            this.can_actor_leave_cell(actor, orig_cell, direction, push_mode) &&
-            this.can_actor_enter_cell(actor, dest_cell, direction, push_mode));
+        if (! this.can_actor_enter_cell(actor, dest_cell, direction, push_mode))
+            return null;
 
-        // If we became an animation in there somewhere (e.g. because we walked into a bowling
-        // ball), stop here
+        // If we succeeded, but became an animation in there somewhere (e.g. because we walked into
+        // a bowling ball), stop here anyway
         if (actor.type.ttl)
-            return false;
+            return null;
 
         // If we have the hook, pull anything behind us, now that we're out of the way.
         // In CC2, this has to happen here to make hook slapping work and allow hooking a moving
         // block to stop us, and it has to use pending decisions rather than an immediate move
         // because we're still in the way (so the block can't move) and also to prevent a block from
         // being able to follow us through a swivel (which we haven't swiveled at decision time).
-        if (this.compat.use_legacy_hooking && success && (actor.traits & ACTOR_TRAITS.adhesive)) {
+        if (this.compat.use_legacy_hooking && (actor.traits & ACTOR_TRAITS.adhesive)) {
             let behind_cell = this.get_neighboring_cell(orig_cell, DIRECTIONS[direction].opposite);
             if (behind_cell) {
                 let behind_actor = behind_cell.get_actor();
                 if (behind_actor && actor.can_pull(behind_actor, direction)) {
                     if (behind_actor.movement_cooldown) {
-                        return false;
+                        return null;
                     }
                     else if (push_mode === 'push') {
                         // Only blocks can actually be moved via pulling, but monsters can still
@@ -1990,7 +1997,7 @@ export class Level extends LevelInterface {
             }
         }
 
-        return success;
+        return direction;
     }
 
     // Try to move the given actor one tile in the given direction and update their cooldown.
@@ -2003,31 +2010,14 @@ export class Level extends LevelInterface {
         // Once we try to move, this expires
         this._set_tile_prop(actor, 'pending_push', null);
 
-        let redirected_direction = actor.cell.redirect_exit(actor, direction);
-        if (direction !== redirected_direction) {
-            // Some tiles (ahem, frame blocks) rotate when their attempted direction is redirected
-            if (actor.type.on_rotate) {
-                let turn = ['right', 'left', 'opposite'].filter(t => {
-                    return DIRECTIONS[direction][t] === redirected_direction;
-                })[0];
-                actor.type.on_rotate(actor, this, turn);
-            }
-
-            direction = redirected_direction;
-        }
-
         // Grab speed /first/, in case the movement or on_blocked turns us into an animation
         // immediately (and then we won't have a speed!)
         // FIXME that's a weird case actually since the explosion ends up still moving
         let speed = actor.type.movement_speed;
 
-        let success = this.check_movement(actor, actor.cell, direction, 'push');
-        // Only set direction after checking movement; check_movement needs it for preventing
-        // backwards overriding in Lynx
-        this.set_actor_direction(actor, direction);
-        if (! success)
+        direction = this.check_movement(actor, actor.cell, direction, 'push', true);
+        if (! direction)
             return false;
-
 
         // We're clear!  Move us
         let goal_cell = this.get_neighboring_cell(actor.cell, direction);

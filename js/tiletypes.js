@@ -715,10 +715,23 @@ const TILE_TYPES = {
                 ! me.type.has_opening(me, DIRECTIONS[direction].opposite);
         },
         blocks_leaving(me, level, other, direction) {
-            // FIXME needs the same logic as redirect_exit, so that an illegal entrance can't leave
-            // at all
-            return ! (other.traits & ACTOR_TRAITS.trackproof) &&
-                ! me.type.has_opening(me, direction);
+            if (other.traits & ACTOR_TRAITS.trackproof)
+                return false;
+
+            let entered_from = DIRECTIONS[me.entered_direction].opposite;
+            if (direction === entered_from) {
+                return ! other.type.can_reverse_on_railroad;
+            }
+
+            for (let track of me.type._iter_tracks(me)) {
+                if ((track[0] === entered_from && track[1] === direction) ||
+                     (track[1] === entered_from && track[0] === direction))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         },
         on_arrive(me, level, other) {
             level._set_tile_prop(me, 'entered_direction', other.direction);
@@ -748,36 +761,19 @@ const TILE_TYPES = {
         on_gray_button(me, level) {
             me.type._switch_track(me, level);
         },
-        redirect_exit(me, other, direction) {
+        redirect_exit(me, level, other, direction) {
             if (other.traits & ACTOR_TRAITS.trackproof)
                 return direction;
 
-            let legal_exits = new Set;
-            let entered_from = DIRECTIONS[me.entered_direction].opposite;
-            if (other.type.can_reverse_on_railroad) {
-                legal_exits.add(entered_from);
-            }
-            for (let track of me.type._iter_tracks(me)) {
-                if (track[0] === entered_from) {
-                    legal_exits.add(track[1]);
-                }
-                else if (track[1] === entered_from) {
-                    legal_exits.add(track[0]);
+            let dirinfo = DIRECTIONS[direction];
+            for (let exit_direction of [direction, dirinfo.right, dirinfo.left, dirinfo.opposite]) {
+                if (level.can_actor_leave_cell(other, me.cell, exit_direction, null)) {
+                    return exit_direction;
                 }
             }
-            if (legal_exits.has(direction)) {
-                return direction;
-            }
-            if (legal_exits.has(DIRECTIONS[direction].right)) {
-                return DIRECTIONS[direction].right;
-            }
-            if (legal_exits.has(DIRECTIONS[direction].left)) {
-                return DIRECTIONS[direction].left;
-            }
-            if (legal_exits.has(DIRECTIONS[direction].opposite)) {
-                return DIRECTIONS[direction].opposite;
-            }
-            // FIXME i think in this case the actor gets stuck, but, facing which way?
+
+            // If none of those exits are legal, fall back to the original direction (probably
+            // leaving the actor stuck)
             return direction;
         },
     },
@@ -2731,6 +2727,7 @@ const TILE_TYPES = {
         wire_propagation_mode: 'autocross',
         can_reverse_on_railroad: true,
         movement_speed: 4,
+        // XXX what the hell where's the on_rotate for this??
         on_clone(me, original) {
             me.wire_directions = original.wire_directions;
         },
