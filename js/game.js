@@ -1424,6 +1424,7 @@ export class Level extends LevelInterface {
 
     make_player_decision(actor, input, forced_only = false) {
         // Only reset the player's is_pushing between movement, so it lasts for the whole push
+        // (This is also why inactive players stay frozen pushing, which I like)
         this.set_tile_prop(actor, 'is_pushing', false);
         // This effect only lasts one tic, after which we can move again
         if (! forced_only) {
@@ -1832,12 +1833,11 @@ export class Level extends LevelInterface {
                     }
 
                     // We can (and in CC2, must!) do a pending push for blocks that are in motion,
-                    // but also for blocks that are (a) CURRENTLY sliding, from the tile that last
-                    // set them moving, (b) ONTO a sliding tile.  A dirt block at rest on force
-                    // floor because it's jammed against a wall can't be pushed directly; a dirt
-                    // block at rest on force floor because it has suction boots can.
-                    let must_pending_push =
-                        (tile.current_slide_mode && tile.cell.get_terrain().type.slide_mode);
+                    // or that are currently sliding (which might include blocks jammed in place).
+                    // However, this ONLY works for blocks on sliding tiles -- a block moving onto a
+                    // teleporter can be pending-pushed, a block moving onto floor is just a wall.
+                    let must_pending_push = (tile.movement_cooldown || tile.current_slide_mode) &&
+                        tile.cell.get_terrain().type.slide_mode;
 
                     if (this.compat.no_directly_pushing_sliding_blocks && must_pending_push) {
                         // CC2: Can't directly push a sliding block, even one on a force floor
