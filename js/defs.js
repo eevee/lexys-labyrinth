@@ -326,8 +326,13 @@ export const COMPAT_FLAG_CATEGORIES = [{
         rulesets: new Set(['lynx']),
     }, {
         key: 'blue_floors_vanish_on_arrive',
-        label: "Fake blue walls vanish when stepped on",
+        label: "Illusory floors vanish when stepped on, not when approached",
         rulesets: new Set(['lynx']),
+    }, {
+        // FIXME actually i'm not sure if this happens in cc2.  it never comes up!
+        key: 'use_toggle_wall_prediction',
+        label: "Toggle floors/walls change immediately",
+        rulesets: new Set(['lynx', 'ms']),
     }, {
         key: 'popwalls_pop_on_arrive',
         label: "Recessed walls activate when stepped on",

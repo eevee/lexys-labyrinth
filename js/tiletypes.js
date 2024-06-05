@@ -1469,10 +1469,9 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         green_toggle_counterpart: 'green_wall',
         blocks(me, level, other) {
-            // Toggle walls don't toggle until the end of the frame, but the collision takes into
-            // account whether a toggle is coming
+            // CC1: Toggle walls effectively change as soon as a button is pressed
             return (
-                level.pending_green_toggle &&
+                level.compat.use_toggle_wall_prediction && level.pending_green_toggle &&
                 (other.type.collision_mask & COLLISION.all_but_ghost));
         },
         activate(me, level) {
@@ -1486,9 +1485,9 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         green_toggle_counterpart: 'green_floor',
         blocks(me, level, other) {
-            // Same as above
+            // CC1: Same as above (which is why we do this manually and don't have blocks_collision)
             return (
-                ! level.pending_green_toggle &&
+                ! (level.compat.use_toggle_wall_prediction && level.pending_green_toggle) &&
                 (other.type.collision_mask & COLLISION.all_but_ghost));
         },
         activate(me, level) {
