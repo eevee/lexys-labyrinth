@@ -4259,7 +4259,7 @@ class Conductor {
 
         // Bind the secret debug button: the icon in the lower left
         document.querySelector('#header-icon').addEventListener('click', ev => {
-            if (! this.player.debug.enabled) {
+            if (this.player && ! this.player.debug.enabled) {
                 new ConfirmOverlay(this,
                     "Enable debug mode?  This will give you lots of toys to play with, " +
                     "but disable all saving of scores until you reload the page!",
