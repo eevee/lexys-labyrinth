@@ -160,6 +160,12 @@ export class EditorLevelMetaOverlay extends DialogOverlay {
             mk('dd', mk('label',
                 mk('input', {name: 'use_cc1_boots', type: 'checkbox'}),
                 " Use CC1-style inventory (can only pick up the four classic boots; can't drop or cycle)")),
+            mk('dd', mk('label',
+                mk('input', {name: 'hide_from_editor', type: 'checkbox'}),
+                " Hide from level editors (probably only obeyed by CC2 itself)")),
+            mk('dd', mk('label',
+                mk('input', {name: 'is_readonly', type: 'checkbox'}),
+                " Prevent editing in level editors (probably only obeyed by CC2 itself)")),
         );
         this.root.elements['viewport'].value = stored_level.viewport_size;
         this.root.elements['blob_behavior'].value = stored_level.blob_behavior;
@@ -196,6 +202,8 @@ export class EditorLevelMetaOverlay extends DialogOverlay {
             });
             change_field('author', els.author.value);
 
+            change_field('comment', els.comment.value);
+
             let time_limit = Math.max(0, Math.min(65535, parseInt(els.time_limit.value, 10)));
             if (Number.isNaN(time_limit)) {
                 time_limit = 0;
@@ -212,6 +220,8 @@ export class EditorLevelMetaOverlay extends DialogOverlay {
             change_field('blob_behavior', parseInt(els.blob_behavior.value, 10));
             change_field('hide_logic', els.hide_logic.checked);
             change_field('use_cc1_boots', els.use_cc1_boots.checked);
+            change_field('hide_from_editor', els.hide_from_editor.checked);
+            change_field('is_readonly', els.is_readonly.checked);
 
             let viewport_size = parseInt(els.viewport.value, 10);
             if (viewport_size !== 9 && viewport_size !== 10) {
@@ -241,6 +251,7 @@ export class EditorLevelBrowserOverlay extends DialogOverlay {
 
         // Set up some infrastructure to lazily display level renders
         // FIXME should this use the tileset appropriate for the particular level?
+        // FIXME in blink this doesn't fire on the initial set of thumbnails
         this.renderer = new CanvasRenderer(this.conductor.tilesets['ll'], 32);
         this.awaiting_renders = [];
         this.observer = new IntersectionObserver((entries, _observer) => {

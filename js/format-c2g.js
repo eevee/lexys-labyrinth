@@ -1147,19 +1147,21 @@ export function parse_level(buf, number = 1) {
 
             if (view.byteLength <= 3)
                 continue;
-            //options.has_solution = view.getUint8(3, true);
+            // TODO i guess "verifying" is interesting
+            // options.replay_verified = view.getUint8(3, true);
 
             if (view.byteLength <= 4)
                 continue;
-            //options.show_map_in_editor = view.getUint8(4, true);
+            level.hide_from_editor = view.getUint8(4, true);
 
             if (view.byteLength <= 5)
                 continue;
-            //options.is_editable = view.getUint8(5, true);
+            level.is_readonly = view.getUint8(5, true);
 
             if (view.byteLength <= 6)
                 continue;
-            //options.solution_hash = format_base.string_from_buffer_ascii(buf.slice(
+            // TODO?  what is the point of this
+            // options.solution_hash = format_base.string_from_buffer_ascii(buf.slice(
                 //section_start + 6, section_start + 22));
 
             if (view.byteLength <= 22)
@@ -1536,6 +1538,14 @@ export function synthesize_level(stored_level) {
     else if (stored_level.viewport_size === 9) {
         options[2] = 1;
         options_length = 3;
+    }
+    if (stored_level.hide_from_editor) {
+        options[4] = 1;
+        options_length = 5;
+    }
+    if (stored_level.is_readonly) {
+        options[5] = 1;
+        options_length = 6;
     }
     if (stored_level.hide_logic) {
         options[22] = 1;
