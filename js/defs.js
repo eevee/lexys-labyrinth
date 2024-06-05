@@ -287,12 +287,12 @@ export const COMPAT_FLAG_CATEGORIES = [{
         rulesets: new Set(['steam-strict']),
     }, {
         key: 'no_early_push',
-        label: "Pushing blocks happens at move time (block slapping is disabled)",
-        // XXX uhhhh
-        // 1. this does not disable block slapping
-        // 2. actually nothing disables block slapping for ms currently
-        // 3. it shouldn't disable block slapping bc it's a lynx compat flag
+        label: "Blocks don't move until move time",
         rulesets: new Set(['lynx', 'ms']),
+    }, {
+        key: 'allow_repushing_blocks',
+        label: "Blocks may be pushed when they have a push already pending",
+        rulesets: new Set(['lynx']),
     }, {
         key: 'allow_pushing_blocks_off_faux_walls',
         label: "Blocks may be pushed (\"flicked\") off of illusory and reveal walls",

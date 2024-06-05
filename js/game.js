@@ -110,7 +110,7 @@ export class Tile {
 
     can_push(tile, direction, level) {
         // This tile already has a push queued, sorry
-        if (tile.pending_push)
+        if (tile.pending_push && ! level.compat.allow_repushing_blocks)
             return false;
 
         if (! (this.type.pushes && this.type.pushes[tile.type.name] &&
