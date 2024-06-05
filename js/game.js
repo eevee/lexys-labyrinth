@@ -1618,9 +1618,13 @@ export class Level extends LevelInterface {
             return;
         if (terrain.type.traps && terrain.type.traps(terrain, this, actor)) {
             // An actor in a cloner or a closed trap can't turn
-            // TODO because of this, if a tank is trapped when a blue button is pressed, then
-            // when released, it will make one move out of the trap and /then/ turn around and
-            // go back into the trap.  this is consistent with CC2 but not ms/lynx
+            if (this.compat.blue_tanks_reverse_in_traps &&
+                actor.type.name === 'tank_blue' && actor.pending_reverse)
+            {
+                // CC1: Blue tanks still turn around
+                this.set_tile_prop(actor, 'pending_reverse', false);
+                this.set_tile_prop(actor, 'direction', DIRECTIONS[actor.direction].opposite);
+            }
             return;
         }
         if (this.compat.traps_like_lynx && terrain.type.name === 'trap') {

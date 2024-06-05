@@ -167,7 +167,7 @@ export const COMPAT_FLAG_CATEGORIES = [{
         rulesets: new Set(['steam-strict', 'lynx', 'ms']),
     }, {
         key: 'no_auto_convert_ccl_blue_walls',
-        label: "Blue walls under blocks are not auto-converted in CCL levels",
+        label: "Illusory walls under blocks are not auto-converted in CCL levels",
         rulesets: new Set(['steam-strict', 'lynx', 'ms']),
     }, {
         key: 'no_auto_convert_ccl_bombs',
@@ -243,8 +243,8 @@ export const COMPAT_FLAG_CATEGORIES = [{
     // TODO what about in a trap, in every game??
     // TODO what does ms do when a tank is on ice or a ff?  wiki's description is wacky
     // TODO yellow tanks seem to have memory too??
-        key: 'tanks_always_obey_button',
-        label: "Blue tanks obey blue buttons even on clone machines",
+        key: 'blue_tanks_reverse_on_cloners',
+        label: "Blue tanks can turn around while on clone machines",
         rulesets: new Set(['steam-strict']),
     }, {
         key: 'tanks_ignore_button_while_moving',
@@ -258,6 +258,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         key: 'teeth_target_internal_position',
         label: "Teeth pursue the cell the player is moving into",
         rulesets: new Set(['lynx']),
+    }, {
+        key: 'blue_tanks_reverse_in_traps',
+        label: "Blue tanks can turn around while trapped",
+        rulesets: new Set(['lynx', 'ms']),
     }, {
         key: 'rff_blocks_monsters',
         label: "Monsters cannot step on random force floors",
