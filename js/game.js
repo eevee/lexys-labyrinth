@@ -932,6 +932,12 @@ export class Level extends LevelInterface {
                 this.make_actor_decision(actor, forced_only);
             }
 
+            // If we're on a force floor, remember its direction, so Lynx can prevent backwards
+            // moves on it later
+            if (actor.pending_slide_mode === 'force') {
+                actor._force_floor_direction = actor.direction;
+            }
+
             // Pending slides only last until a decision is made
             this.set_tile_prop(actor, 'pending_slide_mode', null);
 
@@ -1257,6 +1263,11 @@ export class Level extends LevelInterface {
     }
 
     do_actor_idle(actor) {
+        if (actor._force_floor_direction) {
+            // This only exists for one tic, for Lynx purposes
+            actor._force_floor_direction = null;
+        }
+
         if (actor.movement_cooldown <= 0) {
             let terrain = actor.cell.get_terrain();
             if (terrain.type.on_stand) {
@@ -1461,8 +1472,6 @@ export class Level extends LevelInterface {
         if (! forced_only) {
             this.set_tile_prop(actor, 'is_blocked', false);
         }
-        // This only exists for this tic for Lynx purposes
-        actor._overrode_force_floor = null;
 
         // TODO player in a cloner can't move (but player in a trap can still turn)
 
@@ -1542,12 +1551,6 @@ export class Level extends LevelInterface {
             // At this point, we have exactly 1 or 2 directions, and deciding between them requires
             // checking which ones are blocked.  Note that we do this even if only one direction is
             // requested, meaning that we get to push blocks before anything else has moved!
-
-            // If we're overriding a force floor, remember its direction, so Lynx can prevent
-            // backwards moves for it later
-            if (actor.pending_slide_mode === 'force') {
-                actor._overrode_force_floor = actor.direction;
-            }
 
             let push_mode = this.compat.no_early_push ? 'slap' : 'push';
             let open;
@@ -1985,7 +1988,7 @@ export class Level extends LevelInterface {
         // Lynx: Nothing can move backwards on force floors, and it functions like blocking, but
         // does NOT act like a bonk (hence why it's here)
         if (this.compat.no_backwards_override &&
-            actor._overrode_force_floor === DIRECTIONS[direction].opposite)
+            actor._force_floor_direction === DIRECTIONS[direction].opposite)
         {
             return null;
         }

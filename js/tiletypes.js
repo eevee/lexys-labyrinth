@@ -85,13 +85,19 @@ function _define_force_floor(direction, opposite_type) {
         // Used by Lynx to prevent backwards overriding
         force_floor_direction: direction,
         on_ready(me, level) {
-            if (! level.compat.ignore_starting_on_force_floor && ! level.compat.emulate_60fps) {
+            let actor = me.cell.get_actor();
+            if (! actor)
+                return;
+
+            if (level.compat.ignore_starting_on_force_floor) {
+                // Lynx: Actors that start on a force floor aren't affected by them, but *are* still
+                // bound by not going backwards, so they need to know our direction
+                actor._force_floor_direction = direction;
+            }
+            else if (! level.compat.emulate_60fps) {
                 // Lexy: CC2 levels expect that anything starting on a force floor is forced on the
                 // first frame before it can even move, but we don't have that frame, so fake it.
-                let actor = me.cell.get_actor();
-                if (actor) {
-                    me.type.on_stand(me, level, actor);
-                }
+                me.type.on_stand(me, level, actor);
             }
         },
         on_stand(me, level, other) {
@@ -1076,11 +1082,15 @@ const TILE_TYPES = {
         },
         on_ready(me, level) {
             // See _define_force_floor
-            if (! level.compat.ignore_starting_on_force_floor && ! level.compat.emulate_60fps) {
-                let actor = me.cell.get_actor();
-                if (actor) {
-                    me.type.on_stand(me, level, actor);
-                }
+            let actor = me.cell.get_actor();
+            if (! actor)
+                return;
+
+            if (level.compat.ignore_starting_on_force_floor) {
+                actor._force_floor_direction = level.force_floor_direction;
+            }
+            else if (! level.compat.emulate_60fps) {
+                me.type.on_stand(me, level, actor);
             }
         },
         on_stand(me, level, other) {
