@@ -117,7 +117,9 @@ export function parse_solutions(bytes) {
                         q += 4;
                     }
                     let input = TW_DIRECTION_TO_INPUT_BITS[(val >> 2) & 0x7];
-                    let duration = val >> 5;
+                    // This is supposed to only be 23 bits, but some tools (e.g. SuCC) use the spare
+                    // bits for other stuff, so mask them off
+                    let duration = (val >> 5) & 0x7fffff;
                     for (let i = 0; i < duration; i++) {
                         inputs.push(0);
                     }
@@ -132,7 +134,7 @@ export function parse_solutions(bytes) {
 
                     // Up to 5 bytes is an annoying amount, but we can cut it down to 1-4 by
                     // extracting the direction first
-                    let input = (bytes[q] >> 5) | ((bytes[q + 1] & 0x3f) << 3);
+                    let input = TW_DIRECTION_TO_INPUT_BITS[(bytes[q] >> 5) | ((bytes[q + 1] & 0x3f) << 3)];
                     let duration = bytes[q + 1] >> 6;
                     for (let i = 3; i <= n; i++) {
                         duration |= bytes[q + i - 1] << (2 + (i - 3) * 8);
