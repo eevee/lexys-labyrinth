@@ -81,6 +81,13 @@ export function parse_solutions(bytes) {
             // TODO split this off though
             let inputs = [];
             let q = p + 16;
+            let add_move = (input, duration) => {
+                // duration is how long it's been since the *previous* input, so pad first
+                for (let t = 0; t < duration; t++) {
+                    inputs.push(0);
+                }
+                inputs.push(input);
+            };
             while (q < p + len) {
                 // There are four formats for packing solutions, identified by the lowest two bits,
                 // except that format 3 is actually two formats.  Be aware that the documentation
@@ -94,11 +101,9 @@ export function parse_solutions(bytes) {
                     let input1 = TW_DIRECTION_TO_INPUT_BITS[(val >> 2) & 0x3];
                     let input2 = TW_DIRECTION_TO_INPUT_BITS[(val >> 4) & 0x3];
                     let input3 = TW_DIRECTION_TO_INPUT_BITS[(val >> 6) & 0x3];
-                    inputs.push(
-                        0, 0, 0, input1,
-                        0, 0, 0, input2,
-                        0, 0, 0, input3,
-                    );
+                    add_move(input1, 3);  // actually 4 but duration is one less than
+                    add_move(input2, 3);
+                    add_move(input3, 3);
                 }
                 else if (fmt === 1 || fmt === 2 || (fmt === 3 && fmt2 === 0)) {
                     // "First format" and "second format": one, two, or four bytes containing a
@@ -120,10 +125,7 @@ export function parse_solutions(bytes) {
                     // This is supposed to only be 23 bits, but some tools (e.g. SuCC) use the spare
                     // bits for other stuff, so mask them off
                     let duration = (val >> 5) & 0x7fffff;
-                    for (let i = 0; i < duration; i++) {
-                        inputs.push(0);
-                    }
-                    inputs.push(input);
+                    add_move(input, duration);
                 }
                 else {  // low nybble is 3, and bit 4 is set
                     // "Fourth format": 2 to 5 bytes, containing an exceptionally long direction
@@ -134,23 +136,30 @@ export function parse_solutions(bytes) {
 
                     // Up to 5 bytes is an annoying amount, but we can cut it down to 1-4 by
                     // extracting the direction first
-                    let input = TW_DIRECTION_TO_INPUT_BITS[(bytes[q] >> 5) | ((bytes[q + 1] & 0x3f) << 3)];
                     let duration = bytes[q + 1] >> 6;
                     for (let i = 3; i <= n; i++) {
                         duration |= bytes[q + i - 1] << (2 + (i - 3) * 8);
                     }
 
                     // Mouse moves are encoded as 16 + ((y + 9) * 19) + (x + 9), but I extremely do
-                    // not support them at the moment (and may never), so replace them with blank
-                    // input for now (and possibly forever)
-                    if (input >= 16) {
-                        input = 0;
+                    // not support them at the moment (and may never).  The low four bits are an
+                    // undocumented bitfield of directions
+                    let tw_input = (bytes[q] >> 5) | ((bytes[q + 1] & 0x3f) << 3);
+                    let input = 0;
+                    if (tw_input & 1) {
+                        input |= INPUT_BITS.up;
+                    }
+                    if (tw_input & 2) {
+                        input |= INPUT_BITS.left;
+                    }
+                    if (tw_input & 4) {
+                        input |= INPUT_BITS.down;
+                    }
+                    if (tw_input & 8) {
+                        input |= INPUT_BITS.right;
                     }
 
-                    // And now queue it up
-                    for (let i = 0; i < duration; i++) {
-                        inputs.push(input);
-                    }
+                    add_move(input, duration);
 
                     q += n;
                 }
