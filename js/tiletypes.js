@@ -2232,7 +2232,7 @@ const TILE_TYPES = {
                 if (actor.type.name !== 'tank_blue')
                     continue;
 
-                if (! level.compat.tanks_always_obey_button &&
+                if (! level.compat.blue_tanks_reverse_on_cloners &&
                     (actor.slide_mode || actor.cell.has('cloner')))
                 {
                     continue;
