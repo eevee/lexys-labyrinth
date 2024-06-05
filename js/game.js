@@ -1227,7 +1227,13 @@ export class Level extends LevelInterface {
         if (terrain.type.name === 'button_brown' && terrain.connection) {
             let trapped = terrain.connection.cell.get_actor();
             if (trapped) {
-                this.attempt_out_of_turn_step(trapped, trapped.direction);
+                if (trapped.movement_cooldown === 0) {
+                    this.attempt_out_of_turn_step(trapped, trapped.direction);
+                }
+                else {
+                    // Lynx does a cooldown regardless of whether it could move
+                    this.do_extra_cooldown(trapped);
+                }
             }
         }
     }
@@ -1249,15 +1255,6 @@ export class Level extends LevelInterface {
                 // Lynx: Actors try to teleport for as long as they remain on a teleporter, most
                 // notably (for CCLP purposes) when starting the level already on one
                 actor.just_stepped_on_teleporter = terrain;
-            }
-        }
-
-        // Lynx gives everything in an open trap an extra cooldown, which makes things walk into
-        // open traps at double speed and does weird things to the ejection timing
-        if (this.compat.traps_like_lynx) {
-            let terrain = actor.cell.get_terrain();
-            if (terrain && terrain.type.name === 'trap' && terrain.presses > 0) {
-                this.do_extra_cooldown(actor);
             }
         }
 
