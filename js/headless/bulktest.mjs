@@ -152,7 +152,8 @@ function test_level(stored_level, compat) {
         // (which takes 11 seconds), but I've seen others take longer.  So once we run out of input,
         // keep simulating as long as the player keeps moving every so often, unless we surpass some
         // clearly ridiculous cap like half a minute.
-        if (level.tic_counter > replay.duration + 30 * 20) {
+        // Haha just kidding, CCLXP2 #126 Dodge! ends with a /32-second/ ice slide.
+        if (level.tic_counter > replay.duration + 40 * 20) {
             return make_result('short', "Out of input", true);
         }
         else if (level.tic_counter > replay.duration) {
