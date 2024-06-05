@@ -84,6 +84,16 @@ function _define_force_floor(direction, opposite_type) {
         speed_factor: 0.5,
         // Used by Lynx to prevent backwards overriding
         force_floor_direction: direction,
+        on_ready(me, level) {
+            if (! level.compat.ignore_starting_on_force_floor && ! level.compat.emulate_60fps) {
+                // Lexy: CC2 levels expect that anything starting on a force floor is forced on the
+                // first frame before it can even move, but we don't have that frame, so fake it.
+                let actor = me.cell.get_actor();
+                if (actor) {
+                    me.type.on_stand(me, level, actor);
+                }
+            }
+        },
         on_stand(me, level, other) {
             if (other.traits & ACTOR_TRAITS.forceproof)
                 return;
@@ -1063,6 +1073,15 @@ const TILE_TYPES = {
         blocks(me, level, other) {
             return (level.compat.rff_blocks_monsters &&
                 (other.type.collision_mask & COLLISION.monster_typical));
+        },
+        on_ready(me, level) {
+            // See _define_force_floor
+            if (! level.compat.ignore_starting_on_force_floor && ! level.compat.emulate_60fps) {
+                let actor = me.cell.get_actor();
+                if (actor) {
+                    me.type.on_stand(me, level, actor);
+                }
+            }
         },
         on_stand(me, level, other) {
             if (other.traits & ACTOR_TRAITS.forceproof)

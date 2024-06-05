@@ -337,6 +337,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         label: "Illusory floors vanish when stepped on, not when approached",
         rulesets: new Set(['lynx']),
     }, {
+        key: 'ignore_starting_on_force_floor',
+        label: "Actors that start on force floors aren't initially affected by them",
+        rulesets: new Set(['lynx', 'ms']),
+    }, {
         // FIXME actually i'm not sure if this happens in cc2.  it never comes up!
         key: 'use_toggle_wall_prediction',
         label: "Toggle floors/walls change immediately",
