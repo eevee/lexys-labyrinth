@@ -713,7 +713,6 @@ export class Level extends LevelInterface {
         this._tw_rng = ((Math.imul(this._tw_rng, 1103515245) & 0x7fffffff) + 12345) & 0x7fffffff;
     }
     tw_prng_random4() {
-        let x = this._tw_rng;
         this._advance_tw_prng();
         return this._tw_rng >> 29;
     }
@@ -770,11 +769,10 @@ export class Level extends LevelInterface {
 
     // Lynx/Lexy loop: 20 tics per second
     _advance_tic_lynx() {
-        // Under CC2 rules, there are two wire updates at the very beginning of the game before the
-        // player can actually move.  That means the first tic has five wire phases total.
-        // TODO or i could just, uh, do two wire updates /first/
-        // FIXME this breaks item bestowal contraptions that immediately flip a force floor, since
-        // the critters on the force floors don't get a bonk before this happens
+        // Under CC2 rules, each full tic has two wire phases before the player can move, then one
+        // afterwards.  Even at 20 tps, wire should run at the same rate...  but in order to render
+        // the latest state of the wire, all the wire phases should happen at the end of the tic.
+        // To keep timing the same, the first tic still needs two early wire phases.
         if (this.tic_counter === 0) {
             this.do_wire_phase();
             this.do_wire_phase();
@@ -785,6 +783,7 @@ export class Level extends LevelInterface {
 
         // Wire updates every frame, which means thrice per tic
         this.do_wire_phase();
+        // This is where the third CC2 frame would normally end
         this.do_wire_phase();
         this.do_wire_phase();
 
