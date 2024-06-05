@@ -1462,6 +1462,8 @@ export class Level extends LevelInterface {
         if (! forced_only) {
             this.set_tile_prop(actor, 'is_blocked', false);
         }
+        // This only exists for this tic for Lynx purposes
+        actor._overrode_force_floor = null;
 
         // TODO player in a cloner can't move (but player in a trap can still turn)
 
@@ -1541,6 +1543,13 @@ export class Level extends LevelInterface {
             // At this point, we have exactly 1 or 2 directions, and deciding between them requires
             // checking which ones are blocked.  Note that we do this even if only one direction is
             // requested, meaning that we get to push blocks before anything else has moved!
+
+            // If we're overriding a force floor, remember its direction, so Lynx can prevent
+            // backwards moves for it later
+            if (actor.pending_slide_mode === 'force') {
+                actor._overrode_force_floor = actor.direction;
+            }
+
             let push_mode = this.compat.no_early_push ? 'slap' : 'push';
             let open;
             if (dir2 === null) {
@@ -1976,13 +1985,10 @@ export class Level extends LevelInterface {
 
         // Lynx: Nothing can move backwards on force floors, and it functions like blocking, but
         // does NOT act like a bonk (hence why it's here)
-        if (this.compat.no_backwards_override) {
-            let terrain = orig_cell.get_terrain()
-            if (! (actor.traits & ACTOR_TRAITS.forceproof) &&
-                terrain.type.force_floor_direction === DIRECTIONS[direction].opposite)
-            {
-                return null;
-            }
+        if (this.compat.no_backwards_override &&
+            actor._overrode_force_floor === DIRECTIONS[direction].opposite)
+        {
+            return null;
         }
 
         let original_direction = direction;
