@@ -130,9 +130,16 @@ export class Tile {
             return false;
         }
 
-        // Need to explicitly check this here, otherwise you could /attempt/ to push a block on a
-        // railroad, which would fail, but it would still change the block's direction
-        return level.can_actor_leave_cell(tile, tile.cell, direction);
+        // Trapped blocks can't be pushed
+        let terrain = tile.cell.get_terrain();
+        if (terrain.type.traps && terrain.type.traps(terrain, level, tile) &&
+            // Lynx: Blocks literally in traps /can/ be pushed, and it changes their direction
+            ! (level.compat.traps_like_lynx && terrain.type.name === 'trap'))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     can_pull(tile, direction) {
@@ -245,6 +252,7 @@ export class Cell extends Array {
         return this[LAYERS.item_mod] ?? null;
     }
 
+    // XXX whoa i should either use this way more or way less
     has(name) {
         let current = this[TILE_TYPES[name].layer];
         return current && current.type.name === name;
@@ -933,7 +941,9 @@ export class Level extends LevelInterface {
             // leaking over into the tic /after/ this one when it's made between our own decision
             // and movement phases.  (That can happen with the hook, which pulls both during the
             // holder's decision phase and then again when they move.)
-            // TODO turn pending_push into pending_slide_direction?
+            // TODO turn pending_push into pending_slide_direction?  not sure if that would actually
+            // work, since i think pushing out of a slide is ok but a second push is ignored?  i
+            // guess the slide mode could be changed to 'push'
         }
     }
 
@@ -1228,10 +1238,14 @@ export class Level extends LevelInterface {
             let trapped = terrain.connection.cell.get_actor();
             if (trapped) {
                 if (trapped.movement_cooldown === 0) {
+                    // This flag lets the trap know it's ejecting; it acts closed at all other times
+                    terrain.connection._lynx_ejecting = true;
                     this.attempt_out_of_turn_step(trapped, trapped.direction);
+                    terrain.connection._lynx_ejecting = false;
                 }
                 else {
-                    // Lynx does a cooldown regardless of whether it could move
+                    // Lynx does a cooldown regardless of whether it could move (and whether it was
+                    // stationary), which is why things walking into traps move at double speed
                     this.do_extra_cooldown(trapped);
                 }
             }
@@ -1613,20 +1627,13 @@ export class Level extends LevelInterface {
         }
         if (forced_only)
             return;
-        if (terrain.type.traps && terrain.type.traps(terrain, this, actor)) {
-            // An actor in a cloner or a closed trap can't turn
-            if (this.compat.blue_tanks_reverse_in_traps &&
-                actor.type.name === 'tank_blue' && actor.pending_reverse)
-            {
-                // CC1: Blue tanks still turn around
-                this.set_tile_prop(actor, 'pending_reverse', false);
-                this.set_tile_prop(actor, 'direction', DIRECTIONS[actor.direction].opposite);
-            }
-            return;
-        }
-        if (this.compat.traps_like_lynx && terrain.type.name === 'trap') {
-            // Lynx traps don't allow actors to turn even while open; instead they get ejected
-            // during their idle step
+        // Trapped actors don't even attempt to turn
+        if (terrain.type.traps && terrain.type.traps(terrain, this, actor) &&
+            // CC1: Blue tanks do still turn around, so let them go through their decision process
+            // and then just fail to move later
+            ! (this.compat.blue_tanks_reverse_in_traps &&
+                actor.type.name === 'tank_blue' && actor.pending_reverse))
+        {
             return;
         }
         if (actor.type.decide_movement) {
@@ -1836,6 +1843,14 @@ export class Level extends LevelInterface {
             try {
                 tile._being_pushed = true;
 
+                if (this.compat.failed_push_changes_direction &&
+                    push_mode !== null && tile.movement_cooldown === 0)
+                {
+                    // Lynx: A pushed stationary block changes direction in any mode regardless of
+                    // whether the push succeeds, most notably if it's in a trap
+                    this.set_tile_prop(tile, 'direction', direction);
+                }
+
                 if (push_mode === 'bump' || push_mode === 'slap') {
                     if (tile.movement_cooldown > 0)
                         return false;
@@ -1884,8 +1899,7 @@ export class Level extends LevelInterface {
                     }
                     else {
                         if (! this.compat.no_directly_pushing_sliding_blocks && must_pending_push) {
-                            // If the push failed and the obstacle is in the middle of a slide,
-                            // remember this as the next move it'll make
+                            // If the push failed, remember this as the next move it'll make
                             this.set_tile_prop(tile, 'pending_push', direction);
                             tile.decision = direction;
                         }
@@ -1949,6 +1963,10 @@ export class Level extends LevelInterface {
     // failure.
     // XXX set_direction feels rather jank but it's awkward to express otherwise
     check_movement(actor, orig_cell, direction, push_mode, set_direction) {
+        if (set_direction) {
+            this.set_tile_prop(actor, 'direction', direction);
+        }
+
         // Lynx: Nothing can move backwards on force floors, and it functions like blocking, but
         // does NOT act like a bonk (hence why it's here)
         if (this.compat.no_backwards_override) {
@@ -1962,12 +1980,12 @@ export class Level extends LevelInterface {
 
         let original_direction = direction;
         direction = this.can_actor_leave_cell(actor, orig_cell, direction, push_mode);
-        if (set_direction) {
-            this.set_tile_prop(actor, 'direction', direction ?? original_direction);
+        if (set_direction && direction) {
+            this.set_tile_prop(actor, 'direction', direction);
 
             // Some tiles (ahem, frame blocks) rotate when their attempted direction is redirected,
             // even if the movement ultimately fails, so it can only happen here
-            if (direction && direction !== original_direction && actor.type.on_rotate) {
+            if (direction !== original_direction && actor.type.on_rotate) {
                 // FIXME there's a weird case involving thin walls where a block doesn't rotate as
                 // expected, but i can't quite work out where or why it happens
                 let turn = ['right', 'left', 'opposite'].filter(t => {

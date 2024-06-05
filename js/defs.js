@@ -286,10 +286,6 @@ export const COMPAT_FLAG_CATEGORIES = [{
         label: "Pushing a block off a recessed wall might move you into the resulting wall (\"spring mining\")",
         rulesets: new Set(['steam-strict']),
     }, {
-        key: 'no_early_push',
-        label: "Blocks don't move until move time",
-        rulesets: new Set(['lynx', 'ms']),
-    }, {
         key: 'allow_repushing_blocks',
         label: "Blocks may be pushed when they have a push already pending",
         rulesets: new Set(['lynx']),
@@ -297,6 +293,14 @@ export const COMPAT_FLAG_CATEGORIES = [{
         key: 'allow_pushing_blocks_off_faux_walls',
         label: "Blocks may be pushed (\"flicked\") off of illusory and reveal walls",
         rulesets: new Set(['lynx']),
+    }, {
+        key: 'failed_push_changes_direction',
+        label: "Failed push attempts still change a block's direction",
+        rulesets: new Set(['lynx']),
+    }, {
+        key: 'no_early_push',
+        label: "Blocks don't move until move time",
+        rulesets: new Set(['lynx', 'ms']),
     }, {
         key: 'allow_pushing_blocks_off_all_walls',
         label: "Blocks may be pushed (\"flicked\") off of anything, even walls",

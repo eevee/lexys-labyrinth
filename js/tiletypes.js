@@ -1735,20 +1735,18 @@ const TILE_TYPES = {
                 level.set_tile_prop(me, '_initially_open', false);
             }
         },
-        // FIXME also doesn't trap ghosts, is that a special case???
         traps(me, level, other) {
+            if (other.type.name === 'ghost')
+                return false;
+
             if (level.compat.traps_like_lynx) {
-                // Lynx traps don't actually track open vs closed; actors are just ejected by force
+                // Lynx: Traps don't actually track open vs closed; actors are just ejected by force
                 // by a separate pass at the end of the tic that checks what's on a brown button.
-                // That means a trap held open by a button at level start won't effectively be open
-                // if whatever's on the button moves within the first tic, a quirk that CCLXP2 #17
-                // Double Trouble critically relies on!
-                // To fix this, assume that a trap can never be released on the first turn.
-                // FIXME that's not right since a block or immobile mob might be on a button...
-                if (level.tic_counter === 0)
-                    return true;
+                // That means traps are effectively closed at all times outside of that window
+                return ! me._lynx_ejecting;
             }
-            return ! me.presses && ! me._initially_open && other.type.name !== 'ghost';
+
+            return ! me.presses && ! me._initially_open;
         },
         on_power(me, level) {
             // Treat being powered or not as an extra kind of brown button press
