@@ -282,6 +282,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         label: "Pushing sliding blocks queues a move, rather than moving them right away",
         rulesets: new Set(['steam', 'steam-strict']),
     }, {
+        key: 'emulate_salmon_run',
+        label: "Creative use of a block can let you go the wrong way on force floors (\"salmon run\")",
+        rulesets: new Set(['steam', 'steam-strict']),
+    }, {
         key: 'emulate_spring_mining',
         label: "Pushing a block off a recessed wall might move you into the resulting wall (\"spring mining\")",
         rulesets: new Set(['steam-strict']),

@@ -1068,6 +1068,11 @@ export class Level extends LevelInterface {
             // So first, immediately pretend it stepped on the cell again
             this.step_on_cell(actor, actor.cell);
 
+            // Bonking on a force floor immediately grants us override
+            if (actor.type.is_real_player && ! this.compat.bonking_isnt_instant) {
+                this.set_tile_prop(actor, 'can_override_force_floor', true);
+            }
+
             // If the actor changed direction, immediately try to move again
             if (actor.direction !== direction && ! this.compat.bonking_isnt_instant) {
                 // CC1: Wait until next tic to start moving again, actually
@@ -1578,16 +1583,18 @@ export class Level extends LevelInterface {
             // Doppelgangers copy our /attempted/ move, including a failed override
             this.remember_player_move(actor.decision);
 
-            // If we're overriding a force floor but the direction we're moving in is blocked, we
-            // keep our override power (but only under the CC2 behavior of instant bonking).
-            // Notably, this happens even if we do end up able to move!
-            // XXX maybe that means this should happen elsewhere, and be related to bonking?  but
-            // outside of this method we don't know if we /are/ overriding
             if (actor.pending_slide_mode === 'force' && ! open &&
                 ! this.compat.bonking_isnt_instant)
             {
-                actor.decision = actor.direction;
+                // Bonking at decision time grants us override, just like a normal bonk
                 this.set_tile_prop(actor, 'can_override_force_floor', true);
+
+                if (! this.compat.emulate_salmon_run) {
+                    // Lexy: If we bonked *already*, switch our decision back to the forced move.
+                    // This prevents a salmon run, although it doesn't actually work in Lexy mode
+                    // anyway -- blocks are synchronized with your movement, so you never bonk!
+                    actor.decision = actor.direction;
+                }
             }
             else {
                 // Otherwise this is 100% a conscious move, so we lose override
