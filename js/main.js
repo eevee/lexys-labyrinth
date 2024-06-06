@@ -1803,6 +1803,7 @@ class Player extends PrimaryView {
         }
 
         // Gamepads maybe
+        // FIXME this needs some work
         if (this.gamepads_enabled) {
             for (let gamepad of navigator.getGamepads()) {
                 if (! gamepad)
@@ -1826,7 +1827,7 @@ class Player extends PrimaryView {
 
                     let active = false;
                     if (control[0] === 'button') {
-                        active = gamepad.buttons[control[1]].pressed;
+                        active = gamepad.buttons[control[1]]?.pressed;
                     }
                     else if (control[0] === 'axis') {
                         let value = gamepad.axes[control[1]];
