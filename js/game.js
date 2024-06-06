@@ -2566,7 +2566,7 @@ export class Level extends LevelInterface {
         }
 
         // Go through every circuit and recompute whether it's powered
-        let circuit_changes = new Map;
+        let circuit_changes = this.pending_undo?.circuit_power_changes ?? new Map;
         for (let circuit of this.circuits) {
             if (! circuit.is_powered) {
                 for (let [input_tile, edges] of circuit.inputs.entries()) {
@@ -2583,7 +2583,7 @@ export class Level extends LevelInterface {
         }
 
         this._apply_circuit_power_to_tiles();
-        if (this.undo_enabled && circuit_changes.size > 0 && ! this.pending_undo.circuit_power_changes) {
+        if (this.undo_enabled && circuit_changes.size > 0) {
             this.pending_undo.circuit_power_changes = circuit_changes;
         }
 
