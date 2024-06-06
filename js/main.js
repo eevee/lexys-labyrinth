@@ -2746,7 +2746,13 @@ const BUILTIN_PACKS = [{
     desc: "The latest and greatest.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_5',
 }];
-const BUILTIN_PACKS_BY_IDENT = {};
+const BUILTIN_PACKS_BY_IDENT = {
+    "Lexy's Labyrinth": {
+        // Shh...  secret
+        path: 'levels/lexys-labyrinth.zip',
+        ident: "Lexy's Labyrinth",
+    },
+};
 for (let packdef of BUILTIN_PACKS) {
     BUILTIN_PACKS_BY_IDENT[packdef.ident] = packdef;
 }
