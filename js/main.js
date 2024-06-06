@@ -1334,7 +1334,7 @@ class Player extends PrimaryView {
                 let props = {};
                 for (let key of [
                     'direction', 'movement_speed', 'movement_cooldown',
-                    'current_slide_mode', 'pending_slide_mode',
+                    'current_slide_mode', 'pending_slide_mode', 'can_override_force_floor',
                     'pending_push', 'is_blocked',
                 ]) {
                     let dd = mk('dd');
@@ -1551,6 +1551,7 @@ class Player extends PrimaryView {
 
         this._update_replay_ui();
         if (this.debug.enabled) {
+            // TODO if it's actually loaded, show length
             this.debug.replay_level_label.textContent = this.level.stored_level.has_replay ? "available" : "none";
         }
     }
