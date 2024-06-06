@@ -1737,9 +1737,11 @@ export class Level extends LevelInterface {
     // - 'slap': Like 'bump', but also sets the 'decision' of pushable objects.  Only used with the
     //   no_early_push Lynx compat flag.
     // - 'push': Fire bump triggers.  Attempt to move pushable objects out of the way immediately.
+    // FIXME there are way too many weird-ass extraneous bits here for what's gotta be hot code
     can_actor_enter_cell(actor, cell, direction, push_mode = null) {
         let pushable_tiles = [];
         let deferred_blocked = false;
+        let allow_item_mining = false;
         for (let layer of this.layer_collision_order) {
             let tile = cell[layer];
             if (! tile)
@@ -1749,8 +1751,10 @@ export class Level extends LevelInterface {
             if (tile.type.on_bumped) {
                 tile.type.on_bumped(tile, this, actor, direction);
                 // If that destroyed the tile (e.g. by erasing an animation), skip the rest of this
-                if (! tile.cell)
+                if (! tile.cell) {
+                    allow_item_mining = true;
                     continue;
+                }
             }
 
             // Lynx + MS: Players can't die at decision time, but they don't block movement either
@@ -1805,7 +1809,7 @@ export class Level extends LevelInterface {
                 continue;
             }
 
-            if (layer === LAYERS.item && pushable_tiles.length > 0) {
+            if (layer === LAYERS.item && allow_item_mining) {
                 // CC2 quirk: If an actor bumps a cell containing an item and an animation (or a
                 // block it can push), it will erase the animation (or push the block), even if it
                 // can't move onto the item.  If the actor is sliding, it will move into the cell
@@ -1835,6 +1839,7 @@ export class Level extends LevelInterface {
             )) {
                 // Collect pushables for later, so we don't inadvertently push through a wall
                 pushable_tiles.push(tile);
+                allow_item_mining = true;
             }
             else {
                 // It's in our way and we can't push it, so we're done here
