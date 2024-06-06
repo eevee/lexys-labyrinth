@@ -277,13 +277,21 @@ function pursue_player(me, level) {
         preferred_vertical = 'south';
     }
     // Chooses the furthest direction, vertical wins ties
+    let choices;
     if (Math.abs(dx) > Math.abs(dy)) {
-        // Horizontal first
-        return [preferred_horizontal, preferred_vertical].filter(x => x);
+        choices = [preferred_horizontal, preferred_vertical];
     }
     else {
-        // Vertical first
-        return [preferred_vertical, preferred_horizontal].filter(x => x);
+        choices = [preferred_vertical, preferred_horizontal];
+    }
+
+    if (level.compat.teeth_fall_back_to_first_choice) {
+        // Lynx: Monsters tend to go with their last choice when they're blocked, but for some
+        // reason teeth explicitly prefer their first
+        return [...choices.filter(x => x), choices[0]];
+    }
+    else {
+        return choices.filter(x => x);
     }
 }
 

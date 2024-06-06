@@ -259,6 +259,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         label: "Teeth pursue the cell the player is moving into",
         rulesets: new Set(['lynx']),
     }, {
+        key: 'teeth_fall_back_to_first_choice',
+        label: "Teeth fall back to their first choice of direction when blocked",
+        rulesets: new Set(['lynx']),
+    }, {
         key: 'blue_tanks_reverse_in_traps',
         label: "Blue tanks can turn around while trapped",
         rulesets: new Set(['lynx', 'ms']),
