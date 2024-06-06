@@ -1945,9 +1945,11 @@ export class Level extends LevelInterface {
         // There's one exception: CC2 does seem to have spring mining prevention when pushing a
         // /row/ of ice blocks, so we keep the check if we're in the middle of push-recursing.
         // See CC2 #163 BLOX replay; without this, ice blocks spring mine around 61.9s.
+        // *Also*, this prevents yellow tanks from being bestowed items by pushing blocks, which is
+        // a real mechanic people design around, so skip the check for items specifically here.
         if ((! this.compat.emulate_spring_mining || actor._being_pushed) &&
-            push_mode === 'push' &&
-            cell.some(tile => tile && tile.blocks(actor, direction, this)))
+            push_mode === 'push' && cell.some(tile =>
+                tile && tile.type.layer !== LAYERS.item && tile.blocks(actor, direction, this)))
         {
             return false;
         }
