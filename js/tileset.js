@@ -2327,7 +2327,8 @@ export class Tileset {
         if (coords[0] instanceof Array) {
             if (tile && tile.movement_speed) {
                 let p = tile.movement_progress(packet.update_progress, packet.update_rate);
-                coords = coords[Math.floor(p * coords.length)];
+                // XXX don't like needing this `max` again but a negative p showed up after an undo (cooldown == speed)
+                coords = coords[Math.floor(Math.max(0, p) * coords.length)];
             }
             else  {
                 coords = coords[0];
