@@ -765,6 +765,7 @@ class Player extends PrimaryView {
         this.current_keycodes = new Set;  // keys that are currently held
         this.current_keycodes_new = new Set; // keys that were pressed since input was last read
         // TODO this could all probably be more rigorous but it's fine for now
+        // Note that to avoid goofy collisions, ALL of these keys are checked by scancode
         key_target.addEventListener('keydown', ev => {
             if (! this.active)
                 return;
@@ -785,12 +786,12 @@ class Player extends PrimaryView {
                 return;
             }
 
-            if (ev.key === 'p' || ev.key === 'Pause') {
+            if (ev.code === 'KeyP' || ev.code === 'Pause' || ev.key === 'Pause') {
                 this.toggle_pause();
                 return;
             }
 
-            if (ev.key === 'r') {
+            if (ev.code === 'KeyR') {
                 if (! this._restart_handle) {
                     this.start_restarting();
                 }
@@ -798,7 +799,7 @@ class Player extends PrimaryView {
             }
 
             // Per-tic navigation; only useful if the game isn't running
-            if (ev.key === ',') {
+            if (ev.code === 'Comma') {
                 if (this.state === 'stopped' || this.state === 'paused' || this.turn_based_mode) {
                     this.set_state('paused');
                     this.undo();
@@ -807,7 +808,7 @@ class Player extends PrimaryView {
                 }
                 return;
             }
-            if (ev.key === '.') {
+            if (ev.code === 'Period') {
                 if (this.state === 'waiting' || this.state === 'paused' || this.turn_based_mode) {
                     if (this.state === 'waiting') {
                         if (this.turn_based_mode) {
@@ -836,7 +837,7 @@ class Player extends PrimaryView {
                 return;
             }
 
-            if (ev.key === ' ') {
+            if (ev.code === 'Space') {
                 // Don't scroll pls
                 ev.preventDefault();
 
@@ -845,7 +846,7 @@ class Player extends PrimaryView {
                 }
             }
 
-            if (ev.key === 'z') {
+            if (ev.code === 'KeyZ') {
                 if (this.level.has_undo() &&
                     (this.state === 'stopped' || this.state === 'playing' || this.state === 'paused'))
                 {
@@ -853,7 +854,7 @@ class Player extends PrimaryView {
                 }
                 return;
             }
-            if (ev.key === 'u') {
+            if (ev.code === 'KeyU') {
                 if (this.level.has_undo() &&
                     (this.state === 'stopped' || this.state === 'playing' || this.state === 'paused'))
                 {
@@ -877,12 +878,12 @@ class Player extends PrimaryView {
             if (! this.active)
                 return;
 
-            if (ev.key === 'r') {
+            if (ev.code === 'KeyR') {
                 this.stop_restarting();
                 return;
             }
 
-            if (ev.key === 'z') {
+            if (ev.code === 'KeyZ') {
                 if (this.state === 'rewinding') {
                     this.set_state('playing');
                 }
