@@ -177,6 +177,10 @@ export const COMPAT_FLAG_CATEGORIES = [{
         key: 'no_auto_convert_ccl_items_under_players',
         label: "Players starting on items are not auto-converted in CCL levels",
         rulesets: new Set(['steam-strict', 'lynx', 'ms']),
+    }, {
+        key: 'no_auto_patches',
+        label: "Don't apply individual level patches",
+        rulesets: new Set(['steam', 'steam-strict', 'lynx', 'ms']),
     }],
 }, {
     title: "Actor behavior",
@@ -396,3 +400,157 @@ export function compat_flags_for_ruleset(ruleset) {
     }
     return compat;
 }
+
+
+// Fixes to the *geometry* of individual levels, identified by a hash of their contents only, that
+// make them work under Lexy rules
+export const LEVEL_PATCHES = {
+    // CC1 #70 Nightmare
+    // A contraption in the upper right has the player free a ball from a trap, which then clones a
+    // fireball.  It relies on Lynx's forced trap ejection to keep the ball from cloning more than
+    // one fireball, but that doesn't work in CC2.  (The Steam release modifies the level.)
+    'fef1d27bdca5b16e62b46c7179406b68': [{
+        // Same idea, but I don't want to move the red button because it'll mess up the DAT button
+        // connections, so instead use a lilypad
+        x: 30,
+        y: 8,
+        tiles: [{ type: 'turtle' }],
+    }],
+    // CCLXP2 #17 Double Trouble *
+    // The player starts next to a glider on a trap, with a ball holding the trap open.  The glider
+    // immediately runs the player over.  Under Lynx, the trap doesn't open, because the ball moves
+    // off of it before its idle phase.
+    '89aeb48274b323acbe0fbcca3b297629': [{
+        // Erase the ball holding down the button
+        x: 12,
+        y: 16,
+        tiles: [
+            { type: 'button_brown' },
+        ],
+    }, {
+        // Replace the ball one tile south, preserving the contraption but giving the player time to
+        // escape before the glider is released
+        x: 12,
+        y: 17,
+        tiles: [
+            { type: 'button_red' },
+            { type: 'ball', direction: 'north' },
+        ],
+    }],
+    // CCLXP2 #53 Security Breach *
+    // The level is based around a contraption that keeps pressing blue buttons at the right time to
+    // stop a blue tank from pressing green buttons, which will softlock the level.  It's been
+    // adapted to Lynx's goofy trap timing with a convoluted setup part, but ironically it's very
+    // close to working without any of that — the only issue is that the ball pressing the brown
+    // button needs to be slightly ahead of the ball that gets caught in the trap.
+    '485c3f54024a2f41d65076b2a539cb32': [{
+        // Drop the setup part, by erasing the extra ball that triggers it
+        x: 30,
+        y: 1,
+        tiles: [{ type: 'floor' }],
+    }, {
+        // Move the top-left ball...
+        x: 0,
+        y: 0,
+        tiles: [{ type: 'button_blue' }],
+    }, {
+        // ...to be in the trap from the beginning.
+        x: 0,
+        y: 2,
+        tiles: [{ type: 'trap' }, { type: 'ball', direction: 'north' }],
+    }, {
+        // Move the central ball...
+        x: 10,
+        y: 6,
+        tiles: [{ type: 'floor' }],
+    }, {
+        // ...one space down from the brown button, so the first thing it does is open the trap.
+        // This will get the balls synchronized, with the upper-left one a tic behind.
+        x: 10,
+        y: 9,
+        tiles: [{ type: 'floor' }, { type: 'ball', direction: 'north' }],
+    }, {
+        // Finally, move the tank...
+        x: 4,
+        y: 3,
+        tiles: [{ type: 'floor' }],
+    }, {
+        // ...down one cell, to compensate for the delay.
+        x: 4,
+        y: 4,
+        tiles: [{ type: 'green_floor' }, { type: 'tank_blue', direction: 'north' }],
+    }],
+    // CCLXP2 #120 Frost Rings LX
+    // Uses a "block on a teleporter" trick to make the level only playable on Lynx, not MS.  Alas,
+    // that makes it not playable on CC2, either.
+    '622bbfefc25be596299ccf1fe59ada30': [{
+        // Remove the block!
+        x: 11,
+        y: 11,
+        tiles: [{ type: 'teleport_blue' }],
+    }, {
+        // And get rid of the spare teleporter that's meant to hold it.  Could erase the teleporter
+        // itself, but it feels appropriate to just put the block in its cubby.
+        x: 2,
+        y: 28,
+        tiles: [{ type: 'floor' }, { type: 'dirt_block', direction: 'north' }],
+    }],
+    // CCLP3 #94 Mistakes
+    // There's a small hallway with a ball in it and a red key at one end.  You're supposed to duck
+    // in, grab the key, and get out before the ball gets you.  This is just barely possible with
+    // Lynx timing rules, but seems impossible under CC2 timing.
+    '0177710b3b5807c87449118cdc4c2533': [{
+        // Replace a wall with panel walls so the player can get out faster
+        x: 14,
+        y: 11,
+        tiles: [
+            { type: 'floor' },
+            // The east wall isn't actually necessary, but it looks more deliberate
+            { type: 'thin_walls', edges: DIRECTIONS.east.bit | DIRECTIONS.south.bit },
+        ],
+    }],
+    // CCLP4 #50 Secret Underground Society
+    // Starts out with a "desync blue tanks on ice" contraption, which of course won't work in CC2.
+    '3dad0ce0242228127fe738d960e6320d': [{
+        // Just sync the tanks from the start and the level otherwise works fine.
+        // Do the second one, so the player still has to hit the button at least once.
+        x: 10,
+        y: 19,
+        tiles: [{ type: 'floor' }, { type: 'tank_blue', direction: 'north' }],
+    }],
+    // CCLP4 #69 Ball in an Awkward Place
+    // Past the two red doors near the beginning is a column of pink balls that spans a trap and
+    // some mines.  Pressing the brown button blows two of them up and is /intended/ to jam the
+    // other two in the trap and the tile below, but this relies on Lynx's forced ejection.
+    // Replacing this with a force floor reversed by a pink button replicates the effect.
+    'c7cefa66f2f75f051ff99f1a756f94d3': [{
+        x: 11,
+        y: 17,
+        tiles: [{ type: 'button_pink', wire_directions: DIRECTIONS.north.bit }],
+    }, {
+        x: 11,
+        y: 16,
+        tiles: [{ type: 'floor', wire_directions: DIRECTIONS.north.bit | DIRECTIONS.south.bit }],
+    }, {
+        x: 11,
+        y: 15,
+        tiles: [{ type: 'floor', wire_directions: DIRECTIONS.north.bit | DIRECTIONS.south.bit }],
+    }, {
+        // This is the tile with the block and red key
+        x: 11,
+        y: 14,
+        tiles: [
+            { type: 'floor', wire_directions: DIRECTIONS.south.bit | DIRECTIONS.west.bit },
+            { type: 'key_red' },
+            { type: 'dirt_block', direction: 'north' },
+        ],
+    }, {
+        x: 10,
+        y: 14,
+        tiles: [{ type: 'steel', wire_directions: DIRECTIONS.west.bit | DIRECTIONS.east.bit }],
+    }, {
+        x: 9,
+        y: 14,
+        tiles: [{ type: 'force_floor_n' }, { type: 'ball', direction: 'south' }],
+    }],
+};

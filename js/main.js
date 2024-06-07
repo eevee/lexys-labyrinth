@@ -2,7 +2,7 @@
 // - steam: if a player character starts on a force floor they won't be able to make any voluntary movements until they are no longer on a force floor
 import * as fflate from './vendor/fflate.js';
 
-import { COMPAT_FLAG_CATEGORIES, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
+import { LEVEL_PATCHES, COMPAT_FLAG_CATEGORIES, COMPAT_RULESET_LABELS, COMPAT_RULESET_ORDER, INPUT_BITS, TICS_PER_SECOND, compat_flags_for_ruleset } from './defs.js';
 import * as c2g from './format-c2g.js';
 import * as dat from './format-dat.js';
 import * as format_base from './format-base.js';
@@ -1538,7 +1538,17 @@ class Player extends PrimaryView {
         }
         this.conductor.save_savefile();
 
-        this.level = new Level(stored_level, this.conductor.compat);
+        this.level_patches = new Map;
+        if (stored_level.hash && stored_level.hash in LEVEL_PATCHES) {
+            for (let patch of LEVEL_PATCHES[stored_level.hash]) {
+                // Convert {x, y, tiles} to a Map of cell index => tiles
+                let n = stored_level.coords_to_scalar(patch.x, patch.y);
+                this.level_patches.set(n, patch.tiles.map(
+                    tile => ({...tile, type: TILE_TYPES[tile.type]})));
+            }
+        }
+
+        this.level = new Level(stored_level, this.conductor.compat, this.level_patches);
         this.level.sfx = this.sfx_player;
         this.update_tileset();
         this.renderer.set_level(this.level);
@@ -1580,7 +1590,7 @@ class Player extends PrimaryView {
     }
 
     restart_level() {
-        this.level.restart(this.conductor.compat);
+        this.level.restart(this.conductor.compat, this.level_patches);
         this._clear_state();
     }
 

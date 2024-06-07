@@ -221,6 +221,7 @@ function parse_level(bytes, number) {
     }
     level.use_cc1_boots = true;
 
+    level.hash = util.md5(bytes);
     let view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
     // Header

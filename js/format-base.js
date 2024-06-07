@@ -113,6 +113,7 @@ export class StoredLevel extends LevelInterface {
         super();
         // TODO still not sure this belongs here
         this.number = number;  // one-based
+        this.hash = null;  // depends on format; may or may not be available
         this.title = '';
         this.author = '';
         this.password = null;

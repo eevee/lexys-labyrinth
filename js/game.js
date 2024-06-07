@@ -311,10 +311,10 @@ const UNDO_BUFFER_SIZE = TICS_PER_SECOND * 30;
 // The CC1 inventory has a fixed boot order
 const CC1_INVENTORY_ORDER = ['cleats', 'suction_boots', 'fire_boots', 'flippers'];
 export class Level extends LevelInterface {
-    constructor(stored_level, compat = {}) {
+    constructor(stored_level, compat = {}, patches = null) {
         super();
         this.stored_level = stored_level;
-        this.restart(compat);
+        this.restart(compat, patches);
     }
 
     get update_rate() {
@@ -328,7 +328,7 @@ export class Level extends LevelInterface {
 
     // Level setup ------------------------------------------------------------------------------------
 
-    restart(compat) {
+    restart(compat, patches) {
         this.compat = compat;
 
         // playing: normal play
@@ -422,6 +422,9 @@ export class Level extends LevelInterface {
         }
 
         let n = 0;
+        if (this.compat.no_auto_patches) {
+            patches = null;
+        }
         let connectables = [];
         this.power_sources = [];
         this.remaining_players = 0;
@@ -440,6 +443,9 @@ export class Level extends LevelInterface {
                 this.linear_cells.push(cell);
 
                 let stored_cell = this.stored_level.linear_cells[n];
+                if (patches && patches.has(n)) {
+                    stored_cell = patches.get(n);
+                }
                 n += 1;
                 for (let template_tile of stored_cell) {
                     if (! template_tile)
