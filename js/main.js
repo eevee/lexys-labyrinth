@@ -551,20 +551,22 @@ class Player extends PrimaryView {
     constructor(conductor) {
         super(conductor, document.body.querySelector('main#player'));
 
-        this.key_mapping = {
+        // These are specifically scancodes, i.e. positional.
+        // (The hints are still qwerty, alas; there's no standard API for converting them scancodes
+        // to key labels.)
+        this.keycode_mapping = {
             ArrowLeft: 'left',
             ArrowRight: 'right',
             ArrowUp: 'up',
             ArrowDown: 'down',
-            Spacebar: 'wait',
-            " ": 'wait',
-            w: 'up',
-            a: 'left',
-            s: 'down',
-            d: 'right',
-            q: 'drop',
-            e: 'cycle',
-            c: 'swap',
+            Space: 'wait',
+            KeyW: 'up',
+            KeyA: 'left',
+            KeyS: 'down',
+            KeyD: 'right',
+            KeyQ: 'drop',
+            KeyE: 'cycle',
+            KeyC: 'swap',
         };
         // The buttons in order, then two entries each for the axes (17 to 24)
         // TODO need extra controls for: undo, rewind, pause, begin, etc., but this is currently
@@ -649,17 +651,17 @@ class Player extends PrimaryView {
         this.drop_button.addEventListener('click', ev => {
             // Use the set of "buttons pressed between tics" because it's cleared automatically;
             // otherwise these will stick around forever
-            this.current_keys_new.add('q');
+            this.current_keycodes_new.add('KeyQ');
             ev.currentTarget.blur();
         });
         this.cycle_button = this.root.querySelector('#player-actions .action-cycle');
         this.cycle_button.addEventListener('click', ev => {
-            this.current_keys_new.add('e');
+            this.current_keycodes_new.add('KeyE');
             ev.currentTarget.blur();
         });
         this.swap_button = this.root.querySelector('#player-actions .action-swap');
         this.swap_button.addEventListener('click', ev => {
-            this.current_keys_new.add('c');
+            this.current_keycodes_new.add('KeyC');
             ev.currentTarget.blur();
         });
 
@@ -760,8 +762,8 @@ class Player extends PrimaryView {
         this.next_player_move = null;
         this.player_used_move = false;
         let key_target = document.body;
-        this.current_keys = new Set;  // keys that are currently held
-        this.current_keys_new = new Set; // keys that were pressed since input was last read
+        this.current_keycodes = new Set;  // keys that are currently held
+        this.current_keycodes_new = new Set; // keys that were pressed since input was last read
         // TODO this could all probably be more rigorous but it's fine for now
         key_target.addEventListener('keydown', ev => {
             if (! this.active)
@@ -776,7 +778,7 @@ class Player extends PrimaryView {
             // we care about preventDefaulting are action ones
             // TODO what if a particular browser does something for p/,/.?
             if (ev.repeat) {
-                if (this.key_mapping[ev.key]) {
+                if (this.keycode_mapping[ev.code]) {
                     ev.preventDefault();
                     ev.stopPropagation();
                 }
@@ -859,9 +861,9 @@ class Player extends PrimaryView {
                 }
             }
 
-            if (this.key_mapping[ev.key]) {
-                this.current_keys.add(ev.key);
-                this.current_keys_new.add(ev.key);
+            if (this.keycode_mapping[ev.code]) {
+                this.current_keycodes.add(ev.code);
+                this.current_keycodes_new.add(ev.code);
                 ev.stopPropagation();
                 ev.preventDefault();
 
@@ -887,8 +889,8 @@ class Player extends PrimaryView {
                 return;
             }
 
-            if (this.key_mapping[ev.key]) {
-                this.current_keys.delete(ev.key);
+            if (this.keycode_mapping[ev.code]) {
+                this.current_keycodes.delete(ev.code);
                 ev.stopPropagation();
                 ev.preventDefault();
             }
@@ -1466,7 +1468,7 @@ class Player extends PrimaryView {
     // Called when we lose focus; assume all keys are released, since we can't be sure any more
     enter_background() {
         this.stop_restarting();
-        this.current_keys.clear();
+        this.current_keycodes.clear();
         this.current_touches = {};
 
         if (this.state === 'playing' || this.state === 'rewinding') {
@@ -1644,7 +1646,7 @@ class Player extends PrimaryView {
             }
             else {
                 // Restart (as long as we didn't die /with/ the spacebar held down)
-                if (! this.current_keys.has(' ')) {
+                if (! this.current_keycodes.has('Space')) {
                     this.restart_level();
                 }
             }
@@ -1784,13 +1786,13 @@ class Player extends PrimaryView {
 
         let input = 0;
         // Keys
-        for (let key of this.current_keys) {
-            input |= INPUT_BITS[this.key_mapping[key]];
+        for (let keycode of this.current_keycodes) {
+            input |= INPUT_BITS[this.keycode_mapping[keycode]];
         }
-        for (let key of this.current_keys_new) {
-            input |= INPUT_BITS[this.key_mapping[key]];
+        for (let keycode of this.current_keycodes_new) {
+            input |= INPUT_BITS[this.keycode_mapping[keycode]];
         }
-        this.current_keys_new.clear();
+        this.current_keycodes_new.clear();
 
         // Touches
         for (let touch of Object.values(this.current_touches)) {
@@ -2245,7 +2247,7 @@ class Player extends PrimaryView {
         // Drop any "new" keys when switching into playing, since they accumulate freely as long as
         // the game isn't actually running
         if (new_state === 'playing') {
-            this.current_keys_new.clear();
+            this.current_keycodes_new.clear();
         }
 
         // TODO wonder if some other update_ui stuff could move here
