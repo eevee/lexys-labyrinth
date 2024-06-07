@@ -553,4 +553,23 @@ export const LEVEL_PATCHES = {
         y: 14,
         tiles: [{ type: 'force_floor_n' }, { type: 'ball', direction: 'south' }],
     }],
+    // CCLP5 #48 Tank Game Reborn
+    // The lower right has another tank-ice-desync thingamajig.
+    'd0b7bbc32c9c920d326425cfac5e260e': [{
+        // Put a toggle floor in the way of the tank that needs to be desynced.  There's still sort
+        // of a puzzle to it, since you need to bounce it off using the ice.
+        x: 24,
+        y: 22,
+        tiles: [{ type: 'green_floor' }],
+    }, {
+        // I guess sticking one in the bottom row, too, helps preserve the original intent.
+        x: 26,
+        y: 23,
+        tiles: [{ type: 'green_floor' }],
+    }, {
+        // And put a green button nearby
+        x: 26,
+        y: 25,
+        tiles: [{ type: 'button_green' }],
+    }],
 };
