@@ -2716,27 +2716,27 @@ const BUILTIN_PACKS = [{
     preview: 'levels/previews/lexys-lessons.png',
     ident: "Lexy's Lessons",
     title: "Lexy's Lessons (WIP)",
-    desc: "A set of beginner levels that introduces every mechanic in Chip's Challenge 2, made specifically for Lexy's Labyrinth!",
+    desc: "A whirlwind tour of Chip's Challenge 2 mechanics, custom made for Lexy's Labyrinth!",
 }, {
     path: 'levels/CC2LP1.zip',
     preview: 'levels/previews/cc2lp1.png',
     ident: 'Chips Challenge 2 Level Pack 1',
     title: "Chip's Challenge 2 Level Pack 1",
-    desc: "Thoroughly demonstrates what Chip's Challenge 2 is capable of.  Fair, but doesn't hold your hand; you'd better have at least a passing familiarity with the CC2 elements.",
+    desc: "Dense and tricky.  If you've never played CC2, definitely play Lexy's Lessons first.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_2_Level_Pack_1',
 }, {
     path: 'levels/CCLP1.ccl',
     preview: 'levels/previews/cclp1.png',
     ident: 'cclp1',
     title: "Chip's Challenge Level Pack 1",
-    desc: "Designed like a direct replacement for Chip's Challenge 1, with introductory levels for new players and a gentle difficulty curve.",
+    desc: "A pack for new players, like a parallel universe replacement for Chip's Challenge 1.  Great place to start.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_1',
 }, {
     path: 'levels/CCLXP2.ccl',
     preview: 'levels/previews/cclxp2.png',
     ident: 'cclxp2',
     title: "Chip's Challenge Level Pack 2-X",
-    desc: "The first community pack released, tricky and rough around the edges.",
+    desc: "The first community level pack.  Chaotic, messy, sometimes unfair.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_2_(Lynx)',
 }, {
     path: 'levels/CCLP3.ccl',
@@ -2750,14 +2750,14 @@ const BUILTIN_PACKS = [{
     preview: 'levels/previews/cclp4.png',
     ident: 'cclp4',
     title: "Chip's Challenge Level Pack 4",
-    desc: "Moderately difficult, but not unfair.",
+    desc: "A moderate challenge.  Good next step after CCLP1.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_4',
 }, {
     path: 'levels/CCLP5.ccl',
     preview: 'levels/previews/cclp5.png',
     ident: 'cclp5',
     title: "Chip's Challenge Level Pack 5",
-    desc: "The latest and greatest.",
+    desc: "The latest and greatest, and among the hardest.",
     url: 'https://wiki.bitbusters.club/Chip%27s_Challenge_Level_Pack_5',
 }];
 const BUILTIN_PACKS_BY_IDENT = {
