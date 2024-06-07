@@ -574,8 +574,8 @@ class Player extends PrimaryView {
         this.gamepad_mapping = {
             0: 'drop',  // south (B)
             1: 'wait',  // east (A)
-            2: 'cycle',  // north (X)
-            3: 'swap',  // west (Y)
+            2: 'swap',  // north (X)
+            3: 'cycle',  // west (Y)
             12: 'up',
             13: 'down',
             14: 'left',
