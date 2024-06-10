@@ -355,24 +355,52 @@ export class Editor extends PrimaryView {
         });
         // Mouse wheel to zoom
         this.set_canvas_zoom(1);
+        // Laptops fire wheel events very frequently, whereas mice with scroll wheels fire them very
+        // intermittently, and the units are...  difficult to make sense of.  So to avoid zooming at
+        // hyperspeed on touchpads, just wait a short delay before zooming another tick
+        this.within_wheel_event_delay = false;
         this.viewport_el.addEventListener('wheel', ev => {
-            if (! util.has_ctrl_key(ev))
-                return;
-            // The delta is platform and hardware dependent and ultimately kind of useless, so just
-            // treat each event as a click and hope for the best
             if (ev.deltaY === 0)
                 return;
-            ev.stopPropagation();
-            ev.preventDefault();
 
-            // TODO Alt: Scroll through palette
+            // Plain: native, scroll vertically
+            // Shift: native?, scroll horizontally
+            // Ctrl: Zoom
+            if (util.has_ctrl_key(ev)) {
+                ev.stopPropagation();
+                ev.preventDefault();
 
-            if (ev.deltaY > 0) {
-                this.zoom_by(-1, ev.clientX, ev.clientY);
+                if (this.within_wheel_event_delay) {
+                    return;
+                }
+                else if (ev.deltaY > 0) {
+                    this.zoom_by(-1, ev.clientX, ev.clientY);
+                }
+                else {
+                    this.zoom_by(+1, ev.clientX, ev.clientY);
+                }
+            }
+            // Alt: Scroll through palette
+            else if (ev.altKey) {
+                ev.stopPropagation();
+                ev.preventDefault();
+
+                if (this.within_wheel_event_delay) {
+                    return;
+                }
+                else if (ev.deltaY > 0) {
+                    this.select_foreground_relative(1);
+                }
+                else {
+                    this.select_foreground_relative(-1);
+                }
             }
             else {
-                this.zoom_by(+1, ev.clientX, ev.clientY);
+                return;
             }
+
+            this.within_wheel_event_delay = true;
+            setTimeout(() => { this.within_wheel_event_delay = false; }, 50);
         });
 
         // Toolbox
@@ -582,11 +610,11 @@ export class Editor extends PrimaryView {
             this.export_menu.open_relative_to(ev.currentTarget);
         });
         export_menu_button.append(this.svg_icon('svg-icon-menu-chevron'));
-        //_make_button("Toggle green objects");
 
         // Tile palette
         let palette_el = this.root.querySelector('.-palette');
         this.palette = {};  // name => element
+        this.palette_order = [];
         for (let sectiondef of PALETTE) {
             let section_el = mk('section');
             palette_el.append(mk('h2', sectiondef.title), section_el);
@@ -600,8 +628,10 @@ export class Editor extends PrimaryView {
                     entry = this.renderer.draw_single_tile_type(key);
                 }
                 entry.setAttribute('data-palette-key', key);
+                entry.setAttribute('data-palette-index', this.palette_order.length);
                 entry.classList = 'palette-entry';
                 this.palette[key] = entry;
+                this.palette_order.push(key);
                 section_el.append(entry);
             }
         }
@@ -624,28 +654,11 @@ export class Editor extends PrimaryView {
             ev.stopPropagation();
 
             let key = entry.getAttribute('data-palette-key');
-            if (SPECIAL_PALETTE_ENTRIES[key]) {
-                // Tile with preconfigured stuff on it
-                let tile = {...SPECIAL_PALETTE_ENTRIES[key]};
-                if (fg) {
-                    this.select_foreground_tile(tile, 'palette');
-                }
-                else {
-                    if (tile.type.layer !== LAYERS.terrain)
-                        return;
-                    this.select_background_tile(tile, 'palette');
-                }
+            if (fg) {
+                this.select_foreground_tile(key, 'palette');
             }
             else {
-                // Regular tile name
-                if (fg) {
-                    this.select_foreground_tile(key, 'palette');
-                }
-                else {
-                    if (TILE_TYPES[key].layer !== LAYERS.terrain)
-                        return;
-                    this.select_background_tile(key, 'palette');
-                }
+                this.select_background_tile(key, 'palette');
             }
         });
         // Disable context menu so right-click works
@@ -1389,7 +1402,12 @@ export class Editor extends PrimaryView {
 
     _name_or_tile_to_name_and_tile(name_or_tile) {
         let name, tile;
-        if (typeof name_or_tile === 'string') {
+        if (SPECIAL_PALETTE_ENTRIES[name_or_tile]) {
+            // Tile with preconfigured stuff on it
+            name = name_or_tile;
+            tile = {...SPECIAL_PALETTE_ENTRIES[name_or_tile]};
+        }
+        else if (typeof name_or_tile === 'string') {
             name = name_or_tile;
             tile = { type: TILE_TYPES[name] };
 
@@ -1451,6 +1469,8 @@ export class Editor extends PrimaryView {
 
     select_background_tile(name_or_tile, source) {
         let [_name, tile] = this._name_or_tile_to_name_and_tile(name_or_tile);
+        if (tile.type.layer !== LAYERS.terrain)
+            return;
 
         this.bg_tile = tile;
         if (source === 'palette') {
@@ -1461,6 +1481,16 @@ export class Editor extends PrimaryView {
         }
 
         this.redraw_background_tile();
+    }
+
+    select_foreground_relative(d) {
+        let el = this.palette_fg_selected_el;
+        if (! el)
+            return;
+
+        let index = parseInt(el.getAttribute('data-palette-index'), 10);
+        index = (index + d) % this.palette_order.length;
+        this.select_foreground_tile(this.palette_order[index], 'palette');
     }
 
     // Transform an individual tile in various ways.  No undo handling (as the tile may or may not
