@@ -36,7 +36,9 @@ export function setdefault(map, key, defaulter) {
 }
 
 
+// -------------------------------------------------------------------------------------------------
 // DOM stuff
+
 function _mk(el, children) {
     if (children.length > 0) {
         if (!(children[0] instanceof Node) && children[0] !== undefined && typeof(children[0]) !== "string" && typeof(children[0]) !== "number") {
@@ -155,6 +157,18 @@ export function handle_drop(element, options) {
     });
 }
 
+
+export const is_likely_mac = /mac|iPhone|iPad|iPod/i.test(window.navigator.platform);
+
+// On macOS it’s more natural to use the Command key for shortcuts.
+export function has_ctrl_key(ev) {
+  return is_likely_mac ? ev.metaKey : ev.ctrlKey;
+}
+
+
+// -------------------------------------------------------------------------------------------------
+// Promises and networking
+
 export function sleep(t) {
     return new Promise(res => {
         setTimeout(res, t);
@@ -205,6 +219,10 @@ export async function fetch(url, response_type = 'arraybuffer') {
         throw new Error(`Failed to load ${url} -- ${xhr.status} ${xhr.statusText}`);
     return xhr.response;
 }
+
+
+// -------------------------------------------------------------------------------------------------
+// Data
 
 export function string_from_buffer_ascii(buf, start = 0, len) {
     if (ArrayBuffer.isView(buf)) {

@@ -17,7 +17,6 @@ import {
     SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask
 } from './editordefs.js';
 import { SVGConnection, Selection } from './helpers.js';
-import { isCtrlKey, isMac } from './keyboard.js';
 import * as mouseops from './mouseops.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
 
@@ -170,14 +169,14 @@ export class Editor extends PrimaryView {
             }
 
             // Immediately refresh any ongoing mouse operation when pressing a modifier key
-            if (this.mouse_op && ['Control', 'Shift', 'Alt'].includes(ev.key)) {
+            if (this.mouse_op && ['Control', 'Meta', 'Shift', 'Alt'].includes(ev.key)) {
                 // Note that e.g. ev.shiftKey is not well-defined when actually pressing or
                 // releasing the shift key itself
                 this.mouse_op.set_modifier(ev.key, true);
                 this.mouse_op.rehover();
             }
 
-            if (isCtrlKey(ev)) {
+            if (util.has_ctrl_key(ev)) {
                 // macOS is really weird:
                 //
                 // | Keys pressed | `ev.key` |
@@ -193,16 +192,16 @@ export class Editor extends PrimaryView {
                 // and then manually check if shift is pressed.
                 const key = ev.key.toLowerCase();
 
-                if (key === 'a' && !ev.shiftKey) {
+                if (key === 'a' && ! ev.shiftKey) {
                     this.select_all();
                 }
-                else if (ev.key === 'a' && ev.shiftKey) {
+                else if (key === 'a' && ev.shiftKey) {
                     this.select_none();
                 }
-                else if (key === 'z' && !ev.shiftKey) {
+                else if (key === 'z' && ! ev.shiftKey) {
                     this.undo();
                 }
-                else if ((key === 'z' && ev.shiftKey) || (key === 'y' && !ev.shiftKey)) {
+                else if ((key === 'z' && ev.shiftKey) || (key === 'y' && ! ev.shiftKey)) {
                     this.redo();
                 }
                 else {
@@ -269,7 +268,7 @@ export class Editor extends PrimaryView {
                 return;
 
             // Immediately refresh any ongoing mouse operation when releasing a modifier key
-            if (this.mouse_op && ['Control', 'Shift', 'Alt'].includes(ev.key)) {
+            if (this.mouse_op && ['Control', 'Meta', 'Shift', 'Alt'].includes(ev.key)) {
                 this.mouse_op.set_modifier(ev.key, false);
                 this.mouse_op.rehover();
             }
@@ -357,7 +356,7 @@ export class Editor extends PrimaryView {
         // Mouse wheel to zoom
         this.set_canvas_zoom(1);
         this.viewport_el.addEventListener('wheel', ev => {
-            if (!isCtrlKey(ev))
+            if (! util.has_ctrl_key(ev))
                 return;
             // The delta is platform and hardware dependent and ultimately kind of useless, so just
             // treat each event as a click and hope for the best
@@ -711,7 +710,10 @@ export class Editor extends PrimaryView {
                     tooltip.append(this.svg_icon('svg-icon-mouse2'));
                 }
                 else if (key) {
-                    tooltip.append(mk('kbd', key === 'ctrl' && isMac ? 'cmd' : key));
+                    if (key === 'ctrl' && util.is_likely_mac) {
+                        key = 'cmd';
+                    }
+                    tooltip.append(mk('kbd', key));
                 }
             }
 

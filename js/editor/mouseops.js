@@ -4,11 +4,10 @@
 import * as algorithms from '../algorithms.js';
 import { DIRECTIONS, LAYERS, COLLISION } from '../defs.js';
 import TILE_TYPES from '../tiletypes.js';
-import { mk, mk_svg, walk_grid } from '../util.js';
+import { mk, mk_svg, is_likely_mac, has_ctrl_key, walk_grid } from '../util.js';
 
 import { SPECIAL_TILE_BEHAVIOR } from './editordefs.js';
 import { SVGConnection } from './helpers.js';
-import { isCtrlKey } from './keyboard.js';
 import { CellEditorOverlay } from './tile-overlays.js';
 
 const FORCE_FLOOR_TILES_BY_DIRECTION = {
@@ -410,7 +409,10 @@ export class MouseOperation {
     }
 
     set_modifier(key, state) {
-        if (key === 'Control') {
+        if (key === 'Control' && ! is_likely_mac) {
+            this.ctrl = state;
+        }
+        else if (key === 'Meta' && is_likely_mac) {
             this.ctrl = state;
         }
         else if (key === 'Shift') {
@@ -422,7 +424,7 @@ export class MouseOperation {
     }
 
     _update_modifiers(ev) {
-        this.ctrl = isCtrlKey(ev);
+        this.ctrl = has_ctrl_key(ev);
         this.shift = ev.shiftKey;
         this.alt = ev.altKey;
     }
