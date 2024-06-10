@@ -17,6 +17,7 @@ import {
     SPECIAL_TILE_BEHAVIOR, TILE_DESCRIPTIONS, transform_direction_bitmask
 } from './editordefs.js';
 import { SVGConnection, Selection } from './helpers.js';
+import { isCtrlKey, isMac } from './keyboard.js';
 import * as mouseops from './mouseops.js';
 import { TILES_WITH_PROPS } from './tile-overlays.js';
 
@@ -176,17 +177,32 @@ export class Editor extends PrimaryView {
                 this.mouse_op.rehover();
             }
 
-            if (ev.ctrlKey) {
-                if (ev.key === 'a') {
+            if (isCtrlKey(ev)) {
+                // macOS is really weird:
+                //
+                // | Keys pressed | `ev.key` |
+                // |--------------|----------|
+                // | A            | "a"      |
+                // | shift+A      | "A"      |
+                // | cmd+A        | "a"      |
+                // | cmd+shift+A  | "a" !!!  |
+                // | ctrl+shift+A | "A"      |
+                //
+                // For some reason, with cmd the key is always lowercase.
+                // So we have to check the letter key case insensitively,
+                // and then manually check if shift is pressed.
+                const key = ev.key.toLowerCase();
+
+                if (key === 'a' && !ev.shiftKey) {
                     this.select_all();
                 }
-                else if (ev.key === 'A') {
+                else if (ev.key === 'a' && ev.shiftKey) {
                     this.select_none();
                 }
-                else if (ev.key === 'z') {
+                else if (key === 'z' && !ev.shiftKey) {
                     this.undo();
                 }
-                else if (ev.key === 'Z' || ev.key === 'y') {
+                else if ((key === 'z' && ev.shiftKey) || (key === 'y' && !ev.shiftKey)) {
                     this.redo();
                 }
                 else {
@@ -220,10 +236,18 @@ export class Editor extends PrimaryView {
                     }
                 }
                 else if (ev.key === '-') {
-                    this.zoom_by(-1);
+                    if (this.mouse_coords)
+                        this.zoom_by(-1, this.mouse_coords[0], this.mouse_coords[1]);
+                    else
+                        this.zoom_by(-1);
                 }
-                else if (ev.key === '=') {
-                    this.zoom_by(+1);
+                // `=` because US keyboards have `+` on the same key as `=`, and `+` is shift-`=`
+                // `+` because many other keyboards have `+` on its own key, un-shifted, while `=` is shifted
+                else if (ev.key === '=' || ev.key === '+') {
+                    if (this.mouse_coords)
+                        this.zoom_by(+1, this.mouse_coords[0], this.mouse_coords[1]);
+                    else
+                        this.zoom_by(+1);
                 }
                 else if (ev.key === '1') {
                     this.set_canvas_zoom(1);
@@ -333,6 +357,8 @@ export class Editor extends PrimaryView {
         // Mouse wheel to zoom
         this.set_canvas_zoom(1);
         this.viewport_el.addEventListener('wheel', ev => {
+            if (!isCtrlKey(ev))
+                return;
             // The delta is platform and hardware dependent and ultimately kind of useless, so just
             // treat each event as a click and hope for the best
             if (ev.deltaY === 0)
@@ -685,7 +711,7 @@ export class Editor extends PrimaryView {
                     tooltip.append(this.svg_icon('svg-icon-mouse2'));
                 }
                 else if (key) {
-                    tooltip.append(mk('kbd', key));
+                    tooltip.append(mk('kbd', key === 'ctrl' && isMac ? 'cmd' : key));
                 }
             }
 
