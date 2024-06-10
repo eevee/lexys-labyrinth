@@ -255,6 +255,11 @@ class MousePosition {
     clone() {
         return new this.constructor(this.client_x, this.client_y, this.real_x, this.real_y);
     }
+
+    repositioned(renderer) {
+        return new this.constructor(this.client_x, this.client_y,
+            ...renderer.point_to_real_cell_coords(this.client_x, this.client_y));
+    }
 }
 
 
@@ -336,6 +341,16 @@ export class MouseOperation {
             this.do_abort();
         }
 
+        this._do_move_impl(pos);
+    }
+
+    do_repeat_move() {
+        if (this.prev_pos) {
+            this._do_move_impl(this.prev_pos.repositioned(this.editor.renderer));
+        }
+    }
+
+    _do_move_impl(pos) {
         if (this.cursor_element) {
             this.cursor_element.setAttribute('transform', `translate(${pos.x} ${pos.y})`);
         }
@@ -351,7 +366,7 @@ export class MouseOperation {
             let in_bounds = false;
             if (this.editor.is_in_bounds(pos.x, pos.y)) {
                 let rect = this.editor.actual_viewport_el.getBoundingClientRect();
-                let cx = ev.clientX, cy = ev.clientY;
+                let cx = pos.client_x, cy = pos.client_y;
                 if (rect.left <= cx && cx < rect.right && rect.top <= cy && cy < rect.bottom) {
                     in_bounds = true;
                 }

@@ -336,6 +336,12 @@ export class Editor extends PrimaryView {
             this.mouse_op.do_commit();
             this.set_mouse_button(0);
         });
+        // If the viewport scrolls natively, inform the mouse op
+        this.actual_viewport_el.addEventListener('scroll', ev => {
+            if (this.mouse_op) {
+                this.mouse_op.do_repeat_move();
+            }
+        });
         // Disable context menu, which interferes with right-click tools
         this.viewport_el.addEventListener('contextmenu', ev => {
             ev.preventDefault();
