@@ -568,7 +568,7 @@ export const TILE_DESCRIPTIONS = {
     },
     hint: {
         name: "Hint",
-        desc: "Shows a hint or message of the level designer's choosing.  Stops dirt blocks and monsters.",
+        desc: "Shows a hint or message of the level designer's choosing.  Stops heavy blocks and most monsters.",
     },
     floor: {
         name: "Floor",
@@ -585,7 +585,7 @@ export const TILE_DESCRIPTIONS = {
     chip: {
         name: "Heart",
         cc2_name: "Chip",
-        desc: "Goal of most levels.  Must be collected to open the heart socket.  Stops dirt blocks and most monsters, except rovers.",
+        desc: "Goal of most levels.  Must be collected to open the heart socket.  Stops heavy blocks and most monsters.",
     },
     chip_extra: {
         name: "Extra heart",
@@ -594,17 +594,17 @@ export const TILE_DESCRIPTIONS = {
     },
     socket: {
         name: "Socket",
-        desc: "Can only be opened when the required number of hearts has been collected.  Stops dirt blocks and most monsters, except rovers, but can be opened by anything else.  Not affected by ghosts.",
+        desc: "Can only be opened when the required number of hearts has been collected.  Stops heavy blocks and most monsters.  Opened by anything allowed to step on it, but not affected by ghosts.",
     },
     exit: {
         name: "Exit",
-        desc: "All players must step on one to clear the level.  Stops dirt blocks and most monsters, except rovers.",
+        desc: "All players must step on one to clear the level.  Stops heavy blocks and most monsters.",
     },
 
     // Terrain
     popwall: {
         name: "Popwall",
-        desc: "Turns into a wall when something steps off of it.  Stops dirt blocks and monsters.",
+        desc: "Turns into a wall when something steps off of it.  Stops heavy blocks and monsters.",
     },
     steel: {
         name: "Steel wall",
@@ -620,7 +620,7 @@ export const TILE_DESCRIPTIONS = {
     },
     fake_floor: {
         name: "Illusory floor",
-        desc: "Looks like an illusory wall, but turns to floor when bumped.  Stops dirt blocks and monsters.",
+        desc: "Looks like an illusory wall, but turns to floor when bumped.  Stops heavy blocks and monsters.",
     },
     fake_wall: {
         name: "Illusory wall",
@@ -700,19 +700,19 @@ export const TILE_DESCRIPTIONS = {
     },
     door_blue: {
         name: "Blue door",
-        desc: "Requires a blue key.  Turns to floor when opened.  Stops dirt blocks and monsters that don't normally collect items, even if they have a key.",
+        desc: "Requires a blue key.  Turns to floor when opened.  Stops heavy blocks and monsters that don't normally collect items, even if they have a key.",
     },
     door_red: {
         name: "Red door",
-        desc: "Requires a red key.  Turns to floor when opened.  Stops dirt blocks and monsters that don't normally collect items, even if they have a key.",
+        desc: "Requires a red key.  Turns to floor when opened.  Stops heavy blocks and monsters that don't normally collect items, even if they have a key.",
     },
     door_yellow: {
         name: "Yellow door",
-        desc: "Requires a yellow key.  Turns to floor when opened.  Stops dirt blocks and monsters that don't normally collect items, even if they have a key.",
+        desc: "Requires a yellow key.  Turns to floor when opened.  Stops heavy blocks and monsters that don't normally collect items, even if they have a key.",
     },
     door_green: {
         name: "Green door",
-        desc: "Requires a green key.  Turns to floor when opened.  Stops dirt blocks and monsters that don't normally collect items, even if they have a key.",
+        desc: "Requires a green key.  Turns to floor when opened.  Stops heavy blocks and monsters that don't normally collect items, even if they have a key.",
     },
     swivel_nw: {
         name: "Swivel door",
@@ -759,7 +759,7 @@ export const TILE_DESCRIPTIONS = {
     // Items
     key_blue: {
         name: "Blue key",
-        desc: "Opens blue locks.  Picked up by monsters and dirt blocks.",
+        desc: "Opens blue locks.  Picked up by monsters and heavy blocks.",
     },
     key_red: {
         name: "Red key",
@@ -767,11 +767,11 @@ export const TILE_DESCRIPTIONS = {
     },
     key_yellow: {
         name: "Yellow key",
-        desc: "Opens yellow locks.  Stops dirt blocks and monsters (except rovers).",
+        desc: "Opens yellow locks.  Stops heavy blocks and most monsters.",
     },
     key_green: {
         name: "Green key",
-        desc: "Opens green locks.  Stops dirt blocks and monsters (except rovers).",
+        desc: "Opens green locks.  Stops heavy blocks and most monsters.",
     },
     flippers: {
         name: "Mermaid tail",
@@ -821,7 +821,7 @@ export const TILE_DESCRIPTIONS = {
     xray_eye: {
         name: "X-ray glasses",
         cc2_name: "Secret eye",
-        desc: "Reveals invisible walls, reveal walls, fake floors, popdown floors, floor mimics, and anything underneath dirt blocks, ice blocks, or canopies to the player.  No effect for anything else.",
+        desc: "Reveals invisible walls, reveal walls, fake floors, popdown floors, floor mimics, and anything underneath blocks or canopies to the player.  No effect for anything else.",
     },
     bribe: {
         name: "Bribe",
@@ -924,7 +924,7 @@ export const TILE_DESCRIPTIONS = {
     },
     rover: {
         name: "Rover",
-        desc: "Cycles through the behavior of other monsters.  Collects items and pushes blocks.  Moves at half speed.",
+        desc: "Cycles through the behavior of other monsters.  Collects items and pushes blocks.  May go anywhere a player can go, even onto tiles that stop other monsters (but not under canopies).  Moves at half speed.",
     },
     blob: {
         name: "Blob",
@@ -934,15 +934,15 @@ export const TILE_DESCRIPTIONS = {
     // Mechanisms
     dirt_block: {
         name: "Dirt block",
-        desc: "A single-push block (i.e., cannot push other blocks ahead of it).  Fireproof.  Turns to dirt in water.",
+        desc: "A heavy block.  Cannot push blocks.  Fireproof.  Turns to dirt in water.",
     },
     ice_block: {
         name: "Ice block",
-        desc: "A multi-push block (i.e., can push other blocks ahead of it).  Cannot push dirt blocks directly.  Turns to water in fire.  Turns to ice in water.",
+        desc: "A light block.  Can push other light blocks.  Turns to water in fire.  Turns to ice in water.",
     },
     frame_block: {
         name: "Frame block",
-        desc: "A multi-push block.  Can only be pushed in the directions given by the arrows.  Can be moved in other directions by ice, force floors, etc.  Rotates when moved along a curved railroad track.",
+        desc: "A light block.  Can push other blocks.  Can only be pushed in the directions given by the arrows.  Can be moved in other directions by ice, force floors, etc.  Rotates when moved along a curved railroad track.",
     },
     green_floor: {
         name: "Toggle floor",
@@ -986,7 +986,7 @@ export const TILE_DESCRIPTIONS = {
     },
     cloner: {
         name: "Clone machine",
-        desc: "When activated, creates a duplicate of whatever's on it.  Activated by a red button or a wire pulse.  If activated by wire and something's in the way, tries cloning in other directions.  When empty, can be populated by blocks (except dirt blocks), doppelgängers, ghosts, or rolling bowling balls.",
+        desc: "When activated, creates a duplicate of whatever's on it.  Activated by a red button or a wire pulse.  If activated by wire and something's in the way, tries cloning in other directions.  When empty, can be entered and populated by light blocks, doppelgängers, ghosts, or rolling bowling balls.",
     },
     button_brown: {
         name: "Brown button",
@@ -998,7 +998,7 @@ export const TILE_DESCRIPTIONS = {
     },
     button_orange: {
         name: "Orange button",
-        desc: "Toggles the state of the nearest flame jet while held down, searching outwards in a diamond pattern.",
+        desc: "Inverts the state of the nearest flame jet while held down, searching outwards in a diamond pattern.",
     },
     flame_jet_off: {
         name: "Flame jet (off)",
@@ -1022,7 +1022,7 @@ export const TILE_DESCRIPTIONS = {
     },
     teleport_yellow: {
         name: "Yellow teleporter",
-        desc: "Teleports a traveller to the nearest available yellow teleporter, searching right to left, bottom to top.  Only searches for exits in the direction the traveller entered.  Allows players to exit in a direction of their choice.  If no exit is available, will be picked up like an item, and can be dropped on any floor tile.",
+        desc: "Teleports a traveller to the nearest available yellow teleporter, searching right to left, bottom to top.  Only searches for exits in the direction the traveller entered.  Allows players to exit in a direction of their choice.  If no exit is available, will be picked up like an item, and can be dropped on any blank floor tile.",
     },
     teleport_green: {
         name: "Green teleporter",
@@ -1106,7 +1106,7 @@ export const TILE_DESCRIPTIONS = {
     // Experimental
     sokoban_block: {
         name: "Sokoban block",
-        desc: "A single-push block.  Can't pass over colored floor of a different color.  Has no effect on sokoban buttons of a different color.  Turns to colored floor in water.",
+        desc: "A heavy block.  Can't push other blocks.  Can't pass over colored floor of a different color.  Has no effect on sokoban buttons of a different color.  Turns to colored floor in water.",
     },
     sokoban_button: {
         name: "Sokoban button",
@@ -1168,27 +1168,27 @@ export const TILE_DESCRIPTIONS = {
 
     turntable_cw: {
         name: "Turntable (clockwise)",
-        desc: "Rotates anything entering this tile clockwise.  Frame blocks rotate as if on tracks.  If connected to wire, only functions while receiving power.",
+        desc: "Rotates anything entering this tile clockwise.  Frame blocks and circuit blocks rotate as if on tracks.  If connected to wire, only functions while receiving power.",
     },
     turntable_ccw: {
         name: "Turntable (counterclockwise)",
-        desc: "Rotates anything entering this tile counterclockwise.  Frame blocks rotate as if on tracks.  If connected to wire, only functions while receiving power.",
+        desc: "Rotates anything entering this tile counterclockwise.  Frame blocks and circuit blocks rotate as if on tracks.  If connected to wire, only functions while receiving power.",
     },
     teleport_blue_exit: {
         name: "Blue teleporter exit",
-        desc: "A blue teleporter for all intents and purposes except it can only be exited, not entered.",
+        desc: "Functions as a blue teleporter, except it's only valid as an exit, not an entrance.  Stepping on it does nothing.  Arriving travellers are not ejected.",
     },
     electrified_floor: {
         name: "Electrified floor",
-        desc: "Conducts power (like a 4-way wire).  While powered, destroys anything not wearing lightning boots (except dirt blocks).",
+        desc: "Conducts power (like a 4-way wire).  While powered, destroys anything not wearing lightning boots (except dirt and circuit blocks).",
     },
     circuit_block: {
         name: "Circuit block",
-        desc: "A single-push block.  May contain wires, which will connect to any adjacent wires and conduct power as normal, replacing anything on the floor below.  When pushed into water, turns into floor with the same wires.",
+        desc: "A heavy block.  May contain wires, which will connect to any adjacent wires and conduct power as normal, replacing anything on the floor below.  When pushed into water, turns into floor with the same wires.",
     },
     glass_block: {
         name: "Glass block",
-        desc: "A single-push block.  Can pick up one item it moves over, which may then be cloned via a clone machine.  Drops the item when destroyed.  Turns to floor in water.",
+        desc: "A heavy block.  Can pick up one item it moves over, which may then be cloned via a clone machine.  Drops the item when destroyed.  Turns to floor in water (destroying any item).",
     },
     'logic_gate/diode': {
         name: "Diode",
@@ -1231,7 +1231,7 @@ export const TILE_DESCRIPTIONS = {
     // XXX extremely aspirational lmao
     laser: {
         name: "Laser",
-        desc: "Fires a powerful beam in a straight line, which destroys anything that touches it.",
+        desc: "Fires a laser beam in a straight line.  The beam kills players; destroys monsters (except fireballs and ghosts); destroys frame blocks; melts ice blocks; detonates mines; lights time bombs; burns grass; melts ice; and vitrifies sand.  Spreads in all directions in a glass block.  May be pushed against to change its direction.  If connected to wire, will only fire while powered.",
     },
     prism_main: {
         name: "Prism",
