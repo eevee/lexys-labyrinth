@@ -1009,14 +1009,16 @@ class Player extends PrimaryView {
         });
 
         // When we lose focus, act as though every key was released, and pause the game
-        window.addEventListener('blur', () => {
-            this.enter_background();
-        });
+        window.addEventListener('blur', () => this.enter_background());
+        window.addEventListener('focus', () => this.exit_background());
         // Same when the window becomes hidden (especially important on phones, where this covers
         // turning the screen off!)
-        document.addEventListener('visibilitychange', ev => {
+        document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 this.enter_background();
+            }
+            else if (document.visibilityState === 'visible') {
+                this.exit_background();
             }
         });
 
@@ -1472,8 +1474,15 @@ class Player extends PrimaryView {
         this.current_keycodes.clear();
         this.current_touches = {};
 
-        if (this.state === 'playing' || this.state === 'rewinding') {
-            this.autopause();
+        if ((this.state === 'playing' || this.state === 'rewinding') && ! this.turn_based_mode) {
+            this.set_state('paused');
+            this.autopaused = true;
+        }
+    }
+
+    exit_background() {
+        if (this.autopaused && this.state === 'paused') {
+            this.set_state('playing');
         }
     }
 
@@ -2201,14 +2210,6 @@ class Player extends PrimaryView {
         }
     }
 
-    autopause() {
-        // Turn-based mode doesn't need this
-        if (this.turn_based_mode)
-            return;
-
-        this.set_state('paused');
-    }
-
     start_restarting() {
         this.stop_restarting();
 
@@ -2254,6 +2255,7 @@ class Player extends PrimaryView {
             return;
 
         this.state = new_state;
+        this.autopaused = false;
 
         // Drop any "new" keys when switching into playing, since they accumulate freely as long as
         // the game isn't actually running
