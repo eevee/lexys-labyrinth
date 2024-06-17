@@ -1131,6 +1131,7 @@ const TILE_TYPES = {
     },
     bomb: {
         layer: LAYERS.item,
+        transmogrifies_into: 'chip',
         on_ready(me, level) {
             if (! level.compat.no_auto_convert_ccl_bombs &&
                 level.stored_level.format === 'ccl' &&
@@ -1343,17 +1344,21 @@ const TILE_TYPES = {
     // Mechanisms
     dirt_block: {
         layer: LAYERS.actor,
+        is_actor: true,
+        is_block: true,
+        transmogrifies_into: 'ice_block',
         collision_mask: COLLISION.block_cc1,
         blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.always,
-        is_actor: true,
-        is_block: true,
         innate_traits: ACTOR_TRAITS.fireproof | ACTOR_TRAITS.shockproof,
         can_reverse_on_railroad: true,
         movement_speed: 4,
     },
     ice_block: {
         layer: LAYERS.actor,
+        is_actor: true,
+        is_block: true,
+        transmogrifies_into: 'dirt_block',
         collision_mask: COLLISION.block_cc2,
         blocked_by(me, level, other) {
             // pgchip's ice blocks followed dirt block collision rules, except for being able to go
@@ -1364,8 +1369,6 @@ const TILE_TYPES = {
         },
         blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.never,
-        is_actor: true,
-        is_block: true,
         can_reveal_walls: true,
         can_reverse_on_railroad: true,
         movement_speed: 4,
@@ -1389,11 +1392,11 @@ const TILE_TYPES = {
     },
     frame_block: {
         layer: LAYERS.actor,
+        is_actor: true,
+        is_block: true,
         collision_mask: COLLISION.block_cc2,
         blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.never,
-        is_actor: true,
-        is_block: true,
         can_reveal_walls: true,
         can_reverse_on_railroad: true,
         movement_speed: 4,
@@ -1416,12 +1419,12 @@ const TILE_TYPES = {
     },
     boulder: {
         layer: LAYERS.actor,
+        is_actor: true,
+        is_block: true,
         collision_mask: COLLISION.block_cc2,
         blocks_collision: COLLISION.all,
         // XXX?
         item_pickup_priority: PICKUP_PRIORITIES.never,
-        is_actor: true,
-        is_block: true,
         can_reveal_walls: true,
         // Boulders don't directly push each other; instead on_bumped will propagate the momentum
         // XXX can they not push other kinds of blocks?
@@ -1539,6 +1542,7 @@ const TILE_TYPES = {
         is_chip: true,
         is_required_chip: true,
         green_toggle_counterpart: 'green_bomb',
+        transmogrifies_into: 'green_bomb',
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         check_toll(me, level, other) {
@@ -1558,6 +1562,7 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         is_required_chip: true,
         green_toggle_counterpart: 'green_chip',
+        transmogrifies_into: 'green_chip',
         on_arrive(me, level, other) {
             if (other.type.name === 'ghost')
                 return;
@@ -1805,64 +1810,6 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         // C2M technically supports wires in transmogrifiers, but they don't do anything
         wire_propagation_mode: 'none',
-        _mogrifications: {
-            player: 'player2',
-            player2: 'player',
-            doppelganger1: 'doppelganger2',
-            doppelganger2: 'doppelganger1',
-
-            dirt_block: 'ice_block',
-            ice_block: 'dirt_block',
-
-            ball: 'walker',
-            walker: 'ball',
-
-            fireball: 'bug',
-            bug: 'glider',
-            glider: 'paramecium',
-            paramecium: 'fireball',
-
-            tank_blue: 'tank_yellow',
-            tank_yellow: 'tank_blue',
-
-            teeth: 'teeth_timid',
-            teeth_timid: 'teeth',
-
-            // Items are only mogrified when inside a glass block
-            key_red: 'key_blue',
-            key_blue: 'key_red',
-            key_yellow: 'key_green',
-            key_green: 'key_yellow',
-
-            flippers: 'fire_boots',
-            fire_boots: 'flippers',
-            cleats: 'suction_boots',
-            suction_boots: 'cleats',
-            hiking_boots: 'speed_boots',
-            speed_boots: 'hiking_boots',
-            lightning_bolt: 'railroad_sign',
-            railroad_sign: 'lightning_bolt',
-            helmet: 'xray_eye',
-            xray_eye: 'helmet',
-            hook: 'foil',
-            foil: 'hook',
-            bowling_ball: 'dynamite',
-            dynamite: 'bowling_ball',
-            bribe: 'skeleton_key',
-            skeleton_key: 'bribe',
-            stopwatch_bonus: 'stopwatch_penalty',
-            stopwatch_penalty: 'stopwatch_bonus',
-            green_chip: 'green_bomb',
-            green_bomb: 'green_chip',
-            chip: 'bomb',
-            bomb: 'chip',
-
-            // TODO
-            // boulder: 'log',
-            // log: 'boulder',
-            // ankh: 'phantom_ring',
-            // phantom_ring: 'ankh',
-        },
         _blob_mogrifications: ['glider', 'paramecium', 'fireball', 'bug', 'walker', 'ball', 'teeth', 'tank_blue', 'teeth_timid'],
         on_begin(me, level) {
             update_wireable(me, level);
@@ -1877,17 +1824,17 @@ const TILE_TYPES = {
             if (! me.is_active)
                 return;
             let name = other.type.name;
-            if (me.type._mogrifications[name]) {
-                level.transmute_tile(other, me.type._mogrifications[name]);
+            if (other.type.is_actor && other.type.transmogrifies_into) {
+                level.transmute_tile(other, other.type.transmogrifies_into);
             }
             else if (name === 'blob') {
                 let options = me.type._blob_mogrifications;
                 level.transmute_tile(other, options[level.prng() % options.length]);
             }
             else if (name === 'glass_block' && other.encased_item) {
-                let new_item = me.type._mogrifications[other.encased_item];
-                if (new_item) {
-                    level.set_tile_prop(other, 'encased_item', new_item);
+                let into = TILE_TYPES[other.encased_item].transmogrifies_into;
+                if (into) {
+                    level.set_tile_prop(other, 'encased_item', into);
                 }
                 else {
                     return;
@@ -2516,6 +2463,7 @@ const TILE_TYPES = {
         visual_state: button_visual_state,
     },
     // Logic gates, all consolidated into a single tile type
+    // TODO maybe...  don't?  maybe split up?  idk
     logic_gate: {
         // gate_type: not, and, or, xor, nand, latch-cw, latch-ccw, counter, bogus
         _gate_types: {
@@ -2777,6 +2725,7 @@ const TILE_TYPES = {
     // Time alteration
     stopwatch_bonus: {
         layer: LAYERS.item,
+        transmogrifies_into: 'stopwatch_penalty',
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         // Stopwatch bonus toll functions like a stopwatch penalty, except it doesn't go away and
@@ -2795,6 +2744,7 @@ const TILE_TYPES = {
     },
     stopwatch_penalty: {
         layer: LAYERS.item,
+        transmogrifies_into: 'stopwatch_bonus',
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         // Stopwatch penalty toll just gives you 10 seconds every time??
@@ -2834,6 +2784,7 @@ const TILE_TYPES = {
     // Critters
     bug: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'glider',
         collision_mask: COLLISION.bug,
         decide_movement(me, level) {
             // always try turning as left as possible, and fall back to less-left turns
@@ -2843,6 +2794,7 @@ const TILE_TYPES = {
     },
     paramecium: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'fireball',
         decide_movement(me, level) {
             // always try turning as right as possible, and fall back to less-right turns
             let d = DIRECTIONS[me.direction];
@@ -2851,6 +2803,7 @@ const TILE_TYPES = {
     },
     ball: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'walker',
         decide_movement(me, level) {
             // preserve current direction; if that doesn't work, bounce back the way we came
             let d = DIRECTIONS[me.direction];
@@ -2859,6 +2812,7 @@ const TILE_TYPES = {
     },
     walker: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'ball',
         decide_movement(me, level) {
             // preserve current direction; if that doesn't work, pick a random direction, even the
             // one we failed to move in (but ONLY then; important for RNG sync)
@@ -2877,6 +2831,7 @@ const TILE_TYPES = {
     },
     tank_blue: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'tank_yellow',
         decide_movement(me, level) {
             // always keep moving forward, but reverse if the flag is set
             let direction = me.direction;
@@ -2894,6 +2849,7 @@ const TILE_TYPES = {
     },
     tank_yellow: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'tank_blue',
         collision_mask: COLLISION.yellow_tank,
         pushes: COMMON_PUSHES,
         decide_movement(me, level) {
@@ -2929,6 +2885,7 @@ const TILE_TYPES = {
     },
     teeth: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'teeth_timid',
         movement_parity: 2,
         decide_movement(me, level) {
             let preference = pursue_player(me, level);
@@ -2943,6 +2900,7 @@ const TILE_TYPES = {
     },
     teeth_timid: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'teeth',
         movement_parity: 2,
         decide_movement(me, level) {
             let preference = pursue_player(me, level);
@@ -2957,6 +2915,7 @@ const TILE_TYPES = {
     },
     fireball: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'bug',
         collision_mask: COLLISION.fireball,
         innate_traits: ACTOR_TRAITS.fireproof,
         decide_movement(me, level) {
@@ -2968,6 +2927,7 @@ const TILE_TYPES = {
     },
     glider: {
         ...COMMON_MONSTER,
+        transmogrifies_into: 'paramecium',
         // also doesn't cause turtles to disappear, but we don't have a trait for just that
         innate_traits: ACTOR_TRAITS.waterproof,
         decide_movement(me, level) {
@@ -3058,21 +3018,24 @@ const TILE_TYPES = {
     key_red: {
         // Red key is only picked up by players and doppelgangers
         layer: LAYERS.item,
-        item_priority: PICKUP_PRIORITIES.player,
         is_item: true,
         is_key: true,
+        transmogrifies_into: 'key_blue',
+        item_priority: PICKUP_PRIORITIES.player,
     },
     key_blue: {
         // Blue key is picked up by all actors except CC2 blocks
         layer: LAYERS.item,
-        item_priority: PICKUP_PRIORITIES.always,
         is_item: true,
         is_key: true,
+        transmogrifies_into: 'key_red',
+        item_priority: PICKUP_PRIORITIES.always,
     },
     key_yellow: {
         layer: LAYERS.item,
         is_item: true,
         is_key: true,
+        transmogrifies_into: 'key_green',
         // FIXME ok this is ghastly
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
@@ -3081,6 +3044,7 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         is_item: true,
         is_key: true,
+        transmogrifies_into: 'key_yellow',
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.normal,
     },
@@ -3088,27 +3052,33 @@ const TILE_TYPES = {
     // TODO note: ms allows blocks to pass over tools
     cleats: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'suction_boots',
         item_traits: ACTOR_TRAITS.iceproof,
     },
     suction_boots: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'cleats',
         item_traits: ACTOR_TRAITS.forceproof,
     },
     fire_boots: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'flippers',
         item_traits: ACTOR_TRAITS.fireproof,
     },
     flippers: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'fire_boots',
         item_traits: ACTOR_TRAITS.waterproof,
     },
     hiking_boots: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'speed_boots',
         item_traits: ACTOR_TRAITS.dirtproof,
     },
     // Other tools
     dynamite: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'bowling_ball',
         on_depart(me, level, other) {
             if (! other.type.is_real_player)
                 return;
@@ -3252,6 +3222,7 @@ const TILE_TYPES = {
     },
     bowling_ball: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'dynamite',
         on_drop(level) {
             return 'rolling_ball';
         },
@@ -3290,37 +3261,46 @@ const TILE_TYPES = {
     },
     xray_eye: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'helmet',
         item_traits: ACTOR_TRAITS.perceptive,
     },
     helmet: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'xray_eye',
         item_traits: ACTOR_TRAITS.invulnerable,
     },
     railroad_sign: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'lightning_bolt',
         item_traits: ACTOR_TRAITS.trackproof,
     },
     foil: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'hook',
         item_traits: ACTOR_TRAITS.foiled,
     },
     lightning_bolt: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'railroad_sign',
         item_traits: ACTOR_TRAITS.charged | ACTOR_TRAITS.shockproof,
     },
     speed_boots: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'hiking_boots',
         item_traits: ACTOR_TRAITS.hasty,
     },
     bribe: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'skeleton_key',
     },
     hook: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'foil',
         item_traits: ACTOR_TRAITS.adhesive,
     },
     skeleton_key: {
         ...COMMON_TOOL,
+        transmogrifies_into: 'bribe',
     },
     ankh: {
         ...COMMON_TOOL,
@@ -3351,6 +3331,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         is_real_player: true,
+        transmogrifies_into: 'player2',
         collision_mask: COLLISION.real_player1,
         blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.real_player,
@@ -3385,6 +3366,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         is_real_player: true,
+        transmogrifies_into: 'player',
         collision_mask: COLLISION.real_player2,
         blocks_collision: COLLISION.all,
         item_pickup_priority: PICKUP_PRIORITIES.real_player,
@@ -3402,6 +3384,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         is_monster: true,
+        transmogrifies_into: 'doppelganger2',
         collision_mask: COLLISION.doppel1,
         blocks_collision: COLLISION.all,
         skip_decision_time_collision_check: true,
@@ -3422,6 +3405,7 @@ const TILE_TYPES = {
         is_actor: true,
         is_player: true,
         is_monster: true,
+        transmogrifies_into: 'doppelganger1',
         collision_mask: COLLISION.doppel2,
         blocks_collision: COLLISION.all,
         skip_decision_time_collision_check: true,
@@ -3442,6 +3426,7 @@ const TILE_TYPES = {
         layer: LAYERS.item,
         is_chip: true,
         is_required_chip: true,
+        transmogrifies_into: 'bomb',
         blocks_collision: COLLISION.block_cc1 | COLLISION.monster_typical,
         item_priority: PICKUP_PRIORITIES.real_player,
         check_toll(me, level, other) {
