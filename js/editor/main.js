@@ -605,6 +605,37 @@ export class Editor extends PrimaryView {
                 }
                 util.trigger_local_download((this.stored_level.title || 'untitled') + '.ccl', new Blob([buf]));
             }],
+            ["Download pack as CCL (old CC1 format)", () => {
+                // TODO support getting warnings out of synthesis?
+                let stored_pack = this.conductor.stored_game;
+
+                // Pass in a generator to avoid inflating every level at once
+                function* stored_levels_generator() {
+                    for (let [i, meta] of stored_pack.level_metadata.entries()) {
+                        if (i === this.conductor.level_index) {
+                            // Use the current state of the current level even if it's not been saved
+                            yield this.stored_level;
+                        }
+                        else {
+                            yield stored_pack.load_level(i);
+                        }
+                    }
+                }
+
+                let buf;
+                try {
+                    buf = dat.synthesize_pack(stored_levels_generator.call(this));
+                }
+                catch (errs) {
+                    // FIXME not clear what level they come from
+                    if (errs instanceof dat.CCLEncodingErrors) {
+                        new dialogs.EditorExportFailedOverlay(this.conductor, errs.errors).open();
+                        return;
+                    }
+                    throw errs;
+                }
+                util.trigger_local_download((stored_pack.title || 'untitled') + '.ccl', new Blob([buf]));
+            }],
         ];
         this.export_menu = new MenuOverlay(
             this.conductor,

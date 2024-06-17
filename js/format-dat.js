@@ -463,7 +463,7 @@ export class CCLEncodingErrors extends util.LLError {
     }
 }
 
-export function synthesize_level(stored_level) {
+function _encode_level(stored_level, n) {
     let errors = [];
     if (stored_level.size_x !== 32) {
         errors.push(`Level width must be 32, not ${stored_level.size_x}`);
@@ -472,8 +472,6 @@ export function synthesize_level(stored_level) {
         errors.push(`Level width must be 32, not ${stored_level.size_y}`);
     }
 
-    // TODO might also want the tile world "lynx mode" magic number, or pgchip's ice block rules
-    let magic = 0x0002aaac;
     let top_layer = [];
     let bottom_layer = [];
     let hint_text = null;
@@ -481,7 +479,6 @@ export function synthesize_level(stored_level) {
     let cloner_cxns = [];
     let monster_coords = [];
     let error_found_wires = false;
-    // TODO i could be a little kinder and support, say, items on terrain; do those work in mscc?  tw lynx?
     for (let [i, cell] of stored_level.linear_cells.entries()) {
         let [x, y] = stored_level.scalar_to_coords(i);
         let actor = null;
@@ -507,7 +504,8 @@ export function synthesize_level(stored_level) {
                 other = tile;
             }
 
-            if (tile.type.is_monster) {
+            // TODO decorative monsters that *can't* move are relatively common
+            if (tile.type.is_monster && cell.get_terrain().type.name !== 'cloner') {
                 monster_coords.push(x, y);
             }
         }
@@ -659,6 +657,9 @@ export function synthesize_level(stored_level) {
     }
 
     if (errors.length > 0) {
+        if (n) {
+            errors.push(`(for level ${n})`);
+        }
         throw new CCLEncodingErrors(errors);
     }
 
@@ -669,17 +670,11 @@ export function synthesize_level(stored_level) {
         2 + bottom_layer_bytes.length +
         2 + metadata_length
     );
-    let total_length = (
-        6 +             // game header
-        level_length
-    );
-    let ret = new ArrayBuffer(total_length);
+    let ret = new ArrayBuffer(level_length);
     let array = new Uint8Array(ret);
     let view = new DataView(ret);
-    view.setUint32(0, magic, true);
-    view.setUint16(4, 1, true);  // level count, teehee
 
-    let p = 6;
+    let p = 0;
     view.setUint16(p, level_length - 2, true);  // doesn't include this field
     view.setUint16(p + 2, 1, true);  // level number
     view.setUint16(p + 4, stored_level.time_limit, true);
@@ -703,9 +698,44 @@ export function synthesize_level(stored_level) {
         p += block.byteLength;
     }
 
-    if (p !== total_length) {
-        console.error("Something has gone very awry:", total_length, p);
+    if (p !== level_length) {
+        console.error("Something has gone very awry:", level_length, p);
     }
 
     return ret;
+}
+
+export function synthesize_pack(stored_levels) {
+    let total_length = 6;
+    let encoded_levels = [];
+    let n = 1;
+    for (let stored_level of stored_levels) {
+        let buf = _encode_level(stored_level, n);
+        total_length += buf.byteLength;
+        encoded_levels.push(buf);
+        n += 1;
+    }
+
+    let ret = new ArrayBuffer(total_length);
+    let array = new Uint8Array(ret);
+    let view = new DataView(ret);
+
+    // TODO default to the lynx magic number bc we don't really support ms rules, but ice block
+    // patch also has a magic number i think??
+    //let magic = 0x0002aaac;  // original mscc
+    let magic = 0x0102aaac;
+    view.setUint32(0, magic, true);
+    view.setUint16(4, 1, true);  // level count, teehee
+
+    let p = 6;
+    for (let buf of encoded_levels) {
+        array.set(new Uint8Array(buf), p);
+        p += buf.byteLength;
+    }
+
+    return ret;
+}
+
+export function synthesize_level(stored_level) {
+    return synthesize_pack([stored_level]);
 }
