@@ -339,6 +339,7 @@ const TILE_TYPES = {
         contains_wire: true,
         wire_propagation_mode: 'autocross',
         can_be_powered_by_actor: true,
+        can_be_bucketed: true,
         on_approach(me, level, other) {
             if (other.type.name === 'blob' || other.type.name === 'boulder') {
                 // Blobs spread slime onto floor
@@ -351,6 +352,7 @@ const TILE_TYPES = {
     },
     floor_letter: {
         layer: LAYERS.terrain,
+        can_be_bucketed: true,
         populate_defaults(me) {
             me.overlaid_glyph = "?";
         },
@@ -358,6 +360,7 @@ const TILE_TYPES = {
     // TODO possibly this should be a single tile
     floor_custom_green: {
         layer: LAYERS.terrain,
+        can_be_bucketed: true,
         blocks_collision: COLLISION.ghost,
         blocks(me, level, other) {
             return (other.type.name === 'sokoban_block' && other.color !== 'green');
@@ -365,6 +368,7 @@ const TILE_TYPES = {
     },
     floor_custom_pink: {
         layer: LAYERS.terrain,
+        can_be_bucketed: true,
         blocks_collision: COLLISION.ghost,
         blocks(me, level, other) {
             return (other.type.name === 'sokoban_block' && other.color !== 'red');
@@ -372,6 +376,7 @@ const TILE_TYPES = {
     },
     floor_custom_yellow: {
         layer: LAYERS.terrain,
+        can_be_bucketed: true,
         blocks_collision: COLLISION.ghost,
         blocks(me, level, other) {
             return (other.type.name === 'sokoban_block' && other.color !== 'yellow');
@@ -379,6 +384,7 @@ const TILE_TYPES = {
     },
     floor_custom_blue: {
         layer: LAYERS.terrain,
+        can_be_bucketed: true,
         blocks_collision: COLLISION.ghost,
         blocks(me, level, other) {
             return (other.type.name === 'sokoban_block' && other.color !== 'blue');
@@ -2441,21 +2447,7 @@ const TILE_TYPES = {
         layer: LAYERS.terrain,
         on_arrive(me, level, other) {
             level.sfx.play_once('button-press', me.cell);
-
-            for (let x = Math.max(0, me.cell.x - 2); x <= Math.min(level.width - 1, me.cell.x + 2); x++) {
-                for (let y = Math.max(0, me.cell.y - 2); y <= Math.min(level.height - 1, me.cell.y + 2); y++) {
-                    let cell = level.cell(x, y);
-                    // TODO wait is this right
-                    if (cell === me.cell)
-                        continue;
-
-                    for (let tile of cell) {
-                        if (tile && tile.type.on_gray_button) {
-                            tile.type.on_gray_button(tile, level);
-                        }
-                    }
-                }
-            }
+            level.do_gray_button(me.cell);
         },
         on_depart(me, level, other) {
             level.sfx.play_once('button-release', me.cell);
@@ -3223,7 +3215,7 @@ const TILE_TYPES = {
     bowling_ball: {
         ...COMMON_TOOL,
         transmogrifies_into: 'dynamite',
-        on_drop(level) {
+        on_drop(level, cell) {
             return 'rolling_ball';
         },
     },
@@ -3323,6 +3315,46 @@ const TILE_TYPES = {
     floor_ankh: {
         layer: LAYERS.terrain,
         blocks_collision: COLLISION.all_but_real_player,
+    },
+    remote_gray: {
+        ...COMMON_TOOL,
+        on_drop(level, cell) {
+            level.sfx.play_once('button-press', cell);
+            level.do_gray_button(cell);
+            return null;
+        },
+    },
+    remote_green: {
+        ...COMMON_TOOL,
+        on_drop(level, cell) {
+            level.sfx.play_once('button-press', cell);
+            level.pending_green_toggle = ! level.pending_green_toggle;
+            return null;
+        },
+    },
+    bucket_water: {
+        ...COMMON_TOOL,
+        on_depart(me, level, other) {
+            let terrain = me.cell.get_terrain();
+            if (terrain.type.can_be_bucketed) {
+                level.transmute_tile(terrain, 'water');
+                level.spawn_animation(me.cell, 'splash');
+                level.sfx.play_once('splash', me.cell);
+                level.remove_tile(me);
+            }
+        },
+    },
+    bucket_fire: {
+        ...COMMON_TOOL,
+        on_depart(me, level, other) {
+            let terrain = me.cell.get_terrain();
+            if (terrain.type.can_be_bucketed) {
+                level.transmute_tile(terrain, 'fire');
+                level.spawn_animation(me.cell, 'puff');
+                level.sfx.play_once('step-fire', me.cell);
+                level.remove_tile(me);
+            }
+        },
     },
 
     // Progression

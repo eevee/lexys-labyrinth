@@ -2480,10 +2480,13 @@ export class Level extends LevelInterface {
                 // FIXME quirky things happen if a dropped bowling ball can't enter the facing cell
                 // (mostly it disappears) (also arguably a bug)
                 // FIXME does this even need to be a function lol
-                name = type.on_drop(this);
-                if (name) {
-                    type = TILE_TYPES[name];
+                name = type.on_drop(this, cell);
+                if (name === null) {
+                    // The item disappears on drop, so there's nothing to do
+                    return true;
                 }
+
+                type = TILE_TYPES[name];
             }
             let tile = new Tile(type);
             if (type.is_actor) {
@@ -2852,6 +2855,19 @@ export class Level extends LevelInterface {
         if (this.time_remaining <= 0) {
             // If the timer isn't paused, this will kill the player at the end of the tic
             this.time_remaining = 1;
+        }
+    }
+
+    do_gray_button(origin) {
+        for (let x = Math.max(0, origin.x - 2); x <= Math.min(this.width - 1, origin.x + 2); x++) {
+            for (let y = Math.max(0, origin.y - 2); y <= Math.min(this.height - 1, origin.y + 2); y++) {
+                let cell = this.cell(x, y);
+                for (let tile of cell) {
+                    if (tile && tile.type.on_gray_button) {
+                        tile.type.on_gray_button(tile, this);
+                    }
+                }
+            }
         }
     }
 
