@@ -604,6 +604,7 @@ class Player extends PrimaryView {
         this.chips_el = this.root.querySelector('.chips output');
         this.time_el = this.root.querySelector('.time output');
         this.bonus_el = this.root.querySelector('.bonus output');
+        this.exits_el = this.root.querySelector('.exits output');
         this.inventory_el = this.root.querySelector('.inventory');
 
         this.music_el = this.root.querySelector('#player-music');
@@ -1622,6 +1623,7 @@ class Player extends PrimaryView {
         this.root.classList.remove('--replay-playback');
         this.root.classList.remove('--replay-recording');
         this.root.classList.remove('--bonus-visible');
+        this.root.classList.toggle('--multiple-players', this.level.remaining_players > 1);
         this.root.classList.toggle('--hide-logic', this.level.stored_level.hide_logic);
         this.root.classList.toggle('--cc1-boots', this.level.stored_level.use_cc1_boots);
 
@@ -2111,6 +2113,7 @@ class Player extends PrimaryView {
         if (this.level.bonus_points > 0) {
             this.root.classList.add('--bonus-visible');
         }
+        this.exits_el.textContent = this.level.remaining_players;
 
         // Check for the player standing on a hint tile; this is slightly invasive but lets us
         // notice exactly when it changes (and anyway it's a UI thing, not gameplay)

@@ -1419,6 +1419,7 @@ ol.packtest-summary > li {
         "level      chips"      min-content
         "level      time"       min-content
         "level      bonus"      min-content
+        "level      exits"      min-content
         "level      rules"      1fr
         "level      inventory"  min-content
         /* Need explicit min-content to force the hint to wrap */
@@ -1762,6 +1763,15 @@ body.--debug .player-overlay-message {
     display: none;
     line-height: 1;
 }
+.chips,
+.time,
+.bonus,
+.exits {
+    font-size: calc(var(--tile-height) * var(--scale) * 3/4);
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+}
 .chips {
     grid-area: chips;
 }
@@ -1771,17 +1781,14 @@ body.--debug .player-overlay-message {
 .bonus {
     grid-area: bonus;
 }
-.chips,
-.time,
-.bonus {
-    font-size: calc(var(--tile-height) * var(--scale) * 3/4);
-    display: flex;
-    align-items: center;
-    gap: 0.25em;
+.exits {
+    grid-area: exits;
+    display: none;  /* hidden by default */
 }
 .chips h3,
 .time h3,
-.bonus h3 {
+.bonus h3,
+.exits h3 {
     flex: 0;
     order: 2;
     font-size: 0.75em;
@@ -1790,7 +1797,8 @@ body.--debug .player-overlay-message {
 }
 .chips output,
 .time output,
-.bonus output {
+.bonus output,
+.exits output {
     flex: 1;
     min-width: 2em;
     min-height: 1em;
@@ -1807,12 +1815,18 @@ body.--debug .player-overlay-message {
     color: #6ca2a7;
 }
 .time output.--warning {
-    color: #f48457;
+    color: #fea46e;
 }
 .time output.--danger {
-    color: #e1565f;
+    color: #f85f67;
     /* TODO this can get out of sync and keeps going at 0, but is a neat idea */
     /* animation: time-pulse 1s linear infinite; */
+}
+.time output {
+    color: #6ca2a7;
+}
+.exits output {
+    color: #ffe5b4;
 }
 @keyframes time-pulse {
     0% {
@@ -1829,6 +1843,9 @@ body.--debug .player-overlay-message {
 }
 #player.--bonus-visible .bonus output {
     color: #e2c9ff;
+}
+#player.--multiple-players .exits {
+    display: flex;
 }
 .player-rules {
     font-size: calc(var(--tile-height) * var(--scale) / 4);
@@ -1943,6 +1960,10 @@ body.--debug .player-overlay-message {
     .bonus {
         /* These numbers need to be sliiightly smaller */
         font-size: calc(var(--tile-height) * var(--scale) * 2/3);
+    }
+    .exits {
+        /* Nowhere good to put this really */
+        display: none !important;
     }
     #player .inventory {
         /* stick me in the center left */
