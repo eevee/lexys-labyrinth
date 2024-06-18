@@ -158,7 +158,7 @@ export function handle_drop(element, options) {
 }
 
 
-export const is_likely_mac = /mac|iPhone|iPad|iPod/i.test(window.navigator.platform);
+export const is_likely_mac = globalThis.window && /mac|iPhone|iPad|iPod/i.test(window.navigator.platform);
 
 // On macOS it’s more natural to use the Command key for shortcuts.
 export function has_ctrl_key(ev) {
