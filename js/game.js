@@ -1178,6 +1178,10 @@ export class Level extends LevelInterface {
                 return;
             }
 
+            if (this.render_direction) {
+                this.set_tile_prop(actor, 'render_direction', null);
+            }
+
             if (actor === this.player) {
                 // Play step sound when the player completes a move
                 this._play_footstep(actor);
@@ -1796,6 +1800,7 @@ export class Level extends LevelInterface {
                     this.set_tile_prop(actor, 'previous_cell', actor.cell);
                     this.set_tile_prop(actor, 'destination_cell', cell);
                     this.set_tile_prop(actor, 'is_making_failure_move', true);
+                    this.set_tile_prop(actor, 'render_direction', direction);
                 }
             }
 

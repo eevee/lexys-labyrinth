@@ -2319,7 +2319,7 @@ export class Tileset {
         // If we have an object, it must be a table of directions
         let coords = drawspec;
         if (!(coords instanceof Array)) {
-            coords = coords[(tile && tile.direction) ?? 'south'];
+            coords = coords[tile?.render_direction ?? tile?.direction ?? 'south'];
         }
 
         // Any animation not using the 'animated' special is a dedicated animation tile (like an
@@ -2343,11 +2343,8 @@ export class Tileset {
         if (drawspec.all) {
             frames = drawspec.all;
         }
-        else if (tile && tile.direction) {
-            frames = drawspec[tile.direction];
-        }
         else {
-            frames = drawspec.south;
+            frames = drawspec[tile?.render_direction ?? tile?.direction ?? 'south'];
         }
 
         let is_global = drawspec.global ?? true;
@@ -2687,7 +2684,7 @@ export class Tileset {
 
         // CC2 only supports horizontal and vertical moves, not all four directions.  The other two
         // directions are the animations played in reverse.  TW's large layout supports all four.
-        let direction = (tile ? tile.direction : null) ?? 'south';
+        let direction = tile?.render_direction ?? tile?.direction ?? 'south';
         let axis_cels = drawspec[direction];
         let w = 1, h = 1, x = 0, y = 0, sx = 0, sy = 0, reverse = false;
         if (direction === 'north') {
@@ -2752,7 +2749,7 @@ export class Tileset {
         // The direction overlay is one of four quarter-tiles, drawn about in the center of the
         // rover but shifted an eighth of a tile in the direction in question
         let overlay_position = this._rotate(tile.direction, 0.25, 0.125, 0.75, 0.625);
-        let index = {north: 0, east: 1, west: 2, south: 3}[tile.direction];
+        let index = {north: 0, east: 1, west: 2, south: 3}[tile.render_direction ?? tile.direction];
         if (index === undefined)
             return;
         packet.blit(
