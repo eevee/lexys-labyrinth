@@ -4041,13 +4041,16 @@ class LevelBrowserOverlay extends DialogOverlay {
         this.main.append(table);
         let savefile = conductor.current_pack_savefile;
         let total_abstime = 0, total_score = 0;
+        let cleared = 0, unaided = 0;
         for (let [i, meta] of conductor.stored_game.level_metadata.entries()) {
             let scorecard = savefile.scorecards[i];
             let score = "—", time = "—", abstime = "—", aid = "";
             let button;
             if (scorecard) {
+                cleared += 1;
                 score = scorecard.score.toLocaleString();
                 if (scorecard.aid === 0) {
+                    unaided += 1;
                     aid = "★";
                 }
 
@@ -4143,7 +4146,7 @@ class LevelBrowserOverlay extends DialogOverlay {
 
         table.append(mk('tfoot', mk('tr',
             mk('th'),
-            mk('th.-title', "Total"),
+            mk('th.-total', `${cleared} / ${conductor.stored_game.level_metadata.length} cleared (${unaided}★ unaided)`),
             mk('th'),
             mk('th.-time', util.format_duration(total_abstime / TICS_PER_SECOND, 2)),
             mk('th.-score', total_score.toLocaleString()),
