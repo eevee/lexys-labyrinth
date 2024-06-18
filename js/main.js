@@ -2450,6 +2450,15 @@ class Player extends PrimaryView {
                     }
                 }
 
+                let star = '';
+                if (scorecard.aid === 0) {
+                    if (! old_scorecard || old_scorecard.aid > 0) {
+                        star = mk('span.-new-star', "★");
+                    }
+                    else {
+                        star = "★";
+                    }
+                }
                 overlay.append(mk('div.scoreboard',
                     // base score + time bonus + score bonus
                     mk('div.-subscore', mk('h4', "base score"), mk('p', base.toLocaleString())),
@@ -2462,7 +2471,7 @@ class Player extends PrimaryView {
                     // level score ... first time OR new record OR x short
                     mk('div.-level-score',
                         mk('h4', "level score"),
-                        mk('p', scorecard.score.toLocaleString(), scorecard.aid === 0 ? "★" : "")),
+                        mk('p', scorecard.score.toLocaleString(), star)),
                     score_improvement,
 
                     mk('div.-level-score',

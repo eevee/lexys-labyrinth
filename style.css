@@ -1668,6 +1668,9 @@ body.--debug .player-overlay-message {
 .scoreboard .-level-score {
     grid-column: span 3;
 }
+.scoreboard .-new-star {
+    color: hsl(45, 100%, 75%);
+}
 .scoreboard .-improvement {
     grid-column: span 3;
 }
