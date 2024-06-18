@@ -536,17 +536,17 @@ export class EyedropOperation extends MouseOperation {
         // clicks lol!  clean fix is to make an op immediately and persist it even when mouse isn't
         // down?  then the hover stuff could be rolled into the tool too?  kind of a big change tho
         // so for now let's cheat and hack it onto the editor itself
-        this.last_eyedropped_coords = null;
+        this.last_pos = null;
         this.last_layer = null;
     }
 
-    eyedrop(x, y) {
-        let cell = this.cell(x, y);
+    eyedrop(pos) {
+        let cell = this.cell(pos.x, pos.y);
         if (! cell) {
-            this.last_eyedropped_coords = null;
+            this.last_pos = null;
             return;
         }
-        let n = this.editor.coords_to_scalar(x, y);
+        let n = this.editor.coords_to_scalar(pos.x, pos.y);
 
         // If we're picking the background, we always use the terrain
         if (this.ctrl) {
@@ -557,11 +557,10 @@ export class EyedropOperation extends MouseOperation {
         // Pick the topmost thing, unless we're clicking on a cell repeatedly, in which case we
         // continue from below the last thing we picked
         let layer_offset = 0;
-        if (this.last_eyedropped_coords &&
-            this.last_eyedropped_coords[0] === x && this.last_eyedropped_coords[1] === y)
-        {
+        if (this.last_pos && this.last_pos.x === pos.x && this.last_pos.y === pos.y) {
             layer_offset = this.last_layer;
         }
+        this.last_pos = pos;
         for (let l = LAYERS.MAX - 1; l >= 0; l--) {
             // This scheme means we'll cycle back around after hitting the bottom
             let layer = (l + layer_offset) % LAYERS.MAX;
@@ -574,18 +573,21 @@ export class EyedropOperation extends MouseOperation {
                 continue;
 
             this.editor.select_foreground_tile(tile, n);
-            this.last_eyedropped_coords = [x, y];
             this.last_layer = layer;
             return;
         }
     }
 
     handle_press(pos) {
-        this.eyedrop(pos.x, pos.y);
+        this.eyedrop(pos);
     }
     handle_drag(pos) {
-        // FIXME should only re-eyedrop if we enter a new cell or click again
-        this.eyedrop(pos.x, pos.y);
+        // Eyedrop on drag, but only when entering a new cell, or we'll cycle rapidly through layers
+        // just by moving around within a cell
+        // TODO do we need a cursor for this?
+        if (pos.x !== this.prev_pos.x || pos.y !== this.prev_pos.y) {
+            this.eyedrop(pos);
+        }
     }
 }
 
