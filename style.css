@@ -1033,6 +1033,7 @@ pre.stack-trace {
     font-style: italic;
 }
 .played-pack-list .-progress {
+    isolation: isolate;  /* prevent the z-index on the levels bar from escaping */
     display: grid;
     grid:
         "levels levels  levels"
