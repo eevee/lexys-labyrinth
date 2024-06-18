@@ -289,7 +289,7 @@ class UndoEntry {
     }
 
     estimate_size() {
-        // Based very roughly on Chromium's measurements, so, kinda whatever
+        // Based VERY roughly on Chromium's measurements; tends to overestimate by ~5%
         let size = 112;  // base size of an entry
         size += 16 * Object.keys(this.level_props).length;
         for (let [_, changes] of this.tile_changes) {
@@ -297,17 +297,90 @@ class UndoEntry {
         }
         size += 96 + 32 * this.actor_splices.length;
 
+        if (this.circuit_power_changes) {
+            size += 24 * this.circuit_power_changes.size;
+        }
+
         this.size = size;
         return size;
     }
 }
 
+class UndoBuffer {
+    constructor(min_count, max_size) {
+        this.min_count = min_count;
+        this.max_size = max_size;
+        // Number of blank entries to add when the buffer is full
+        this.chunk_size = TICS_PER_SECOND * 5;
 
-// The undo stack is implemented with a ring buffer, and this is its size.  One entry per tic.
-// Based on Chrome measurements made against the pathological level CCLP4 #40 (Periodic Lasers) and
-// sitting completely idle, undo consumes about 2 MB every five seconds, so this shouldn't go beyond
-// 12 MB for any remotely reasonable level.
-const UNDO_BUFFER_SIZE = TICS_PER_SECOND * 30;
+        this.entries = new Array(this.min_count);
+        this.entries.fill(null);
+
+        this.approx_size = 0;
+        // Index where a new entry should be written
+        this.head = 0;
+        // Index of the oldest entry; if this points to null, there are no entries
+        this.tail = 0;
+    }
+
+    get num_entries() {
+        let n = (this.head - this.tail + this.entries.length) % this.entries.length;
+        if (n === 0 && ! this.is_empty) {
+            n += this.entries.length;
+        }
+        return n;
+    }
+
+    get is_empty() {
+        return this.entries[this.tail] === null;
+    }
+
+    forget_oldest() {
+        if (! this.entries[this.tail])
+            return;
+
+        this.approx_size -= this.entries[this.tail].size;
+        this.entries[this.tail] = null;
+        this.tail = (this.tail + 1) % this.entries.length;
+    }
+
+    push(entry) {
+        this.approx_size += entry.size;
+        // (This uses >= because the approx size counts the new entry, but the count doesn't)
+        while (this.approx_size > this.max_size && this.num_entries >= this.min_count) {
+            this.forget_oldest();
+        }
+
+        if (this.head >= this.entries.length && this.entries[0] === null) {
+            this.head = 0;
+        }
+        if (this.head >= this.entries.length || this.entries[this.head]) {
+            // The head is already occupied (which means it should be the tail), or it's aiming past
+            // the end; either way, splice in some extra space
+            let space = new Array(this.chunk_size);
+            space.fill(null);
+            this.entries.splice(this.head, 0, ...space);
+            if (this.tail >= this.head) {
+                this.tail += this.chunk_size;
+            }
+        }
+        this.entries[this.head] = entry;
+
+        // If we go off the end of the array, let the head point there for now, and decide whether
+        // to wrap later
+        this.head += 1;
+    }
+
+    pop() {
+        this.head = (this.head - 1 + this.entries.length) % this.entries.length;
+        let entry = this.entries[this.head];
+        this.approx_size -= entry.size;
+        this.entries[this.head] = null;
+        return entry;
+    }
+}
+
+
 // The CC1 inventory has a fixed boot order
 const CC1_INVENTORY_ORDER = ['cleats', 'suction_boots', 'fire_boots', 'flippers'];
 export class Level extends LevelInterface {
@@ -387,11 +460,9 @@ export class Level extends LevelInterface {
             this._blob_modifier = Math.floor(Math.random() * 256);
         }
 
-        this.undo_buffer = new Array(UNDO_BUFFER_SIZE);
-        for (let i = 0; i < UNDO_BUFFER_SIZE; i++) {
-            this.undo_buffer[i] = null;
-        }
-        this.undo_buffer_index = 0;
+        // The undo stack is implemented with a variable-size ring buffer, one entry per tic.
+        // It lasts at least 30 seconds, but tries not to exceed 10 MB
+        this.undo_buffer = new UndoBuffer(TICS_PER_SECOND * 30, 10_000_000);
         this.pending_undo = new UndoEntry;
         // If undo_enabled is false, we won't create any undo entries.  Undo is only disabled during
         // bulk testing, where a) no one will ever undo and b) the overhead is significant.
@@ -2674,12 +2745,7 @@ export class Level extends LevelInterface {
     // Undo/redo --------------------------------------------------------------------------------------
 
     has_undo() {
-        let prev_index = this.undo_buffer_index - 1;
-        if (prev_index < 0) {
-            prev_index += UNDO_BUFFER_SIZE;
-        }
-
-        return this.undo_buffer[prev_index] !== null;
+        return ! this.undo_buffer.is_empty;
     }
 
     commit() {
@@ -2694,12 +2760,8 @@ export class Level extends LevelInterface {
         }
 
         this.pending_undo.estimate_size();
-        this.undo_buffer[this.undo_buffer_index] = this.pending_undo;
-
+        this.undo_buffer.push(this.pending_undo);
         this.pending_undo = new UndoEntry;
-
-        this.undo_buffer_index += 1;
-        this.undo_buffer_index %= UNDO_BUFFER_SIZE;
     }
 
     undo() {
@@ -2709,12 +2771,10 @@ export class Level extends LevelInterface {
         this._undo_entry(this.pending_undo);
         this.pending_undo = new UndoEntry;
 
-        this.undo_buffer_index -= 1;
-        if (this.undo_buffer_index < 0) {
-            this.undo_buffer_index += UNDO_BUFFER_SIZE;
+        let entry = this.undo_buffer.pop();
+        if (entry) {
+            this._undo_entry(entry);
         }
-        this._undo_entry(this.undo_buffer[this.undo_buffer_index]);
-        this.undo_buffer[this.undo_buffer_index] = null;
     }
 
     // Reverse a single undo entry
