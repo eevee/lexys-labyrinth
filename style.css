@@ -22,10 +22,10 @@ body {
     --hover-hue: 15;
     --selected-hue: 320;
     --panel-bg-color: hsl(var(--main-hue), 20%, 12.5%);
-    --button-bg-color: hsl(var(--main-hue), 60%, 25%);
+    --button-bg-color: hsl(var(--main-hue), 60%, 30%);
     --button-bg-gradient: linear-gradient(to bottom, var(--button-bg-shadow-color), transparent 75%);
     --button-bg-shadow-color: #fff1;
-    --button-bg-hover-color: hsl(var(--hover-hue), 70%, 35%);
+    --button-bg-hover-color: hsl(var(--hover-hue), 80%, 40%);
     --generic-bg-hover-on-white: hsl(var(--hover-hue), 90%, 85%);
     --generic-bg-selected-on-white: hsl(var(--selected-hue), 50%, 85%);
     --generic-border-selected-on-white: hsl(var(--selected-hue), 60%, 75%);
@@ -76,14 +76,14 @@ button:active,
     z-index: 1;
 }
 button:enabled.button-bright {
-    background-color: hsl(var(--main-hue), 60%, 40%);
+    background-color: hsl(var(--main-hue), 60%, 45%);
 }
 button:enabled.button-bright:hover {
-    background-color: hsl(var(--hover-hue), 65%, 50%);
+    background-color: hsl(var(--hover-hue), 70%, 50%);
 }
 button:disabled {
-    color: #808080;
-    background-color: #202020;
+    color: #999;
+    background-color: #444;
     cursor: auto;
 }
 button.button-big {
