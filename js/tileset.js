@@ -1883,11 +1883,11 @@ export const LL_TILESET_LAYOUT = {
             west: [30, 3],
         },
         // These are frames from the splash/explosion animations
-        exploded: [17, 26],
-        failed: [17, 26],
-        drowned: [17, 27],
-        slimed: [17, 28],
-        fell: [17, 29],
+        exploded: [17, 28],
+        failed: [17, 28],
+        drowned: [17, 29],
+        slimed: [17, 30],
+        fell: [17, 31],
         exited: [31, 0],
     },
     bogus_player_win: {
@@ -1974,11 +1974,11 @@ export const LL_TILESET_LAYOUT = {
             west: [30, 7],
         },
         // These are frames from the splash/explosion animations
-        exploded: [17, 26],
-        failed: [17, 26],
-        drowned: [17, 27],
-        slimed: [17, 28],
-        fell: [17, 29],
+        exploded: [17, 28],
+        failed: [17, 28],
+        drowned: [17, 29],
+        slimed: [17, 30],
+        fell: [17, 31],
         exited: [31, 4],
     },
 
