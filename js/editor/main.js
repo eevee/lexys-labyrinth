@@ -656,14 +656,8 @@ export class Editor extends PrimaryView {
             let section_el = mk('section');
             palette_el.append(mk('h2', sectiondef.title), section_el);
             for (let key of sectiondef.tiles) {
-                let entry;
-                if (SPECIAL_PALETTE_ENTRIES[key]) {
-                    let tile = SPECIAL_PALETTE_ENTRIES[key];
-                    entry = this.renderer.draw_single_tile_type(tile.type.name, tile);
-                }
-                else {
-                    entry = this.renderer.draw_single_tile_type(key);
-                }
+                let tile_or_name = SPECIAL_PALETTE_ENTRIES[key] ?? key;
+                let entry = CanvasRenderer.draw_single_tile(this.renderer.tileset, tile_or_name);
                 entry.setAttribute('data-palette-key', key);
                 entry.setAttribute('data-palette-index', this.palette_order.length);
                 entry.classList = 'palette-entry';
