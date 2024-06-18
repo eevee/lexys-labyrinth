@@ -621,9 +621,8 @@ class Player extends PrimaryView {
         });
         this.restart_button = this.root.querySelector('.control-restart');
         this.restart_button.addEventListener('click', ev => {
-            new ConfirmOverlay(this.conductor, "Abandon this attempt and try again?", () => {
-                this.restart_level();
-            }).open();
+            this.confirm_game_interruption(
+                "Abandon this attempt and try again?", () => this.restart_level());
             ev.currentTarget.blur();
         });
         this.undo_button = this.root.querySelector('.control-undo');
@@ -691,9 +690,8 @@ class Player extends PrimaryView {
                     this.set_state('playing');
                 }),
                 btn("Retry", () => {
-                    this.confirm_game_interruption("Abandon this attempt and try again?", () => {
-                        this.restart_level();
-                    });
+                    this.confirm_game_interruption(
+                        "Abandon this attempt and try again?", () => this.restart_level());
                 }),
             ),
             // failure
@@ -2213,7 +2211,7 @@ class Player extends PrimaryView {
     start_restarting() {
         this.stop_restarting();
 
-        if (! (this.state === 'playing' || this.state === 'paused' || this.state === 'rewinding'))
+        if (this.state === 'waiting')
             return;
 
         let t0 = performance.now();
