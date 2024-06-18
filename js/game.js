@@ -2591,7 +2591,9 @@ export class Level extends LevelInterface {
                 }
             }
 
-            if (this.undo_enabled && circuit.is_powered !== circuit._was_powered) {
+            if (this.undo_enabled && circuit.is_powered !== circuit._was_powered &&
+                ! circuit_changes.has(circuit))
+            {
                 circuit_changes.set(circuit, circuit._was_powered);
             }
         }
