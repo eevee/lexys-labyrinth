@@ -317,9 +317,9 @@ export const CC2_TILESET_LAYOUT = {
         global: false,
         duration: 0.5,
         cc2_duration: 1,
-        idle_frame_index: 2,
+        idle_frame_index: 0,
         // appropriately, this animation ping-pongs
-        all: [[10, 10], [11, 10], [12, 10], [13, 10], [14, 10], [13, 10], [12, 10], [11, 10]],
+        all: [[12, 10], [13, 10], [14, 10], [13, 10], [12, 10], [11, 10], [10, 10], [11, 10]],
     },
     steel: {
         // Wiring!
@@ -2175,9 +2175,9 @@ export const LL_TILESET_LAYOUT = {
         global: false,
         duration: 0.5,
         cc2_duration: 1,
-        idle_frame_index: 2,
+        idle_frame_index: 0,
         // appropriately, this animation ping-pongs
-        all: [[27, 24], [28, 24], [29, 24], [30, 24], [31, 24], [30, 24], [29, 24], [28, 24]],
+        all: [[29, 24], [30, 24], [31, 24], [30, 24], [29, 24], [28, 24], [27, 24], [28, 24]],
     },
     rolling_ball: {
         __special__: 'animated',
