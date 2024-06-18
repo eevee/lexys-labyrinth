@@ -22,7 +22,6 @@ const PAGE_TITLE = "Lexy's Labyrinth";
 // (it's 6 characters so it becomes exactly 8 base64 chars with no leftovers to entangle)
 const REPLAY_PREFIX = "TExERU1P";
 const RESTART_KEY_DELAY = 1.0;
-const REWIND_SPEED = 4;
 
 function format_replay_duration(t) {
     return `${t} tics (${util.format_duration(t / TICS_PER_SECOND)})`;
@@ -1947,8 +1946,14 @@ class Player extends PrimaryView {
         // Set the new timeout FIRST, so the time it takes to update the game doesn't count against
         // the framerate
         if (this.state === 'rewinding') {
-            // Rewind faster than normal time
-            dt /= REWIND_SPEED;
+            this.rewinding_for += dt;
+            // Rewind faster than normal time, speeding up from 1x to 8x over 15 seconds.
+            // (Numbers subject to fiddling.)
+            // Let's use everyone's favorite sigmoid function!
+            let x = Math.min(1, this.rewinding_for / 15_000);
+            let p = x * x * (3 - 2 * x);
+            this.rewind_speed = 1 + 7 * p;
+            dt /= this.rewind_speed;
         }
         this._advance_handle = window.setTimeout(this._advance_bound, dt);
 
@@ -1965,8 +1970,6 @@ class Player extends PrimaryView {
             }
             // If there are no undo entries left, freeze in place until the player stops rewinding,
             // which I think is ye olde VHS behavior
-            // TODO detect if we hit the start of the level (rather than just running the undo
-            // buffer dry) and change to 'waiting' instead?
         }
     }
 
@@ -2021,7 +2024,7 @@ class Player extends PrimaryView {
             let elapsed = (performance.now() - this.last_advance) / 1000;
             let speed = this.play_speed;
             if (this.state === 'rewinding') {
-                speed *= REWIND_SPEED;
+                speed *= this.rewind_speed;
             }
             update_progress = elapsed * TICS_PER_SECOND * (3 / this.level.update_rate) * speed;
             update_progress = Math.min(1, update_progress);
@@ -2519,6 +2522,8 @@ class Player extends PrimaryView {
         // rewinding
         if (this.state === 'rewinding') {
             this.renderer.use_rewind_effect = true;
+            this.rewinding_for = 0;
+            this.rewind_speed = 1;
         }
         else if (this.state !== 'paused') {
             this.renderer.use_rewind_effect = false;
