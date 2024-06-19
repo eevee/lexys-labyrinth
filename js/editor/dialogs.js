@@ -14,8 +14,13 @@ export class EditorPackMetaOverlay extends DialogOverlay {
         dl.append(
             mk('dt', "Title"),
             mk('dd', mk('input', {name: 'title', type: 'text', value: stored_pack.title})),
+            mk('dt', "Author"),
+            mk('dd', mk('input', {name: 'author', type: 'text', value: stored_pack.metadata.by ?? ""})),
+            mk('dt', "Description"),
+            mk('dd.-textarea', mk('textarea', {name: 'description'}, stored_pack.metadata.description ?? "")),
+            mk('dt', "Difficulty"),
+            mk('dd', mk('input', {name: 'difficulty', type: 'number', min: 1, max: 5, step: 0.5, value: stored_pack.metadata.difficulty ?? 3}), " (between 1 and 5)"),
         );
-        // TODO...?  what else is a property of the pack itself
 
         this.add_button("save", () => {
             let els = this.root.elements;
@@ -25,6 +30,9 @@ export class EditorPackMetaOverlay extends DialogOverlay {
                 stored_pack.title = title;
                 this.conductor.update_level_title();
             }
+            stored_pack.metadata.by = els.author.value || undefined;
+            stored_pack.metadata.description = els.description.value || undefined;
+            stored_pack.metadata.difficulty = parseFloat(els.difficulty.value);
 
             this.close();
         });
