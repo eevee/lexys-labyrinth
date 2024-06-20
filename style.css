@@ -1319,7 +1319,7 @@ ol.packtest-summary > li {
     /* Special shenanigans for holding R to restart */
     --restart-progress: 0;
     background-image: var(--button-bg-gradient), conic-gradient(
-        hsl(345, 60%, 40%) 0deg calc(var(--restart-progress) * 360deg),
+        hsl(345, 80%, 40%) 0deg calc(var(--restart-progress) * 360deg),
         transparent calc(var(--restart-progress) * 360deg) 360deg)
 }
 @media (orientation: portrait) {
