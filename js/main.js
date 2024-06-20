@@ -1947,12 +1947,12 @@ class Player extends PrimaryView {
         // the framerate
         if (this.state === 'rewinding') {
             this.rewinding_for += dt;
-            // Rewind faster than normal time, speeding up from 1x to 8x over 15 seconds.
+            // Rewind faster than normal time, speeding up from 2x to 8x over 30 seconds.
             // (Numbers subject to fiddling.)
             // Let's use everyone's favorite sigmoid function!
-            let x = Math.min(1, this.rewinding_for / 15_000);
+            let x = Math.min(1, this.rewinding_for / 30_000);
             let p = x * x * (3 - 2 * x);
-            this.rewind_speed = 1 + 7 * p;
+            this.rewind_speed = 2 + 6 * p;
             dt /= this.rewind_speed;
         }
         this._advance_handle = window.setTimeout(this._advance_bound, dt);
