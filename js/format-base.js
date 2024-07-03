@@ -175,6 +175,7 @@ export class StoredPack {
         // This isn't very strongly defined, but it's used to distinguish scores for packs and URLs
         this.identifier = identifier;
         this.title = "";
+        this.metadata = {};
         this._level_loader = level_loader;
 
         // Simple objects containing keys that are usually:
