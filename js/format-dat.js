@@ -124,7 +124,7 @@ const TILE_ENCODING = {
 const REVERSE_TILE_ENCODING = {};
 for (let [tile_byte, spec] of Object.entries(TILE_ENCODING)) {
     tile_byte = parseInt(tile_byte, 10);  // these are keys so they get stringified ugh
-    if (0x36 <= tile_byte && tile_byte <= 0x37) {
+    if (tile_byte === 0x20 || tile_byte === 0x36 || tile_byte === 0x37) {
         // These are unused tiles which get turned into invisible walls; don't encode invisible
         // walls as them!  (0x38 is also "unused", but pgchip turns it into ice block.)
         continue;
